@@ -11,7 +11,11 @@ export function getSessionCookieOptions(headers: Headers): CookieOptions {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: localhost ? "Lax" : "None",
+    // Lax, not None: both cookies are first-party only (the agent door uses
+    // Bearer tokens, nothing embeds this site), and None drags the cookie into
+    // third-party-cookie and partitioning rules that made browsers drop the
+    // session on refresh.
+    sameSite: "Lax",
     secure: !localhost,
   };
 }

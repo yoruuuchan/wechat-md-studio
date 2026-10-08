@@ -38,6 +38,15 @@ curl -4 -sS -m 10 -X POST -H 'Content-Type: application/json' \
 echo
 echo "### 4. login with real access key"
 COOKIE_JAR=$(mktemp)
+SET_COOKIE=$(curl -4 -sS -m 10 -c "$COOKIE_JAR" -D - -o /dev/null -X POST -H 'Content-Type: application/json' \
+  -d "{\"json\":{\"accessKey\":\"$ACCESS_KEY\"}}" "$APP/api/trpc/auth.login" | grep -i '^set-cookie:' || true)
+echo "  set-cookie: ${SET_COOKIE:0:120}"
+# First-party session cookie: Lax keeps it out of third-party-cookie and
+# partitioning rules; None made browsers drop the session on refresh.
+case "$SET_COOKIE" in
+  *HttpOnly*Secure*SameSite=Lax*) echo "  [PASS] cookie attributes HttpOnly+Secure+Lax" ;;
+  *) echo "  [FAIL] unexpected cookie attributes: $SET_COOKIE"; exit 1 ;;
+esac
 curl -4 -sS -m 10 -c "$COOKIE_JAR" -X POST -H 'Content-Type: application/json' \
   -d "{\"json\":{\"accessKey\":\"$ACCESS_KEY\"}}" "$APP/api/trpc/auth.login" | head -c 200; echo
 echo "  cookie set: $(grep -c mopai_sid "$COOKIE_JAR" || true)"
