@@ -1,6 +1,9 @@
 import { useMemo, useRef } from 'react'
+import { Link } from 'react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { MaterialItem } from '@/lib/render'
+import { CREDITS } from '@/lib/credits'
+import { ZOOM_STEPS } from '@/lib/store'
 import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type SignatureConfig } from '@/lib/types'
 
 interface Props {
@@ -9,6 +12,10 @@ interface Props {
   cover: string
   sig: SignatureConfig
   onSig: (s: SignatureConfig) => void
+  syncScroll: boolean
+  onSyncScrollChange: (v: boolean) => void
+  zoom: number
+  onZoomChange: (z: number) => void
   onJump: (line: number) => void
   onCopyTitle: (t: string) => void
   onUpload: (files: File[], item: MaterialItem) => void
@@ -139,14 +146,14 @@ export default function SidePanel(p: Props) {
       <Tabs defaultValue="materials" className="flex h-full flex-col">
         <div className="border-b border-line-2 px-3 pt-3">
           <TabsList className="h-8 w-full rounded-xl bg-surface-sunken" style={{ boxShadow: 'var(--shadow-inset)' }}>
-            <TabsTrigger value="materials" className="flex-1 rounded-lg text-[12px]">素材</TabsTrigger>
-            <TabsTrigger value="titles" className="flex-1 rounded-lg text-[12px]">标题</TabsTrigger>
+            <TabsTrigger value="materials" className="flex-1 rounded-lg text-[12px]">图片</TabsTrigger>
+            <TabsTrigger value="titles" className="flex-1 rounded-lg text-[12px]">稿件信息</TabsTrigger>
             <TabsTrigger value="settings" className="flex-1 rounded-lg text-[12px]">设置</TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="materials" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
-          <Label>素材清单 · 点击上传直接回填</Label>
+          <Label>图片清单 · 点击上传直接回填</Label>
           {p.materials.length === 0 ? (
             <p className="ya-well p-3 text-[13px] leading-relaxed text-ink-3">
               正文中还没有图片。用 <code className="rounded bg-surface-sunken px-1">![图注说明]()</code> 添加占位，或直接把图片拖进编辑器。
@@ -207,10 +214,7 @@ export default function SidePanel(p: Props) {
               <p className="ya-well p-3 text-[12px] leading-relaxed text-ink-2">{p.cover}</p>
             </>
           )}
-        </TabsContent>
-
-        <TabsContent value="settings" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
-          <Label>署名 · @signature 展开内容</Label>
+          <div className="mt-4"><Label>署名 · @signature 展开内容</Label></div>
           <div className="space-y-2">
             {(
               [
@@ -232,6 +236,54 @@ export default function SidePanel(p: Props) {
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
             署名跟着稿件走，保存在账号里。稿件存在云端，换设备也能打开。
+          </p>
+        </TabsContent>
+
+        <TabsContent value="settings" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+          <Label>体验</Label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
+              <span className="text-[12px] text-ink-1">同步滚动</span>
+              <button
+                onClick={() => p.onSyncScrollChange(!p.syncScroll)}
+                aria-pressed={p.syncScroll}
+                title={p.syncScroll ? '编辑区与预览区一起滚动，点一下关掉' : '两栏各自独立滚动，点一下开启同步'}
+                className={`rounded-lg px-2.5 py-0.5 text-[12px] transition-colors ${
+                  p.syncScroll ? 'text-ink-1' : 'text-ink-4 hover:text-ink-3'
+                }`}
+                style={p.syncScroll ? { boxShadow: 'inset 0 0 0 1.5px var(--primary-500)' } : { boxShadow: 'var(--shadow-inset)' }}
+              >
+                {p.syncScroll ? '开' : '关'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
+              <span className="text-[12px] text-ink-1">整体字体大小</span>
+              <select
+                value={p.zoom}
+                onChange={(e) => p.onZoomChange(Number(e.target.value))}
+                title="整个界面一起缩放，按浏览器保存"
+                className="rounded-md border-none bg-surface-elevated px-1.5 py-0.5 text-[12px] tabular-nums text-ink-1 outline-none"
+                style={{ boxShadow: 'var(--shadow-flat)' }}
+              >
+                {ZOOM_STEPS.map((z) => (
+                  <option key={z} value={z}>{z}%</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
+            缩放按浏览器保存，编辑器、侧栏、预览框一起放大缩小。
+          </p>
+          <div className="mt-4"><Label>致谢</Label></div>
+          <p className="ya-well p-3 text-[12px] leading-relaxed text-ink-2">
+            本站站在开源肩膀上：{CREDITS.map((c) => c.name).join('、')}，共 {CREDITS.length}{' '}
+            个项目，全部宽松许可（{[...new Set(CREDITS.map((c) => c.license))].join(' / ')}）。
+            <Link
+              to="/references"
+              className="ml-1 whitespace-nowrap text-brand underline decoration-brand/40 underline-offset-2"
+            >
+              完整清单与许可 →
+            </Link>
           </p>
         </TabsContent>
       </Tabs>

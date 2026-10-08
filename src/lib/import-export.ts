@@ -338,6 +338,7 @@ function readSettings(value: unknown): AppSettings | null {
     themeId: value.themeId,
     sig: { layout, proof, review },
     syncScroll: typeof value.syncScroll === 'boolean' ? value.syncScroll : true,
+    zoom: typeof value.zoom === 'number' && value.zoom >= 90 && value.zoom <= 125 ? value.zoom : 100,
   }
 }
 

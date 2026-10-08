@@ -283,6 +283,7 @@ describe('toBundle / bundleFilename', () => {
       themeId: 'golden',
       sig: { layout: '赵', proof: '钱', review: '孙' },
       syncScroll: false,
+      zoom: 110,
     }
     const parsed = JSON.parse(toBundle([doc()], settings)) as { settings: typeof settings }
     expect(parsed.settings).toEqual(settings)
@@ -445,12 +446,14 @@ describe('parseBundle', () => {
         themeId: 'paper',
         sig: { layout: 'a', proof: 'b', review: 'c' },
         syncScroll: false,
+        zoom: 110,
       }),
     )
     expect(good.ok && good.settings).toEqual({
       themeId: 'paper',
       sig: { layout: 'a', proof: 'b', review: 'c' },
       syncScroll: false,
+      zoom: 110,
     })
 
     // A broken settings block must never cost the owner their articles.

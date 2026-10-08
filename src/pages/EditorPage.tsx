@@ -31,7 +31,7 @@ import {
 } from '@/lib/render'
 import { getTheme } from '@/lib/themes'
 import { cleanHtml, copyPlain, copyRichText, downloadFile, previewPage } from '@/lib/clipboard'
-import { createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
+import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { CHEATSHEET } from '@/lib/sample'
@@ -160,6 +160,7 @@ export default function EditorPage() {
   const uploadMutation = trpc.storage.upload.useMutation()
 
   useEffect(() => saveSettings(settings), [settings])
+  useEffect(() => applyZoom(settings.zoom), [settings.zoom])
 
   // The article behind an agent's link only exists on the server, so it needs a
   // session. Hand the id to the login page in the URL and let it come back.
@@ -919,8 +920,6 @@ export default function EditorPage() {
             blockOffsets={rendered.blockOffsets}
             width={previewWidth}
             onWidthChange={setPreviewWidth}
-            syncScroll={settings.syncScroll}
-            onSyncScrollChange={(v) => setSettings((s) => ({ ...s, syncScroll: v }))}
             onScroll={onPreviewScroll}
           />
         </ResizablePanel>
@@ -936,6 +935,10 @@ export default function EditorPage() {
                 cover={parsed.meta.cover}
                 sig={settings.sig}
                 onSig={(sig) => setSettings((s) => ({ ...s, sig }))}
+                syncScroll={settings.syncScroll}
+                onSyncScrollChange={(v) => setSettings((s) => ({ ...s, syncScroll: v }))}
+                zoom={settings.zoom}
+                onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
                 onJump={(line) => editorRef.current?.jumpToLine(line)}
                 onCopyTitle={(t) => {
                   copyPlain(t)

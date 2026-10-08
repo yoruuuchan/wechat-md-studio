@@ -19,6 +19,8 @@ export interface AppSettings {
   sig: SignatureConfig
   /** Editor and preview scroll together. Defaults to on; persisted per browser. */
   syncScroll: boolean
+  /** Whole-UI zoom in percent (90/100/110/125); 100 is the design size. */
+  zoom: number
 }
 
 const DOCS_KEY = 'mopai.docs.v1'
@@ -112,6 +114,7 @@ export function loadSettings(): AppSettings {
     themeId: 'golden',
     sig: { layout: 'Yoru', proof: 'Yoru', review: 'Yoru' },
     syncScroll: true,
+    zoom: 100,
   }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
@@ -120,6 +123,13 @@ export function loadSettings(): AppSettings {
     // fallthrough
   }
   return def
+}
+
+export const ZOOM_STEPS = [90, 100, 110, 125] as const
+
+export function applyZoom(percent: number): void {
+  const step = ZOOM_STEPS.includes(percent as (typeof ZOOM_STEPS)[number]) ? percent : 100
+  document.documentElement.style.zoom = String(step / 100)
 }
 
 export function saveSettings(s: AppSettings) {

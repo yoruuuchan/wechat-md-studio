@@ -10,8 +10,6 @@ interface Props {
   onWidthChange: (w: 375 | 677) => void
   /** From renderDoc: which top-level child of the root section each block starts at. */
   blockOffsets: number[]
-  syncScroll: boolean
-  onSyncScrollChange: (v: boolean) => void
   /** Called on every scroll of the preview; the page forwards it to sync. */
   onScroll?: () => void
 }
@@ -20,7 +18,7 @@ interface Props {
 // 同步滚动因此不能往输出里塞 id/class 锚点（两者都是公众号红线），改成由
 // renderDoc 给出「第 i 个 block 落在第几个顶层子元素」，在这里量像素位置。
 const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
-  { html, stats, width, onWidthChange, blockOffsets, syncScroll, onSyncScrollChange, onScroll },
+  { html, stats, width, onWidthChange, blockOffsets, onScroll },
   ref,
 ) {
   const article = useMemo(() => ({ __html: html }), [html])
@@ -115,19 +113,6 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-line-1 px-4">
         <span className="ya-eyebrow">预览 · 所见即所复制</span>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => onSyncScrollChange(!syncScroll)}
-            title={syncScroll ? '编辑区与预览区一起滚动，点一下关掉' : '两栏各自独立滚动，点一下开启同步'}
-            aria-pressed={syncScroll}
-            className={`rounded-lg px-2 py-0.5 text-[11px] transition-colors ${
-              syncScroll
-                ? 'text-ink-1'
-                : 'text-ink-4 hover:text-ink-3'
-            }`}
-            style={syncScroll ? { boxShadow: 'inset 0 0 0 1.5px var(--primary-500)' } : { boxShadow: 'var(--shadow-inset)' }}
-          >
-            同步滚动
-          </button>
           {/* 分段选择：凹陷轨道 + 选中项 1.5px primary 描边，不用实心底色 */}
           <div className="flex items-center rounded-xl bg-surface-sunken p-0.5" style={{ boxShadow: 'var(--shadow-inset)' }}>
             {([375, 677] as const).map((w) => (
