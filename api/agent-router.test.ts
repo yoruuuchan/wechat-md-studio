@@ -265,20 +265,32 @@ describe('the agent door', () => {
   })
 
   it('uploads an image and returns the img: reference the Markdown needs', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFUlEQVR4nGP8//8/AzbAxIAHjEIQRQoAHbcCpV0v4G8AAAAASUVORK5CYII=',
+      'base64',
+    )
     const form = new FormData()
-    form.append('file', new File([new Uint8Array([1, 2, 3, 4])], 'cover.png', { type: 'image/png' }))
+    form.append('file', new File([png], 'cover.png', { type: 'image/png' }))
     const res = await agentRouter.request('/images', { method: 'POST', headers: WRITE, body: form })
     expect(res.status).toBe(201)
     const body = await json<{ key: string; ref: string; url: string; size: number }>(res)
-    expect(body.key).toBe('key-4')
+    expect(body.key).toBe(`key-${png.byteLength}`)
     // `img:<key>` is what goes in the Markdown; the url is only for humans.
-    expect(body.ref).toBe('img:key-4')
-    expect(body.url).toBe('http://localhost/api/img/key-4')
-    expect(body.size).toBe(4)
+    expect(body.ref).toBe(`img:key-${png.byteLength}`)
+    expect(body.url).toBe(`http://localhost/api/img/key-${png.byteLength}`)
+    expect(body.size).toBe(png.byteLength)
 
     const rows = await getDb().select().from(files)
-    expect(rows.map((r) => r.key)).toContain('key-4')
-    expect(rows.find((r) => r.key === 'key-4')?.name).toContain('agent/1/')
+    expect(rows.map((r) => r.key)).toContain(`key-${png.byteLength}`)
+    expect(rows.find((r) => r.key === `key-${png.byteLength}`)?.name).toContain('agent/1/')
+  })
+
+  it('refuses bytes whose magic numbers contradict the declared type', async () => {
+    const form = new FormData()
+    form.append('file', new File([new Uint8Array([1, 2, 3, 4])], 'cover.png', { type: 'image/png' }))
+    const res = await agentRouter.request('/images', { method: 'POST', headers: WRITE, body: form })
+    expect(res.status).toBe(400)
+    expect((await json<{ error: string }>(res)).error).toContain('只认')
   })
 
   it('explains a missing file field instead of failing obscurely', async () => {

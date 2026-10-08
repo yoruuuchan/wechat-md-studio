@@ -17,6 +17,7 @@ import type {
 import { OWNER } from "./auth-types";
 import { env } from "./lib/env";
 import { requireAgent } from "./lib/agent-auth";
+import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
 import { storage, StorageError } from "./lib/storage";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
@@ -326,12 +327,21 @@ agentRouter.post("/images", requireAgent("write"), async (c) => {
   if (bytes.byteLength === 0) {
     return c.json({ error: "文件是空的" }, 400);
   }
+  // Same rule as the browser door: what gets stored and later served from the
+  // public image domain comes from the bytes, never from a declared type.
+  const mime = sniffImageMime(bytes);
+  if (!mime) {
+    return c.json(
+      { error: `只认 ${ACCEPTED_IMAGE_LABEL} 这几种图片`, hint: "按字节头判断，扩展名和声明的 Content-Type 都不算" },
+      400,
+    );
+  }
 
   try {
     const saved = await storage.uploadFile({
       fileContent: bytes,
       fileName: `agent/${OWNER_ID}/${file.name || "image"}`,
-      contentType: file.type || undefined,
+      contentType: mime,
     });
     await getDb().insert(files).values({
       key: saved.key,

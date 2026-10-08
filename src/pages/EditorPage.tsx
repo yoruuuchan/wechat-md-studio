@@ -228,7 +228,6 @@ export default function EditorPage() {
   const resolveDiagram = useCallback((code: string) => diagramRefs.get(code) ?? null, [diagramRefs])
   const diagramBusy = useRef(new Set<string>())
   const diagramFailed = useRef(new Set<string>())
-  const diagramHinted = useRef(false)
   const [diagramPending, setDiagramPending] = useState(0)
 
   const rendered = useMemo(
@@ -300,30 +299,23 @@ export default function EditorPage() {
     const imported = await docxToDocxImport(await file.arrayBuffer(), htmlToDialect)
     let markdown = imported.markdown
     if (imported.images.length) {
-      if (!isAuthenticated) {
-        toast.error('这篇 Word 里有图片，但没有登录', {
-          description: '文字已经导入，图片位置留了占位；登录后重新导入可以带上图',
-          action: { label: '去登录', onClick: () => navigate('/login') },
-        })
-      } else {
-        const refs = await Promise.all(
-          imported.images.map(async (img) => {
-            try {
-              const res = await uploadMutation.mutateAsync({
-                name: `docx-${Date.now()}.png`,
-                contentBase64: img.dataUri.split(',')[1] || '',
-                contentType: img.contentType,
-              })
-              return `img:${res.key}`
-            } catch {
-              return null
-            }
-          }),
-        )
-        markdown = (await import('@/lib/rich-paste')).fillImageSlots(markdown, refs.map((r) => r ?? ''))
-        const failed = refs.filter((r) => r === null).length
-        if (failed) toast.warning(`${failed} 张图片没传上去，正文里留了占位`)
-      }
+      const refs = await Promise.all(
+        imported.images.map(async (img) => {
+          try {
+            const res = await uploadMutation.mutateAsync({
+              name: `docx-${Date.now()}.png`,
+              contentBase64: img.dataUri.split(',')[1] || '',
+              contentType: img.contentType,
+            })
+            return `img:${res.key}`
+          } catch {
+            return null
+          }
+        }),
+      )
+      markdown = (await import('@/lib/rich-paste')).fillImageSlots(markdown, refs.map((r) => r ?? ''))
+      const failed = refs.filter((r) => r === null).length
+      if (failed) toast.warning(`${failed} 张图片没传上去，正文里留了占位`)
     }
     const doc = createDoc()
     doc.name = safeFilename(file.name.replace(/\.[^.]+$/, ''), '导入的稿件', '') || '导入的稿件'
@@ -433,17 +425,6 @@ export default function EditorPage() {
       if (b.type === 'code' && b.code.trim() && diagramOf(b.lang)) wanted.add(b.code)
     }
     if (!wanted.size) return
-    if (!isAuthenticated) {
-      if (!diagramHinted.current) {
-        diagramHinted.current = true
-        toast.info('登录后 mermaid 代码块会变成插图', {
-          description: '图表要先渲染成图片再上传；没登录时正文里保留源码',
-          action: { label: '去登录', onClick: () => navigate('/login') },
-          duration: 8000,
-        })
-      }
-      return
-    }
     const todo = [...wanted].filter(
       (code) =>
         !diagramRefs.has(code) && !diagramBusy.current.has(code) && !diagramFailed.current.has(code),
@@ -489,7 +470,7 @@ export default function EditorPage() {
       })()
     }, 1200)
     return () => window.clearTimeout(timer)
-  }, [parsed, diagramRefs, isAuthenticated, navigate])
+  }, [parsed, diagramRefs])
 
   /**
    * Tell the owner their previous upload is now unreferenced.
@@ -721,13 +702,6 @@ export default function EditorPage() {
    * which image it is filling.
    */
   const handleEditorFiles = (files: File[], at: number | null) => {
-    if (!isAuthenticated) {
-      toast.error('上传图片需要先登录', {
-        description: '编辑和复制不需要登录',
-        action: { label: '去登录', onClick: () => navigate('/login') },
-      })
-      return
-    }
     const images = files.filter((f) => /^image\//.test(f.type))
     if (images.length < files.length) {
       const bad = files.find((f) => !/^image\//.test(f.type))!
