@@ -413,6 +413,11 @@ golden 主题的每个组件样式与示范稿 `公众号排版示范稿_GoldenS
   AGPL 第 13 条第二段允许与 AGPL 作品组合。
 - MIT / Apache-2.0 / WTFPL 来源可单向并入 AGPL 项目，各自的版权声明与许可文本已按要求保留。
 
+界面字体自托管：Geist / Geist Mono 与 Noto Sans SC（后者按 google 式 unicode-range 切片，
+浏览器只下载当页用到的切片），三者均为 SIL Open Font License 1.1；许可正文见
+`app/public/fonts/OFL-NotoSansSC.txt` 与 Geist 随附许可。预览纸与复制出去的 HTML 不使用
+webfont——读者端字体由微信决定，屏幕所见必须等于发出去的样子。
+
 ## Acknowledgements / 致谢
 
 这个工具的能力有一大部分是站在别人的开源工作上长出来的。下面按「我们到底拿了多少」分组，每条都写清具体是哪个文件的哪套机制，以及——同样重要——我们评估过但主动放弃的部分和放弃的理由。

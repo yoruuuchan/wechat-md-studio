@@ -62,8 +62,10 @@ export default function Login() {
         {rejected && (
           <p className="mt-3 text-center text-[12px] text-bad-700">{loginMutation.data?.message}</p>
         )}
-        <p className="mt-4 text-center text-[12px] leading-relaxed text-ink-3">
-          口令只用来打开站长自己的云端草稿箱；排版、上传图片、复制和导出都不用登录。
+        <p className="mt-4 space-y-1 text-center text-[11px] leading-relaxed text-ink-3">
+          <span className="block">不登录就能用：排版、上传、复制、导出、换主题。</span>
+          <span className="block">口令只打开一样东西：云端草稿箱（跨设备保存、永久保留）。</span>
+          <span className="block">它目前仅对站长开放；人数多后会更新为多账号。</span>
         </p>
       </div>
     </div>
