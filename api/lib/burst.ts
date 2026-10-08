@@ -12,10 +12,17 @@
  */
 const WINDOW_MS = 60 * 1000
 const MAX_PER_WINDOW = Number(process.env.ANON_BURST_PER_MINUTE || 12)
+/**
+ * Per-IP ceiling per UTC day. The visitor quota is keyed on a cookie an
+ * attacker can delete, so without this one IP could rotate cookies and drip
+ * uploads all day; the global byte cap still bounds the damage either way.
+ */
+const MAX_PER_DAY = Number(process.env.ANON_IP_DAILY_IMAGES || 100)
 /** Past this many tracked IPs, sweep the ones whose window has expired. */
 const SWEEP_AT = 5000
 
 const hits = new Map<string, number[]>()
+const days = new Map<string, { day: string; count: number }>()
 
 export interface BurstVerdict {
   ok: boolean
@@ -47,9 +54,38 @@ export function allowBurst(
   return true
 }
 
+/** Pure like allowBurst: `day` is injected so a date roll can be tested. */
+export function allowIpDaily(
+  store: Map<string, { day: string; count: number }>,
+  key: string,
+  day: string,
+  limit = MAX_PER_DAY,
+): boolean {
+  const bucket = store.get(key)
+  if (!bucket || bucket.day !== day) {
+    store.set(key, { day, count: 1 })
+  } else if (bucket.count >= limit) {
+    return false
+  } else {
+    bucket.count += 1
+  }
+
+  if (store.size > SWEEP_AT) {
+    for (const [k, b] of store) if (b.day !== day) store.delete(k)
+  }
+  return true
+}
+
 export function checkBurst(ip: string): BurstVerdict {
   if (!allowBurst(hits, ip, Date.now())) {
     return { ok: false, message: `上传太频繁了，每分钟最多 ${MAX_PER_WINDOW} 张，稍等一下再试` }
+  }
+  return { ok: true }
+}
+
+export function checkIpDaily(ip: string): BurstVerdict {
+  if (!allowIpDaily(days, ip, new Date().toISOString().slice(0, 10))) {
+    return { ok: false, message: `这个地址今天传得够多了（每日最多 ${MAX_PER_DAY} 张），明天再来` }
   }
   return { ok: true }
 }

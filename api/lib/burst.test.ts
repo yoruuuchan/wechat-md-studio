@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowBurst, clientIp } from './burst'
+import { allowBurst, allowIpDaily, clientIp } from './burst'
 
 const NOW = 1_800_000_000_000
 const MINUTE = 60_000
@@ -34,6 +34,28 @@ describe('allowBurst', () => {
     for (let i = 0; i < 12; i++) allowBurst(store, 'ip-a', NOW + i, 12)
     allowBurst(store, 'ip-a', NOW + MINUTE + 1000, 12)
     expect(store.get('ip-a')).toEqual([NOW + MINUTE + 1000])
+  })
+})
+
+describe('allowIpDaily', () => {
+  it('stops the upload past the daily limit', () => {
+    const store = new Map<string, { day: string; count: number }>()
+    for (let i = 0; i < 100; i++) expect(allowIpDaily(store, 'ip-a', '2026-10-08', 100)).toBe(true)
+    expect(allowIpDaily(store, 'ip-a', '2026-10-08', 100)).toBe(false)
+  })
+
+  it('resets when the UTC day rolls', () => {
+    const store = new Map<string, { day: string; count: number }>()
+    for (let i = 0; i < 100; i++) allowIpDaily(store, 'ip-a', '2026-10-08', 100)
+    expect(allowIpDaily(store, 'ip-a', '2026-10-08', 100)).toBe(false)
+    expect(allowIpDaily(store, 'ip-a', '2026-10-09', 100)).toBe(true)
+  })
+
+  it('counts each IP separately', () => {
+    const store = new Map<string, { day: string; count: number }>()
+    for (let i = 0; i < 100; i++) allowIpDaily(store, 'ip-a', '2026-10-08', 100)
+    expect(allowIpDaily(store, 'ip-a', '2026-10-08', 100)).toBe(false)
+    expect(allowIpDaily(store, 'ip-b', '2026-10-08', 100)).toBe(true)
   })
 })
 

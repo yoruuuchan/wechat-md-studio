@@ -18,6 +18,7 @@ import { OWNER } from "./auth-types";
 import { env } from "./lib/env";
 import { requireAgent } from "./lib/agent-auth";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
+import { denyLog } from "./lib/deny-log";
 import { storage, StorageError } from "./lib/storage";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
@@ -331,6 +332,7 @@ agentRouter.post("/images", requireAgent("write"), async (c) => {
   // public image domain comes from the bytes, never from a declared type.
   const mime = sniffImageMime(bytes);
   if (!mime) {
+    denyLog("bad-magic", { door: "agent", bytes: bytes.byteLength });
     return c.json(
       { error: `只认 ${ACCEPTED_IMAGE_LABEL} 这几种图片`, hint: "按字节头判断，扩展名和声明的 Content-Type 都不算" },
       400,

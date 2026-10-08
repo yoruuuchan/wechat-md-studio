@@ -6,7 +6,8 @@ import { storage } from "./lib/storage";
 import { env } from "./lib/env";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
 import { ANON_OWNER_ID, checkAnonQuota, readAnonUsage } from "./lib/anon-quota";
-import { checkBurst, clientIp } from "./lib/burst";
+import { checkBurst, checkIpDaily, clientIp } from "./lib/burst";
+import { denyLog } from "./lib/deny-log";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
 
@@ -77,19 +78,32 @@ export const storageRouter = createRouter({
       // image domain, so an HTML or SVG payload renamed to .png would be stored
       // XSS there; it also keeps a lying Content-Type from being persisted.
       const mime = sniffImageMime(bytes);
-      if (!mime)
+      if (!mime) {
+        denyLog("bad-magic", { door: ctx.user ? "owner" : "anon", bytes: bytes.byteLength });
         throw new TRPCError({ code: "BAD_REQUEST", message: `只认 ${ACCEPTED_IMAGE_LABEL} 这几种图片` });
+      }
 
       if (!ctx.user) {
-        // Cheapest check first: the burst limit is in memory, the quota reads
-        // the database, and neither should be reached by a flood.
-        const burst = checkBurst(clientIp(ctx.req.headers));
-        if (!burst.ok)
+        // Cheapest check first: the in-memory limits cost nothing, the quota
+        // reads the database, and neither should be reached by a flood.
+        const ip = clientIp(ctx.req.headers);
+        const burst = checkBurst(ip);
+        if (!burst.ok) {
+          denyLog("burst", { ip });
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: burst.message ?? "上传太频繁了" });
+        }
+
+        const daily = checkIpDaily(ip);
+        if (!daily.ok) {
+          denyLog("ip-daily", { ip });
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: daily.message ?? "今日上传额度用完了" });
+        }
 
         const verdict = checkAnonQuota(await readAnonUsage(ctx.visitor), bytes.byteLength);
-        if (!verdict.ok)
+        if (!verdict.ok) {
+          denyLog("quota", { ip, visitor: ctx.visitor.slice(0, 8), detail: verdict.message });
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: verdict.message ?? "上传额度用完了" });
+        }
       }
 
       try {

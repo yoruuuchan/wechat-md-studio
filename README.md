@@ -121,10 +121,13 @@ MathJax 默认的红色错误盒子（那个盒子带 `data-mjx-error` 和一个
 | 层 | 措施 | 位置 |
 |---|---|---|
 | 应用 | 每 IP 每分钟 12 次上传（内存计数，重启即清） | `api/lib/burst.ts` |
+| 应用 | 每 IP 每 UTC 日 100 张（内存计数）——访客额度挂在可删的 Cookie 上，这条让换 Cookie 慢灌变贵 | 同上，`ANON_IP_DAILY_IMAGES` |
 | 应用 | 每访客滚动 24 小时 30 张 / 100 MB | `api/lib/anon-quota.ts` |
 | 应用 | 全部匿名上传合计 1.5 GB 封顶 | 同上，`ANON_TOTAL_BYTES` |
 | 应用 | 只认字节头是 jpeg / png / gif / webp 的图；**对外提供的 Content-Type 由字节决定，不信请求头** | `api/lib/image-type.ts` |
 | 应用 | 匿名图片按访客 Cookie 的哈希归属，别人列不出也删不掉 | `api/lib/visitor.ts` |
+| 运维 | 每次拒收写一行 `[upload-deny] 原因 key=value` 到服务日志（burst / ip-daily / quota / bad-magic，两扇门都写），晨报定时任务 grep 它 | `api/lib/deny-log.ts` |
+| 运维 | 匿名池应急清理：`sudo bash /opt/mopai/scripts/server-anon-purge.sh --days N` 先干跑、`--apply` 才删，只碰 ownerId=0 | `scripts/server-anon-purge.sh` |
 | 边缘 | 高威胁分数请求走 managed challenge、扫描器 UA 直接拦、路径穿越与危险方法拦掉 | zone 上已有的 WAF 自定义规则 |
 | 边缘 | AI 爬虫保护 = block | Cloudflare 账户设置 |
 
@@ -268,6 +271,7 @@ python -c "import secrets,base64;print('mopai_'+base64.urlsafe_b64encode(secrets
 | `ANON_DAILY_BYTES` | 100 MB | 同上，字节数 |
 | `ANON_TOTAL_BYTES` | 1.5 GB | 所有匿名上传加起来的总上限——桶是共享免费额度 |
 | `ANON_BURST_PER_MINUTE` | 12 | 每个来源 IP 每分钟，内存计数，用来挡住灌水 |
+| `ANON_IP_DAILY_IMAGES` | 100 | 每个来源 IP 每 UTC 日，内存计数；访客额度挂在可删的 Cookie 上，这条让换 Cookie 慢灌变贵 |
 
 其它可选项：
 

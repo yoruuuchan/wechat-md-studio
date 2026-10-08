@@ -241,6 +241,8 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 - `server-acceptance-test.sh` — 站点可达、登录、上传、公网 302→200、未登录被拦
 - `server-e2e-check.sh` — 图片全链路（上传→公网取回→删除）
 - `server-round2-check.sh` — 稿件 CRUD、草稿箱语义、存储统计、孤儿图清理
+- `server-anon-purge.sh` — 匿名池应急清理：`--days N` 默认干跑、`--apply` 才删，只碰 ownerId=0。
+  注意 `files.createdAt` 存的是 **unix 秒**（sqlite 的 unixepoch 默认），不是毫秒
 
 改了 API 或数据结构后，**改完必须重跑并让 exit code 保持 0**。
 
