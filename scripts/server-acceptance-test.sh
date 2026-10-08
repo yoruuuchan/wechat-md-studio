@@ -43,9 +43,19 @@ SET_COOKIE=$(curl -4 -sS -m 10 -c "$COOKIE_JAR" -D - -o /dev/null -X POST -H 'Co
 echo "  set-cookie: ${SET_COOKIE:0:120}"
 # First-party session cookie: Lax keeps it out of third-party-cookie and
 # partitioning rules; None made browsers drop the session on refresh.
+# Secure is set only off-localhost, and this suite usually runs on loopback.
 case "$SET_COOKIE" in
-  *HttpOnly*Secure*SameSite=Lax*) echo "  [PASS] cookie attributes HttpOnly+Secure+Lax" ;;
+  *HttpOnly*SameSite=Lax*) echo "  [PASS] cookie attributes HttpOnly+Lax" ;;
   *) echo "  [FAIL] unexpected cookie attributes: $SET_COOKIE"; exit 1 ;;
+esac
+case "$APP" in
+  *127.0.0.1* | *localhost*) ;;
+  *)
+    case "$SET_COOKIE" in
+      *Secure*) echo "  [PASS] Secure present on public host" ;;
+      *) echo "  [FAIL] public host without Secure: $SET_COOKIE"; exit 1 ;;
+    esac
+    ;;
 esac
 curl -4 -sS -m 10 -c "$COOKIE_JAR" -X POST -H 'Content-Type: application/json' \
   -d "{\"json\":{\"accessKey\":\"$ACCESS_KEY\"}}" "$APP/api/trpc/auth.login" | head -c 200; echo

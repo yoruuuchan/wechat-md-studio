@@ -80,7 +80,7 @@ export default function SidePanel(p: Props) {
               }}
               disabled={uploading}
               title={m.kind !== '单图' ? '清空引用，保留占位' : '删除这一行图片'}
-              className="ya-link-btn danger !text-[11px] disabled:opacity-50"
+              className="ya-link-btn danger !text-[12px] disabled:opacity-50"
             >
               删除
             </button>
@@ -105,18 +105,18 @@ export default function SidePanel(p: Props) {
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           title="点击定位到编辑器对应行"
         >
-          <span className="shrink-0 rounded-md bg-brand-100 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-brand">{m.no}</span>
-          <span className="text-[11px] text-ink-3">{m.kind}</span>
+          <span className="shrink-0 rounded-md bg-brand-100 px-1.5 py-0.5 text-[12px] font-medium tabular-nums text-brand">{m.no}</span>
+          <span className="text-[12px] text-ink-3">{m.kind}</span>
           {m.hasSrc ? (
-            <span className="ml-auto shrink-0 rounded-md bg-ok-100 px-1.5 text-[10px] text-ok-700">已传图</span>
+            <span className="ml-auto shrink-0 rounded-md bg-ok-100 px-1.5 text-[11px] text-ok-700">已传图</span>
           ) : (
-            <span className="ml-auto shrink-0 rounded-md bg-warn-100 px-1.5 text-[10px] text-warn-700">待插图</span>
+            <span className="ml-auto shrink-0 rounded-md bg-warn-100 px-1.5 text-[11px] text-warn-700">待插图</span>
           )}
         </button>
       </div>
-      <p className="mt-1 text-[12px] leading-relaxed text-ink-1">{m.desc}</p>
+      <p className="mt-1 text-[13px] leading-relaxed text-ink-1">{m.desc}</p>
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[11px] text-ink-3">{m.alt || '未命名'}</span>
+        <span className="min-w-0 truncate text-[12px] text-ink-3">{m.alt || '未命名'}</span>
         {rowButtons(m)}
       </div>
     </li>
@@ -148,7 +148,7 @@ export default function SidePanel(p: Props) {
         <TabsContent value="materials" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
           <Label>素材清单 · 点击上传直接回填</Label>
           {p.materials.length === 0 ? (
-            <p className="ya-well p-3 text-[12px] leading-relaxed text-ink-3">
+            <p className="ya-well p-3 text-[13px] leading-relaxed text-ink-3">
               正文中还没有图片。用 <code className="rounded bg-surface-sunken px-1">![图注说明]()</code> 添加占位，或直接把图片拖进编辑器。
             </p>
           ) : (
@@ -157,19 +157,19 @@ export default function SidePanel(p: Props) {
                 <div key={g.key}>
                   {g.ordinal && (
                     <div className="ya-well mb-1.5 flex items-center gap-2 !rounded-xl px-2 py-1.5">
-                      <span className="text-[11px] text-ink-2">轮播 {g.ordinal}</span>
+                      <span className="text-[12px] text-ink-2">轮播 {g.ordinal}</span>
                       <select
                         value={g.ratio ?? DEFAULT_CAROUSEL_RATIO}
                         onChange={(e) => p.onCarouselRatio(g.ordinal!, e.target.value as CarouselRatio)}
                         title="整个轮播统一用这个比例，改完所有图需要重传"
-                        className="rounded-md border-none bg-surface-elevated px-1.5 py-0.5 text-[11px] tabular-nums text-ink-1 outline-none"
+                        className="rounded-md border-none bg-surface-elevated px-1.5 py-0.5 text-[12px] tabular-nums text-ink-1 outline-none"
                         style={{ boxShadow: 'var(--shadow-flat)' }}
                       >
                         {CAROUSEL_RATIOS.map((r) => (
                           <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
-                      <span className="ml-auto text-[10px] text-ink-3">整组统一</span>
+                      <span className="ml-auto text-[11px] text-ink-3">整组统一</span>
                     </div>
                   )}
                   <ul className="space-y-1.5">{g.items.map(materialRow)}</ul>
