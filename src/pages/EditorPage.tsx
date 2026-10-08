@@ -638,30 +638,41 @@ export default function EditorPage() {
     }
   }
 
-  /** Carousel images: every one gets the same frame, so the slides line up. */
-  const uploadToCarousel = async (files: File[], item: MaterialItem, ratio: CarouselRatio) => {
-    if (!activeDoc || !item.carouselOrdinal) return
+  /**
+   * Fill consecutive slots of one multi-image block (carousel or gallery).
+   *
+   * Both kinds address their images by occurrence, so the filling logic is
+   * shared. What differs is where the frame ratio lives: a carousel's is chosen
+   * in the side panel and written back into its opener, a gallery's is written in
+   * its fence line by hand — so only a carousel has an ordinal, and only a
+   * carousel needs the source rewritten here.
+   */
+  const uploadToGroup = async (files: File[], item: MaterialItem, ratio: CarouselRatio) => {
+    if (!activeDoc) return
     let content = activeDoc.content
-    if (item.ratio !== ratio) {
+    if (item.carouselOrdinal && item.ratio !== ratio) {
       content = setCarouselRatio(content, item.carouselOrdinal, ratio)
     }
+    const where = item.kind === '画廊' ? '网格' : '轮播'
     let okCount = 0
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      // A carousel's slides are consecutive `![` slots in the source. Fill from
-      // the clicked slot onward by index, so a multi-file drop lands in order.
+      // A block's images are consecutive `![` slots in the source. Fill from the
+      // clicked slot onward by index, so a multi-file drop lands in order.
       // (The old code substituted the file name as the caption, which never
       // matched the placeholder text and made every file after the first fail
       // silently.)
       const occurrence = item.occurrence + i
-      // Each slide is addressed by its own caption, not the clicked one:
-      // slides may carry different placeholder text, and checking them all
-      // against the clicked caption refused every file after the first.
+      // Each slot is addressed by its own caption, not the clicked one:
+      // captions may differ between slots, and checking them all against the
+      // clicked caption refused every file after the first.
       const slot = materials.find((m) => m.occurrence === occurrence)
-      const staysInCarousel = slot?.kind === '轮播' && slot.carouselOrdinal === item.carouselOrdinal
-      if (!slot || !staysInCarousel || !canLocateImage(content, slot.alt, occurrence)) {
+      const sameGroup =
+        slot?.kind === item.kind &&
+        (item.carouselOrdinal ? slot.carouselOrdinal === item.carouselOrdinal : slot.line === item.line)
+      if (!slot || !sameGroup || !canLocateImage(content, slot.alt, occurrence)) {
         toast.warning(`${file.name} 没有对应的空位`, {
-          description: '这个轮播里已经没有更多占位行，多出的图请手动插入',
+          description: `这个${where}里已经没有更多占位行，多出的图请手动插入`,
         })
         continue
       }
@@ -748,9 +759,16 @@ export default function EditorPage() {
       toast.error(`${bad.name} 不是图片`)
       return
     }
-    if (item.kind !== '轮播') {
+    if (item.kind === '单图') {
       // 单图不强制裁切，但给一个选项，省得想统一高度时还得重传
       setFrameTask({ files, item, mode: 'loose' })
+      return
+    }
+    if (item.kind === '画廊') {
+      // A gallery's frame is written in its fence line, so there is nothing to
+      // pick here — lock the ratio and leave only how to frame the shot. Without
+      // the crop the cells keep their own shapes and the grid rows go ragged.
+      setFrameTask({ files, item, mode: 'carousel', locked: item.ratio })
       return
     }
     // Carousel slides always get the dialog. When the carousel ratio is already
@@ -941,6 +959,7 @@ export default function EditorPage() {
         alt={frameTask?.item?.alt || frameTask?.files[0]?.name || ''}
         current={frameTask?.locked}
         mode={frameTask?.mode ?? 'loose'}
+        fence={frameTask?.item?.kind === '画廊' ? ':::gallery' : ':::carousel'}
         busy={uploadingKey !== null}
         onCancel={() => setFrameTask(null)}
         onManual={() => {
@@ -954,7 +973,7 @@ export default function EditorPage() {
           setFrameTask(null)
           if (!task) return
           if (task.mode === 'carousel' && task.item && ratio) {
-            void uploadToCarousel(task.files, task.item, ratio)
+            void uploadToGroup(task.files, task.item, ratio)
           } else {
             // Pass the task so a re-crop replaces the image instead of inserting
             // a second copy at the cursor.

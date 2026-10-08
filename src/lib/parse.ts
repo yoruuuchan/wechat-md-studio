@@ -2,8 +2,14 @@ import MarkdownIt from 'markdown-it'
 import type { Token } from 'markdown-it'
 import markdownItMark from 'markdown-it-mark'
 import markdownItContainer from 'markdown-it-container'
-import type { Block, CarouselRatio, CellAlign, Doc, DocMeta, InlineSeg, SourceSpan } from './types'
-import { DEFAULT_CAROUSEL_RATIO, isCarouselRatio } from './types'
+import type { Block, CarouselItem, CarouselRatio, CellAlign, Doc, DocMeta, InlineSeg, SourceSpan } from './types'
+import {
+  DEFAULT_CAROUSEL_RATIO,
+  DEFAULT_GALLERY_COLS,
+  DEFAULT_GALLERY_RATIO,
+  isCarouselRatio,
+  isGalleryCols,
+} from './types'
 import { fencedRanges, isInFence } from './fences'
 
 // ---------- front matter ----------
@@ -47,6 +53,7 @@ const md = new MarkdownIt({ html: false, linkify: false, breaks: false })
   .use(markdownItContainer, 'quote')
   .use(markdownItContainer, 'center')
   .use(markdownItContainer, 'carousel')
+  .use(markdownItContainer, 'gallery')
 
 // ---------- inline ----------
 
@@ -350,6 +357,57 @@ export function parseMarkdown(src: string): Doc {
         type: 'carousel',
         title,
         ratio,
+        items,
+        occurrence: items.length ? items[0].occurrence : nextOccurrence(''),
+        ...span(t, tokens[i], 1),
+      })
+      continue
+    }
+
+    if (t.type === 'container_gallery_open') {
+      // :::gallery [列数] [比例] 标题 —— 两个参数都可省略
+      let rest = (t.info || '').replace(/^gallery\s*/, '').trim()
+      let cols = DEFAULT_GALLERY_COLS
+      let ratio: CarouselRatio = DEFAULT_GALLERY_RATIO
+      // 列数是裸整数，比例带冒号。负向预查挡住「4:3」被读成 4 列，
+      // 这样 :::gallery 4:3 标题 才是「默认列数 + 4:3」。
+      const colsMatch = rest.match(/^(\d+)(?!\s*:)\s*/)
+      if (colsMatch) {
+        const n = Number(colsMatch[1])
+        // 只吃下确实支持的列数；「7 张现场图」这种要原样留在标题里
+        if (isGalleryCols(n)) {
+          cols = n
+          rest = rest.slice(colsMatch[0].length).trim()
+        }
+      }
+      const ratioMatch = rest.match(/^(\d+\s*:\s*\d+)\s*/)
+      if (ratioMatch) {
+        const candidate = ratioMatch[1].replace(/\s+/g, '')
+        if (isCarouselRatio(candidate)) {
+          ratio = candidate
+          rest = rest.slice(ratioMatch[0].length).trim()
+        }
+      }
+      const title = rest
+      const items: CarouselItem[] = []
+      i++
+      while (i < tokens.length && tokens[i].type !== 'container_gallery_close') {
+        // 同一行的多张图（软换行分隔）也要全部收集
+        if (tokens[i].type === 'inline' && tokens[i].children) {
+          for (const c of tokens[i].children!) {
+            if (c.type === 'image') {
+              const alt = c.content.trim()
+              items.push({ alt, src: String(c.attrGet('src') ?? ''), occurrence: nextOccurrence(alt) })
+            }
+          }
+        }
+        i++
+      }
+      blocks.push({
+        type: 'gallery',
+        title,
+        ratio,
+        cols,
         items,
         occurrence: items.length ? items[0].occurrence : nextOccurrence(''),
         ...span(t, tokens[i], 1),

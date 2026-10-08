@@ -55,8 +55,18 @@ echo
 echo "=== pre-clean leftovers from an earlier interrupted run ==="
 # This script must be re-runnable: a previous run that died mid-way would
 # otherwise leave rows behind and break the row-count assertions below.
+# docs.remove is a SOFT delete: the tombstone stays in the recycle bin and
+# importLocal still sees the id as taken, so an interrupted run made the next
+# run fail at imported==1. Hard-purge our own test ids straight from sqlite.
 post docs.remove '{"json":{"id":"acc-1"}}' | must >/dev/null
 post docs.remove '{"json":{"id":"acc-2"}}' | must >/dev/null
+DB="${MOPAI_DB:-/opt/mopai/app/data/mopai.db}"
+if [ -f "$DB" ]; then
+  node -e 'const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(process.argv[1]);const r=db.prepare("delete from docs where id like ?").run("acc-%");console.log("  hard-purged acc- rows (incl. tombstones):", r.changes);' "$DB" \
+    || echo "  WARN: sqlite hard-purge skipped; tombstones may fail the assertions below"
+else
+  echo "  WARN: $DB not found; skipping the tombstone purge"
+fi
 get docs.list | must | python3 -c '
 import sys, json
 rows = [r for r in json.load(sys.stdin) if r["id"].startswith("acc-")]

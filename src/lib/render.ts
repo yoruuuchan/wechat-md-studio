@@ -64,6 +64,7 @@ export function renderDoc(
   let chars = 0
   let images = 0
   let carousels = 0
+  let galleries = 0
   let headingNo = 0
   let imageNo = 0
 
@@ -130,6 +131,18 @@ export function renderDoc(
         // it left `img:key` untouched and the slides rendered as broken images.
         const items = b.items.map((it) => ({ ...it, src: it.src ? resolveImg(it.src) : '' }))
         pushBlock(theme.carousel(b.title, caption, items, b.ratio), true, bi)
+        break
+      }
+      case 'gallery': {
+        galleries++
+        imageNo++
+        images += b.items.length
+        if (b.items.length < 2) warnings.push('画廊至少需要 2 张图片')
+        const caption = `图${imageNo} ${b.title || '多图网格'}（共 ${b.items.length} 张）`
+        // Same resolver as single images and carousel slides: without it the
+        // cells keep a raw `img:key` and render as broken images.
+        const items = b.items.map((it) => ({ ...it, src: it.src ? resolveImg(it.src) : '' }))
+        pushBlock(ext(theme).gallery(b.title, caption, items, b.ratio, b.cols), true, bi)
         break
       }
       case 'signature':
@@ -222,7 +235,7 @@ export function renderDoc(
   }
 
   const html = theme.root(cleaned.map((p) => p.html).join('\n'))
-  return { html, stats: { chars, images, carousels, warnings: [...new Set(warnings)] }, blockOffsets }
+  return { html, stats: { chars, images, carousels, galleries, warnings: [...new Set(warnings)] }, blockOffsets }
 }
 
 const VOID_TAGS = new Set([
@@ -267,7 +280,7 @@ function warnLinks(segs: InlineSeg[], warnings: string[]) {
 // 素材清单：逐张图片一行（轮播拆成单张），供后台插图对照与上传回填
 export interface MaterialItem {
   no: string // 图N 或 图N-M
-  kind: '单图' | '轮播'
+  kind: '单图' | '轮播' | '画廊'
   desc: string
   alt: string // Markdown 中的 alt，用于上传后定位回填
   /** Raw src from the Markdown, e.g. `img:<key>`; empty for a placeholder. */
@@ -280,9 +293,17 @@ export interface MaterialItem {
    * unique, and every slide in a carousel shares one line number.
    */
   occurrence: number
-  /** Set for carousel items: every image in one carousel shares this frame. */
+  /** Set for carousel and gallery items: every image in one block shares this frame. */
   ratio?: CarouselRatio
-  /** Index of the carousel block, so the UI can group items of the same carousel. */
+  /**
+   * Index of the carousel block, so the UI can group items of the same carousel
+   * under one ratio control.
+   *
+   * Gallery rows deliberately do not set it. The ordinal is what triggers that
+   * grouping, and a gallery's ratio is written in its fence line rather than
+   * picked in the panel — so its images belong in the loose list, where each one
+   * gets its own upload control and the ratio still arrives via `ratio`.
+   */
   carouselOrdinal?: number
 }
 
@@ -325,6 +346,21 @@ export function collectMaterials(doc: Doc, resolveDiagram: DiagramResolver = () 
           occurrence: it.occurrence,
           ratio: b.ratio,
           carouselOrdinal: carouselNo,
+        })
+      })
+    } else if (b.type === 'gallery') {
+      imageNo++
+      b.items.forEach((it, idx) => {
+        out.push({
+          no: `图${imageNo}-${idx + 1}`,
+          kind: '画廊',
+          desc: `${b.title ? b.title + ' · ' : ''}${it.alt || '未命名'}`,
+          alt: it.alt,
+          src: it.src,
+          hasSrc: !!it.src,
+          line: b.line,
+          occurrence: it.occurrence,
+          ratio: b.ratio,
         })
       })
     }

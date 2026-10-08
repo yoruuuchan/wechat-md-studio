@@ -71,11 +71,15 @@ export default function SidePanel(p: Props) {
             </button>
             <button
               onClick={() => {
-                const what = m.kind === '轮播' ? '清空这张图的引用？占位会留着，可以重新传。' : '删掉这张图？正文里对应的那一行会一起移除。'
-                if (window.confirm(what)) (m.kind === '轮播' ? p.onClear : p.onRemove)(m)
+                // Anything inside a multi-image block keeps its placeholder: a
+                // grid or a strip with a hole in it is still a layout, whereas
+                // deleting the line would quietly change how many cells there are.
+                const multi = m.kind !== '单图'
+                const what = multi ? '清空这张图的引用？占位会留着，可以重新传。' : '删掉这张图？正文里对应的那一行会一起移除。'
+                if (window.confirm(what)) (multi ? p.onClear : p.onRemove)(m)
               }}
               disabled={uploading}
-              title={m.kind === '轮播' ? '清空引用，保留占位' : '删除这一行图片'}
+              title={m.kind !== '单图' ? '清空引用，保留占位' : '删除这一行图片'}
               className="ya-link-btn danger !text-[11px] disabled:opacity-50"
             >
               删除

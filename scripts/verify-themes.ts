@@ -1,11 +1,13 @@
-// Throwaway: render the sample doc with all three themes and assert the
+// Throwaway: render the sample doc with every theme in the catalog and assert the
 // WeChat platform red lines. Bundled by esbuild so it can import src/lib/*.
+// With two hundred-odd themes now, this is the only thing standing between a
+// theme that looks fine and a theme that pastes into 公众号 as broken markup.
 import { parseMarkdown } from '../src/lib/parse'
 import { renderDoc, setCarouselRatio, clearImageSrc, removeImageLine, fillImageSrc, collectMaterials } from '../src/lib/render'
 import { THEMES, carouselFrame } from '../src/lib/themes'
 import { previewPage, cleanHtml } from '../src/lib/clipboard'
 import { SAMPLE_DOC, THEME_PREVIEW_DOC } from '../src/lib/sample'
-import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO } from '../src/lib/types'
+import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, GALLERY_COLS } from '../src/lib/types'
 import { COLOR_FAMILIES, KNOWN_LICENSES, ORIGINAL_LICENSE, STYLE_TAGS } from '../src/lib/theme-meta'
 import { manualOutputSize } from '../src/lib/image'
 import fs from 'node:fs'
@@ -78,7 +80,7 @@ console.log('blocks:', parsed.blocks.length)
 
 // 统一预览稿必须真的覆盖全部语义节点，否则某些主题能力根本没被校验到
 const REQUIRED_BLOCKS = [
-  'carousel', 'center', 'code', 'heading', 'hr', 'image', 'list',
+  'carousel', 'center', 'code', 'gallery', 'heading', 'hr', 'image', 'list',
   'paragraph', 'quoteBox', 'quoteCard', 'signature', 'subheading', 'table',
 ]
 const missingBlocks = REQUIRED_BLOCKS.filter((k) => !blockKinds.includes(k))
@@ -121,16 +123,16 @@ for (const theme of THEMES) {
   const blanks = (html.match(/<p style="margin:0;"><span leaf="">&nbsp;<\/span><\/p>/g) || []).length
   check(theme.id, 'boxed modules padded with blank paragraphs', blanks > 0, `count=${blanks}`)
 
-/** Source-less images become plain placeholder paragraphs. Carousel items are
-   * counted in stats.images but share one 图N caption on the carousel module. */
+/** Source-less images become plain placeholder paragraphs. Carousel and gallery
+   * items are counted in stats.images but share one 图N caption on their module. */
   const standalone = preview.blocks.filter((b) => b.type === 'image' && !b.src).length
-  const carouselsWithoutSrc = preview.blocks.filter(
-    (b) => b.type === 'carousel' && b.items.every((it) => !it.src),
+  const groupsWithoutSrc = preview.blocks.filter(
+    (b) => (b.type === 'carousel' || b.type === 'gallery') && b.items.every((it) => !it.src),
   ).length
   const placeholders = html.match(/<p[^>]*><span leaf="">图\d+ [^<]*<\/span><\/p>/g) || []
   check(theme.id, 'source-less images become standalone 图N paragraphs',
-    placeholders.length === standalone + carouselsWithoutSrc,
-    `${placeholders.length}/${standalone + carouselsWithoutSrc}`)
+    placeholders.length === standalone + groupsWithoutSrc,
+    `${placeholders.length}/${standalone + groupsWithoutSrc}`)
   check(theme.id, 'no <img> when nothing is uploaded', !/<img /.test(html))
 
   // 表格：必须真出 <table>，且逐列对齐（:--- / :---: / ---:）要落到单元格上
@@ -272,6 +274,54 @@ for (const theme of THEMES) {
   check('rewrite', 'first carousel gets the new ratio', first.includes(':::carousel 9:16 第一个'))
   check('rewrite', 'second carousel is untouched', first.includes(':::carousel 1:1 第二个'))
   check('rewrite', 'out-of-range occurrence is a no-op', setCarouselRatio(two, 9, '1:1') === two)
+}
+
+// --- gallery grid -----------------------------------------------------------
+{
+  console.log('\n=== gallery grid ===')
+  const grid = (cols: number, ratio: string, n: number, src: string) =>
+    `:::gallery ${cols} ${ratio} 演示\n${`![图](${src})\n`.repeat(n)}:::\n`
+
+  for (const cols of GALLERY_COLS) {
+    const html = renderDoc(parseMarkdown(grid(cols, '4:3', cols * 2, 'img:a.png')), THEMES[0], sig, resolveImg).html
+    const cells = [...html.matchAll(/width:([\d.]+)%;display:inline-block/g)].map((m) => Number(m[1]))
+    check(`${cols}列`, 'every image gets a percentage-width cell', cells.length === cols * 2, `${cells.length}/${cols * 2}`)
+
+    // A row that sums past 100% wraps its last cell onto the next line, which
+    // reads as a broken grid rather than as slightly tighter gutters.
+    const rowTotal = cells[0] * cols + (cols - 1) * 2
+    check(`${cols}列`, 'a full row stays at or under 100%', rowTotal <= 100,
+      `${cells[0]}% x ${cols} + ${(cols - 1) * 2}% gutters = ${rowTotal}%`)
+
+    check(`${cols}列`, 'cells are inline-block, never grid or float',
+      /display:inline-block/.test(html) && !/display:\s*grid/i.test(html) && !/float:/i.test(html))
+    check(`${cols}列`, 'no object-fit and no fixed pixel height on an image',
+      !/object-fit/i.test(html) && !/<img[^>]*style="[^"]*height:\s*\d/.test(html))
+    check(`${cols}列`, 'height:auto keeps the ratio when WeChat shrinks the width',
+      /width:100%;height:auto/.test(html))
+    check(`${cols}列`, 'images carry the crop ratio in their attributes',
+      (html.match(/width="400" height="300"/g) || []).length === cols * 2)
+    // 曾经漏掉解析，整条轮播裂图；网格走同一条 resolveImg，这里守住它
+    check(`${cols}列`, 'gallery cells resolve img:key to an absolute URL',
+      !/src="img:/.test(html) &&
+        (html.match(/src="https:\/\/wechat\.yoru-and-akari\.dev\/api\/img\//g) || []).length === cols * 2)
+  }
+
+  const empty = renderDoc(parseMarkdown(grid(3, '1:1', 3, '')), THEMES[0], sig, resolveImg).html
+  check('placeholder', 'an unuploaded cell shows a placeholder box', (empty.match(/待插入图片/g) || []).length === 3)
+  check('placeholder', 'and renders no <img> at all', !/<img /.test(empty))
+
+  const odd = renderDoc(parseMarkdown(':::gallery 7 张现场图\n![A]()\n![B]()\n:::\n'), THEMES[0], sig, resolveImg).html
+  check('legacy', 'an unsupported column count stays in the title', odd.includes('7 张现场图'))
+
+  // 每个主题都得真把格子渲染出来，不能有哪套主题把这个块吞掉
+  const src = grid(3, '4:3', 4, 'img:a.png')
+  const swallowed = THEMES.filter((t) => {
+    const h = renderDoc(parseMarkdown(src), t, sig, resolveImg).html
+    return (h.match(/display:inline-block/g) || []).length !== 4
+  }).map((t) => t.id)
+  check('all-themes', `every one of ${THEMES.length} themes renders all 4 cells`, swallowed.length === 0,
+    swallowed.slice(0, 5).join(','))
 }
 
 // --- per-image deletion -----------------------------------------------------

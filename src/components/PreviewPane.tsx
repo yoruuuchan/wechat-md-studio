@@ -169,6 +169,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
         </span>
         <span className="tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
           {stats.chars} 字 · {stats.images} 图{stats.carousels ? ` · ${stats.carousels} 轮播` : ''}
+          {stats.galleries ? ` · ${stats.galleries} 网格` : ''}
         </span>
       </div>
     </div>

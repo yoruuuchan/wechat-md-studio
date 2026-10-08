@@ -6,6 +6,7 @@ import { appRouter } from "./router";
 import { agentRouter } from "./agent-router";
 import { createContext } from "./context";
 import { storage } from "./lib/storage";
+import { startAnonGc } from "./lib/anon-gc";
 import { env } from "./lib/env";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -55,4 +56,12 @@ if (env.isProduction) {
   serve({ fetch: app.fetch, port, hostname }, () => {
     console.log(`公众号排版助手 running on http://${hostname}:${port}/`);
   });
+
+  // The anonymous image pool recycles itself: one sweep shortly after boot, then
+  // one a day. lib/anon-gc.ts decides what qualifies and logs one stable
+  // `[anon-gc] …` line per sweep. Deliberately inside this production block —
+  // dev and the test suite share IMG_BASE_URL with the live worker, so a sweep
+  // there would delete real objects. Fire and forget: it must never delay
+  // serving, and it catches its own errors.
+  startAnonGc();
 }

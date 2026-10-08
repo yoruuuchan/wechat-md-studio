@@ -50,6 +50,12 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 测匿名额度不用等一天：起服务时压小就行，例如
 `ANON_DAILY_IMAGES=2 ANON_DAILY_BYTES=1048576 ANON_TOTAL_BYTES=10485760`。
 
+匿名图回收（GC）的旋钮是 `ANON_GC_DAYS`（默认 14 天）和 `ANON_GC_ENABLED`（默认开，只有写成字符串 `false` 才关）。
+**别拿本地服务试删**：`.env` 里的 `IMG_BASE_URL` 指的是线上 Worker，本地跑一次生产模式的 GC 就会真删线上匿名图。
+要端到端验，先用 `mopai-worker/` 起一个本地 `wrangler dev` 再把 `IMG_BASE_URL` 指过去；
+纯逻辑（年龄边界、`img:<key>` 引用判定、`ownerId≠0` 绝不碰）已经在 `api/lib/anon-gc.test.ts` 里，`npm test` 就够。
+排程只挂在 `api/boot.ts` 的生产分支里，所以 `npm run dev` 和 vitest 都不会跑 GC。
+
 ---
 
 ## 二、它在做什么
@@ -128,7 +134,7 @@ Markdown → 语义 AST（src/lib/parse.ts）→ 主题模板函数（src/lib/th
 | 入口 | Cloudflare Tunnel → `wechat.yoru-and-akari.dev`，tunnel id `1c05edf4-f1f1-4156-9aa2-8a1ddca0fa14`（ingress 在服务器 `/etc/cloudflared/mopai.yml`） |
 | 门禁 | **站点公开，没有 Cloudflare Access**（2026-10-08 撤掉，之前是邮箱验证只放行站长）。撤的方式：本机的 CF token 只读写不动，于是借一个已登录 dashboard 的浏览器会话，走它的同源代理 `dash.cloudflare.com/api/v4/...` 删掉了两个 Access 应用；同一会话把本站并入了 zone 上那条高威胁分数 challenge 规则（现在 `http.host in {"app..." "wechat..."}`）。`ACCESS_KEY` 只决定谁能用云端草稿箱；排版、上传、复制、导出都不用登录 |
 | 图片公网读 | 站点公开之后 `/api/img/*` 自然是公网可读（微信抓图必须匿名可达）。以前那个 bypass Access 应用已随之删除。若将来把门禁关回去，必须同时建一个 bypass 应用放行 `/api/img/*`（`cf-create-access.sh` 里已有这段，路径最具体者优先）；同理若放行 `/api/agent/*`，**绝不能连带放行 `/api/trpc/*`**——那里有 `auth.login` |
-| 防滥用 | 应用层四道（IP 突发限流 / 访客 24h 额度 / 匿名总量封顶 / 字节头判类型）+ zone 上已有的 WAF 规则。细节与「刻意没做的三件事」见 `app/README.md`「公开之后靠什么挡滥用」 |
+| 防滥用 | 应用层额度（IP 突发限流 / 每 IP 每日 / 访客 24h / 匿名总量封顶 / 字节头判类型）+ **匿名图回收**（`api/lib/anon-gc.ts`：启动 1 分钟后跑一次、之后每 24h，删掉超过 `ANON_GC_DAYS` 且没有云端稿件引用的 `ownerId=0` 图，先 Worker 确认对象已删再删账本行）+ zone 上已有的 WAF 规则。细节与「刻意没做的三件事」见 `app/README.md`「公开之后靠什么挡滥用」 |
 | 图片存储 | Worker `mopai-images` → R2 `mopai-assets`；Worker 持有 R2 binding，**服务器上不存在任何 S3 凭证** |
 | 数据 | SQLite，`/opt/mopai/app/data/mopai.db` |
 | SSH | `ssh cc-tokyo-01` |
@@ -242,7 +248,9 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 - `server-e2e-check.sh` — 图片全链路（上传→公网取回→删除）
 - `server-round2-check.sh` — 稿件 CRUD、草稿箱语义、存储统计、孤儿图清理
 - `server-anon-purge.sh` — 匿名池应急清理：`--days N` 默认干跑、`--apply` 才删，只碰 ownerId=0。
-  注意 `files.createdAt` 存的是 **unix 秒**（sqlite 的 unixepoch 默认），不是毫秒
+  注意 `files.createdAt` 存的是 **unix 秒**（sqlite 的 unixepoch 默认），不是毫秒。
+  2026-10-08 起常态回收由应用内的 GC 做（`api/lib/anon-gc.ts`），这个脚本降级成手动超驰：
+  想立刻收回空间、或想用比 `ANON_GC_DAYS` 更小的阈值扫一次时才用
 
 改了 API 或数据结构后，**改完必须重跑并让 exit code 保持 0**。
 
@@ -298,6 +306,12 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 主题库分支的 CDP 验收对它单独归因，不算主题库的失败。
 >
 > 2026-10-07 更新：更名「公众号排版助手 by Yoru」+ Yoru 阴文印 logo + 弦月 favicon（`src/lib/brand.ts`、`src/components/YoruMark.tsx`）；新增模板专区页 `/themes`（`src/pages/Themes.tsx`，验收 `scripts/cdp-verify-rebrand.mjs`）；前端按设计系统铁律进一步内凹化（carriers 用 `ya-well`/inset，`ya-selected` 自带 sunken 底+1.5px 描边）；域名从 mopai 切到 wechat（Tunnel ingress + DNS + Access 放行三处都要动）。同日晚些时候 `/themes` 升级为多来源模板库（见上表与 THEME-SOURCES.md）。
+>
+> 2026-10-08 更新：匿名图 GC 落地——`api/lib/anon-gc.ts`（纯函数 `selectGcCandidates` + sweep）
+> 与 `api/boot.ts` 生产分支里的排程，旋钮 `ANON_GC_DAYS`（默认 14）/ `ANON_GC_ENABLED`（默认开）。
+> 匿名池从「只进不出、填满即永久拒客」变成循环的，下面第 2 条因此结案；
+> `scripts/server-anon-purge.sh` 保留不动，降级成手动超驰。误删面（访客本地草稿的引用服务端看不见）
+> 是**刻意接受**的取舍，细节在第 2 条与 `app/README.md`「公开之后靠什么挡滥用」。
 
 ### 产品方向（用户明确拍板的）
 
@@ -320,10 +334,16 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 ### 中
 
 1. **`storage.orphans` 不覆盖另一台设备的未同步草稿**：本地草稿 key 通过 `alsoKeep` 传，但只覆盖**本机** localStorage。另一台设备的草稿引用的图可能被误判为孤儿。要根治得让草稿也同步。
-2. **匿名图片没有回收机制，`ANON_TOTAL_BYTES` 会一次性填满**：清理只能由上传者自己在素材库里点，
-   而他大概率再也不回来。总量撞到 1.5 GB 之后**所有人都传不了图**，且不会自愈。
-   要修就得有个按时间/引用情况的后台清理（例如超过 N 天且不被任何稿件引用的匿名图删掉），
-   或者把总额度调高并盯着 R2 用量。上线后先看真实增长速率再决定阈值。
+2. **匿名图片没有回收机制 → 已修（2026-10-08，`api/lib/anon-gc.ts`）**：以前清理只能由上传者自己在素材库里点，
+   而他大概率再也不回来，总量撞到 `ANON_TOTAL_BYTES`（1.5 GB）之后**所有人都传不了图**且不会自愈。
+   现在启动 1 分钟后跑一次、之后每 24h 一次：删掉 `ownerId=0`、比 `ANON_GC_DAYS`（默认 14 天）更旧、
+   且没有任何云端稿件正文含 `img:<key>` 的图（回收站里的稿件也算引用，因为可以恢复）。
+   顺序是先 `storage.deleteFile` 让 Worker 确认对象已删，**再**删 `files` 行；Worker 拒绝或连不上就保留行、
+   写一行 `[anon-gc] delete-failed key=… reason=…`，下次重试。每次运行结束写一行
+   `[anon-gc] deleted=N bytes=B failed=F days=D`（格式固定，晨报 grep 它）。旋钮见 `.env.example`。
+   **残留取舍，刻意保留、别当 bug 修**：匿名访客的稿件只在他们自己浏览器的 localStorage 里，服务端看不见，
+   所以「14 天前传的图还被某访客的本地草稿引用」会被误删——和 `scripts/server-anon-purge.sh` 同口径。
+   还没实测的：线上第一次 sweep 的真实规模，14 天这个默认值是按估计的增长速率定的，跑完看 `deleted=` 再调。
 
 ### 低
 

@@ -8,13 +8,16 @@ interface Props {
   /** Which slot is being filled, shown so the user knows what they are cropping. */
   label: string
   alt: string
-  /** Ratio already written into the carousel opener — locks the choice when set. */
+  /** Ratio already written into the block's opener — locks the choice when set. */
   current?: CarouselRatio
   /**
-   * Carousel slides must share one frame, so the choice is mandatory there.
-   * A standalone image may keep its own proportions, so offer that too.
+   * Every image in a multi-image block (carousel or gallery) must share one
+   * frame, so the choice is mandatory there. A standalone image may keep its own
+   * proportions, so offer that too.
    */
   mode: 'carousel' | 'loose'
+  /** The opener line to edit when the ratio needs changing; named in the copy. */
+  fence?: string
   busy: boolean
   onCancel: () => void
   onConfirm: (ratio: CarouselRatio | null) => void
@@ -23,11 +26,22 @@ interface Props {
 }
 
 /**
- * Every image in one carousel is cropped to a single shared frame, so the
- * published slides line up instead of jumping in height. A standalone image is
- * left alone unless the user asks otherwise.
+ * Every image in one multi-image block is cropped to a single shared frame, so
+ * the published slides or cells line up instead of jumping in height. A
+ * standalone image is left alone unless the user asks otherwise.
  */
-export default function RatioPicker({ open, label, alt, current, mode, busy, onCancel, onConfirm, onManual }: Props) {
+export default function RatioPicker({
+  open,
+  label,
+  alt,
+  current,
+  mode,
+  fence = ':::carousel',
+  busy,
+  onCancel,
+  onConfirm,
+  onManual,
+}: Props) {
   const [ratio, setRatio] = useState<CarouselRatio | null>(mode === 'loose' ? null : current ?? '4:3')
   const locked = mode === 'carousel' && Boolean(current)
 
@@ -52,13 +66,13 @@ export default function RatioPicker({ open, label, alt, current, mode, busy, onC
               </>
             ) : locked ? (
               <>
-                这个轮播已经定死 <strong className="text-ink-1">{ratio}</strong>。轮播内所有图片必须同比例，
-                换比例请先在正文里改 <code className="rounded bg-surface-sunken px-1">:::carousel</code> 那一行。
+                这组图片已经定死 <strong className="text-ink-1">{ratio}</strong>。同一组里的图片必须同比例，
+                换比例请先在正文里改 <code className="rounded bg-surface-sunken px-1">{fence}</code> 那一行。
               </>
             ) : (
               <>
-                轮播里的图片必须同比例，所以先定一个。图片会按所选比例居中裁切后再上传，
-                之后这个轮播里剩下的图自动沿用同一个比例。
+                同一组里的图片必须同比例，所以先定一个。图片会按所选比例居中裁切后再上传，
+                之后这组里剩下的图自动沿用同一个比例。
               </>
             )}
           </DialogDescription>

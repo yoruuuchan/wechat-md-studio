@@ -37,6 +37,7 @@ const SNIPPETS: { label: string; detail: string; template: string }[] = [
   { label: ':::quote', detail: '引文框', template: ':::quote\n|\n:::\n' },
   { label: ':::center', detail: '居中强调句', template: ':::center\n|\n:::\n' },
   { label: ':::carousel', detail: '图片轮播（上传时选画幅比例）', template: ':::carousel 4:3 |\n![]()\n![]()\n:::\n' },
+  { label: ':::gallery', detail: '多图网格（列数与比例写在开头）', template: ':::gallery 3 1:1 |\n![]()\n![]()\n![]()\n:::\n' },
   { label: ':::结束', detail: '闭合当前模块', template: ':::\n|' },
   { label: '##KICKER', detail: '章节标题，序号自动编号', template: '## KICKER | |\n' },
   { label: '###', detail: '次级标题，无序号', template: '### |\n' },

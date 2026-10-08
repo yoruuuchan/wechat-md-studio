@@ -46,6 +46,15 @@ export const env = {
   anonDailyBytes: Number(process.env.ANON_DAILY_BYTES || 100 * 1024 * 1024),
   anonTotalBytes: Number(process.env.ANON_TOTAL_BYTES || 1536 * 1024 * 1024),
 
+  // Recycling for that pool. Uploads without a login are never deleted by their
+  // uploader — most of them never come back — so without a sweep the total above
+  // fills exactly once and then refuses everybody. GC drops `ownerId = 0` images
+  // older than this many days that no cloud 稿件 references (`img:<key>`).
+  // ANON_GC_ENABLED=false stops the sweeps; anything else (including unset)
+  // leaves them on.
+  anonGcDays: Number(process.env.ANON_GC_DAYS || 14),
+  anonGcEnabled: process.env.ANON_GC_ENABLED !== "false",
+
   // Absolute origin for links handed to agents (`editorUrl`). Optional: when
   // unset the agent API derives it from the incoming request, which is already
   // the public origin behind the Cloudflare Tunnel. Set it only if the app is

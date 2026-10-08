@@ -374,9 +374,12 @@ const undoResult = await evaluate(`(async () => {
   const items = [...document.querySelectorAll('[role=menuitem]')]
   const names = items.map(i => i.textContent.trim())
   if (items.length < 1) return JSON.stringify({ error: 'empty menu', names })
-  // Last item is 新建稿件: a fresh test database holds only one article, so
-  // picking another existing one would just re-select the current document.
-  items[items.length - 1].click()
+  // Pick the blank-article entry by label, not by position: the menu has grown a
+  // second creation entry (新建示例稿) after it, so "the last item" silently
+  // became "another copy of the sample".
+  const blank = items.find(i => i.textContent.trim() === '新建稿件')
+  if (!blank) return JSON.stringify({ error: 'no 新建稿件 entry in the menu', names })
+  blank.click()
   await new Promise(r => setTimeout(r, 1200))
   const after = window.__mopaiCodemirror
   const switched = after.state.doc.toString()

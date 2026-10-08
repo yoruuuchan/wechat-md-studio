@@ -34,6 +34,7 @@ export type Block =
   | ({ type: 'quoteBox'; paras: InlineSeg[][] } & SourceSpan) // :::quote 引文框
   | ({ type: 'image'; alt: string; src: string; occurrence: number } & SourceSpan) // ![图注](src)
   | ({ type: 'carousel'; title: string; ratio: CarouselRatio; items: CarouselItem[]; occurrence: number } & SourceSpan) // :::carousel [比例] 标题
+  | ({ type: 'gallery'; title: string; ratio: CarouselRatio; cols: number; items: CarouselItem[]; occurrence: number } & SourceSpan) // :::gallery [列数] [比例] 标题
   | ({ type: 'signature' } & SourceSpan) // @signature
   | ({ type: 'list'; ordered: boolean; items: InlineSeg[][] } & SourceSpan)
   | ({ type: 'table'; align: CellAlign[]; head: InlineSeg[][]; rows: InlineSeg[][][] } & SourceSpan) // GFM 表格
@@ -41,19 +42,21 @@ export type Block =
   | ({ type: 'math'; tex: string; display: boolean } & SourceSpan) // $$…$$ on its own lines
   | ({ type: 'hr' } & SourceSpan)
 
+/**
+ * One image inside a multi-image block (carousel or gallery).
+ *
+ * `occurrence` is the 1-based index of this image among every `![...](...)` in
+ * the raw Markdown, counted in document order. It is the only unambiguous way to
+ * address one image back in the source: captions repeat, and every image in one
+ * block shares a single line number.
+ */
 export interface CarouselItem {
   alt: string
   src: string
-  /**
-   * 1-based index of this image among every `![...](...)` in the raw Markdown,
-   * counted in document order. This is the only unambiguous way to address one
-   * image back in the source: captions repeat, and a carousel gives all its
-   * slides the same line number.
-   */
   occurrence: number
 }
 
-/** Uniform frame every image in one carousel is cropped to at upload time. */
+/** Uniform frame every image in one carousel or gallery is cropped to at upload time. */
 export const CAROUSEL_RATIOS = ['4:3', '3:4', '16:9', '9:16', '1:1'] as const
 
 export type CarouselRatio = (typeof CAROUSEL_RATIOS)[number]
@@ -62,6 +65,18 @@ export const DEFAULT_CAROUSEL_RATIO: CarouselRatio = '4:3'
 
 export function isCarouselRatio(v: string): v is CarouselRatio {
   return (CAROUSEL_RATIOS as readonly string[]).includes(v)
+}
+
+/** Columns a gallery may lay its images out in. One column is just a stack, so it starts at two. */
+export const GALLERY_COLS = [2, 3, 4] as const
+
+export const DEFAULT_GALLERY_COLS = 2
+
+/** Square by default: unlike a carousel strip, a grid reads best when cells match. */
+export const DEFAULT_GALLERY_RATIO: CarouselRatio = '1:1'
+
+export function isGalleryCols(v: number): v is (typeof GALLERY_COLS)[number] {
+  return (GALLERY_COLS as readonly number[]).includes(v)
 }
 
 /** "4:3" -> 4/3, used for cropping and for sizing the frame. */
@@ -85,6 +100,7 @@ export interface RenderStats {
   chars: number
   images: number
   carousels: number
+  galleries: number
   warnings: string[]
 }
 

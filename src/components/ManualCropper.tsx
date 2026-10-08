@@ -79,7 +79,7 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
           <DialogDescription className="text-[12px] leading-relaxed">
             {ratio ? (
               <>
-                这个轮播统一 <strong className="text-ink-1">{ratio}</strong> 比例，所以裁切框锁成该比例——
+                这组图片统一 <strong className="text-ink-1">{ratio}</strong> 比例，所以裁切框锁成该比例——
                 拖动图片决定留下哪一块，滚轮或下面的滑杆缩放。
               </>
             ) : (

@@ -8,8 +8,11 @@
  *   deleteFile       DELETE /api/upload?key=<key>   (X-Admin-Key)
  *   getPresignedUrl  —      public URL under IMG_BASE_URL
  *
- * Keys are stable forever, so the URL derived from a key never changes. That is
- * what makes it safe to bake `/api/img/<key>` into copied WeChat HTML.
+ * Keys never change while their ledger row lives, so the URL derived from a
+ * key is safe to bake into copied WeChat HTML. Owner and agent rows live
+ * forever; anonymous rows (ownerId = 0) can be recycled by api/lib/anon-gc.ts
+ * once they age past ANON_GC_DAYS unreferenced — copied articles keep working
+ * because WeChat re-hosts the image at publish time.
  */
 
 import { env } from './env'
