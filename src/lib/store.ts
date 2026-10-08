@@ -24,9 +24,17 @@ export interface AppSettings {
 const DOCS_KEY = 'mopai.docs.v1'
 const ACTIVE_KEY = 'mopai.active.v1'
 const SETTINGS_KEY = 'mopai.settings.v1'
+/** One-time migration marker: browsers whose storage predates the sample. */
+const SAMPLE_SEEDED_KEY = 'mopai.sample.v1'
+const SAMPLE_MARKER = '欢迎使用公众号排版助手'
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
+}
+
+/** Empty means "nothing but the front-matter skeleton": the old blank default. */
+function bodyIsEmpty(content: string): boolean {
+  return content.replace(/^---[\s\S]*?---\n?/, '').trim() === ''
 }
 
 export function loadDocs(): { docs: DocRecord[]; activeId: string } {
@@ -37,25 +45,38 @@ export function loadDocs(): { docs: DocRecord[]; activeId: string } {
       const docs = JSON.parse(raw) as DocRecord[]
       if (Array.isArray(docs) && docs.length) {
         // Tolerate records written before savedAt / deletedAt / source existed.
-        const normalised = docs.map((d) => ({
+        let out: DocRecord[] = docs.map((d) => ({
           ...d,
           savedAt: d.savedAt ?? null,
           deletedAt: d.deletedAt ?? null,
           source: d.source ?? null,
         }))
-        return { docs: normalised, activeId: normalised.some((d) => d.id === activeId) ? activeId : normalised[0].id }
+        let active = out.some((d) => d.id === activeId) ? activeId : out[0].id
+        // Browsers that stored docs before the sample existed keep their old
+        // blank default forever otherwise — and a blank active article also
+        // makes every theme thumbnail in the picker render as empty paper.
+        if (!localStorage.getItem(SAMPLE_SEEDED_KEY)) {
+          localStorage.setItem(SAMPLE_SEEDED_KEY, '1')
+          let sample = out.find((d) => d.content.includes(SAMPLE_MARKER))
+          if (!sample) {
+            sample = createSampleDoc()
+            out = [sample, ...out]
+          }
+          const current = out.find((d) => d.id === active)
+          if (!current || bodyIsEmpty(current.content)) active = sample.id
+          saveDocs(out, active)
+        }
+        return { docs: out, activeId: active }
       }
     }
   } catch {
     // fallthrough
   }
-  const first: DocRecord = {
-    id: uid(),
-    name: '示例稿 · 语法速览',
-    content: SAMPLE_DOC,
-    updatedAt: Date.now(),
-    savedAt: null,
-    deletedAt: null,
+  const first = createSampleDoc()
+  try {
+    localStorage.setItem(SAMPLE_SEEDED_KEY, '1')
+  } catch {
+    // 存储失败不阻塞编辑
   }
   return { docs: [first], activeId: first.id }
 }
