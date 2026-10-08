@@ -330,8 +330,11 @@ export default function TopBar(p: Props) {
         {p.userName ? (
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] text-ink-1 outline-none transition-colors hover:bg-line-1">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-[10px] font-medium text-brand-600">
-                {p.userName.slice(0, 1)}
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 10.5 12 3l9 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 9.5V21h14V9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </span>
               <span className="max-w-[80px] truncate">{p.userName}</span>
             </DropdownMenuTrigger>

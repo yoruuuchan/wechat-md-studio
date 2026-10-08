@@ -9,7 +9,7 @@ export type SessionPayload = {
 export const OWNER: User = {
   id: 1,
   unionId: 'owner',
-  name: '墨排',
+  name: 'Yoru',
   email: null,
   avatar: null,
   role: 'admin',
