@@ -11,6 +11,7 @@ import {
   isGalleryCols,
 } from './types'
 import { fencedRanges, isInFence } from './fences'
+import { blankComments } from './comments'
 
 // ---------- front matter ----------
 // 只支持简单键值与列表，刻意不引入 YAML 依赖：
@@ -195,10 +196,14 @@ function scanImageOccurrences(body: string): { alt: string; occurrence: number }
 
 export function parseMarkdown(src: string): Doc {
   const { meta, body, offset } = parseFrontMatter(src)
-  const tokens = md.parse(body, {})
+  // Editor notes are source-only. The blanking is length-preserving, so the
+  // token maps below still point at the editor's own lines — what changes is
+  // that a `<!-- … -->` never survives into the AST.
+  const text = blankComments(body)
+  const tokens = md.parse(text, {})
   const blocks: Block[] = []
   // Cursor into the raw-scan list; images appear in the same order in both.
-  const imgScan = scanImageOccurrences(body)
+  const imgScan = scanImageOccurrences(text)
   let imgCursor = 0
   const nextOccurrence = (alt: string): number => {
     // Prefer the entry that matches the caption; markdown-it drops images that

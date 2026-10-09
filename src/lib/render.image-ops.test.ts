@@ -112,6 +112,32 @@ describe('occurrence survives images the AST cannot see', () => {
   })
 })
 
+describe('a commented-out image is not an occurrence', () => {
+  // A note can hold anything, including image syntax the author parked for
+  // later. Both scanners skip comment spans, so the index the editor computes
+  // and the span this helper edits still describe the same picture.
+  const PARKED = [
+    '![真图](img:1)',
+    '',
+    '<!-- 先放这里：![暂存的图](img:parked) -->',
+    '',
+    '![第二张真图](img:2)',
+    '',
+  ].join('\n')
+
+  it('numbers the second real image as 2', () => {
+    const mats = collectMaterials(parseMarkdown(PARKED))
+    expect(mats.map((m) => m.alt)).toEqual(['真图', '第二张真图'])
+    expect(mats.map((m) => m.occurrence)).toEqual([1, 2])
+  })
+
+  it('writes to the second real image, leaving the parked one alone', () => {
+    const out = fillImageSrc(PARKED, '第二张真图', 2, 'img:new')
+    expect(out).toContain('![第二张真图](img:new)')
+    expect(out).toContain('![暂存的图](img:parked)')
+  })
+})
+
 describe('setCarouselRatio targets one carousel', () => {
   const TWO = [
     ':::carousel 4:3 第一组',

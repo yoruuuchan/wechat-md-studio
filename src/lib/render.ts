@@ -3,6 +3,7 @@ import { baseTableBlock, BLANK, esc, type Theme } from './themes'
 import { ext, type FootnoteItem } from './theme-fallbacks'
 import { diagramOf } from './diagram'
 import { fencedRanges, isInFence } from './fences'
+import { commentRanges, isInComment } from './comments'
 
 // 盒式模块的前后空行由 pushBlock(boxed=true) 统一插入
 
@@ -391,14 +392,17 @@ interface ImageSpan {
 function findImageSpan(content: string, occurrence: number): ImageSpan | null {
   if (occurrence < 1) return null
   const fences = fencedRanges(content)
+  const comments = commentRanges(content, fences)
   const re = /!\[([^\]]*)\]\(/g
   let m: RegExpExecArray | null
   let seen = 0
   while ((m = re.exec(content))) {
     // Must match parse.ts's scanImageOccurrences exactly: the occurrence number
     // comes from there, so skipping a different set of matches here would send
-    // an uploaded key to the wrong image.
-    if (isInFence(fences, m.index)) continue
+    // an uploaded key to the wrong image. parse.ts counts over the blanked body,
+    // where a comment's `![…](…)` is already spaces — this is the same rule
+    // applied to the untouched source.
+    if (isInFence(fences, m.index) || isInComment(comments, m.index)) continue
     seen++
     if (seen !== occurrence) continue
     const start = m.index

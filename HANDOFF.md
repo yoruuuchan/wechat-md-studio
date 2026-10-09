@@ -319,6 +319,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 9. **给 `files` 加列必须加在最后**。drizzle 的 `sqlite-proxy` 驱动按**位置**映射行，而 `ALTER TABLE ... ADD COLUMN` 只会追加到末尾；`db/schema.ts` 里声明的顺序一旦和物理顺序不一致，读出来的字段会整体错位，而且**不报错**。`api/queries/files-upgrade.test.ts` 就是钉这件事的。同理，`CREATE INDEX` 引用新列必须放在 `ALTER` 之后——旧库上 `CREATE TABLE IF NOT EXISTS` 是 no-op，先建索引会直接 `no such column`。
 10. **改 Cloudflare 之前先确认 token 能写**。只读 token 的写操作回 `HTTP 405 / 10405`，不是「权限不足」那种一眼能认的错。免费额度已经用满（见部署形态表），加规则前先 `bash scripts/cf-open-public.sh --check` 看清 zone 上已有什么。
 11. **脚本里调 tRPC：查询用 GET，变更用 POST**。用 POST 打查询会得到 `Unsupported POST-request to query procedure`，而 HTTP 状态还是 200，很容易误判成"接口坏了"。
+12. **编辑备注 `<!-- … -->` 曾经根本没被隐藏**（2026-10-09 修）：markdown-it 用 `html: false`（这是红线，原样 HTML 不能进正文），于是注释被转义成普通文字，预览和复制都带着它——示例稿里「渲染和复制都不会带上它」那句话是 2026-10-07 重写示例时写下的空头支票。现在 `src/lib/comments.ts` 在解析前做**等长空格化**（围栏代码块里的不动），行号与字符偏移完全不变，所以块偏移和图片 occurrence 编号都不受影响；两处原始正文扫描（`parse.ts` 的 `scanImageOccurrences`、`render.ts` 的 `findImageSpan`）对称跳过注释范围，注释里的 `![…](…)` 不打乱图号。**动这两处扫描器时保持对称，否则上传的图会写错位置。** 已知限制（与图片扫描同源）：行内代码里的注释也会被空格化。
 
 ---
 
