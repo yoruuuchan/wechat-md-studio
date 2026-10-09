@@ -153,19 +153,41 @@ Markdown → 语义 AST（src/lib/parse.ts）→ 主题模板函数（src/lib/th
 
 ### 部署流程（**服务器上不要跑 npm ci**，2GB 内存会 OOM）
 
-```powershell
-# 本地
+```bash
+# 本地：包名带 commit 短哈希，临时目录用 mktemp——绝不用固定名
+TAG=$(git rev-parse --short HEAD)
+OUT=$(mktemp -d)
 npm run build
-tar -czf $env:TEMP\mopai.tar.gz dist
-scp $env:TEMP\mopai.tar.gz cc-tokyo-01:/tmp/mopai-release.tar.gz
+tar -czf "$OUT/mopai-$TAG.tar.gz" dist
 
-# 服务器
-ssh cc-tokyo-01 'bash /tmp/install.sh'
+# 传上去：先传脚本本身（仓库版），再传包
+scp scripts/server-install-release.sh cc-tokyo-01:/tmp/install.sh
+scp "$OUT/mopai-$TAG.tar.gz" cc-tokyo-01:/tmp/mopai-$TAG.tar.gz
+
+# 服务器：先对哈希，再抢部署锁装（tarball 路径当参数传给脚本）
+ssh cc-tokyo-01 "sha256sum /tmp/mopai-$TAG.tar.gz"   # 必须等于本机 sha256sum 的输出
+ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$TAG.tar.gz"
 ```
 
-`scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 装到 /opt/mopai/app → **restart** → 健康检查）。
+`scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 装到 /opt/mopai/app → **restart** → 健康检查），
+它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。
 
-**部署后必须核对**：本地与线上的 `dist/boot.js` sha256、以及 `dist/public/index.html` 引用的 js/css 文件名是否一致。前一轮出现过"以为部署了、其实服务器还在跑旧包"。
+**两条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
+
+1. **包名永远带 commit 短哈希，本机临时文件用 `mktemp -d`。** worktree 只隔离仓库里的文件，
+   本机 `/tmp`（都指向同一个 `E:\SYSTEM~2\15877\Temp`）和服务器 `/tmp` 是所有会话共享的。
+   配方原来写死 `$env:TEMP\mopai.tar.gz` → `/tmp/mopai-release.tar.gz`，照做就必然互相覆盖——
+   而且同一份 dist 两次打包**尺寸几乎一样**，用尺寸或 mtime 根本核不出串包（当时还出现过
+   「mtime 一直在更新、大小却对不上」的假象）。只有 sha256 能分辨：传前在服务器上
+   `sha256sum` 比对，必要时再从包里解出 `dist/boot.js` 单独比一次。
+2. **安装必须在服务器上抢 `flock`。** install 脚本是 `rm -rf dist` + `cp` + `restart` 的顺序，
+   两个 install 并行时读者会看到半成品目录，或者后装的旧包把新包顶掉。`flock` 让第二次调用排队，
+   而不是交错执行。
+
+**部署后必须核对**（别只看命令有没有报错）：本地与线上的 `dist/boot.js` sha256、以及
+`dist/public/index.html` 引用的 js/css 文件名是否一致；再用
+`systemctl show mopai.service -p ExecMainStartTimestamp` 确认重启时间就是这一次的。
+前一轮出现过"以为部署了、其实服务器还在跑旧包"。
 
 ### 公开仓库与发布流水线
 
