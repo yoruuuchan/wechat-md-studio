@@ -172,6 +172,11 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$T
 `scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 装到 /opt/mopai/app → **restart** → 健康检查），
 它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。
 
+**家里这条线路对 30 MB+ 的单次 scp 会稳定重置**（`FATAL: send() failed, 10054`，2026-10-09 当天连试三次全挂，
+有一次还挂在连接上不退出）。别干等重试，按 network-ops 的分块办法：`split -b 4M` 切块 → 逐块 `scp`
+（每块配 `timeout`，失败只重传那一块）→ 每块在服务器上 `sha256sum` 对过 → `cat part-* > /tmp/mopai-$TAG.tar.gz`
+→ 再对整个包对一次 sha256。9 块里通常有一两块要重传，整体 10 分钟左右，比反复重传整包可靠。
+
 **两条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
 
 1. **包名永远带 commit 短哈希，本机临时文件用 `mktemp -d`。** worktree 只隔离仓库里的文件，
