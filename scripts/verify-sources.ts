@@ -150,10 +150,11 @@ console.log('\n=== generated documents are in sync ===')
   if (stale.length) {
     console.log('      → 跑 `npm run sync:docs` 重新生成，然后重跑本校验。')
   }
-  // 兜底：整文件重算一遍必须和现文一致（防止块之外的标记性问题，比如标记重复）
+  // 兜底：整文件重算一遍必须和现文一致（防止块之外的标记性问题，比如标记重复）。
+  // 按内容比较、忽略行尾：git 检出或编辑器可能把工作区写成 CRLF，那不是漂移。
   for (const file of DOC_FILES) {
     const current = fs.readFileSync(file, 'utf8')
-    check(`${file} renders idempotently`, renderDocFile(file, current) === current)
+    check(`${file} renders idempotently`, renderDocFile(file, current) === current.replace(/\r\n/g, '\n'))
   }
 }
 
