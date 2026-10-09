@@ -27,6 +27,10 @@ export function resolveTheme(choice: ThemeChoice): ThemeName {
 export function applyTheme(name: ThemeName): void {
   const root = document.documentElement
   root.dataset.theme = name
+  // Tailwind 的 dark: 变体挂在 .dark 类上（tailwind.config 的 darkMode: ["class"]）。
+  // shadcn 组件（Tabs / Dialog / Popover / Select…）全靠这批语义 token，
+  // 少了这个类，深色下它们仍拿浅色值——侧栏标签就成了黑字配深底。
+  root.classList.toggle('dark', name === 'yoru')
   // 让原生控件、滚动条、表单跟随，否则暗色下会冒出亮色的系统部件
   root.style.colorScheme = name === 'yoru' ? 'dark' : 'light'
 }
