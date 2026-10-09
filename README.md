@@ -3,7 +3,11 @@
 把 Markdown 变成**可以直接粘进微信公众号后台**的排版：左侧写稿，右侧实时预览，一键复制富文本。
 图片通过图床进入正文，微信粘贴时自行转存。
 
-**[在线使用](https://wechat.yoru-and-akari.dev)** · [主题库](https://wechat.yoru-and-akari.dev/themes) · [开源致谢](https://wechat.yoru-and-akari.dev/references)
+**[在线使用](https://wechat.yoru-and-akari.dev)** · [主题库](https://wechat.yoru-and-akari.dev/themes) · [开源致谢](https://wechat.yoru-and-akari.dev/references) · [使用规范](https://wechat.yoru-and-akari.dev/terms)
+
+| akari（亮） | yoru（暗） |
+|:--:|:--:|
+| ![左栏 Markdown 源稿、中栏公众号实时预览、右栏图片清单](docs/images/editor-akari.png) | ![同一份稿子在深色界面下，正文纸面仍是白底](docs/images/editor-yoru.png) |
 
 开发 Agent 请先读 [AGENTS.md](AGENTS.md)。
 
@@ -16,7 +20,19 @@
 - **导入导出**：Markdown、DOCX 导入；Markdown、正文 HTML、完整预览页与整包稿件备份导出。
 - **Agent 往返**：REST API + Python 客户端推稿、打开网页精修、读回结果，内容 hash 防止静默覆盖。
 
-排版、上传、复制和导出无需登录；口令用于站长云端草稿箱。匿名图片有额度与回收期限，见 [运维说明](HANDOFF.md#安全与匿名资源回收)。
+排版、上传、复制和导出无需登录；口令用于站长云端草稿箱。匿名图片有额度与回收期限，条款见
+[使用规范](https://wechat.yoru-and-akari.dev/terms)，实现口径见 [运维说明](HANDOFF.md#安全与匿名资源回收)。
+
+## 界面与效果
+
+模板库的每一套都渲染同一份样稿，横向比较才成立；卡片上直接标出作者、色系与许可证。
+
+![模板库：按风格、复杂度、色系与来源筛选，卡片里是真实渲染结果](docs/images/theme-library.png)
+
+排版结果特写（golden 主题，即打开时的默认样稿）——首行缩进、章节自动编号、下划线重点、
+链接降级脚注、居中强调句、金句卡片和引文框都在这一屏里：
+
+<img src="docs/images/typeset-golden.png" width="420" alt="golden 主题下的正文排版效果特写" />
 
 ## 核心架构
 
@@ -74,6 +90,23 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时将 `.env` �
 
 主题重新导入和按功能选择浏览器验收脚本，见 [验证导航](docs/verification.md)。
 
+## 使用规范与责任边界
+
+完整条款在 **[/terms](https://wechat.yoru-and-akari.dev/terms)**，这里留下最要紧的三条：
+
+- **正文不经过本站。** 不登录时稿件只存在你自己浏览器的 IndexedDB / localStorage 里，服务器收不到内容；
+  登录只打开站长的云端草稿箱。你用本站排出的文字写了什么，责任在执笔和发布它的人，不在这个编辑器。
+- **图片是唯一的例外。** 匿名上传同样不需要登录，文件因此落在本站的对象存储上，并以
+  `https://wechat.yoru-and-akari.dev/api/img/…` **公网可读**——拿到链接的人都能看到。本站不做内容审核，
+  只有字节头校验、额度封顶和 14 天自动回收。不要上传你不愿意公开、或者你不拥有权利的图片。
+- **禁止借本站图床传播**违法内容、涉及未成年人的性内容、侵犯他人著作权或肖像隐私的内容、恶意程序与诈骗素材，
+  以及把图床当网盘批量灌图。发现即删。权利人要投诉：写信到 [yoruandakari@duck.com](mailto:yoruandakari@duck.com)，
+  写清具体地址、你是权利人或受其委托的说明、以及联系方式。
+
+服务按现状提供，可能随时变更、限流或下线；软件本身无担保（AGPL-3.0 第 15 条）。
+本站没有账号体系，能兑现的处置只有删除文件和拒绝继续接收。想要完全不同的责任边界就自己部署一份——
+存储桶、域名、额度和日志都在你手里，这一页的条款对你就不再适用。
+
 ## License 与来源
 
 项目采用 **AGPL-3.0-or-later**，见 [LICENSE](https://github.com/yoruuuchan/wechat-md-studio/blob/master/LICENSE)。
@@ -91,6 +124,7 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时将 `.env` �
 | [HANDOFF.md](HANDOFF.md) | 部署、服务器、Cloudflare、安全机制与环境记录 |
 | [THEME-SOURCES.md](THEME-SOURCES.md) | 主题来源、License、lineage、移植损耗与导入审计 |
 | [References](https://wechat.yoru-and-akari.dev/references) / [credits.ts](src/lib/credits.ts) / [NOTICE](LICENSES/NOTICE.md) | 统一开源致谢数据、取舍与许可核实记录 |
+| [/terms](https://wechat.yoru-and-akari.dev/terms) / [Terms.tsx](src/pages/Terms.tsx) | 使用规范、图片上传的公开边界、投诉与删除入口 |
 | [配置](docs/configuration.md) / [验证](docs/verification.md) | 环境变量、本地运行、开发与浏览器验收命令 |
 | [渲染与图片](docs/rendering.md) | AST / Theme 边界、微信 HTML、公式、Mermaid、裁切与图片生命周期 |
 | [稿件与编辑器](docs/documents.md) | 本地 / 云端保存、合并与冲突、草稿箱、素材库、导入导出 |

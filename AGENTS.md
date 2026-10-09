@@ -32,11 +32,13 @@
 | 微信排版 / renderer | [渲染与图片](docs/rendering.md)、`parse.ts` / `render.ts` / `theme-kit.ts`、相关测试、`scripts/verify-themes.ts`；公式另读 `math-sanitize.ts` |
 | 保存 / 同步 / 导入导出 | [稿件与编辑器](docs/documents.md)、相关 hooks / API / schema 及其测试 |
 | Agent 接入 | [Agent API](docs/agent-api.md)、`contracts/agent.ts`、路由 / 鉴权与客户端实现及验收脚本 |
+| 使用规范 / 责任边界 | [Terms.tsx](src/pages/Terms.tsx) 与 README 的「使用规范与责任边界」是派生文档：额度读 `api/lib/anon-quota.ts` 与 `api/lib/burst.ts`、回收读 `api/lib/anon-gc.ts`、正文落在哪里读 `src/lib/store.ts` 与 `body-store.ts`。改这些行为时同步两处措辞，只写实现兑现得了的处置 |
 
 实现、schema、测试与验证脚本定义可执行规则；命令以 `package.json` 和脚本参数为准。
 主题数量从 `THEMES` 注册表复算。署名事实维护在 sources / metadata / credits，审计依据保存在专项文档与许可证副本。
 `BEGIN GENERATED` / `gen:` 区块由 `sync:docs` 生成，`verify:sources` 复核；README 只保留数量与来源摘要，完整致谢进入 NOTICE。
 README 只做项目首页；本文件维护工作约束；HANDOFF 记录部署流程与有日期的环境快照，实际环境操作前重新核对。
+README 顶部的界面截图存在 `docs/images/`，界面结构（栏数、顶栏动作、模板库布局）变化后重截并同名替换，别只改文案留旧图。
 修改事实源后只更新受影响的说明与入口，避免维护多份主题表、署名表或兼容规则清单。
 
 ## 核心工程约束
