@@ -17,6 +17,9 @@ trap 'rm -f "$COOKIE_HDR"' EXIT
 # Capture the header and send it back by hand instead.
 post() { curl -4 -sS -m 30 -H "Cookie: $COOKIE" -X POST -H 'Content-Type: application/json' -d "$2" "$APP/api/trpc/$1"; }
 get()  { curl -4 -sS -m 30 -H "Cookie: $COOKIE" "$APP/api/trpc/$1"; }
+# GET with a tRPC input — queries that take one (docs.get) read the JSON-encoded
+# input from the query string.
+getq() { curl -4 -sS -m 30 -H "Cookie: $COOKIE" "$APP/api/trpc/$1?input=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$2")"; }
 # A tRPC error still comes back as HTTP 200, so refuse anything without a result
 # envelope. Also refuse NaN, which JSON turns into the string "NaN" - a silent
 # sign that a Date or a number went wrong server-side.
@@ -69,7 +72,7 @@ else
 fi
 get docs.list | must | python3 -c '
 import sys, json
-rows = [r for r in json.load(sys.stdin) if r["id"].startswith("acc-")]
+rows = [r for r in json.load(sys.stdin)["items"] if r["id"].startswith("acc-")]
 assert not rows, rows
 print("  clean start")
 '
@@ -91,13 +94,23 @@ fi
 echo
 echo "=== docs CRUD ==="
 # save is update-only by contract: new rows come from saveToDrafts/importLocal.
-post docs.saveToDrafts '{"json":{"id":"acc-1","name":"验收稿","content":"# 一\n","updatedAt":1791310000000}}' | must >/dev/null
-post docs.save '{"json":{"id":"acc-1","name":"验收稿改名","content":"# 二\n","updatedAt":1791310001000}}' | must >/dev/null
+# Every write carries the hash the row was read at: the server compare-and-swaps
+# on it, so a stale base is refused instead of overwriting someone else's text.
+H=$(post docs.saveToDrafts '{"json":{"id":"acc-1","name":"验收稿","content":"# 一\n","updatedAt":1791310000000}}' \
+  | must | python3 -c 'import sys,json; print(json.load(sys.stdin)["hash"])')
+H=$(post docs.save "{\"json\":{\"id\":\"acc-1\",\"name\":\"验收稿改名\",\"content\":\"# 二\\n\",\"updatedAt\":1791310001000,\"baseHash\":\"$H\"}}" \
+  | must | python3 -c '
+import sys, json
+r = json.load(sys.stdin)
+assert r.get("ok") is True and r.get("missing") is False, r
+print(r["hash"])
+')
 get docs.list | must | python3 -c '
 import sys, json
 # Only look at this script own rows: the app seeds a demo 稿件 into an empty
-# database, so a global row count is not ours to assert on.
-mine = [r for r in json.load(sys.stdin) if r["id"].startswith("acc-")]
+# database, so a global row count is not ours to assert on. The list is
+# metadata-only (id/name/times/hash) these days, which is all this check needs.
+mine = [r for r in json.load(sys.stdin)["items"] if r["id"].startswith("acc-")]
 assert len(mine) == 1, "expected exactly 1 acc- row, got %d: %s" % (len(mine), mine)
 assert mine[0]["name"] == "验收稿改名", "update did not apply in place: %s" % mine[0]["name"]
 print("  acc- rows=%d name=%s" % (len(mine), mine[0]["name"]))
@@ -114,7 +127,7 @@ print("  server answered missing=true")
 '
 get docs.list | must | python3 -c '
 import sys, json
-mine = [r for r in json.load(sys.stdin) if r["id"] == "acc-ghost"]
+mine = [r for r in json.load(sys.stdin)["items"] if r["id"] == "acc-ghost"]
 assert not mine, "save re-created a deleted article: %s" % mine
 print("  no zombie row created")
 '
@@ -123,10 +136,12 @@ post docs.importLocal '{"json":{"docs":[{"id":"acc-1","name":"旧","content":"x"
 
 echo
 echo "=== carousel ratio survives a save/load round trip ==="
-post docs.save '{"json":{"id":"acc-1","name":"轮播稿","content":":::carousel 16:9 宽幅演示\n![A]()\n![B]()\n:::\n","updatedAt":1791310002000}}' | must >/dev/null
-get docs.list | must | python3 -c '
+H=$(post docs.save "{\"json\":{\"id\":\"acc-1\",\"name\":\"轮播稿\",\"content\":\":::carousel 16:9 宽幅演示\\n![A]()\\n![B]()\\n:::\\n\",\"updatedAt\":1791310002000,\"baseHash\":\"$H\"}}" \
+  | must | python3 -c 'import sys,json; r=json.load(sys.stdin); assert r.get("ok") is True, r; print(r["hash"])')
+# The body is not part of the list any more; docs.get is the on-demand read.
+getq docs.get '{"json":{"id":"acc-1"}}' | must | python3 -c '
 import sys, json
-row = [r for r in json.load(sys.stdin) if r["id"] == "acc-1"][0]
+row = json.load(sys.stdin)["doc"]
 assert ":::carousel 16:9" in row["content"], row["content"]
 print("  ratio line stored verbatim:", row["content"].splitlines()[0])
 '
@@ -150,7 +165,8 @@ for n in keep drop; do
   OUR_KEYS="$OUR_KEYS $K"
   echo "  uploaded $n -> $K"
   if [ "$n" = keep ]; then
-    post docs.save "{\"json\":{\"id\":\"acc-1\",\"name\":\"引用稿\",\"content\":\"img:$K\",\"updatedAt\":1791310003000}}" | must >/dev/null
+    H=$(post docs.save "{\"json\":{\"id\":\"acc-1\",\"name\":\"引用稿\",\"content\":\"img:$K\",\"updatedAt\":1791310003000,\"baseHash\":\"$H\"}}" \
+      | must | python3 -c 'import sys,json; r=json.load(sys.stdin); assert r.get("ok") is True, r; print(r["hash"])')
   fi
 done
 get storage.stats | must | python3 -c "
@@ -203,7 +219,7 @@ print('  removed our %s test image(s): deleted=%s' % (len($TEARDOWN), r['deleted
 "
 get docs.list | must | python3 -c '
 import sys, json
-mine = [r for r in json.load(sys.stdin) if r["id"].startswith("acc-")]
+mine = [r for r in json.load(sys.stdin)["items"] if r["id"].startswith("acc-")]
 print("  our docs left:", len(mine))
 assert not mine
 '
