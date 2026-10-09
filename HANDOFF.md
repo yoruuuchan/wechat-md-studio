@@ -472,6 +472,24 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > --incremental`（3 处 `<local workspace>` 替换）→ `git am -p2 --3way`；AGENTS 必读资料表那处
 > 三方追加冲突按合并时的同一解法保留全部三条。推前用脱敏表自己的 19 条左值扫公开工作树与新增行，
 > **零命中**才推。配图 1.7MB 随 `--binary` 正常进出，GitHub raw 取回字节与本地一致。
+>
+> 2026-10-10 结案（线上 bundle 已切成 React 生产版）：上面那条「由站长决定」的悬案在无人值守窗口
+> 拍板执行，依据是没有任何一条理由支持继续跑开发版。**根因不是构建命令，是 `.env` 里那行
+> `NODE_ENV=development`**——vite 会把它拿去当 React 的编译条件，而 `api/lib/env.ts` 只认字面量
+> `production`，所以「不写这行」和「写 development」对服务端完全等价、对构建产物天差地别。
+> 两条看着像正确答案的修法都**实测无效**，别再走：`vite build --mode production` 之后入口仍是
+> `index-BbB82EWp.js`、`jsxDEV` 13 处；在 `vite.config.ts` 加 `define: {'process.env.NODE_ENV': …}`
+> 只把体积压到 2,478,265、`jsxDEV` 还剩 11 处（React 的 dev/prod 走包导出条件，`define` 只替换字面量）。
+> 删掉 `.env` 那行之后入口 `index-D_Kmk5xT.js`、2,326,911 字节、`jsxDEV` 归零。
+> 根因是文档教的：README / 配置文档 / 本文件三处都写着「开发时设 NODE_ENV=development」，四处指示
+> 已全部改成「整行删掉」，`.env.example` 也加了注释。
+> **新增防线**：`scripts/server-install-release.sh` 现在拒绝入口含 `jsxDEV` 的包（`MOPAI_ALLOW_DEV_BUNDLE=1`
+> 才放行），放在动 `/opt/mopai` 之前。已拿上一个开发版包做过反向测试：`REFUSED` + exit=1，
+> 线上资产名与服务状态都没被碰。
+> 上线验证：本地生产模式（独立库 + `ANON_GC_ENABLED=false`）跑 `cdp-verify-terms` 12/12、
+> `cdp-verify-dark-theme` 与 `cdp-verify-favorites` ALL PASSED，确认压缩后的生产 bundle 交互正常；
+> 部署后对公网再跑同样两套，全绿。三重核对全过（`boot.js` `b4840d2f…` 未变、
+> `index-D_Kmk5xT.js` / `index-BqizAfmg.css` 本地=线上=公网、`ExecMainStartTimestamp` 16:34:40 UTC）。
 
 ### 产品方向（用户明确拍板的）
 
