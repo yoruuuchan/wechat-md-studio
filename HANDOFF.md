@@ -261,7 +261,9 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
   2026-10-08 起常态回收由应用内的 GC 做（`api/lib/anon-gc.ts`），这个脚本降级成手动超驰：
   想立刻收回空间、或想用比 `ANON_GC_DAYS` 更小的阈值扫一次时才用
 
-改了 API 或数据结构后，**改完必须重跑并让 exit code 保持 0**。
+改了 API 或数据结构后，**验收脚本自己也可能要改**（它们不在部署包里，装 dist 不会更新），改完重跑必须 exit 0。
+改法与推脚本一样走 LF 字节：在仓库 `app/scripts/` 改 → `cat <脚本> | ssh cc-tokyo-01 'cat > /tmp/x.sh'`（或 WSL 里的 `stage-to-tokyo.sh`）→ `sudo install -m 755 -o root -g root /tmp/x.sh /opt/mopai/scripts/`。
+2026-10-09 撞过这条：稿件 API 改成元数据列表后，`round2` 还按数组解析 `docs.list`，verify-all 直接失败。
 
 ---
 
