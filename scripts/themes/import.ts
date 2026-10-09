@@ -90,7 +90,7 @@ const xiaohu: SourceInfo = {
   author: 'xiaohuailabs',
   repo: 'https://github.com/xiaohuailabs/xiaohu-wechat-format',
   license: 'MIT',
-  licenseFile: 'app/licenses/xiaohu-wechat-format/LICENSE-NOTE.md',
+  licenseFile: 'LICENSES/xiaohu-wechat-format/LICENSE-NOTE.md',
   attribution:
     'Themes from xiaohuailabs/xiaohu-wechat-format. The upstream README declares "## License — MIT"; ' +
     'the repository ships no LICENSE file. Copyright belongs to the xiaohu-wechat-format authors.',
@@ -139,7 +139,7 @@ const raphael: SourceInfo = {
   author: 'Raphael Editor Contributors',
   repo: 'https://github.com/liuxiaopai-ai/raphael-publish',
   license: 'MIT',
-  licenseFile: 'app/licenses/raphael-publish/LICENSE',
+  licenseFile: 'LICENSES/raphael-publish/LICENSE',
   attribution: 'Copyright (c) 2024 Raphael Editor Contributors. Licensed under the MIT License.',
   adapted:
     '直接读取上游 src/lib/themes/*.ts 的 tag→内联 CSS 字典；补 <span leaf=""> 包裹，' +
@@ -168,7 +168,7 @@ const huasheng: SourceInfo = {
   author: '花生 (alchaincyf)',
   repo: 'https://github.com/alchaincyf/huasheng_editor',
   license: 'MIT',
-  licenseFile: 'app/licenses/huasheng-editor/LICENSE',
+  licenseFile: 'LICENSES/huasheng-editor/LICENSE',
   attribution: 'Copyright (c) 2024 花生 (alchaincyf). Licensed under the MIT License.',
   adapted:
     '从上游 styles.js 的 STYLES 表取 tag→内联 CSS 字典（该文件是浏览器全局脚本，导入时补 export）；' +
@@ -203,7 +203,7 @@ const mdwechat: SourceInfo = {
   author: '字间排版',
   repo: 'https://github.com/laogou717/md-wechat',
   license: 'MIT',
-  licenseFile: 'app/licenses/md-wechat/LICENSE',
+  licenseFile: 'LICENSES/md-wechat/LICENSE',
   attribution: 'Copyright (c) 2026 字间排版. Licensed under the MIT License.',
   adapted:
     '调用上游自己的 buildStyles(theme) 取到 baseStyles 与主题覆盖合并后的完整样式字典；' +
@@ -253,7 +253,7 @@ const wenyan: SourceInfo = {
   author: 'Lei (caol64)',
   repo: 'https://github.com/caol64/wenyan-core',
   license: 'Apache-2.0',
-  licenseFile: 'app/licenses/wenyan-core/LICENSE',
+  licenseFile: 'LICENSES/wenyan-core/LICENSE',
   attribution: 'Copyright caol64/wenyan-core contributors. Licensed under the Apache License, Version 2.0.',
   adapted:
     '解析上游 src/assets/themes/*.css：展开 :root 变量与 calc()，丢弃伪元素与 position:absolute 规则，' +
@@ -285,7 +285,7 @@ const wenyan: SourceInfo = {
               author: header?.author || upstreamSlug.split('/')[0],
               repo: upstreamRepo,
               license: 'MIT' as ThemeLicense,
-              licenseFile: `app/licenses/typora-upstream/${upstreamSlug.replace(/\//g, '-')}-LICENSE`,
+              licenseFile: `LICENSES/typora-upstream/${upstreamSlug.replace(/\//g, '-')}-LICENSE`,
               attribution: `Typora theme "${header?.title}" by ${header?.author} (${upstreamRepo}), MIT; ` +
                 'adapted for WeChat by caol64/wenyan-core (Apache-2.0) and ported into this project.',
               upstream: `Typora theme ${upstreamSlug}, via caol64/wenyan-core src/assets/themes/${file}`,
@@ -308,7 +308,7 @@ const xedit: SourceInfo = {
   author: 'rotbit',
   repo: 'https://github.com/rotbit/xedit',
   license: 'MIT',
-  licenseFile: 'app/licenses/xedit/LICENSE',
+  licenseFile: 'LICENSES/xedit/LICENSE',
   attribution: 'Copyright (c) 2026 rotbit. Licensed under the MIT License.',
   adapted:
     '读取上游 src/lib/themes/presets.ts 的 ThemePreset 表，把每套 #nice 选择器 CSS 解析成语义节点规格；' +
@@ -342,7 +342,7 @@ const inkpress: SourceInfo = {
   author: 'inkpress',
   repo: 'https://github.com/michellewkx/inkpress',
   license: 'MIT',
-  licenseFile: 'app/licenses/inkpress/LICENSE',
+  licenseFile: 'LICENSES/inkpress/LICENSE',
   attribution: 'Copyright (c) 2026 inkpress. Licensed under the MIT License.',
   adapted:
     '读取上游 themes/*.yaml：每个节点是 style 多行 CSS 串（container 是属性字典，转成 CSS 串），' +

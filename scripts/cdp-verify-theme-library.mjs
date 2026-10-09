@@ -127,6 +127,16 @@ async function goto(url, settle = 2500) {
   await sleep(settle)
 }
 
+/** 轮询等待页面里的条件成立（导航/重渲染在满载机器上可能超过固定 sleep）。 */
+async function waitFor(expression, timeout = 8000) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    if (await evaluate(expression)) return true
+    await sleep(250)
+  }
+  return await evaluate(expression)
+}
+
 // ---------------------------------------------------------------- login
 await setViewport(1440, 900)
 await goto(APP, 3000)
@@ -198,14 +208,16 @@ check('card shows source project and license', /(MIT|AGPL|GPL|Project-Original)/
 const repoLinks = await evaluate(
   `[...document.querySelectorAll('[data-theme-card] a[href^="https://github.com"]')].length`,
 )
-// 三套自研主题在开源之前没有公开仓库（brand.ts 的 REPO_URL 留空），其余每套都必须能跳回上游
-check('ported themes link out to their upstream repos', repoLinks === cardCount - 3, `links=${repoLinks}/${cardCount}`)
+// 开源之后每张卡都能跳仓库：导入/移植主题指向各自上游，三套自研主题指向本项目仓库
+// （brand.ts 的 REPO_URL 已填）。这里钉「每张卡都有仓库入口」。
+check('every theme card links out to a repo', repoLinks === cardCount, `links=${repoLinks}/${cardCount}`)
 
 // ------------------------------------------------------- 来源详情
 console.log('\n=== provenance panel ===')
+// 挑一套导入主题：它一定有 licenseFile 与完整 lineage（自研主题没有「许可证留存」行）
 await evaluate(`(() => {
-  const card = [...document.querySelectorAll('[data-theme-card]')]
-    .find(c => c.querySelector('a[href^="https://github.com"]'))
+  const card = document.querySelector('[data-theme-card^="xiaohu-"]')
+  card.scrollIntoView({ block: 'center' })
   const btn = [...card.querySelectorAll('button')].find(b => b.textContent.trim() === '来源')
   btn.click()
   return card.getAttribute('data-theme-card')
@@ -371,7 +383,7 @@ await evaluate(`(() => {
   btn.click()
 })()`)
 await sleep(3000)
-check('applying a theme returns to the editor', (await evaluate(`location.pathname`)) === '/')
+check('applying a theme returns to the editor', await waitFor(`location.pathname === '/'`))
 check(
   'chosen theme id is persisted',
   (await evaluate(`JSON.parse(localStorage.getItem('mopai.settings.v1')||'{}').themeId`)) === target,
@@ -379,7 +391,10 @@ check(
 )
 check(
   'editor preview is styled after applying',
-  (await evaluate(`document.querySelector('section[style*="max-width"]')?.outerHTML.length ?? 0`)) > 2000,
+  await waitFor(`(() => {
+    const s = document.querySelector('section[style*="max-width"]')
+    return !!s && s.outerHTML.length > 2000
+  })()`, 10000),
 )
 await shot('04-editor-with-imported-theme.png')
 const editorErrors = consoleErrors.length - libraryErrors

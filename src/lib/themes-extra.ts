@@ -11,7 +11,7 @@ import type { InlineSeg } from './types'
 /**
  * 这六套主题移植自 gzh-design-skill 的主题组件库，上游是 AGPL-3.0-or-later。
  * AGPL 有传染性且第 13 条覆盖网络服务：本项目把它们的组件语言编进产物，
- * 整体就必须继续以 AGPL 提供源码。许可证文本留存在 licenses/ 下。
+ * 整体就必须继续以 AGPL 提供源码。许可证文本留存在 LICENSES/ 下。
  */
 const GZH_DESIGN: Omit<ThemeOrigin, 'upstream' | 'adapted'> = {
   kind: 'ported',
@@ -19,7 +19,7 @@ const GZH_DESIGN: Omit<ThemeOrigin, 'upstream' | 'adapted'> = {
   author: '甲木 (Jiamu) × 摸鱼小李 (Moyu Xiaoli)',
   repo: 'https://github.com/isjiamu/gzh-design-skill',
   license: 'AGPL-3.0-or-later',
-  licenseFile: 'app/licenses/gzh-design-skill/LICENSE',
+  licenseFile: 'LICENSES/gzh-design-skill/LICENSE',
   attribution:
     '主题组件库来自 gzh-design-skill，Copyright (C) 2026 甲木 (Jiamu) × 摸鱼小李 (Moyu Xiaoli)，依据 AGPL-3.0-or-later 使用并修改。',
 }

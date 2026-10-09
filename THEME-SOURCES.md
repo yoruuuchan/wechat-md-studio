@@ -3,31 +3,44 @@
 审计日期：2026-10-07。所有 license 结论均取自仓库内 LICENSE 文件原文或 GitHub API 的
 license 字段（实测），上游主题文件已浅克隆核对；标注「推断」的条目是法律判断而非事实记录。
 
-主题库当前共 **219 套**：210 套导入 + 6 套 gzh-design-skill 移植 + 3 套自研。
-导入由 `scripts/themes/import.ts` 生成 `src/lib/themes-imported/*.ts`，产物提交进仓库，
-运行时不依赖任何上游仓库。重跑：`npm run import:themes`（上游克隆位置见文末）。
+<!-- BEGIN GENERATED: themes-doc-intro — npm run sync:docs -->
+主题库当前共 **219 套**：210 套由 `scripts/themes/import.ts` 从 7 个上游仓库导入、6 套 gzh-design-skill 移植、3 套自研。
+导入产物在 `src/lib/themes-imported/*.ts`，提交进仓库，运行时不依赖任何上游仓库。重跑：`npm run import:themes`（上游克隆位置见文末）。
+<!-- END GENERATED: themes-doc-intro -->
 
 ## 一、已接入来源
 
+<!-- BEGIN GENERATED: themes-doc-sources — npm run sync:docs -->
 | 来源 | License | 套数 | 上游格式 | 许可证留存 |
 |---|---|---|---|---|
-| [xiaohuailabs/xiaohu-wechat-format](https://github.com/xiaohuailabs/xiaohu-wechat-format) | MIT（README 声明，**仓库无 LICENSE 文件**） | 85 | 纯 JSON，snake_case 样式字典 | `app/licenses/xiaohu-wechat-format/LICENSE-NOTE.md` |
-| [liuxiaopai-ai/raphael-publish](https://github.com/liuxiaopai-ai/raphael-publish) | MIT | 30 | TS，tag→内联 CSS 串 | `app/licenses/raphael-publish/LICENSE` |
-| [laogou717/md-wechat](https://github.com/laogou717/md-wechat) | MIT（26 套）+ **GPL-3.0-only（2 套）** | 28 | JS，`styles:(p)=>({元素:CSS})` | `app/licenses/md-wechat/LICENSE` |
-| [michellewkx/inkpress](https://github.com/michellewkx/inkpress) | MIT | 26 | YAML，每节点 `style:` 多行 CSS，自带 series/tags | `app/licenses/inkpress/LICENSE` |
-| [alchaincyf/huasheng_editor](https://github.com/alchaincyf/huasheng_editor) | MIT | 20 | JS 全局脚本，tag→内联 CSS 串 | `app/licenses/huasheng-editor/LICENSE` |
-| [rotbit/xedit](https://github.com/rotbit/xedit) | MIT | 13 | TS，`#nice` 选择器 CSS 串 | `app/licenses/xedit/LICENSE` |
-| [caol64/wenyan-core](https://github.com/caol64/wenyan-core) | Apache-2.0（其中 7 套上游为 MIT Typora 主题） | 8 | CSS 文件 + TS 注册表 | `app/licenses/wenyan-core/LICENSE` + `app/licenses/typora-upstream/*` |
-| [isjiamu/gzh-design-skill](https://github.com/isjiamu/gzh-design-skill) | **AGPL-3.0-or-later** | 6 | Markdown 组件库 | `app/licenses/gzh-design-skill/LICENSE` |
-| 本项目自研 | Project-Original | 3 | — | — |
+| [xiaohuailabs/xiaohu-wechat-format](https://github.com/xiaohuailabs/xiaohu-wechat-format) | MIT | 85 | 纯 JSON，snake_case 样式字典 | `LICENSES/xiaohu-wechat-format/LICENSE-NOTE.md` |
+| [liuxiaopai-ai/raphael-publish](https://github.com/liuxiaopai-ai/raphael-publish) | MIT | 30 | TS，tag→内联 CSS 串 | `LICENSES/raphael-publish/LICENSE` |
+| [laogou717/md-wechat](https://github.com/laogou717/md-wechat) | MIT 26 套 · GPL-3.0-only 2 套 | 28 | JS，styles:(p)=>({元素:CSS}) | `LICENSES/md-wechat/LICENSE` |
+| [michellewkx/inkpress](https://github.com/michellewkx/inkpress) | MIT | 26 | YAML，每节点 style: 多行 CSS，自带 series/tags | `LICENSES/inkpress/LICENSE` |
+| [alchaincyf/huasheng_editor](https://github.com/alchaincyf/huasheng_editor) | MIT | 20 | JS 全局脚本，tag→内联 CSS 串 | `LICENSES/huasheng-editor/LICENSE` |
+| [rotbit/xedit](https://github.com/rotbit/xedit) | MIT | 13 | TS，#nice 选择器 CSS 串 | `LICENSES/xedit/LICENSE` |
+| [caol64/wenyan-core](https://github.com/caol64/wenyan-core) | MIT 7 套 · Apache-2.0 1 套 | 8 | CSS 文件 + TS 注册表 | `LICENSES/wenyan-core/LICENSE` + `LICENSES/typora-upstream/` 7 份 |
+| [isjiamu/gzh-design-skill](https://github.com/isjiamu/gzh-design-skill) | AGPL-3.0-or-later | 6 | Markdown 组件库 | `LICENSES/gzh-design-skill/LICENSE` |
+| 本项目自研 | Project-Original | 3 | 手写主题（theme-kit 语义节点） | — |
 
-### 统计（`npm run verify:themes` 可复算）
+审计备注：
 
-- 按来源：xiaohu 85 · raphael 30 · md-wechat 28 · inkpress 26 · huasheng 20 · xedit 13 · wenyan 8 · gzh 6 · 自研 3
-- 按许可证：MIT 207 · AGPL-3.0-or-later 6 · Project-Original 3 · GPL-3.0-only 2 · Apache-2.0 1
-- 按风格标签（多标签）：文艺复古 77 · 杂志 68 · 治愈 66 · 科技 55 · 商务 40 · 中国风 24 · 暗色 21 · 学术 20 · 卡通 9 · 政务 3 · 运动 2 · 节日 0
-- 按复杂度：简洁 56 · 标准 97 · 复杂 57
-- 按色系：冷色 90 · 暖色 85 · 中性 31 · 多彩 4
+- **xiaohu-wechat-format**：上游 README 声明 MIT，但仓库内没有 LICENSE 文件；LICENSES/ 下的副本是这份授权状态记录。
+- **md-wechat**：28 套里 2 套（科技蓝 / 全栈蓝）的上游自述移植自 mdnice 经典主题，按 GPL-3.0-only 单独标注；其余 26 套按上游 MIT。
+- **huasheng_editor**：上游是 ricocc/rico-md 那 21 套主题的直接来源；我们取上游仓库本身，不取二手拷贝。
+- **wenyan-core**：8 套里 7 套的 CSS 头注释标明各自的 Typora 上游主题与作者（7 个上游仓库实测均为 MIT），第 8 套 wenyan-default 按 wenyan-core 的 Apache-2.0 记录；许可证文本存在 typora-upstream/ 下。
+- **gzh-design-skill**：AGPL-3.0-or-later 有传染性且第 13 条覆盖网络服务：本项目整体因此以 AGPL 提供源码；线上部署与公开仓库对应是履行该义务的方式。
+<!-- END GENERATED: themes-doc-sources -->
+
+### 统计（由 `npm run sync:docs` 生成；`npm run verify:sources` 复核一致性）
+
+<!-- BEGIN GENERATED: themes-doc-stats — npm run sync:docs -->
+- 按来源：xiaohu-wechat-format 85 · raphael-publish 30 · md-wechat 28 · inkpress 26 · huasheng_editor 20 · xedit 13 · wenyan-core 8 · gzh-design-skill 6 · 本项目自研 3
+- 按许可证：MIT 207 · AGPL-3.0-or-later 6 · GPL-3.0-only 2 · Apache-2.0 1 · 本项目自研 3
+- 按风格标签（多标签）：文艺复古 79 · 杂志 73 · 治愈 67 · 科技 58 · 商务 43 · 中国风 24 · 学术 22 · 暗色 21 · 卡通 10 · 政务 4 · 运动 2 · 节日 0
+- 按复杂度：简洁 59 · 标准 100 · 复杂 60
+- 按色系：冷色 93 · 暖色 88 · 中性 34 · 多彩 4
+<!-- END GENERATED: themes-doc-stats -->
 
 风格标签与复杂度由 `scripts/themes/lib/classify.ts` 从上游描述/标签文本 + 样式度量推导，
 不是人工逐套标注；11 套上游文本完全没有关键词证据，其标签来自配色推导或兜底。
@@ -40,7 +53,7 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
   MIT 标签不覆盖它们。
 - wenyan 的 7 套（orangeheart / rainbow / lapis / pie / maize / purple / phycat）：CSS 头注释明文
   标注 Typora 上游主题、作者与仓库，7 个上游仓库实测全部 MIT。每套主题的 `meta.origin`
-  记到 Typora 作者一级，许可证文本存在 `app/licenses/typora-upstream/`。
+  记到 Typora 作者一级，许可证文本存在 `LICENSES/typora-upstream/`。
   第 8 套 `wenyan-default` 无头注释，按 wenyan-core 的 Apache-2.0 记录。
 - huasheng_editor 是 ricocc/rico-md 那 21 套的上游（id 与 name 逐一对应）。取上游，不取二手拷贝。
 - gzh-design-skill 的 6 套：上游 references/ 下无更窄授权，整套受 AGPL-3.0-or-later 覆盖。
@@ -91,25 +104,28 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
 
 ## 四、应用整体许可证：已定为 AGPL-3.0-or-later（2026-10-07 拍板）
 
-仓库根目录 `LICENSE` 为 AGPL-3.0 正文，`app/package.json` 的 `license` 字段与
-`app/README.md` 的署名章节同步声明。219 套主题全部保留，兼容性逐族核对：
+仓库根目录 `LICENSE` 为 AGPL-3.0 正文。
 
-| 上游许可证 | 套数 | 与 AGPL-3.0 应用的关系 |
+<!-- BEGIN GENERATED: themes-doc-compat — npm run sync:docs -->
+`app/package.json` 的 `license` 字段与 `app/README.md` 的署名章节同步声明。219 套主题全部保留，兼容性逐族核对：
+
+| 上游许可证 | 套数 | 与 AGPL-3.0-or-later 应用的关系 |
 |---|---|---|
 | MIT | 207 | 单向并入，保留版权声明与许可文本即可（已做） |
-| AGPL-3.0-or-later（gzh-design-skill） | 6 | 同许可证族，保留联名署名（已做） |
-| GPL-3.0-only（mdnice 派生 2 套） | 2 | AGPL 第 13 条第二段明文允许与 GPL-3.0 作品组合为单一 AGPL 作品 |
-| Apache-2.0（wenyan-core） | 1 | 兼容；保留 LICENSE、标注修改、传递 NOTICE（上游无 NOTICE，此条免） |
+| AGPL-3.0-or-later | 6 | 同许可证族，保留联名署名（已做） |
+| GPL-3.0-only | 2 | AGPL 第 13 条第二段明文允许与 GPL-3.0 作品组合为单一 AGPL 作品 |
+| Apache-2.0 | 1 | 兼容；保留 LICENSE、标注修改、传递 NOTICE（上游无 NOTICE，此条免） |
 | 本项目自研 | 3 | — |
+<!-- END GENERATED: themes-doc-compat -->
 
 由此产生的义务，按可执行性排序：
 
 1. **源码提供**：AGPL 第 13 条要求线上服务向使用者提供完整对应源码。仓库公开、且部署
    构建能对应到公开提交即满足。**在仓库公开之前部署含 copyleft 主题的构建，义务尚未履行**——
    开源发布应早于或同步于下一次部署，别先部署后开源。
-2. **署名保留**：各来源的版权声明、许可文本与 lineage 已在 `app/licenses/` 与每套主题的
-   `meta.origin` 中保留；`npm run verify:themes` 会校验许可证文件真实存在，删主题时
-   别留下悬空的 licenseFile 引用。
+2. **署名保留**：各来源的版权声明、许可文本与 lineage 已在 `LICENSES/` 与每套主题的
+   `meta.origin` 中保留；`npm run verify:sources` 会校验许可证文件真实存在、且每个来源与
+   主题的引用一一对应，删主题时别留下悬空的 licenseFile 引用。
 3. **衍生同许可证**：后续新增主题或改动渲染层，产物仍属 AGPL-3.0-or-later；再引入
    更严或不相容的来源（BSL、附加禁商用条款等）前，先回本文件第二节核对。
 

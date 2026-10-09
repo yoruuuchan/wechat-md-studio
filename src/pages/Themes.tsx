@@ -18,6 +18,7 @@ import { THEME_PREVIEW_DOC } from '@/lib/sample'
 import { YoruMark } from '@/components/YoruMark'
 import { APP_NAME, APP_BYLINE } from '@/lib/brand'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useThemeFavorites } from '@/hooks/useThemeFavorites'
 
 // 模板库：全部主题渲染同一份 THEME_PREVIEW_DOC，视觉差异才可比。
 // 主题数量上百，所以预览 DOM 只在卡片滚进视口附近时才注入，
@@ -132,6 +133,25 @@ function Tag({ children, tone = 'muted' }: { children: React.ReactNode; tone?: '
   )
 }
 
+function IconStar({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      aria-hidden="true"
+    >
+      <path
+        d="M12 3.2l2.6 5.3 5.9.85-4.25 4.14 1 5.86L12 16.7l-5.25 2.65 1-5.86L3.5 9.35l5.9-.85z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function OriginDetails({ theme }: { theme: Theme }) {
   const o = theme.meta.origin
   return (
@@ -176,13 +196,17 @@ function OriginDetails({ theme }: { theme: Theme }) {
 function ThemeCard({
   theme,
   active,
+  favorited,
   previewHtml,
   onUse,
+  onToggleFavorite,
 }: {
   theme: Theme
   active: boolean
+  favorited: boolean
   previewHtml: string
   onUse: () => void
+  onToggleFavorite: () => void
 }) {
   const [showOrigin, setShowOrigin] = useState(false)
   const o = theme.meta.origin
@@ -209,6 +233,18 @@ function ThemeCard({
             <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-ink-3">{theme.desc}</p>
           )}
         </div>
+        <button
+          type="button"
+          data-theme-fav={theme.id}
+          onClick={onToggleFavorite}
+          aria-pressed={favorited}
+          aria-label={favorited ? `取消收藏「${theme.name}」` : `收藏「${theme.name}」`}
+          title={favorited ? '取消收藏' : '收藏：存到本浏览器，顶部快速切换器里置顶'}
+          className="ya-link-btn -mr-1 -mt-0.5 shrink-0 !p-1.5"
+          style={{ color: favorited ? 'var(--primary-600)' : 'var(--ink-4)' }}
+        >
+          <IconStar filled={favorited} />
+        </button>
       </div>
 
       <ScaledPreview html={previewHtml} />
@@ -258,11 +294,13 @@ export default function Themes() {
   const navigate = useNavigate()
   const [themeId, setThemeId] = useState(() => loadSettings().themeId)
   const sig = useMemo(() => loadSettings().sig, [])
+  const { favorites, count: favCount, toggle: toggleFavorite } = useThemeFavorites()
 
   const [tags, setTags] = useState<Set<StyleTag>>(new Set())
   const [levels, setLevels] = useState<Set<Complexity>>(new Set())
   const [colors, setColors] = useState<Set<ColorFamily>>(new Set())
   const [sources, setSources] = useState<Set<string>>(new Set())
+  const [favOnly, setFavOnly] = useState(false)
   const [query, setQuery] = useState('')
 
   const toggle = <T,>(set: Set<T>, v: T, apply: (s: Set<T>) => void) => {
@@ -293,6 +331,7 @@ export default function Themes() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return THEMES.filter((t) => {
+      if (favOnly && !favorites.has(t.id)) return false
       if (tags.size && !t.meta.styles.some((s) => tags.has(s))) return false
       if (levels.size && !levels.has(t.meta.complexity)) return false
       if (colors.size && !colors.has(t.meta.color)) return false
@@ -308,16 +347,18 @@ export default function Themes() {
         a.meta.origin.project.localeCompare(b.meta.origin.project) ||
         a.name.localeCompare(b.name, 'zh-Hans-CN'),
     )
-  }, [tags, levels, colors, sources, query])
+  }, [tags, levels, colors, sources, favOnly, favorites, query])
 
   const clearAll = () => {
     setTags(new Set())
     setLevels(new Set())
     setColors(new Set())
     setSources(new Set())
+    setFavOnly(false)
     setQuery('')
   }
-  const filtering = tags.size + levels.size + colors.size + sources.size > 0 || query.trim() !== ''
+  const filtering =
+    tags.size + levels.size + colors.size + sources.size > 0 || favOnly || query.trim() !== ''
 
   const applyTheme = (t: Theme) => {
     const s = loadSettings()
@@ -357,6 +398,22 @@ export default function Themes() {
               placeholder="搜索主题名、描述、来源或作者"
               className="ya-input flex-1"
             />
+            <button
+              type="button"
+              data-fav-filter
+              onClick={() => setFavOnly((v) => !v)}
+              aria-pressed={favOnly}
+              title="只看收藏过的模板（星标存本浏览器）"
+              className={`ya-btn ya-btn-sm shrink-0 ${favOnly ? 'ya-selected text-ink-1' : 'ya-btn-ghost'}`}
+            >
+              <span style={{ color: favOnly ? 'var(--primary-600)' : 'var(--ink-4)' }}>
+                <IconStar filled={favOnly} />
+              </span>
+              收藏
+              <span className="tabular-nums" style={{ color: 'var(--ink-4)' }}>
+                {favCount}
+              </span>
+            </button>
             {filtering && (
               <button onClick={clearAll} className="ya-btn ya-btn-ghost ya-btn-sm shrink-0">
                 清空筛选
@@ -393,7 +450,9 @@ export default function Themes() {
 
         {filtered.length === 0 ? (
           <div className="ya-well rounded-2xl p-10 text-center text-[13px] text-ink-3">
-            没有符合当前筛选条件的模板，试试放宽一点。
+            {favOnly && favCount === 0
+              ? '还没有收藏的模板。点卡片右上角的星标收藏常用模板，之后就能一键筛出来，也会出现在编辑器顶部的快速切换器里。'
+              : '没有符合当前筛选条件的模板，试试放宽一点。'}
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -402,15 +461,17 @@ export default function Themes() {
                 key={t.id}
                 theme={t}
                 active={t.id === themeId}
+                favorited={favorites.has(t.id)}
                 previewHtml={previews[t.id]}
                 onUse={() => applyTheme(t)}
+                onToggleFavorite={() => toggleFavorite(t.id)}
               />
             ))}
           </div>
         )}
 
         <p className="mt-8 text-center text-[11px] leading-relaxed text-ink-3">
-          主题库来自多个开源项目，各套模板的授权与署名以卡片内标注为准，许可证原文留存在仓库的 licenses/ 目录。
+          主题库来自多个开源项目，各套模板的授权与署名以卡片内标注为准，许可证原文留存在仓库的 LICENSES/ 目录。
         </p>
       </main>
       <Toaster position="bottom-center" toastOptions={{ style: { borderRadius: 10 } }} />

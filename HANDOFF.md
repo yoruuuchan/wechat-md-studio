@@ -40,8 +40,11 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
   - `npm run check` — tsc，必须 0 错误
   - `npm run build` — 产出 `dist/boot.js`（自包含）+ `dist/public/`
   - `npm run verify:themes` — 111 项离线校验（主题红线、比例、删除、驱动契约）
+  - `npm run verify:sources` — 来源/致谢/许可数据自洽 + README、THEME-SOURCES.md、LICENSES/NOTICE.md 的生成区块与数据一致（改了主题、来源或 credits 后必跑）
+  - `npm run sync:docs` — 重新生成上面三个文档里带 `BEGIN GENERATED` 标记的区块（新增主题/来源/credit 后先跑它）
   - `npm run import:themes` — 从上游克隆重新生成 `src/lib/themes-imported/`（上游位置见 THEME-SOURCES.md）
   - `node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` — 模板库页的真实浏览器验收
+  - `node scripts/cdp-verify-favorites.mjs <url> [CDP端口]` — 收藏流转 + /references 页面的真实浏览器验收（无需登录）
   - `node scripts/cdp-verify-public-access.mjs <url> 9335` — **不登录**走一遍上传全链路的真实浏览器验收
   - `node scripts/cdp-verify-docs-sync.mjs [端口] [CDP端口]` — 稿件同步模型验收：登录合并不丢本地稿、stale 保存出冲突弹窗且云端新版不被覆盖、三条冲突处理路径、草稿箱服务端卡片与搜索。**自带临时数据库和 mock 图床，不碰线上**
   - `bash scripts/cf-open-public.sh --check|--plan|（空）` — Cloudflare 门禁开关（撤 Access + 并入威胁分数规则）
@@ -81,9 +84,14 @@ Markdown → 语义 AST（src/lib/parse.ts）→ 主题模板函数（src/lib/th
 | `src/lib/themes-extra.ts` | 六套 gzh-design-skill 移植主题（AGPL，见 THEME-SOURCES.md） |
 | `src/lib/themes-imported/*.ts` | **生成物**，由 `npm run import:themes` 产出，不要手改 |
 | `scripts/themes/import.ts` + `scripts/themes/lib/*` | 各来源的 importer：抽取 → 归一 → 色板反推 → 分类推导 → 落盘 |
+| `src/lib/theme-sources.ts` | **来源注册表**：每个上游项目的仓库/作者/默认许可证/许可证文件/格式/审计备注。主题的 `meta.origin.project` 必须命中这里 |
+| `src/lib/credits.ts` / `src/lib/favorites.ts` | 代码层面的致谢数据（borrowed/declined）/ 主题收藏的本地存储（`mopai.theme-favorites.v1`） |
+| `scripts/sources/*` + `scripts/verify-sources.ts` | 从数据生成 README / THEME-SOURCES.md / NOTICE.md 的区块（`npm run sync:docs`）并机器校验（`npm run verify:sources`） |
 
 每套 Theme 必须带 `meta`（风格标签、复杂度、色系、来源项目/作者/仓库/许可证/署名/lineage）。
 `npm run verify:themes` 会校验 catalog 完整性与许可证文件存在性——**新加主题不写 meta 过不了校验**，这是刻意的。
+来源项目与文档的一致性（新来源必须登记进 `theme-sources.ts`、许可证文件大小写精确存在、
+README/NOTICE 的统计与 catalog 同步）归 `npm run verify:sources` 管。
 来源审计、未接入清单与「应用整体许可证」的待拍板事项都在 `THEME-SOURCES.md`。
 
 ### 自研公众号语法
@@ -427,10 +435,11 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 
 1. `npm run check` → 0 错误
 2. `npm run verify:themes` → `ALL CHECKS PASSED`
-3. **前端行为改动**：用无头 Chrome + CDP 在真实应用里点一遍，截图或贴出实测数据
-4. **API / 数据改动**：在服务器上重跑 `sudo bash /opt/mopai/scripts/verify-all.sh`，exit code 必须是 0
-5. 部署后核对本地与线上的文件 hash
-6. `git commit`，commit message 用**英文**，写清楚"为什么"而不只是"改了什么"
+3. **主题 / 来源 / 致谢数据有改动时**：先 `npm run sync:docs` 重新生成文档区块，再 `npm run verify:sources` → `ALL CHECKS PASSED`
+4. **前端行为改动**：用无头 Chrome + CDP 在真实应用里点一遍，截图或贴出实测数据
+5. **API / 数据改动**：在服务器上重跑 `sudo bash /opt/mopai/scripts/verify-all.sh`，exit code 必须是 0
+6. 部署后核对本地与线上的文件 hash
+7. `git commit`，commit message 用**英文**，写清楚"为什么"而不只是"改了什么"
 
 **报告时区分「实测到的」和「推断的」。** 这个项目最贵的教训就是拿推断当结论。
 

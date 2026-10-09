@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   DropdownMenu,
@@ -7,7 +7,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { THEMES } from '@/lib/themes'
+import { THEMES, type Theme } from '@/lib/themes'
+import { useThemeFavorites } from '@/hooks/useThemeFavorites'
 import type { DocRecord } from '@/lib/store'
 import { APP_NAME, APP_BYLINE, REPO_URL } from '@/lib/brand'
 import { YoruMark } from '@/components/YoruMark'
@@ -70,6 +71,41 @@ const SYNC_LABEL: Record<Props['syncState'], { text: string; color: string; titl
 export default function TopBar(p: Props) {
   const [themeOpen, setThemeOpen] = useState(false)
   const activeTheme = THEMES.find((t) => t.id === p.themeId) || THEMES[0]
+  const { favorites } = useThemeFavorites()
+  const favoriteThemes = useMemo(() => THEMES.filter((t) => favorites.has(t.id)), [favorites])
+
+  // 快速切换器只放每类前几套：219 套每套都要实时渲染缩略图，
+  // 全塞进来既慢也没法扫；完整浏览在下面的「查看全部模板」。
+  // 收藏单独一组置顶、且不再进分类组，同一个主题只出现一次。
+  const QUICK_PER_CAT = 6
+  const QUICK_FAVORITES = 6
+
+  const quickTile = (t: Theme) => (
+    <button
+      key={t.id}
+      data-theme-quick={t.id}
+      onClick={() => {
+        p.onTheme(t.id)
+        setThemeOpen(false)
+      }}
+      className={`group rounded-2xl p-2 text-left transition-all ${
+        t.id === p.themeId ? 'ya-selected' : 'bg-surface-sunken hover:bg-surface-base'
+      }`}
+      style={t.id === p.themeId ? undefined : { boxShadow: 'var(--shadow-inset)' }}
+    >
+      <div className="relative h-20 overflow-hidden rounded-lg bg-white" style={{ boxShadow: 'var(--shadow-inset)' }}>
+        <div
+          className="pointer-events-none absolute left-0 top-0 origin-top-left"
+          style={{ width: 677, transform: 'scale(0.26)' }}
+          dangerouslySetInnerHTML={{ __html: p.miniPreview(t.id) }}
+        />
+      </div>
+      <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
+        <span className="ya-dot" style={{ background: t.ui.accent }} />
+        <span className="text-[12px] font-medium text-ink-1">{t.name}</span>
+      </div>
+    </button>
+  )
 
   return (
     <header className="ya-glass flex h-14 shrink-0 items-center gap-3 px-4">
@@ -153,47 +189,47 @@ export default function TopBar(p: Props) {
         <PopoverContent align="center" className="ya-pop w-[600px] border-none p-3">
           <p className="ya-eyebrow mb-2 px-1">排版主题 · 当前稿件实时预览</p>
           <div className="max-h-[62vh] overflow-y-auto pr-0.5">
+            {favoriteThemes.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1.5 flex items-center gap-1 px-1 text-[10px] font-semibold tracking-[0.12em] text-ink-4">
+                  <span style={{ color: 'var(--primary-500)' }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12 3.2l2.6 5.3 5.9.85-4.25 4.14 1 5.86L12 16.7l-5.25 2.65 1-5.86L3.5 9.35l5.9-.85z" />
+                    </svg>
+                  </span>
+                  收藏
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {favoriteThemes.slice(0, QUICK_FAVORITES).map(quickTile)}
+                </div>
+                {favoriteThemes.length > QUICK_FAVORITES && (
+                  <button
+                    onClick={() => {
+                      setThemeOpen(false)
+                      p.onOpenThemes()
+                    }}
+                    className="mt-1.5 px-1 text-[11px] text-brand-600 hover:underline"
+                  >
+                    还有 {favoriteThemes.length - QUICK_FAVORITES} 套收藏，去模板库看全部 →
+                  </button>
+                )}
+              </div>
+            )}
             {(['简约', '商务', '杂志', '活力'] as const).map((cat) => {
-              // 快速切换器只放每类前几套：219 套每套都要实时渲染缩略图，
-              // 全塞进来既慢也没法扫；完整浏览在下面的「查看全部模板」
-              const QUICK_PER_CAT = 6
-              const all = THEMES.filter((t) => t.category === cat)
+              const all = THEMES.filter((t) => t.category === cat && !favorites.has(t.id))
               const list = all.slice(0, QUICK_PER_CAT)
-              if (activeTheme.category === cat && !list.some((t) => t.id === activeTheme.id)) {
+              if (
+                activeTheme.category === cat &&
+                !favorites.has(activeTheme.id) &&
+                !list.some((t) => t.id === activeTheme.id)
+              ) {
                 list.unshift(activeTheme)
               }
               if (!list.length) return null
               return (
                 <div key={cat} className="mb-3">
                   <p className="mb-1.5 px-1 text-[10px] font-semibold tracking-[0.12em] text-ink-4">{cat}</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {list.map((t) => (
-                      <button
-                        key={t.id}
-                        data-theme-quick={t.id}
-                        onClick={() => {
-                          p.onTheme(t.id)
-                          setThemeOpen(false)
-                        }}
-                        className={`group rounded-2xl p-2 text-left transition-all ${
-                          t.id === p.themeId ? 'ya-selected' : 'bg-surface-sunken hover:bg-surface-base'
-                        }`}
-                        style={t.id === p.themeId ? undefined : { boxShadow: 'var(--shadow-inset)' }}
-                      >
-                        <div className="relative h-20 overflow-hidden rounded-lg bg-white" style={{ boxShadow: 'var(--shadow-inset)' }}>
-                          <div
-                            className="pointer-events-none absolute left-0 top-0 origin-top-left"
-                            style={{ width: 677, transform: 'scale(0.26)' }}
-                            dangerouslySetInnerHTML={{ __html: p.miniPreview(t.id) }}
-                          />
-                        </div>
-                        <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
-                          <span className="ya-dot" style={{ background: t.ui.accent }} />
-                          <span className="text-[12px] font-medium text-ink-1">{t.name}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                  <div className="grid grid-cols-3 gap-2">{list.map(quickTile)}</div>
                 </div>
               )
             })}

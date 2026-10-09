@@ -5,7 +5,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07
 - **抓取方式**：从本地 shallow clone（`git clone --depth 1`）逐字复制 LICENSE 文件，未经任何修改、截断或重新排版。
-- **结构化数据**：机器可读的版本在 `src/lib/credits.ts`，页面上的版本在 `/references`，README 的 `## Acknowledgements / 致谢` 一节与两者一致。三处内容如有出入，以 `src/lib/credits.ts` 为准。
+- **结构化数据**：机器可读的版本在 `src/lib/credits.ts`，页面上的版本在 `/references`，README 的 `## Acknowledgements / 致谢` 一节由 `npm run sync:docs` 从同一份数据生成。三处内容如有出入，以 `src/lib/credits.ts` 为准；本文件与数据的对应关系由 `npm run verify:sources` 校验（每个 credit 的仓库、许可证副本、版权行都必须能在下表里找到）。
 
 ## 一、上游清单与核实结果
 
@@ -47,9 +47,11 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 ### 许可传染性结论
 
-**八个上游项目全部是宽松许可：WTFPL v2 × 1、MIT × 4、Apache-2.0 × 3。
+<!-- BEGIN GENERATED: notice-license-tally — npm run sync:docs -->
+**八个上游项目全部是宽松许可：MIT × 4、Apache-2.0 × 3、WTFPL v2 × 1。
 没有任何 GPL / LGPL / AGPL / MPL / SSPL / BUSL 等 copyleft 或 source-available 许可，
 也没有任何项目缺失 LICENSE 文件。**
+<!-- END GENERATED: notice-license-tally -->
 
 因此这些上游对本项目选择自己的开源许可证（MIT / Apache-2.0 / 其它）不构成传染性约束。
 唯一需要留意的是 Apache-2.0 的 NOTICE/署名义务，只在我们从 wenyan 系复制实际代码时才触发。
@@ -105,8 +107,9 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 ## 四、维护约定
 
-- 新增或改动 `src/lib/credits.ts` 里的条目时，同步更新本文件的表格、`/references` 页面文案
-  （页面直接读数据，通常无需改动）和 README 的 `## Acknowledgements / 致谢` 一节。
+- 新增或改动 `src/lib/credits.ts` 里的条目时：在本文件第一节的审计表里补一行（记录 commit、
+  版权行、md5，`npm run verify:sources` 会点名缺了哪一行），再跑 `npm run sync:docs`
+  重新生成 README 的致谢一节与统计区块。`/references` 页面直接读数据，通常无需改动。
 - 每次从上游取用新代码，把 LICENSE 副本重新核对一遍：上游可能换许可证。
   核对方式就是重新读 LICENSE 文件并比对 md5，不要信 README 或 package.json 的 `license` 字段。
 - 从 Apache-2.0 上游复制实际代码时，在对应文件头部保留版权声明，并在本文件里记下改动了什么。

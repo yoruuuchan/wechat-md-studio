@@ -10,10 +10,15 @@ import {
   type Credit,
   type Usage,
 } from '@/lib/credits'
+import { THEMES } from '@/lib/themes'
+import { licenseLabel, tallyByLicense, tallyThemeSources } from '@/lib/theme-sources'
+import { ORIGINAL_LICENSE } from '@/lib/theme-meta'
 
 /**
- * Acknowledgements / References page. All content comes from src/lib/credits.ts;
- * this file is layout only.
+ * Acknowledgements / References page. All content comes from src/lib/credits.ts
+ * (code-level credits) and src/lib/theme-sources.ts / src/lib/themes.ts (theme
+ * material provenance); this file is layout only. `npm run verify:sources`
+ * fails if any project name, repo or license literal shows up in here.
  *
  * Every colour goes through the Console tokens in index.css (--ink-*, --bg-*,
  * --line-*, --primary-*) instead of hardcoded hex, so the page follows along if
@@ -87,6 +92,16 @@ function IconScale() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  )
+}
+
+function IconLayers() {
+  // Stacked sheets: the theme library's many sources.
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3 3 8l9 5 9-5-9-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="m3 13 9 5 9-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -269,6 +284,26 @@ export default function References() {
     return [...m.entries()].sort((a, b) => b[1] - a[1])
   }, [])
 
+  // copyleft 检测与 scripts/sources/report.ts 的口径一致：如果上游列表里出现
+  // GPL / SSPL 一类许可证，正向陈述「全部宽松」就不成立了，改成点名提示。
+  const copyleftCredits = useMemo(
+    () => CREDITS.filter((c) => /GPL|SSPL|BUSL|MPL/.test(c.license)),
+    [],
+  )
+
+  // 主题库的账：按许可证（自研放最后）与按来源（套数降序）。
+  const themeLicenseTally = useMemo(() => {
+    const rows = tallyByLicense(THEMES)
+    return [...rows.filter((r) => r.license !== ORIGINAL_LICENSE), ...rows.filter((r) => r.license === ORIGINAL_LICENSE)]
+  }, [])
+  const sourceRows = useMemo(
+    () =>
+      [...tallyThemeSources(THEMES)]
+        .sort((a, b) => b.count - a.count)
+        .map((s) => ({ ...s, label: s.kind === 'original' ? '本项目自研' : s.project })),
+    [],
+  )
+
   const visible = groups.filter((g) => filter === 'all' || g.usage === filter)
 
   // Chips come from the groups that have entries, not from USAGE_ORDER: a usage
@@ -327,37 +362,85 @@ export default function References() {
                 {n}
               </span>
             ))}
-            。没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件——
-            所以这些上游对本项目自己选开源许可证不构成传染性约束。
+            。
+            {copyleftCredits.length === 0
+              ? '没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件——所以这些上游对本项目自己选开源许可证不构成传染性约束。'
+              : `注意：存在 copyleft 上游（${copyleftCredits.map((c) => c.name).join('、')}），整体许可证选择以它们为准。`}
           </p>
           <ul className="mt-3 space-y-2 text-[12px] leading-[1.7]" style={{ color: 'var(--ink-3)' }}>
-            <li className="flex gap-2">
-              <span className="ya-dot mt-[6px] shrink-0" style={{ background: 'var(--warning-500)' }} />
-              <span>
-                <strong style={{ color: 'var(--ink-2)' }}>doocs/md 是 WTFPL v2，不是 MIT。</strong>
-                许可极度宽松、无传染性，但正式名称含粗口，致谢文案里怎么写需要定一个口径。
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="ya-dot mt-[6px] shrink-0" style={{ background: 'var(--frost-500)' }} />
-              <span>
-                <strong style={{ color: 'var(--ink-2)' }}>foolgry/editor 是 huasheng_editor 的 fork</strong>
-                ，LICENSE 字节相同、版权行都写「花生 (alchaincyf)」。致谢里同时点出 fork 关系和原始版权人。
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="ya-dot mt-[6px] shrink-0" style={{ background: 'var(--success-500)' }} />
-              <span>
-                <strong style={{ color: 'var(--ink-2)' }}>wenyan 系三个仓库都是 Apache-2.0</strong>
-                ，带专利授权和 NOTICE 义务。目前我们只借鉴思路、代码自己写；一旦直接复制它的代码，
-                就要保留版权声明并注明改动。
-              </span>
-            </li>
+            {CREDITS.filter((c) => c.licenseNote).map((c) => (
+              <li key={c.name} className="flex gap-2">
+                <span className="ya-dot mt-[6px] shrink-0" style={{ background: 'var(--warning-500)' }} />
+                <span>
+                  <strong style={{ color: 'var(--ink-2)' }}>{c.name}</strong>：{c.licenseNote}
+                </span>
+              </li>
+            ))}
           </ul>
           <p className="mt-3 text-[11.5px] leading-[1.7]" style={{ color: 'var(--ink-4)' }}>
             每份 LICENSE 的逐字副本、上游 commit、md5 和明细在仓库的{' '}
             <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/</code> 目录，
             说明文件是 <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/NOTICE.md</code>。
+          </p>
+        </section>
+
+        {/* 主题库来源：模板库里的每一套主题的来路与许可账 */}
+        <section className="ya-well mb-4 p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <span style={{ color: 'var(--primary-600)' }}>
+              <IconLayers />
+            </span>
+            <h2 className="text-[14px] font-semibold" style={{ color: 'var(--ink-1)' }}>
+              主题库来源
+            </h2>
+            <span className="ya-eyebrow">模板库 {THEMES.length} 套 · 逐来源</span>
+          </div>
+          <p className="mt-2.5 text-[12.5px] leading-[1.75]" style={{ color: 'var(--ink-2)' }}>
+            模板库的 {THEMES.length} 套主题按上游许可证分组：{' '}
+            {themeLicenseTally.map((r, i) => (
+              <span key={r.license}>
+                {i > 0 && ' · '}
+                <strong style={{ color: 'var(--ink-1)', fontFamily: 'var(--font-mono)' }}>
+                  {licenseLabel(r.license)}
+                </strong>{' '}
+                {r.count}
+              </span>
+            ))}
+            。每套主题的卡片上点「来源」可看到它的原项目、原作者与 lineage；许可证原文留存在仓库{' '}
+            <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/</code>，逐来源审计见{' '}
+            <code style={{ fontFamily: 'var(--font-mono)' }}>THEME-SOURCES.md</code>。
+          </p>
+          <ul className="mt-3 space-y-2">
+            {sourceRows.map((s) => (
+              <li
+                key={s.project}
+                className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 rounded-xl px-3 py-2 text-[12px]"
+                style={{ background: 'var(--bg-tint)' }}
+              >
+                {s.repo ? (
+                  <a
+                    href={s.repo}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="font-semibold underline decoration-dotted underline-offset-2"
+                    style={{ color: 'var(--primary-600)' }}
+                  >
+                    {s.label}
+                  </a>
+                ) : (
+                  <span className="font-semibold" style={{ color: 'var(--ink-1)' }}>{s.label}</span>
+                )}
+                <span className="tabular-nums" style={{ color: 'var(--ink-3)' }}>{s.count} 套</span>
+                <span className="text-[11px]" style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                  {s.licenses.map((l) => `${licenseLabel(l.license)} ×${l.count}`).join(' · ')}
+                </span>
+                <span className="ml-auto text-[11px]" style={{ color: 'var(--ink-4)' }}>{s.author}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[11.5px] leading-[1.7]" style={{ color: 'var(--ink-4)' }}>
+            这份账与 README、THEME-SOURCES.md 的数字同源（`src/lib/theme-sources.ts` + 主题 catalog），
+            由 <code style={{ fontFamily: 'var(--font-mono)' }}>npm run verify:sources</code> 在构建前机器校验。
           </p>
         </section>
 
