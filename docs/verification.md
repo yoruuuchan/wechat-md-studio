@@ -54,6 +54,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 |---|---|
 | 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` |
 | 收藏 / References | [cdp-verify-favorites.mjs](../scripts/cdp-verify-favorites.mjs)：`node scripts/cdp-verify-favorites.mjs <url> [CDP端口]`；无需登录 |
+| 使用规范 /terms 与侧栏入口 | [cdp-verify-terms.mjs](../scripts/cdp-verify-terms.mjs)：`node scripts/cdp-verify-terms.mjs <url> [CDP端口]`；无需登录 |
 | 同步滚动 / 布局变化 | [cdp-verify-scroll-sync.mjs](../scripts/cdp-verify-scroll-sync.mjs)：先读脚本参数；覆盖缩放、换纸、图片变化与往返漂移 |
 | 匿名上传与公开访问 | [cdp-verify-public-access.mjs](../scripts/cdp-verify-public-access.mjs)：`node scripts/cdp-verify-public-access.mjs <url> 9335` |
 | 编辑器 / 富文本 / 复制 / 图片粘贴 | [cdp-verify-editor-upgrades.mjs](../scripts/cdp-verify-editor-upgrades.mjs)：`node scripts/cdp-verify-editor-upgrades.mjs <url> <key> 9335` |

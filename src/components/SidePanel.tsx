@@ -154,6 +154,15 @@ export default function SidePanel(p: Props) {
 
         <TabsContent value="materials" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
           <Label>图片清单 · 点击上传直接回填</Label>
+          <p className="mb-2.5 mt-1 text-[11px] leading-relaxed text-ink-3">
+            上传的图片公网可读，14 天没被引用会自动回收。
+            <Link
+              to="/terms"
+              className="ml-1 whitespace-nowrap text-brand underline decoration-brand/40 underline-offset-2"
+            >
+              使用规范 →
+            </Link>
+          </p>
           {p.materials.length === 0 ? (
             <p className="ya-well p-3 text-[13px] leading-relaxed text-ink-3">
               正文中还没有图片。用 <code className="rounded bg-surface-sunken px-1">![图注说明]()</code> 添加占位，或直接把图片拖进编辑器。
@@ -283,6 +292,16 @@ export default function SidePanel(p: Props) {
               className="ml-1 whitespace-nowrap text-brand underline decoration-brand/40 underline-offset-2"
             >
               完整清单与许可 →
+            </Link>
+          </p>
+          <div className="mt-4"><Label>使用规范</Label></div>
+          <p className="ya-well p-3 text-[12px] leading-relaxed text-ink-2">
+            正文只存在你这台浏览器里，服务器不收；图片上传是公开写入面，传上来的图任何人都能打开。
+            <Link
+              to="/terms"
+              className="ml-1 whitespace-nowrap text-brand underline decoration-brand/40 underline-offset-2"
+            >
+              禁止用途与投诉删除 →
             </Link>
           </p>
         </TabsContent>
