@@ -432,6 +432,20 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 若 tip 已前移就扔掉手上这包重建**（重建 2 分钟，比重装一遍便宜）。恢复方式：master tip
 > `f30b771` 重建重传，xray 与直连两条通道轮流开窗（直连 08:43 重开），按「分块累积 + 逐块
 > sha256 + 凑齐后 `flock` 安装」落地，三重核对全过，线上资产名回到 `index-Baubn_TV.js`。
+>
+> 2026-10-09 部署记录（收尾文档同步上线）：合并 `102567b`（README / AGENTS / 验证导航登记局部复制与深色验收，
+> Skill 更名「公众号排版助手 by Yoru」与 editorUrl 登录边界；纯文档，构建产物不变）。整包 sha256 `c5555bda…`
+> （33.7MB，9×4MB 分块上传，part-05 撞到一次 `send() failed, 10054`，自动重传补齐后逐块核 hash），
+> `flock` 安装于 10:29:28 UTC，三重核对全过：线上 `dist/boot.js` sha256 = 本地 `b4840d2f…`，`index.html`
+> 资产名 `index-Baubn_TV.js` / `index-BwLwt3me.css` 未变（JS 资产字节 `80bd585b…` 与本地一致），公网 200。
+> **本轮等于原样重装**：改动都在文档层。
+>
+> **顺带发现（未处理，待站长拍板）**：**当前线上**客户端 bundle 是 React 开发版——根因是主工作区
+> `app/.env` 第一行 `NODE_ENV=development` 被 `npm run build`（vite build）读走，React 按开发模式出包
+> （入口 2.66MB，含 `jsxDEV`；`StrictMode` 双渲染与开发警告在线上一直生效）。生产版构建入口 2.31MB
+> （`index-QCLeONym.js`），`NODE_ENV=production npm run build` 可复现，且与干净 worktree 构建字节一致
+> （入口 sha256 `d87e6206…`）；服务端 `dist/boot.js` 两种模式同哈希，不受影响。此前版本未逐版回查。
+> 要不要切生产版、部署构建是否固定 `NODE_ENV=production`，由站长决定后另行处理。
 
 ### 产品方向（用户明确拍板的）
 
