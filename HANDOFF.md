@@ -248,7 +248,6 @@ python -m git_filter_repo --force \
 
 **验收重写结果时只扫 HEAD 的祖先**：`git rev-list --all` 会把你为了对比而 fetch 进来的
 备份 remote 也算进去，于是"没替换成功"的假象。用 `git rev-list HEAD`。
-另外**必查** `git grep -c '\*\*\*REMOVED\*\*\*' HEAD` 是不是 0——那是坑 1 的唯一信号。
 重写前先 `git clone --mirror` 一份备份，出问题能整仓还原。
 
 **红线：全量重建会改写公开历史，只有在确认还没有外部 clone/fork 时才允许 force push。**
@@ -399,6 +398,31 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > （新，含窄窗口、resize、换纸、图片变化、往返漂移）；同时修好了侧栏改版后失效的「同步滚动」开关
 > 选择器（`cdp-verify-editor-upgrades.mjs` 现在全绿）。回归测试：`src/lib/inline-cjk.test.ts`、
 > `src/lib/sync-scroll.test.ts`。
+>
+> 2026-10-09 补记（部署协调，不涉及代码）：线上今天**装了两遍**，原因值得记住。第一次（13:54 +09:00）
+> 用本会话 merge 出的 `661d3fa` 构建部署，装完才发现 master 上还有 `7111efb`（主题收藏）没进那个构建
+> ——等于把别人已经上线的功能从线上盖掉了。第二次（14:17）改用当时的 tip `ee324e0` 重建、重新分块
+> 上传、再 `flock` 装一遍，收藏功能已回到线上（实测 `/themes` 219 个收藏按钮，点击写入
+> `mopai.theme-favorites.v1`）。**教训：构建前先 `git log --oneline -1 master` 确认 tip，别用自己
+> 合并时的那个 commit 去构建**——并行会话的提交可能在合并与安装之间进到 master。分块上传 + `flock`
+> 这两条硬规矩这次都照做了（包名带 commit 短哈希，`/tmp` 里 9 块逐块核 sha256 再 `cat` 重组）。
+>
+> 发布到公开仓库：本次增量发布的区间是 `3460436..47ddeb2`（本会话的两次修复 + 主题收藏 +
+> verify-sources + LICENSE 目录合并）。
+>
+> 2026-10-09 更新（编辑器工具栏分支）：左栏标题区加了一条 Markdown 工具栏 + 语义格式刷。
+> 新文件 `src/lib/md-format.ts`（**纯函数**：行内/块级转换、格式状态识别、格式刷、插入模板）与
+> `src/components/MarkdownToolbar.tsx`（UI；折叠靠隐藏测量行按真实宽度算，低频项进常驻的 `···`）。
+> `EditorPane` 新增 `getState / applyEdit / insertTemplate / undo / redo` 句柄方法和
+> `onViewState / onPaint` 回调；`EditorPage` 把命令接到和打字同一条链路上（`view.dispatch` →
+> `onChange` → `activeDoc.content`），所以预览、同步滚动、草稿保存、复制都自然跟着更新。
+> **模块约定**：`md-format.ts` 不 import CodeMirror / React，每个命令都是
+> `(text, selection) → { doc, from, to }`，编辑层只负责 dispatch 与最小 diff；加新命令沿用这一形状。
+> 格式刷只复制**语义**、不复制视觉：行内 bold/mark/italic/strike/code 取精确状态（源没有的会被去掉），
+> 块级复制 普通正文/章节标题/小标题/金句卡片/引文框/居中强调（章节标题连 kicker 一起复制）。
+> 单击刷一次、双击锁定、Esc 退出；锁定态在按钮上多一个锁形小标。
+> 单测 `src/lib/md-format.test.ts`（52 项）；浏览器验收 `scripts/cdp-verify-toolbar.mjs`
+> （75 项，本地生产模式 + 独立库；折叠部分要先把侧栏展开，否则预览面板 maxSize 820 会顶住编辑区宽度）。
 
 ### 产品方向（用户明确拍板的）
 

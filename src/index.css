@@ -374,6 +374,34 @@ body {
 .ya-link-btn:hover { background: var(--bg-tint); color: var(--ink-1); }
 .ya-link-btn.danger:hover { color: var(--error-700); }
 
+/* 编辑器工具条的小按钮：24px 高，激活态沿用 ya-selected 的凹陷 + 描边铁律 */
+.ya-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.ya-tool:hover:not(:disabled) { background: var(--line-1); color: var(--ink-1); }
+.ya-tool:disabled { color: var(--ink-4); cursor: not-allowed; }
+.ya-tool[data-active="true"] {
+  background: var(--bg-sunken);
+  box-shadow: var(--shadow-inset), inset 0 0 0 1.5px var(--primary-500);
+  color: var(--primary-700);
+}
+
 /* 输入：凹陷 + focus 3px halo（永不出现浏览器默认 outline） */
 .ya-input {
   height: 36px;

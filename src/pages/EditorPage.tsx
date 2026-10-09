@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Toaster, toast } from 'sonner'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +9,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import TopBar from '@/components/TopBar'
-import EditorPane, { type EditorHandle } from '@/components/EditorPane'
+import EditorPane, { type EditorHandle, type EditorViewState } from '@/components/EditorPane'
+import MarkdownToolbar, { type BrushMode, type ToolbarAction, type ToolbarState } from '@/components/MarkdownToolbar'
 import PreviewPane from '@/components/PreviewPane'
 import SidePanel from '@/components/SidePanel'
 import RatioPicker from '@/components/RatioPicker'
@@ -27,6 +27,30 @@ import {
 import { renderDiagramPng } from '@/lib/diagram-raster'
 import { parseMarkdown } from '@/lib/parse'
 import {
+  applyBrush,
+  blockAtLine,
+  blockCharRange,
+  buildCarousel,
+  buildCodeFence,
+  buildGallery,
+  buildImagePlaceholder,
+  buildMath,
+  buildMermaid,
+  buildTable,
+  clearInline,
+  convertBlocksTo,
+  inlineStateAt,
+  lineOfOffset,
+  lineStarts,
+  snapshotAt,
+  toBlockInfo,
+  toggleInline,
+  toggleLink,
+  toggleList,
+  type BrushSnapshot,
+  type EditResult,
+} from '@/lib/md-format'
+import {
   renderDoc,
   collectMaterials,
   fillImageSrc,
@@ -41,7 +65,6 @@ import { cleanHtml, copyPlain, copyRichText, downloadFile, previewPage } from '@
 import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
-import { CHEATSHEET } from '@/lib/sample'
 import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import { blobToBase64, compressForUpload, cropToRatio, fileFromImageUrl, filenameForMime } from '@/lib/image'
@@ -140,8 +163,18 @@ export default function EditorPage() {
   const [conflictOpen, setConflictOpen] = useState(false)
   const importKindRef = useRef<'markdown' | 'docx' | 'bundle'>('markdown')
   const importRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<EditorHandle>(null)
   const previewRef = useRef<PreviewScrollHandle>(null)
+  /**
+   * Live editor state for the toolbar: the selection, and how deep the undo
+   * history is. Reported by EditorPane on every transaction.
+   */
+  const [viewState, setViewState] = useState<EditorViewState | null>(null)
+  /** Format brush: off, one painting, or locked for a run of paintings. */
+  const [brush, setBrush] = useState<BrushMode>('off')
+  /** What the brush captured when it was armed; read again on every painting. */
+  const brushRef = useRef<BrushSnapshot | null>(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user, isAuthenticated, isLoading: authLoading, isFetching: authFetching, logout } = useAuth()
@@ -281,6 +314,37 @@ export default function EditorPage() {
     [parsed, theme, settings.sig, mathSvgs, resolveDiagram],
   )
   const materials = useMemo(() => collectMaterials(parsed, resolveDiagram), [parsed, resolveDiagram])
+
+  // The toolbar reads block semantics off the parser's own blocks — the same
+  // structure the renderer consumes, so "what the menu says" cannot drift from
+  // "what the preview shows".
+  const blockInfos = useMemo(() => toBlockInfo(parsed.blocks), [parsed.blocks])
+
+  const toolbarState = useMemo<ToolbarState>(() => {
+    const text = activeDoc?.content ?? ''
+    if (!viewState) {
+      return {
+        inline: { bold: false, mark: false, italic: false, strike: false, code: false, link: false },
+        block: 'paragraph',
+        ordered: false,
+        canUndo: false,
+        canRedo: false,
+      }
+    }
+    const from = Math.max(0, Math.min(viewState.from, text.length))
+    const to = Math.max(from, Math.min(viewState.to, text.length))
+    const starts = lineStarts(text)
+    const line = lineOfOffset(starts, from)
+    const block = blockAtLine(blockInfos, line)
+    const range = block ? blockCharRange(text, block, starts) : undefined
+    return {
+      inline: inlineStateAt(text, { from, to }, range),
+      block: block?.kind ?? 'paragraph',
+      ordered: block?.ordered ?? false,
+      canUndo: viewState.undoDepth > 0,
+      canRedo: viewState.redoDepth > 0,
+    }
+  }, [activeDoc?.content, viewState, blockInfos])
 
   const { onEditorScroll, onPreviewScroll, onLayoutChange } = useSyncScroll({
     enabled: settings.syncScroll,
@@ -837,6 +901,134 @@ export default function EditorPage() {
     })
   }
 
+  /** Character range of the block around a position, for scoping inline scans. */
+  const rangeAt = (text: string, pos: number) => {
+    const starts = lineStarts(text)
+    const block = blockAtLine(blockInfos, lineOfOffset(starts, pos))
+    return block ? blockCharRange(text, block, starts) : undefined
+  }
+
+  /** Every toolbar command funnels through here: compute an edit, apply it. */
+  const runAction = (a: ToolbarAction) => {
+    const ed = editorRef.current
+    if (!ed) return
+    if (a.type === 'undo') {
+      ed.undo()
+      return
+    }
+    if (a.type === 'redo') {
+      ed.redo()
+      return
+    }
+    const st = ed.getState()
+    if (!st) return
+    const sel = { from: st.from, to: st.to }
+    const apply = (res: EditResult | null) => {
+      if (res) ed.applyEdit(res)
+    }
+    switch (a.type) {
+      case 'inline':
+        apply(toggleInline(st.text, sel, a.format, rangeAt(st.text, sel.from)))
+        return
+      case 'link':
+        apply(toggleLink(st.text, sel, rangeAt(st.text, sel.from)))
+        return
+      case 'clear': {
+        // Inline first: it never adds or removes a line, so the block pass can
+        // keep working from the parsed spans afterwards.
+        const inlined = clearInline(st.text, sel, rangeAt(st.text, sel.from))
+        const doc = inlined?.doc ?? st.text
+        const at = inlined ?? sel
+        const blocked = convertBlocksTo(doc, { from: at.from, to: at.to }, blockInfos, { kind: 'paragraph' })
+        apply(blocked ?? inlined)
+        return
+      }
+      case 'block':
+      case 'quote':
+        apply(convertBlocksTo(st.text, sel, blockInfos, { kind: a.kind }))
+        return
+      case 'list':
+        apply(toggleList(st.text, sel, a.ordered))
+        return
+      case 'image':
+        imageInputRef.current?.click()
+        return
+      case 'imagePlaceholder': {
+        const t = buildImagePlaceholder()
+        ed.insertTemplate(t.text, t.caret, t.caretEnd)
+        return
+      }
+      case 'table': {
+        const t = buildTable(a.cols, a.rows, a.align)
+        ed.insertTemplate(t.text, t.caret)
+        return
+      }
+      case 'carousel': {
+        const t = buildCarousel(a.ratio)
+        ed.insertTemplate(t.text, t.caret)
+        return
+      }
+      case 'gallery': {
+        const t = buildGallery(a.cols, a.ratio)
+        ed.insertTemplate(t.text, t.caret)
+        return
+      }
+      case 'math': {
+        const t = buildMath(a.tex)
+        ed.insertTemplate(t.text, t.caret)
+        return
+      }
+      case 'code': {
+        const t = buildCodeFence(a.lang)
+        ed.insertTemplate(t.text, t.caret)
+        return
+      }
+      case 'mermaid': {
+        const t = buildMermaid()
+        ed.insertTemplate(t.text, t.caret)
+        return
+      }
+      case 'hr':
+        ed.insertTemplate('---')
+        return
+      case 'signature':
+        ed.insertTemplate('@signature')
+        return
+    }
+  }
+
+  /** Arm or disarm the format brush; arming captures the source's semantics. */
+  const handleBrush = (mode: BrushMode) => {
+    if (mode === 'off') {
+      brushRef.current = null
+      setBrush('off')
+      return
+    }
+    const st = editorRef.current?.getState()
+    if (!st) return
+    brushRef.current = snapshotAt(st.text, { from: st.from, to: st.to }, blockInfos)
+    setBrush(mode)
+  }
+
+  /**
+   * Paint the captured format onto whatever the mouse just selected. A single
+   * brush disarms only after a painting that actually changed something.
+   */
+  const handlePaint = () => {
+    const ed = editorRef.current
+    const snap = brushRef.current
+    if (brush === 'off' || !ed || !snap) return
+    const st = ed.getState()
+    if (!st) return
+    const res = applyBrush(st.text, { from: st.from, to: st.to }, snap, blockInfos)
+    if (!res) return
+    ed.applyEdit(res)
+    if (brush === 'single') {
+      brushRef.current = null
+      setBrush('off')
+    }
+  }
+
   return (
     <div className="ya-page flex h-screen flex-col overflow-hidden">
       <TopBar
@@ -921,32 +1113,7 @@ export default function EditorPage() {
               e.preventDefault()
             }}
           >
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-line-1 px-4">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3">
-                markdown · 语义源稿
-                <span className="ml-2 normal-case tracking-normal text-ink-4">可拖拽图片上传 · ctrl/⌘+space 补全 · ⌘B 加粗 · ⌘K 链接</span>
-              </span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="rounded-lg px-2 py-1 text-[11px] text-ink-2 transition-colors hover:bg-line-1 hover:text-ink-1">
-                    语法速查
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="ya-pop w-80 border-none p-0">
-                  <p className="ya-eyebrow border-b border-line-2 px-3 py-2">
-                    公众号专用语法
-                  </p>
-                  <ul className="max-h-80 overflow-y-auto p-2">
-                    {CHEATSHEET.map((c) => (
-                      <li key={c.syntax} className="flex items-baseline gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-tint">
-                        <code className="shrink-0 rounded-md bg-brand-100 px-1.5 py-0.5 font-mono text-[11px] text-brand-600">{c.syntax}</code>
-                        <span className="text-[12px] text-ink-2">{c.desc}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </PopoverContent>
-              </Popover>
-            </div>
+            <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
             <div className="min-h-0 flex-1">
               {activeLoading || activeError ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
@@ -971,6 +1138,8 @@ export default function EditorPage() {
                   onLayout={onEditorLayout}
                   onFiles={handleEditorFiles}
                   onHtml={handleHtml}
+                  onViewState={setViewState}
+                  onPaint={brush !== 'off' ? handlePaint : undefined}
                 />
               )}
             </div>
@@ -1156,6 +1325,20 @@ export default function EditorPage() {
           const f = e.target.files?.[0]
           if (f) void handleImportFile(f, importKindRef.current)
           e.target.value = ''
+        }}
+      />
+
+      {/* 工具栏「图片」：走和拖拽完全相同的上传 / 裁切 / 回填链路，插到光标处 */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files || [])
+          e.target.value = ''
+          if (files.length) handleEditorFiles(files, null)
         }}
       />
 

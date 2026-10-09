@@ -10,7 +10,7 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, redo, undo, redoDepth, undoDepth } from '@codemirror/commands'
 import {
   autocompletion,
   closeBrackets,
@@ -29,6 +29,25 @@ export interface EditorHandle extends EditorScrollHandle {
   insertText: (text: string) => void
   /** Insert at an explicit document position; null means the cursor. */
   insertAt: (pos: number | null, text: string) => void
+  /** The live document and selection, for computing an edit. */
+  getState: () => { text: string; from: number; to: number } | null
+  /** Apply a computed edit; only the changed span is dispatched so undo stays one step. */
+  applyEdit: (res: { doc: string; from: number; to: number }) => void
+  /** Insert a whole block, optionally putting the caret (or a selection) inside it. */
+  insertTemplate: (text: string, caret?: number, caretEnd?: number) => void
+  undo: () => void
+  redo: () => void
+  focus: () => void
+}
+
+/** What the toolbar needs to know about the editor between transactions. */
+export interface EditorViewState {
+  /** 0-based line of the selection start. */
+  line: number
+  from: number
+  to: number
+  undoDepth: number
+  redoDepth: number
 }
 
 // ---------- 公众号语法 snippets ----------
@@ -328,6 +347,24 @@ function insertBlock(view: EditorView, rawPos: number, text: string) {
   view.focus()
 }
 
+/**
+ * `insertBlock`, but the caret (or a selection) can be placed inside the
+ * inserted text — a table wants the caret in its first header cell, a fence
+ * wants it on the empty line in the middle.
+ */
+function insertBlockTemplate(view: EditorView, rawPos: number, text: string, caret?: number, caretEnd?: number) {
+  const clamped = Math.max(0, Math.min(rawPos, view.state.doc.length))
+  const line = view.state.doc.lineAt(clamped)
+  const pos = line.text.trim() ? line.to : clamped
+  const before = line.text.trim() ? '\n\n' : line.from > 0 ? '\n' : ''
+  const anchor = pos + before.length + (caret ?? text.length)
+  view.dispatch({
+    changes: { from: pos, insert: before + text + '\n' },
+    selection: caretEnd != null ? { anchor, head: pos + before.length + caretEnd } : { anchor },
+  })
+  view.focus()
+}
+
 interface Props {
   value: string
   /**
@@ -355,10 +392,17 @@ interface Props {
    * Returning true means the page converted it and the editor should stand down.
    */
   onHtml?: (html: string, plain: string) => boolean
+  /** Fired whenever the selection or the document changes; feeds the toolbar. */
+  onViewState?: (s: EditorViewState) => void
+  /**
+   * Fired on every mouseup in the editor. The page listens only while the
+   * format brush is armed, and uses it as "paint onto what is now selected".
+   */
+  onPaint?: () => void
 }
 
 const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
-  { value, docKey, onChange, onScroll, onLayout, onFiles, onHtml },
+  { value, docKey, onChange, onScroll, onLayout, onFiles, onHtml, onViewState, onPaint },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -373,6 +417,10 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
   onHtmlRef.current = onHtml
   const onLayoutRef = useRef(onLayout)
   onLayoutRef.current = onLayout
+  const onViewStateRef = useRef(onViewState)
+  onViewStateRef.current = onViewState
+  const onPaintRef = useRef(onPaint)
+  onPaintRef.current = onPaint
   /** Last seen scroller size, so the update listener reports real layout changes only. */
   const lastSize = useRef({ w: 0, h: 0 })
 
@@ -433,9 +481,25 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
             onFilesRef.current?.(files, at)
             return true
           },
+          // The brush paints on release: by then the drag has settled on the
+          // passage the user meant, and a plain click has its collapsed cursor.
+          mouseup: () => {
+            onPaintRef.current?.()
+            return false
+          },
         }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChangeRef.current(u.state.doc.toString())
+          if (u.docChanged || u.selectionSet) {
+            const sel = u.state.selection.main
+            onViewStateRef.current?.({
+              line: u.state.doc.lineAt(sel.from).number - 1,
+              from: sel.from,
+              to: sel.to,
+              undoDepth: undoDepth(u.state),
+              redoDepth: redoDepth(u.state),
+            })
+          }
           // The scroller's own size is the one signal that means "the text just
           // wrapped differently": the pane got narrower or shorter. Scroll sync
           // has to re-anchor after that, and a wrapped line's height cannot be
@@ -452,6 +516,15 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
     const view = new EditorView({ state, parent: hostRef.current })
     viewRef.current = view
     lastSize.current = { w: view.scrollDOM.clientWidth, h: view.scrollDOM.clientHeight }
+    // Seed the toolbar: a freshly built view (article switch) has a selection
+    // and an empty history the page has not heard about yet.
+    onViewStateRef.current?.({
+      line: view.state.doc.lineAt(view.state.selection.main.from).number - 1,
+      from: view.state.selection.main.from,
+      to: view.state.selection.main.to,
+      undoDepth: undoDepth(view.state),
+      redoDepth: redoDepth(view.state),
+    })
     // Exposed so the headless-browser check in scripts/cdp-verify-image-ops.mjs
     // can type into the real editor instead of guessing at the DOM.
     ;(window as unknown as { __mopaiCodemirror?: EditorView }).__mopaiCodemirror = view
@@ -534,6 +607,53 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
       if (!view) return
       insertBlock(view, pos ?? view.state.selection.main.head, text)
     },
+    getState: () => {
+      const view = viewRef.current
+      if (!view) return null
+      const sel = view.state.selection.main
+      return { text: view.state.doc.toString(), from: sel.from, to: sel.to }
+    },
+    applyEdit: (res) => {
+      const view = viewRef.current
+      if (!view) return
+      const old = view.state.doc.toString()
+      if (old === res.doc) {
+        view.dispatch({ selection: { anchor: res.from, head: res.to } })
+        view.focus()
+        return
+      }
+      // Dispatch only the changed span: a whole-document replacement would be
+      // recorded as one edit too, but this keeps unspecified extensions and
+      // any in-flight selection sound, and the change set stays meaningful.
+      let head = 0
+      const min = Math.min(old.length, res.doc.length)
+      while (head < min && old[head] === res.doc[head]) head++
+      let tail = 0
+      while (tail < min - head && old[old.length - 1 - tail] === res.doc[res.doc.length - 1 - tail]) tail++
+      view.dispatch({
+        changes: { from: head, to: old.length - tail, insert: res.doc.slice(head, res.doc.length - tail) },
+        selection: { anchor: res.from, head: res.to },
+      })
+      view.focus()
+    },
+    insertTemplate: (text: string, caret?: number, caretEnd?: number) => {
+      const view = viewRef.current
+      if (!view) return
+      insertBlockTemplate(view, view.state.selection.main.head, text, caret, caretEnd)
+    },
+    undo: () => {
+      const view = viewRef.current
+      if (!view) return
+      undo(view)
+      view.focus()
+    },
+    redo: () => {
+      const view = viewRef.current
+      if (!view) return
+      redo(view)
+      view.focus()
+    },
+    focus: () => viewRef.current?.focus(),
   }))
 
   return <div ref={hostRef} className="h-full w-full overflow-hidden" />
