@@ -33,7 +33,8 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 - `.env` 从 `.env.example` 复制（`.env` 已被 gitignore，**永远不要提交**）
 - 项目级命令与按范围选择的验收脚本见 [AGENTS](AGENTS.md#验证与完成报告) 和 [验证导航](docs/verification.md)。
 
-开发模式下 `ACCESS_KEY` / `SESSION_SECRET` 可使用示例占位值；`.env` 中设 `NODE_ENV=development`。
+开发模式下 `ACCESS_KEY` / `SESSION_SECRET` 可使用示例占位值；`.env` 里**不要写 `NODE_ENV`**
+（不是字面量 `production` 就是开发语义，而 vite 会把这个值拿去决定 React 编译条件）。
 生产模式会拒绝占位值，完整变量与启动方式见 [配置文档](docs/configuration.md)。
 测匿名额度不用等一天：起服务时压小就行，例如
 `ANON_DAILY_IMAGES=2 ANON_DAILY_BYTES=1048576 ANON_TOTAL_BYTES=10485760`。

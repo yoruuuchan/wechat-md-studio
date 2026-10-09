@@ -16,7 +16,9 @@ cp .env.example .env
 npm run dev
 ```
 
-PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时把 `.env` 的 `NODE_ENV` 改为 `development`；
+PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时**删掉 `.env` 里的 `NODE_ENV` 这一行**：
+服务端只要不是字面量 `production` 就是开发语义，不用显式写；而 vite 会把 `.env` 的 `NODE_ENV`
+当作 React 的编译条件，留着 `development` 就会把开发版 bundle 一路构建出来并部署上线。
 默认开发地址是 `http://localhost:3000`，Vite 与 Hono 共用端口。
 开发环境允许示例密钥；缺密钥会使用开发默认值并输出 `[env]` 警告。
 图片服务未配置或不可达时，上传会明确报错，仍可编辑、预览、复制与导出。
@@ -26,7 +28,7 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时把 `.env` �
 
 | 变量 | 当前默认 / 要求 | 用途 |
 |---|---|---|
-| `NODE_ENV` | `production` 开启生产校验；示例文件默认 `production` | 区分开发与生产；GC 仅在生产服务排程 |
+| `NODE_ENV` | 示例文件默认 `production`；**开发时整行删掉，不要写成 `development`** | `production` 开启生产校验与 GC 排程；写进 `.env` 会同时改变前端构建产物 |
 | `HOST` | `127.0.0.1` | 服务端监听地址 |
 | `PORT` | `3100` | 生产服务端端口；Vite 开发端口由 `vite.config.ts` 定义 |
 | `DATABASE_URL` | 生产必填；示例为 `file:./data/mopai.db` | SQLite；相对路径按进程工作目录解析 |

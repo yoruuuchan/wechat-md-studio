@@ -52,7 +52,8 @@ cp .env.example .env
 npm run dev
 ```
 
-PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时将 `.env` 的 `NODE_ENV` 设为 `development`，默认打开 `http://localhost:3000`。
+PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时把 `.env` 里的 `NODE_ENV` 整行删掉——
+留着 `development` 会让 vite 构建出 React 开发版 bundle 并一路带到线上。默认打开 `http://localhost:3000`。
 图床配置、生产密钥与启动方式见 [配置与本地运行](docs/configuration.md)。
 
 ## 公众号 Markdown 方言

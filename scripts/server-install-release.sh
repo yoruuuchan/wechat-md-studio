@@ -22,6 +22,22 @@ tar -xzf "$RELEASE" -C /tmp/mopai-extract
 test -f /tmp/mopai-extract/dist/boot.js || { echo "tarball has no dist/boot.js" >&2; exit 1; }
 ls -la /tmp/mopai-extract/dist
 
+# React ships its development bundle whenever the build machine's .env carries
+# NODE_ENV=development, because vite reads that value out of .env and uses it as
+# the compilation condition. That bundle has reached production more than once.
+ENTRY=$(grep -o 'assets/index-[A-Za-z0-9_-]*\.js' /tmp/mopai-extract/dist/public/index.html | head -1)
+if [ -n "$ENTRY" ] && grep -q "jsxDEV" "/tmp/mopai-extract/dist/public/$ENTRY"; then
+  if [ "${MOPAI_ALLOW_DEV_BUNDLE:-}" = "1" ]; then
+    echo "WARN: installing React's development bundle ($ENTRY) anyway" >&2
+  else
+    echo "REFUSED: $ENTRY contains jsxDEV — this is React's development build." >&2
+    echo "  Cause: NODE_ENV=development in the build machine's app/.env." >&2
+    echo "  Fix: delete that line from .env, rebuild, re-upload." >&2
+    echo "  Deliberately want it? re-run with MOPAI_ALLOW_DEV_BUNDLE=1." >&2
+    exit 1
+  fi
+fi
+
 echo "== install into /opt/mopai/app =="
 sudo rm -rf /opt/mopai/app/dist
 sudo cp -r /tmp/mopai-extract/dist /opt/mopai/app/dist
