@@ -32,6 +32,27 @@ function equalsConstantTime(a: string, b: string): boolean {
 }
 
 /**
+ * One startup line per token that is too weak to be worth having.
+ *
+ * The door itself keeps reading the raw env on every request (see
+ * `configuredTokens`), so this changes no behaviour — it only says out loud,
+ * once, what `AGENT_TOKENS=claude:pass` means: an agent token can write the
+ * owner's drafts box, so a guessable one is a backdoor, not a shortcut. Called
+ * from boot.ts in production only. The token value never reaches the log; the
+ * line carries the entry's name and its length.
+ */
+export function warnAboutWeakTokens(minLength = 16): void {
+  for (const entry of configuredTokens()) {
+    if (entry.token.length < minLength) {
+      console.warn(
+        `[agent] AGENT_TOKENS entry "${entry.name}" is only ${entry.token.length} characters; ` +
+          `mint one with 32 random bytes (see .env.example)`,
+      )
+    }
+  }
+}
+
+/**
  * Parsed on every request: it is a handful of splits, and this way nothing has
  * to fight a module-level cache that was filled before `.env` was read.
  */

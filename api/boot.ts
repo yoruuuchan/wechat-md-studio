@@ -9,6 +9,7 @@ import { storage } from "./lib/storage";
 import { startAnonGc } from "./lib/anon-gc";
 import { env } from "./lib/env";
 import { securityHeaders } from "./lib/security-headers";
+import { warnAboutWeakTokens } from "./lib/agent-auth";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -53,6 +54,11 @@ if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
+
+  // The agent door stays closed while AGENT_TOKENS is empty; when it is open,
+  // say once at boot if a token is too weak to be worth having. (The door reads
+  // the raw env per request by design, so boot is the one eager reader.)
+  warnAboutWeakTokens();
 
   // Port and bind address come from lib/env.ts, which validates them (an
   // unparsable PORT used to become NaN and hand the failure to the OS).

@@ -308,7 +308,7 @@ python -c "import secrets,base64;print('mopai_'+base64.urlsafe_b64encode(secrets
 | `ANON_TOTAL_BYTES` | 1.5 GB | 所有匿名上传加起来的总上限——桶是共享免费额度 |
 | `ANON_BURST_PER_MINUTE` | 12 | 每个来源 IP 每分钟，内存计数，用来挡住灌水 |
 | `ANON_IP_DAILY_IMAGES` | 100 | 每个来源 IP 每 UTC 日，内存计数；访客额度挂在可删的 Cookie 上，这条让换 Cookie 慢灌变贵 |
-| `AUTH_LOGIN_PER_MINUTE` | 10 | 每个来源 IP 每分钟的登录尝试上限，内存计数。对错都算一次，超了直接 429（`[auth-deny] login-burst`） |
+| `AUTH_LOGIN_PER_MINUTE` | 10 | 每个来源 IP 每分钟的登录尝试上限，内存计数。对错都算一次，超了直接 429（`[auth-deny] login-burst`）。**没有来源头的请求共用一个 `unattributed` 桶**（服务器本机验收脚本就是），它们一起消耗这份额度——连跑两遍带登录的验收脚本可能撞上它 |
 | `ANON_GC_DAYS` | 14 | 回收的年龄阈值（天）：`ownerId=0`、比这更旧、又没有云端稿件引用的图会被删。写 `0` 等于「只要没被引用就删」 |
 | `ANON_GC_ENABLED` | `true` | 只有写成字符串 `false` 才关闭回收；关掉之后池子只进不出，回到 2026-10-08 之前那个填满即拒客的行为 |
 

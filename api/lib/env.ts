@@ -14,10 +14,12 @@ import "dotenv/config";
  *      an invalid value refuses to start rather than runs wide open.
  *
  * Defaults live next to the knob they belong to. `.env.example` documents them
- * for operators and `env.test.ts` pins them; nothing else in the server reads
- * `process.env` (PORT/HOST used to live in boot.ts, burst.ts read two limits of
- * its own — both moved here so there is exactly one place where a typo can end
- * up as `undefined`).
+ * for operators and `env.test.ts` pins them. PORT/HOST used to live in boot.ts
+ * and burst.ts read two limits of its own — both moved here, so a typo can no
+ * longer become `undefined` somewhere this file never looks. The one deliberate
+ * exception is `AGENT_TOKENS`: agent-auth.ts reads it per request (so nothing
+ * has to fight a cache filled before `.env` was read) and warns about entries it
+ * cannot parse; boot only adds the weak-token warning.
  */
 
 const MIB = 1024 * 1024;

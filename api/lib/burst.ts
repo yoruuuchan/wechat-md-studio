@@ -114,12 +114,18 @@ export function checkLoginAttempt(ip: string): BurstVerdict {
  * is reached through the Cloudflare Tunnel, so CF-Connecting-IP is set by the
  * edge and cannot be forged by the client; the fallbacks are for local runs and
  * self-hosted deployments without Cloudflare in front.
+ *
+ * `'unattributed'` is what a request carrying none of those headers gets — the
+ * server's own acceptance scripts, for one. Every such caller shares that single
+ * bucket, which is why a burst of host-side logins can spend the login ceiling
+ * for all of them at once. The label is what a deny line prints, so it says what
+ * happened instead of `unknown`, which reads like a bug.
  */
 export function clientIp(headers: Headers): string {
   return (
     headers.get('cf-connecting-ip') ||
     headers.get('x-real-ip') ||
     headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-    'unknown'
+    'unattributed'
   )
 }

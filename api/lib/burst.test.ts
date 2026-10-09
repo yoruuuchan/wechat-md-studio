@@ -108,6 +108,8 @@ describe('clientIp', () => {
   })
 
   it('buckets unattributable requests together rather than letting them through', () => {
-    expect(clientIp(new Headers())).toBe('unknown')
+    // The server's own acceptance scripts land here, and they share the bucket —
+    // the login ceiling applies to them exactly as it does to a stranger.
+    expect(clientIp(new Headers())).toBe('unattributed')
   })
 })
