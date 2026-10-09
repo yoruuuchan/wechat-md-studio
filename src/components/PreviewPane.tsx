@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef, type ClipboardEvent } from 'react'
+import { toast } from 'sonner'
 import type { RenderStats } from '@/lib/types'
 import { fillBlockOffsets } from '@/lib/sync-scroll'
+import { serializeWechatSelection } from '@/lib/selection-copy'
 import type { PreviewScrollHandle } from '@/hooks/useSyncScroll'
 
 interface Props {
@@ -34,6 +36,23 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   onScrollRef.current = onScroll
   const onLayoutRef = useRef(onLayout)
   onLayoutRef.current = onLayout
+
+  // Copying part of the preview is a normal Ctrl/Cmd+C away: the browser's own
+  // serialization drops every ancestor above the range's common ancestor, so
+  // deep selections lose their inline styling (see lib/selection-copy.ts).
+  // This event only fires for selections made inside this box; when the
+  // serializer declines the selection we return without touching the event and
+  // the browser copies exactly as it always did.
+  const handleCopy = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
+    const root = contentRef.current?.firstElementChild
+    if (!root) return
+    const payload = serializeWechatSelection(root, window.getSelection())
+    if (!payload) return
+    event.preventDefault()
+    event.clipboardData.setData('text/html', payload.html)
+    event.clipboardData.setData('text/plain', payload.plainText)
+    toast.success('已复制选中内容，可直接粘贴到公众号')
+  }, [])
 
   // Measuring every block on every scroll event would read layout hundreds of
   // times a second. Cache the offsets and drop the cache when anything that can
@@ -161,7 +180,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
             className="shrink-0 rounded-[4px] bg-white transition-all duration-300"
             style={{ width, boxShadow: 'var(--shadow-lifted)' }}
           >
-            <div ref={contentRef} className="px-1 py-6" dangerouslySetInnerHTML={article} />
+            <div ref={contentRef} className="px-1 py-6" onCopy={handleCopy} dangerouslySetInnerHTML={article} />
           </div>
         </div>
       </div>

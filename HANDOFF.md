@@ -232,6 +232,8 @@ python -m git_filter_repo --force \
 
 #### 增量发布（2026-10-07 起用的就是这条，不重写历史）
 
+2026-10-09 文档整理发布基线：公开仓库 `7822921` 对应伞仓库 `fd6fec7` 的 `app/` 子树（经常规脱敏，保留公开根 LICENSE）。后续增量从此伞提交计算，发布前仍需核对远端与本地主线。
+
 ```bash
 # 在伞仓库里：<base> = 公开仓库当前镜像到的那个伞提交
 git format-patch --binary <base>..master -- app/     # -o 只能写仓库内；落在根目录后移走
@@ -386,6 +388,25 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 单击刷一次、双击锁定、Esc 退出；锁定态在按钮上多一个锁形小标。
 > 单测 `src/lib/md-format.test.ts`（52 项）；浏览器验收 `scripts/cdp-verify-toolbar.mjs`
 > （75 项，本地生产模式 + 独立库；折叠部分要先把侧栏展开，否则预览面板 maxSize 820 会顶住编辑区宽度）。
+>
+> 2026-10-09 部署记录（工具栏上线）：合并 `93bd5ac`（含 `8017cbd` 工具栏 + master 侧的主题收藏）。
+> 合并后在主工作区重跑 `check`/`verify:themes`/`test`（1351 项全过）再构建。33.7MB 包按分块红线走
+> （9×4MB 逐块 scp + 逐块 sha256 + `cat` 重组 + 整包 sha256 `c014632e…` 对上），`flock` 安装。
+> 部署后三重核对全过：线上 `dist/boot.js` sha256 = 本地 `b4840d2f…`，`index.html` 资产名一致
+> （`index-CFYxMExv.js` / `index-BwLwt3me.css`），`ExecMainStartTimestamp` = 2026-10-09 06:54:26 UTC，
+> 公网 `wechat.yoru-and-akari.dev` 已在服务新资产名（HTTP 200）。**公开仓库增量发布还没做**：
+> 本次区间是 `47ddeb2..93bd5ac`（工具栏 + 格式刷），走不走、何时走由站长定。
+>
+> 2026-10-09 部署记录（预览局部复制上线）：`e8e6fa7`（预览框选后 Ctrl/⌘+C 直接复制，
+> `src/lib/selection-copy.ts` 重建祖先链；验收脚本 `scripts/cdp-verify-selection-copy.mjs`）经
+> worktree 分支合并进 master（`93a1d81`，含当天全部并行会话的提交）。合并态在分支上重跑
+> `check`/`test`（1366 项全过）/`verify:themes`/`build`/CDP 验收（ALL CHECKS PASSED）后再快进 master。
+> 33.7MB 包照分块红线走（9×4MB 逐块 scp + 逐块 sha256 + `cat` 重组，整包 sha256
+> `7f87e025…` 对上），`flock` 安装于 07:18:54 UTC。三重核对全过：线上 `dist/boot.js` sha256
+> = 本地 `b4840d2f…`（API 层两版相同），`index.html` 资产名一致（`index-NXPJchCO.js` /
+> `index-BwLwt3me.css`），公网已在服务新资产名且 bundle 里能 grep 到「已复制选中内容」。
+> **公开仓库增量发布仍欠着**：区间现为 `47ddeb2..93a1d81`（工具栏 + 格式刷 + 局部复制 + 文档），
+> 走不走、何时走仍由站长定。
 
 ### 产品方向（用户明确拍板的）
 

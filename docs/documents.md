@@ -78,3 +78,10 @@ SQLite 使用 Node 内置 `node:sqlite` + Drizzle `sqlite-proxy`。
 查询使用普通 `select().limit(1)`，驱动命中 / 未命中契约见
 [connection.test.ts](../api/queries/connection.test.ts)、[files-upgrade.test.ts](../api/queries/files-upgrade.test.ts)。
 服务端重启、数据文件与真实环境操作由 [HANDOFF](../HANDOFF.md) 维护。
+
+## 预览局部复制
+
+整篇复制仍由 renderer HTML → `copyRichText` 完成。预览内框选后的 Ctrl/⌘+C 由
+[selection-copy.ts](../src/lib/selection-copy.ts) 保留选区片段，并克隆祖先内联样式直到文章根 `section`；
+不扩大首尾选区，也不展开预览的 `getComputedStyle`。折叠选区或端点在正文外时保留浏览器原生复制。
+对应 [selection-copy.test.ts](../src/lib/selection-copy.test.ts) 与 [浏览器验收](../scripts/cdp-verify-selection-copy.mjs)。
