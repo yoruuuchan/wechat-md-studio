@@ -320,6 +320,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 10. **改 Cloudflare 之前先确认 token 能写**。只读 token 的写操作回 `HTTP 405 / 10405`，不是「权限不足」那种一眼能认的错。免费额度已经用满（见部署形态表），加规则前先 `bash scripts/cf-open-public.sh --check` 看清 zone 上已有什么。
 11. **脚本里调 tRPC：查询用 GET，变更用 POST**。用 POST 打查询会得到 `Unsupported POST-request to query procedure`，而 HTTP 状态还是 200，很容易误判成"接口坏了"。
 12. **编辑备注 `<!-- … -->` 曾经根本没被隐藏**（2026-10-09 修）：markdown-it 用 `html: false`（这是红线，原样 HTML 不能进正文），于是注释被转义成普通文字，预览和复制都带着它——示例稿里「渲染和复制都不会带上它」那句话是 2026-10-07 重写示例时写下的空头支票。现在 `src/lib/comments.ts` 在解析前做**等长空格化**（围栏代码块里的不动），行号与字符偏移完全不变，所以块偏移和图片 occurrence 编号都不受影响；两处原始正文扫描（`parse.ts` 的 `scanImageOccurrences`、`render.ts` 的 `findImageSpan`）对称跳过注释范围，注释里的 `![…](…)` 不打乱图号。**动这两处扫描器时保持对称，否则上传的图会写错位置。** 已知限制（与图片扫描同源）：行内代码里的注释也会被空格化。
+13. **控制台里那条「Cloudflare 探针被 CSP 拦掉」的报错不是 bug**（2026-10-09 决定容忍）：zone 开着 JavaScript Detections（`bot_management.enable_js=true`），CF 会往 HTML 注入内联探针 `window.__CF$cv$params={r:'<ray id>',…}`，正文每次请求都不同（**用哈希放行不可行**），于是一律被 `script-src 'self'` 拦下——页面功能不受影响，只是每次访问多一条 violation。保留该设置是因为同 zone 其他子域没有严格 CSP、仍然受益，而探针本来也拿不到本站信号；要根除只能去 dashboard 关掉 zone 级的 `enable_js`（本机 token 只读，改不了）。
 
 ---
 
