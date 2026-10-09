@@ -5,7 +5,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07
 - **抓取方式**：从本地 shallow clone（`git clone --depth 1`）逐字复制 LICENSE 文件，未经任何修改、截断或重新排版。
-- **结构化数据**：机器可读的版本在 `src/lib/credits.ts`，页面上的版本在 `/references`，README 的 `## Acknowledgements / 致谢` 一节由 `npm run sync:docs` 从同一份数据生成。三处内容如有出入，以 `src/lib/credits.ts` 为准；本文件与数据的对应关系由 `npm run verify:sources` 校验（每个 credit 的仓库、许可证副本、版权行都必须能在下表里找到）。
+- **结构化数据**：[credits.ts](../src/lib/credits.ts) 是来源与使用性质的统一事实源，[References](https://wechat.yoru-and-akari.dev/references) 直接读它；[README](../README.md) 只保留入口。本文件保存许可证副本、核实时间、commit 与摘要；主题来源另见 [THEME-SOURCES](../THEME-SOURCES.md)。
 
 ## 一、上游清单与核实结果
 
@@ -107,9 +107,143 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 ## 四、维护约定
 
-- 新增或改动 `src/lib/credits.ts` 里的条目时：在本文件第一节的审计表里补一行（记录 commit、
-  版权行、md5，`npm run verify:sources` 会点名缺了哪一行），再跑 `npm run sync:docs`
-  重新生成 README 的致谢一节与统计区块。`/references` 页面直接读数据，通常无需改动。
+- 新增或改动来源时，统一修改 [credits.ts](../src/lib/credits.ts)，保留对应许可副本并更新本文件的核实记录。
+  运行 `npm run sync:docs` 更新生成区块，再运行 `npm run verify:sources`；主题来源注册在 `src/lib/theme-sources.ts`。
+  References 页面直接读数据；README 与 [AGENTS](../AGENTS.md) 只维护入口，不再复制逐项致谢。
 - 每次从上游取用新代码，把 LICENSE 副本重新核对一遍：上游可能换许可证。
   核对方式就是重新读 LICENSE 文件并比对 md5，不要信 README 或 package.json 的 `license` 字段。
 - 从 Apache-2.0 上游复制实际代码时，在对应文件头部保留版权声明，并在本文件里记下改动了什么。
+
+## 五、完整开源致谢
+
+以下由 [credits.ts](../src/lib/credits.ts) 自动生成，与 References 页面共用数据；手写审计记录在前四节。
+
+<!-- BEGIN GENERATED: notice-credits — npm run sync:docs -->
+### 许可证核实
+
+2026-10-07 逐个打开上游 LICENSE 文件核对，核对的 commit 与副本 md5 记在 [本文件](NOTICE.md) 第一节；来源与使用性质以 `src/lib/credits.ts` 为准。
+
+| 上游 | LICENSE | LICENSE 里的版权行 | 副本 |
+|---|---|---|---|
+| [md-wechat](https://github.com/laogou717/md-wechat) | MIT | `Copyright (c) 2026 字间排版` | `LICENSES/laogou717-md-wechat-LICENSE.txt` |
+| [doocs/md](https://github.com/doocs/md) | WTFPL v2 | `Copyright (C) 2025 Doocs <admin@doocs.org>` | `LICENSES/doocs-md-LICENSE.txt` |
+| [huasheng_editor](https://github.com/alchaincyf/huasheng_editor) | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `LICENSES/alchaincyf-huasheng_editor-LICENSE.txt` |
+| [MDInline](https://github.com/din4e/MDInline) | MIT | `Copyright (c) 2026 din4e` | `LICENSES/din4e-MDInline-LICENSE.txt` |
+| [wenyan-core](https://github.com/caol64/wenyan-core) | Apache-2.0 | `标准 Apache 2.0 附录，未填写具体版权人（package.json author: Lei <caol64@gmail.com>）` | `LICENSES/caol64-wenyan-core-LICENSE.txt` |
+| [wenyan-ui](https://github.com/caol64/wenyan-ui) | Apache-2.0 | `标准 Apache 2.0 附录，未填写具体版权人（package.json author: Lei <caol64@gmail.com>）` | `LICENSES/caol64-wenyan-ui-LICENSE.txt` |
+| [wenyan](https://github.com/caol64/wenyan) | Apache-2.0 | `标准 Apache 2.0 附录，未填写具体版权人（package.json author: Lei <caol64@gmail.com>）` | `LICENSES/caol64-wenyan-LICENSE.txt` |
+| [editor（foolgry）](https://github.com/foolgry/editor) | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `LICENSES/foolgry-editor-LICENSE.txt` |
+
+8 个上游全部是宽松许可：MIT × 4、Apache-2.0 × 3、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
+
+3 点需要留意：
+
+1. **[doocs/md](https://github.com/doocs/md)**：LICENSE 正文是「DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004」，版权行 Copyright (C) 2025 Doocs <admin@doocs.org>。这是极度宽松的类公有领域许可，没有传染性，但 SPDX 标识符不是 MIT，且许可证名称含粗口——本项目的口径是照实写出它的真实名称 WTFPL v2，不做改写。
+2. **[wenyan-core](https://github.com/caol64/wenyan-core)**：Apache-2.0 带专利授权条款和 NOTICE 义务：如果我们将来直接复制它的代码（而不只是借鉴思路），必须在发行物里保留 LICENSE 全文与版权声明，并注明我们改动了哪些文件。LICENSES/ 下的副本就是为这个义务准备的。wenyan、wenyan-core、wenyan-ui 三个仓库的 LICENSE 文件字节完全相同（md5 d229da563da18fe5d58cd95a6467d584），许可一致。
+3. **[editor（foolgry）](https://github.com/foolgry/editor)**：LICENSE 的版权行是「Copyright (c) 2024 花生 (alchaincyf)」，与 alchaincyf/huasheng_editor 的 LICENSE 字节相同——因为本仓库 README 第 13 行明说它 fork 自 huasheng_editor，LICENSE 原样继承。foolgry 自己新增的部分（分享服务、Go 后端、Mermaid、Skill）没有单独的版权行，沿用同一份 MIT 条款。致谢里应当同时点出 fork 关系和原始版权人。
+
+### 移植（ported）
+
+机制已经落在我们的代码里，实现与上游高度对应。
+
+**[md-wechat](https://github.com/laogou717/md-wechat)**（MIT，字间排版（laogou717））
+
+- 外链转脚注。公众号只保留 mp.weixin.qq.com 域名的可点击链接，其余外链粘贴时会被编辑器直接剥掉，只剩文字、网址全丢。上游 src/lib/renderer.js:523 的 link_footnote 规则把 link_open 换成 span_open（保住链接的视觉样式但不再是 <a>）、在链接文字后补一个上标 [n]、网址收进文末【参考资料】，微信内链不受影响。我们落在 src/lib/render.ts：isFootnotable 判定 + createLinkRegistry 收集 + 主题的 footnotes() 输出。因为我们有自己的语义 IR，这件事在渲染层做就够了，不需要动 markdown-it 的 token 流。
+- 富文本复制的降级路径。上游 src/lib/clipboard.js 的 legacyCopy：离屏 contentEditable div（position:fixed; left:-9999px）+ Range.selectNodeContents + execCommand("copy") + 用完移除。我们的 src/lib/clipboard.ts 是同一套兜底，主路径同样是 ClipboardItem 的 text/html + text/plain 双通道。
+
+**没采用**：
+
+- IndexedDB 图片短引用链路（src/lib/imagedb.js：字节存 IndexedDB，文档里只留 local: 短引用，复制前再还原成 data URI）。我们的图走 Cloudflare R2 + img:<key>，稿件跨设备同步时图也跟着在；data URI 会把几 MB 的 base64 塞进正文，公众号粘贴路径上很容易超限。
+- justifiedWidths 两端对齐多图网格（src/lib/renderer.js:224）和它配套的 aspect-ratio + object-fit:cover 裁切（:635）。按固定比例裁切会切掉图片内容，这违反我们的公众号红线。
+- 它的 markdown-it core ruler 改写体系（list_flat 列表扁平化、block_context 块级祖先记录、gallery 网格图）。上游真正的「token 扁平化」是列表而不是表格；我们的解析器直接产出语义 IR，没有 token 流可改，这套机制在我们这里没有落点。
+
+**[huasheng_editor](https://github.com/alchaincyf/huasheng_editor)**（MIT，花生（alchaincyf））
+
+- 富文本粘贴前的四道闸门。上游在 app.js:2679-2852，顺序是：纯文本形如 [Image #N] 的占位符直接拒绝并提示改用截图工具/浏览器复制/拖拽 → isMarkdown(text)（:2783）命中就把原文当 Markdown 插入、不做 HTML 转换 → isIDEFormattedHTML(html, text)（:2812）识别 VS Code / Ace 的签名（meta charset、ace_line、Consolas|Monaco|Menlo|Courier 等宽字体）加两个结构启发式 → isMainlyCode（:2718）识别「有 pre/code 但没有 p/div 语义标签」的整段代码。这是防止「从别的 Markdown 编辑器复制过来，Turndown 把 **粗体** 转义成 \*\*粗体\*\*」的关键。已落在 src/lib/rich-paste.ts：gate 1 looksLikeMarkdown/markdownScore、gate 2 IDE 语法高亮、gate 3 整段代码进围栏、gate 4 占位符拒绝，聚合出口是 shouldConvertHtml。我们改了计分方式——上游是「13 个模式命中 ≥2」的扁平计数，两个弱信号就能定案；我们按强/弱加权（rich-paste.ts:60-115，代码注释原文 "Weights mirror upstream huasheng_editor's isMarkdown"），块级结构（围栏、标题、图片、表格、容器、==mark==、链接）单独就能定案，纯内联线索必须有搭档。
+- Turndown 的配置方式。上游 app.js:2557-2629 用 keep(['table','thead','tbody','tfoot','tr','th','td']) 保住表格结构、addRule('table') 自定义表格输出、addRule('image') 把图片从流里抽出来单独走上传。已落在 src/lib/rich-paste.ts:810-1010 的 createService：用 addRule 铺出 dialectHeading / dialectMark / dialectStrikethrough / dialectLink / dialectImage / dialectPre / dialectListItem / dialectTable* / dialectBlockquote / dialectCenter 一整套规则，把 HTML 直接转成我们自己的公众号方言而不是通用 Markdown；转换前先跑 cleanHtmlSource（:344-）把 Word 条件注释与 VML、<?xml?>、Office 命名空间标签（<o:p>、<w:WordDocument>）、Mso* class、data-*/aria-* 属性清掉。上游是运行时从 jsDelivr 按需拉 turndown@7.2.0（ensureTurndown，:2530），我们把 turndown + turndown-plugin-gfm 打进包。
+- 图片压缩策略。上游 app.js:243-330 的 class ImageCompressor 按最长边缩到 1920、Canvas 重编码（透明 PNG 先铺白底再 drawImage）、压完比原图大就退回原文件；复制到公众号之前还有第二道 recompressForClipboard（app.js:2195-2230，最长边 1200 / quality 0.6）。已落在 src/lib/image-compress.ts，并且推广了：最长边从上游的固定 1920 改成按公众号正文实宽推出来的 2048（677px 容器减 20px padding = 657 CSS px，× 3 DPR ≈ 1971，取 2 的幂），两段固定档改成「800 KB 目标体积 + quality 从 0.9 每次减 0.1 走到 0.6 下限」的阶梯（:24-50，循环在 :283）。上游那条「压完更大就用原图」的判断保留成了 grew 标志（:303）。上游没有目标体积这一维，阶梯是我们加的。
+
+**没采用**：
+
+- 多图网格的 360px 固定容器高 + object-fit:contain + 灰底（app.js:1676-1722）。固定高度会让竖图两侧留出大片灰底，也违反我们的公众号红线。
+- 整体渲染路线：markdown-it → HTML 字符串 → DOMParser → 按选择器把 STYLES[theme].styles[selector] 追加到每个匹配元素的 style 上（applyInlineStyles，app.js:1352-1394）。主题是「选择器 → 样式」的查表，我们是模板函数，表达力差一个量级。
+- 无构建的单文件工程形态（app.js 3600+ 行、index.html 2100+ 行、DEBUG = true 硬编码、满屏 console.log）。
+
+### 适配（adapted）
+
+思路已经落地，但围绕我们自己的语义 IR 重写过，不是逐行搬运。
+
+**[doocs/md](https://github.com/doocs/md)**（WTFPL，Doocs <admin@doocs.org>）
+
+- 双向同步滚动改用「块映射」而不是总高度百分比。上游 apps/web/src/composables/useScrollSync.ts 的文档注释原文就是 "Uses block-based mapping (not simple pixel ratio) so large content skew between panes stays accurate"，配套 apps/web/src/lib/preview/scroll-sync-blocks.ts 负责把源文档按空行切块、按比例映射块序号。我们的 src/lib/sync-scroll.ts 是同一思路的独立实现：块边界取自解析器语义 IR 的 line/lineEnd，块内用进度插值（progressInBlock / lineAtProgress），再加 fillBlockOffsets 补上「这个块没渲染出元素」的空洞。思路来自上游，代码没有搬运。
+- 滚动事件用一次 requestAnimationFrame 收口再做映射计算。上游 useScrollSync.ts 用 rAF 清 isSyncingFromEditor / isSyncingFromPreview 标志来吞掉自己那次程序化滚动的回声；我们的 src/hooks/useSyncScroll.ts 把整次映射放进 rAF，配合 110ms 空闲窗口决定哪一侧拥有同步权，避免两个面板互相拽。
+- 公式的产出形态。上游和 wenyan-core 走的是同一条 MathJax tex-svg + fontCache:"none" 的路（doocs 在 packages/core/src/utils/mathjax.ts:56），两家独立佐证了「这样产出的 SVG 能活过公众号粘贴」；我们已经按这条路线落地在 src/lib/math.ts，细节记在 wenyan-core 条目。
+
+**没采用**：
+
+- 持久化分层（apps/web/src/storage/：IndexedDB 引擎 + engines/ + repositories/ + migrate/ + quota.ts）。一开始记作「不做」：我们已经是 localStorage 草稿 + 服务端 SQLite 双写，再插一层只会多一个真相源。后来改了主意，而且是同一条理由推翻了它：正文是唯一会无限长大的东西（一篇长文加上粘贴的表格就进 MB 级），而 localStorage 的 setItem 满了会抛异常，旧代码把异常吞掉——编辑器照常打字，刷新之后正文退回上一版。现在按同一位置切分：正文进 IndexedDB（src/lib/body-store.ts，没有 IndexedDB 时降级回 localStorage），索引、设置、回收站这些小的仍旧步存在 localStorage（src/lib/store.ts），写失败一律进 persistenceStatus()，由顶栏状态位和 toast 说出来。上游那套 engines / repositories 分层没有抄——我们要的是「写不下要看得见」，不是多一层抽象。
+- 把输入和重渲染解耦的做法。上游是 Vue，走 debounce（apps/web/src/lib/debounce.ts）；我们是 React，用 useDeferredValue + useMemo（src/pages/EditorPage.tsx:135-141）。目标相同、机制无关，所以记作参考而不是移植。
+- monorepo 多端分包（apps/web、apps/vscode、apps/utools、apps/api + packages/core、md-cli、mcp-server）。我们是单一 Vite 应用，现在拆包是过度工程。
+- mermaid 走内联 SVG 的做法（packages/core/src/extensions/mermaid.ts 147 行 + packages/core/src/utils/wechat-svg.ts 1434 行）。为了让 mermaid 的 SVG 活过公众号粘贴，上游把 <foreignObject> 里的 HTML 标签手工重写成真正的 SVG <text>/<tspan>（自己算 x/y/text-anchor/居中/多行 dy/edgeLabel 的背景 rect）、把双向边重叠的标签沿主轴推开、按 viewBox 缩放夹住最小字号（em/rem/% 单位刻意不动）、再算出真实像素宽高写进 width/height 并封顶 677px。这套消毒依赖 getComputedStyle / getBBox / getTotalLength / getPointAtLength，全是只有活 DOM 才有的 API，而且假设样式已经被 juice 内联过；它的渲染时机也是异步回填（渲染器先返回占位 div，mermaid.render 完成后 document.getElementById(id).innerHTML = svg）。我们的渲染链是纯函数返回字符串（renderDoc → 主题模板 → dangerouslySetInnerHTML 一次性替换），要接这套就得让 React 的 vdom 和手工 DOM 修改共存，等于放弃「预览就是复制出去的那份字符串」。所以我们换了条路：mermaid → SVG → canvas → PNG → 走现成的图片上传链路 → 普通 <img>，天然满足全部红线，还自动进素材库、能被统计和重裁。代价是图里文字不可选、深色模式不跟随、改一个字要重新上传。
+
+**[MDInline](https://github.com/din4e/MDInline)**（MIT，din4e）
+
+- DOCX 导入的库选择和加载时机。上游 frontend/src/lib/import/docx.ts 的 extractDocxHtml 用 mammoth 转 HTML，并且刻意动态 import，注释理由是「mammoth 很大，只有用户真的导入 .docx 时才需要」。已落在 src/lib/import-export.ts:439-487 的 docxToDocxImport：同样是 await import('mammoth')，理由一模一样（:440-444 的注释写着静态 import 会把约 600 KB 的 DOCX/XML 机制塞进入口 chunk，动态 import 让 Vite 拆出独立 chunk，首屏不必为一个多数会话用不到的功能付费）。上游的 extractDocxHtml 只返回 HTML 字符串、不处理图片；图片那一半是我们自己的——用 convertImage 覆盖 mammoth 默认的 base64 内联，把每张图收进 images[]、在 Markdown 里留 ![alt](docx-import:N) 占位（:366-380、:474-483），之后按名字而不是按位置替换，两张图共用同一个 alt 也不会错位。占位符刻意不写成 img:<key>，因为 Materials.tsx 扫那个协议来判定「哪些图还在用」，待上传的占位不能被算进去。另外我们还叠了一层 mammoth styleMap（:407-415），把 Word 的 Title 映射成 h1、Quote / Intense Quote 映射成 blockquote，好接上我们方言里的文章标题和金句卡。HTML→方言的转换是注入进来的 HtmlToMarkdown，实际实现复用 rich-paste.ts，避免留下第二份更差的副本。
+- （计划参考）useClampedNumber，frontend/src/components/controls.tsx:36。滑块和数字输入框共用一个夹取值：输入过程中允许越界的中间态（否则想打 16 会在敲下 "1" 时就被夹到 min），失焦或滑块松手才夹回 [min, max]。我们的排版参数面板还没有这类联动控件。
+
+**没采用**：
+
+- ThemeConfig + 运行时 CSS 字符串主题（frontend/src/lib/theme.ts 的类型定义，lib/css.ts 把它拼成一整串 CSS，所有选择器都挂在 .mdcss 下）。数据驱动的主题只能表达字号、颜色、间距、字重这类标量，表达不了我们主题里的结构性差异（金句卡、引文框、自动编号章节、轮播画框、署名块）。引入它等于把主题能力削平到 5%。
+- juice 的 CSS 事后内联流程（frontend/src/lib/inline.ts，juice.inlineContent）。它的复制根节点是 <div class="mdcss">，而公众号会剥掉 class 属性和非白名单标签——先产出带 class 的 HTML 再靠 juice 内联，这条路在公众号粘贴路径上不成立。我们的主题函数直接输出 <section>/<p> + 内联 style，从根上不需要事后内联这一步。
+- 它 frontend/src/lib/word/ 那套自研 DOCX/RTF 解析器（docx.ts 168 行 + parse.ts 347 行 + rtf.ts 196 行 + ir.ts 79 行 + worddoc.ts 33 行，合计约 820 行）。mammoth 已经覆盖我们要的保真度，自己维护一份 OOXML 解析器不划算。
+- 它那份「公众号安全属性守卫」。实际检查下来既过度保守又没真的守住，我们改为在主题函数里只输出白名单标签和内联样式，用产出侧约束替代事后过滤。
+
+**[wenyan-core](https://github.com/caol64/wenyan-core)**（Apache-2.0，Lei（caol64））
+
+- MathJax SVG 数学公式，src/core/parser/mathjaxParser.ts（107 行）。mathjax-full + liteAdaptor() 在纯 JS 环境里跑 tex2svg，关键配置是 fontCache: options.fontCache ?? "none"——让每个 SVG 自带完整的 path 定义，不引用共享的 <defs> 也不依赖外部字体或 CSS。这是公式能活过公众号粘贴路径的前提。我们的 src/lib/math.ts 是同一套配置的独立实现，另外加了一个 PACKAGE_VERSION 全局来绕开 components/version.js 里那句 eval 出来的 require（浏览器里没有 require），并且用 formatError / compileError 把坏 TeX 变成抛错而不是 MathJax 默认的红色 merror 盒子——那个盒子带 data-mjx-error 属性和一个镜像的 <text> 节点，会被原样粘进正文。公式在公众号后台的实际行为已经实测过，见 declined 第一条。
+
+**没采用**：
+
+- 微信 HTML 清洗规则，src/core/renderer/wechatPostRender.ts（103 行）。四条里两条我们实测后确认不需要：把 mjx-container 拆出裸 SVG 并把 width/height 搬进 style（理由写的是「公众号不认 SVG 的宽高属性」），以及给每个 <li> 的子节点包一层 <section>。2026-10-07 用真主题代码生成探针、由作者在公众号后台实粘：MathJax 原样输出（ex 单位 + currentColor）三种写法全部完整存活，带内联样式 run 的裸 <li> 也没有被拆成两行。所以 SVG 的尺寸我们一个字都不改（手算 ex→px 会小约 10%），只在 wrapper 上补一个显式 color 来解析 currentColor（src/lib/theme-fallbacks.ts 的 defaultMath）；9 套主题里用裸 <li> 的 5 套也都不用动。剩下两条里，块级公式父节点 text-align:center 我们的 defaultMath 已经这么做，代码块保持缩进那条我们用 white-space:pre-wrap 达到同样效果（themes.ts 的 codeBlock），没有做 \n → <br> 的替换。
+- core / ui / cli / mcp 四仓库分包 + package.json 五路 exports（. / ./wrapper / ./publish / ./wechat / ./http）。它拆包是因为有五个独立分发的产品（mac App Store、Windows/Linux、CLI、MCP、Web），我们只有一个 Vite 应用。真正值得学的是它「环境适配走注入」的边界划法（HttpAdapter / TokenStorageAdapter / MermaidRenderer / GetInputContentFn），这一点我们的 resolveImg / resolveMath / resolveDiagram 已经是同构做法，不需要引入包结构。
+- 它给 CLI/MCP 用的 Node 门面（src/node/wrapper.ts 的 renderAndPublish / renderAndPublishToServer + JSDOM 补齐 DOM）。等我们真的要做 Agent 发布通道时这是最直接的参照，但现在还没有那个入口。
+
+**[editor（foolgry）](https://github.com/foolgry/editor)**（MIT，foolgry（fork 自 alchaincyf/huasheng_editor））
+
+- Skill 的工程写法，skills/wechat-markdown-editor/SKILL.md（267 行）→ 已落在 skills/wechat-typesetter/（SKILL.md + scripts/mopai.py，Python 3 标准库零依赖）。照做的约定：令牌只放技能目录下的 .env（被 .gitignore 忽略、set-token 会把权限收到 600，Windows 上失败被吞掉）；set-token 幂等，重复执行原地替换而不是堆行，也支持从 stdin 读；「不预检直接调、报错再配」——SKILL.md 明确禁止每次推送前跑 token-status 或 cat .env，理由是正常路径不该多一轮往返；报错信息里自带 .env 的绝对路径和 set-token 命令，agent 看到错误就知道怎么补；token-status 只显示掩码；同步到全局技能目录时必须排除 .env，否则仓库里的模板会覆盖掉用户的真令牌（表现为「昨天还能发，今天突然说需要令牌」）。段落顺序也照抄：先给报错原文，再讲怎么配。
+- 本地图片上传的客户端做法，scripts/publish.py:300-339（手写 multipart）、:342-358（相对路径按 Markdown 所在目录解析，不是 cwd）、:361-403（同一路径只传一次、单张失败不中断发布而是进 warnings）→ 已落在 scripts/mopai.py 的 upload_image / resolve_local_ref / process_images。改写目标换成我们的 img:<key>（上游写绝对 URL）；跳过前缀里加了 img: 和 docx-import:，这两个协议后面没有斜杠，按上游 img:// 那样判断会漏。
+- 令牌的服务端模型，server/main.go：库里只存摘要、明文只在签发那一次返回（:1426、:1742-1744）、吊销是软删除而不是 DELETE（:1479-1498）、凭证校验失败绝不降级为匿名（:335）、401 响应体自带自助入口（:1354-1363）→ 已落在 api/lib/agent-auth.ts（常量时间比较，401 与 403 分开措辞，每个令牌带名字和 scope）和 api/agent-router.ts。P0 阶段令牌来自环境变量 AGENT_TOKENS=name:token[:scope]，删掉一行即等于吊销，所以还没有 tokens 表；那张表和前端管理面板留作开源后的 P1。
+- 401 的错误契约（main.go:1345-1363 区分「没带凭证」和「凭证无效」两种措辞）→ 我们每个错误体都是 {error, hint}，hint 写的是下一步动作，不是一句「未授权」。
+
+**没采用**：
+
+- 匿名可读的分享页（/s/<id> 文章页、/p/<id>/<sid> 项目深链，server/main.go:143-145）。我们的稿件库按 owner 隔离，匿名访客从 API 一个字都读不到；成稿的去处是公众号后台，不是一个给人网页阅读的地址。做匿名分享页等于自己开始托管公开内容，还要防 id 枚举和爬虫——上游 ADR-0004 花了一整段讲它为什么被迫关闭匿名发布，我们没必要主动走进同一个坑。需要说明的是它自己也不开放匿名*发布*（:311、:335 明确要求令牌），我们分歧的只是「读」这一侧。
+- 浏览器和 Agent 共用同一组端点、同一套 Bearer 令牌（上游不区分内外，区别只在凭证存哪：浏览器 localStorage，agent .env）。我们刻意分成两扇门：浏览器继续走 tRPC + cookie session，agent 走 /api/agent/* 的朴素 REST + Bearer。理由是 superjson 的 wire format 对第三方客户端极不友好（Date 字段要手写元信息、错误包在 JSON-RPC 信封里），而 Skill 要能被任何 harness 用一行 curl 验证；顺带也让两种凭证能有不同的权限和生命周期。
+- 把人类登录口令兼作 API 令牌（上游的 WXMD_LIST_PASSWORD 回退，main.go:1704-1728）。我们的 ACCESS_KEY 是站内登录口令，兼作 API 凭证会让「它到底是什么」变含糊，而且泄露一次就得让所有 agent 一起失效。
+- Project 聚合与 attach/detach 那一整套（约 250 行）。我们的对应物是扁平的稿件库，不需要第二个聚合维度。
+- 给令牌删除权（main.go:585-645）。我们的 agent 只能读和写，删除始终是人在网页里做的动作，回收站也归人管。
+- 把样式表硬编码进脚本和 SKILL.md 两处（publish.py:51-79 的 27 个 key）。主题会增删，两份手工同步的副本迟早对不上，所以 mopai.py 里一个主题名都没有，一律现拉 GET /api/agent/themes。
+- 用时间戳做乐观锁。原打算照上游那样比对 updatedAt，实测发现 docs.updatedAt 落库是秒级精度、带的还是客户端时钟，同一秒内的两次写入无法区分——agent 会在毫无察觉的情况下冲掉人工精修。改成内容 sha256 的前 16 位（hash / baseHash），顺带让「重推同样内容」变成幂等成功而不是假冲突。
+- MCP server。上游也没有（全仓库零命中）；我们的 agent 跑在本机、能用 shell，一个零依赖脚本比 MCP 更普适，MCP 还要每个 harness 单独配置并维护 stdio 进程生命周期。
+- 它 fork 之后保留的 huasheng_editor 渲染路线（选择器查表 + applyInlineStyles）。同 huasheng_editor 条目。
+
+### 参考（reference）
+
+读过、比较过，用来印证或排除方案，代码里没有对应实现。
+
+**[wenyan-ui](https://github.com/caol64/wenyan-ui)**（Apache-2.0，Lei（caol64））
+
+- 「注入点」而不是继承的宿主/UI 边界：src/lib/hooks/*.ts 全是 setContext/getContext 对（setUploadImage、setExportImageClick、setHandleFileOpen、setPublishArticleClick……），每个 get 都带一个网页版降级默认值（弹窗提示「请用桌面客户端」），宿主在启动时一次性注册实现。我们的服务端能力（R2 图片、稿件库）现在是组件里直接调 tRPC；将来要给 Agent 或非浏览器入口开同一条渲染链路时，这套「能力由宿主注册、缺失就明确降级」的划法可以直接借鉴。
+
+**没采用**：
+
+- SvelteKit 组件库本身。我们是 React 19 + Vite，UI 层无法复用，只借它的边界设计。
+
+**[wenyan](https://github.com/caol64/wenyan)**（Apache-2.0，Lei（caol64））
+
+- 宿主侧的一次性接线写法：src/lib/setHooks.ts 把 Swift 桥的实现（文章存储、主题存储、设置存储、导出、发布）在应用启动时集中塞进 wenyan-ui 的注入点，业务组件对此完全无感。作为我们将来给 Agent/CLI 开第二个宿主时的参照。
+
+**没采用**：
+
+- SvelteKit + 桌面壳（mac App Store / Windows / Linux）的产品形态。我们是纯 Web 应用 + Cloudflare 部署。
+<!-- END GENERATED: notice-credits -->

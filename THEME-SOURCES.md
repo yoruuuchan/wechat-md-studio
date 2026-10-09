@@ -1,5 +1,9 @@
 # 主题库来源与授权审计
 
+[项目首页](README.md) · [Agent 入口](AGENTS.md) · [开源致谢](https://wechat.yoru-and-akari.dev/references) · [工程来源审计](LICENSES/NOTICE.md)
+
+本文记录主题授权与移植审计；来源注册在 [theme-sources.ts](src/lib/theme-sources.ts)，分类与来源字段以 [theme-meta.ts](src/lib/theme-meta.ts) 和各 Theme 的 `meta.origin` 为准。生成区块由 `sync:docs` 更新，`verify:sources` 复核。
+
 审计日期：2026-10-07。所有 license 结论均取自仓库内 LICENSE 文件原文或 GitHub API 的
 license 字段（实测），上游主题文件已浅克隆核对；标注「推断」的条目是法律判断而非事实记录。
 
@@ -107,7 +111,7 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
 仓库根目录 `LICENSE` 为 AGPL-3.0 正文。
 
 <!-- BEGIN GENERATED: themes-doc-compat — npm run sync:docs -->
-`app/package.json` 的 `license` 字段与 `app/README.md` 的署名章节同步声明。219 套主题全部保留，兼容性逐族核对：
+[package.json](package.json) 的 `license` 字段与 [README](README.md#license-与来源) 同步声明。219 套主题全部保留，兼容性逐族核对：
 
 | 上游许可证 | 套数 | 与 AGPL-3.0-or-later 应用的关系 |
 |---|---|---|
@@ -130,17 +134,17 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
    更严或不相容的来源（BSL、附加禁商用条款等）前，先回本文件第二节核对。
 
 若未来想改回宽松许可证：按 `meta.origin.license` 过滤移除 8 套 copyleft 主题即可，
-其余 208 套不受影响；gzh 那 6 套想要回，走 clean-room 重造，或按上游 README 的共创邀请
+其余 211 套（208 套宽松许可上游 + 3 套自研）不受影响；gzh 那 6 套想要回，走 clean-room 重造，或按上游 README 的共创邀请
 联系甲木谈单独授权（你已是该仓库上游贡献者，PR #19 已合并，接触点是现成的）。
 
 ## 五、重跑导入
 
-上游仓库浅克隆在 `<local tmp>/theme-sources/<owner>--<repo>/`（tmp 区，不进仓库）。
-换机器时按第一节表格里的仓库地址重新 `git clone --depth 1`，或用环境变量覆盖：
+默认导入目录由 `scripts/themes/import.ts` 定义（本机临时克隆，不进仓库）。
+换机器时按第一节表格的地址 `git clone --depth 1`，目录名使用 `<owner>--<repo>`，并通过环境变量指定：
 
 ```bash
 THEME_SOURCES=/path/to/clones npm run import:themes
 ```
 
-导入后必须跑 `npm run verify:themes`（含 catalog 完整性与许可证文件存在性检查）
+导入后先 `npm run sync:docs` 更新生成区块，再跑 `npm run verify:sources` 与 `npm run verify:themes`（含 catalog 完整性与许可证文件存在性检查）
 与 `node scripts/cdp-verify-theme-library.mjs <url> <key> 9334`（真实浏览器验收）。

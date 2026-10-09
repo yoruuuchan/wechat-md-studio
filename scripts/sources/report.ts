@@ -2,7 +2,7 @@
 // 里那些必须与数据一致的段落。
 //
 //   数据源                     产出
-//   src/lib/credits.ts          README「致谢」、NOTICE 的许可传染性结论
+//   src/lib/credits.ts          Full acknowledgements and license tally in NOTICE
 //   src/lib/theme-sources.ts    README 主题统计、THEME-SOURCES.md 来源表与统计
 //   src/lib/themes.ts（THEMES）  每一处主题数量与 License 分布
 //
@@ -34,7 +34,6 @@ import {
   ORIGINAL_LICENSE,
   STYLE_TAGS,
   complexityLabel,
-  isCopyleft,
   type ThemeLicense,
 } from '../../src/lib/theme-meta'
 import pkg from '../../package.json'
@@ -172,45 +171,15 @@ export function buildReadmeThemeCount(): string {
   return `${THEMES.length} 套`
 }
 
-/** README「许可证与第三方主题署名」中随 catalog 变动的段落。 */
+/** A short README source summary; detailed statistics stay in the audit docs. */
 export function buildReadmeThemeSources(): string {
-  const byLicense = orderedLicenses()
   const groups = sourceGroups()
   const upstreamThemes = THEMES.length - groups.originals
-
-  const tallyLine = byLicense.map((r) => `${licenseLabel(r.license)} ${r.count}`).join(' · ')
-  const copyleft = byLicense.filter((r) => isCopyleft(r.license))
-  const copyleftTotal = copyleft.reduce((n, r) => n + r.count, 0)
-  const tallySources = tallyThemeSources(THEMES)
-  const copyleftDetail = copyleft
-    .map((r) => {
-      const from = tallySources
-        .filter((s) => s.licenses.some((l) => l.license === r.license))
-        .map((s) => s.project)
-        .join('、')
-      return `${from} 的 ${r.license} ${r.count} 套`
-    })
-    .join('、')
-  const permissive = byLicense.filter((r) => r.license !== ORIGINAL_LICENSE && !isCopyleft(r.license))
-  const permissiveDetail = permissive.map((r) => `${r.license} ${r.count} 套`).join('、')
-
-  const lines = [
-    `主题库聚合了多个开源项目，共 **${THEMES.length} 套**（本项目自研 ${groups.originals} 套 + ${groups.importedProjects.size + 1} 个上游项目 ${upstreamThemes} 套）。每套主题在模板库卡片上点「来源」可看到原项目、原作者、许可证、lineage 与移植改动；上游许可证原文留存在 \`LICENSES/\`；完整来源审计、未接入清单与移植中的有损转换见 [\`THEME-SOURCES.md\`](./THEME-SOURCES.md)。`,
+  return [
+    `主题库共 **${THEMES.length} 套**：${groups.originals} 套自研 + ${groups.importedProjects.size + 1} 个上游项目的 ${upstreamThemes} 套主题，来源与许可维护在统一 metadata 中。`,
     '',
-    `按上游许可证分组：**${tallyLine}**。`,
-    '',
-  ]
-  if (copyleftTotal > 0) {
-    lines.push(
-      `- 主题库里的 ${copyleftTotal} 套 copyleft 主题（${copyleftDetail}）是本仓库整体选择 **${PROJECT_LICENSE}** 的直接原因：AGPL 有传染性、第 13 条覆盖网络服务；GPL-3.0-only 依 AGPL 第 13 条第二段允许与 AGPL 作品组合为单一 AGPL 作品。`,
-    )
-  }
-  if (permissive.length) {
-    lines.push(
-      `- 宽松许可的来源（${permissiveDetail}）可单向并入 AGPL 项目，各自的版权声明与许可文本已按要求保留。`,
-    )
-  }
-  return lines.join('\n')
+    '主题审计见 [THEME-SOURCES](THEME-SOURCES.md)；工程借鉴、取舍与完整致谢由 [credits.ts](src/lib/credits.ts) 驱动 [References](https://wechat.yoru-and-akari.dev/references) 与 [LICENSES/NOTICE](LICENSES/NOTICE.md)。',
+  ].join('\n')
 }
 
 function creditBullets(items: string[], indent = ''): string[] {
@@ -227,13 +196,13 @@ function creditSection(credit: Credit): string[] {
   return out
 }
 
-/** README「Acknowledgements / 致谢」区块（表格 + 分组清单都从这里生成）。 */
-export function buildReadmeAcknowledgements(): string {
+/** Full NOTICE acknowledgements, including tables and grouped credit details. */
+export function buildNoticeAcknowledgements(): string {
   const out: string[] = []
 
   out.push('### 许可证核实', '')
   out.push(
-    '2026-10-07 逐个打开上游 LICENSE 文件核对（不是从 README 或 `package.json` 的 `license` 字段推的），核对的 commit 与副本 md5 记在 [`LICENSES/NOTICE.md`](./LICENSES/NOTICE.md)。',
+    '2026-10-07 逐个打开上游 LICENSE 文件核对，核对的 commit 与副本 md5 记在 [本文件](NOTICE.md) 第一节；来源与使用性质以 `src/lib/credits.ts` 为准。',
     '',
   )
   out.push('| 上游 | LICENSE | LICENSE 里的版权行 | 副本 |')
@@ -376,7 +345,7 @@ export function buildThemesDocCompatibility(): string {
   const rows = orderedLicenses()
   const out: string[] = []
   out.push(
-    `\`app/package.json\` 的 \`license\` 字段与 \`app/README.md\` 的署名章节同步声明。${THEMES.length} 套主题全部保留，兼容性逐族核对：`,
+    `[package.json](package.json) 的 \`license\` 字段与 [README](README.md#license-与来源) 同步声明。${THEMES.length} 套主题全部保留，兼容性逐族核对：`,
     '',
     `| 上游许可证 | 套数 | 与 ${PROJECT_LICENSE} 应用的关系 |`,
     '|---|---|---|',
@@ -408,7 +377,7 @@ export function buildNoticeLicenseTally(): string {
 export const DOC_BLOCKS: DocBlock[] = [
   { file: 'README.md', name: 'theme-count', inline: true, build: buildReadmeThemeCount },
   { file: 'README.md', name: 'readme-theme-sources', build: buildReadmeThemeSources },
-  { file: 'README.md', name: 'readme-credits', build: buildReadmeAcknowledgements },
+  { file: 'LICENSES/NOTICE.md', name: 'notice-credits', build: buildNoticeAcknowledgements },
   { file: 'THEME-SOURCES.md', name: 'themes-doc-intro', build: buildThemesDocIntro },
   { file: 'THEME-SOURCES.md', name: 'themes-doc-sources', build: buildThemesDocSourceTable },
   { file: 'THEME-SOURCES.md', name: 'themes-doc-stats', build: buildThemesDocStats },

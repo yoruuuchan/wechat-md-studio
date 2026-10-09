@@ -11,6 +11,19 @@ description: 墨排（mopai）公众号排版线上协作技能。当用户要�
 
 脚本是零依赖的 Python 3 标准库实现，Windows 和 Linux 都能直接跑，不用装任何东西。下面命令里的 `mopai.py` 指 `<技能目录>/scripts/mopai.py`（`<技能目录>` 就是本 `SKILL.md` 所在目录）；Windows 用 `python`，Linux/macOS 用 `python3`。**每条错误信息里都带 `script` 和 `envFile` 的绝对路径**，不用猜文件在哪，直接从那句报错里复制。
 
+## 稿件语法看哪里
+
+本技能只管把 Markdown 推上去、读回来，**不教语法**。站点稿件是一套公众号方言：
+标准 Markdown 之外还有 `==重点==`、`## KICKER | 标题`、金句卡、`:::quote`、
+`:::carousel`、`@signature`、front matter 等扩展；只写标准 Markdown 也能渲染，
+但方言特性不会自己出现。写稿前按这个顺序找参考：
+
+1. 仓库根的 [README 语法表](../../README.md#公众号-markdown-方言)——公众号方言的简明速览；
+2. [`src/lib/sample.ts`](../../src/lib/sample.ts) 的 `SAMPLE_DOC`——完整示例稿；`THEME_PREVIEW_DOC` 是统一主题验收样稿；
+3. [渲染与图片](../../docs/rendering.md)——公式、Mermaid、多图参数与微信兼容规则；开发规则另见 [AGENTS](../../AGENTS.md)。
+
+手边只有本技能副本、没有仓库检出时，把上面几个文件随技能一起带走，或先克隆仓库再写稿。
+
 ## 直接推送就行，不要预先检查 .env
 
 **不要为了"保险"在推送前先跑 `token-status`、`cat .env` 或判断 `.env` 存不存在。** 直接调 `push`：令牌配好了就成功，没配好脚本会立刻失败，错误信息里已经带上 `.env` 的绝对路径、`set-token` 命令和令牌的生成方式。**只有看到那句报错时**，才去处理令牌（见下一节）。

@@ -1,18 +1,13 @@
-# 公众号排版助手 by Yoru · 接手提示词（给下一个 AI）
+# 公众号排版助手 by Yoru · 部署、运维与环境交接
 
-> 用法：把本文件整段贴给另一个窗口的 AI，或让它先读这个文件再动手。
+[项目首页](README.md) · [Agent 工作入口](AGENTS.md) · [配置与本地运行](docs/configuration.md) · [验证导航](docs/verification.md)
 
----
+本文负责服务器、部署流水线、Cloudflare、安全机制与真实环境记录。通用开发规则与模块导航由
+AGENTS 维护；渲染、图片、稿件和 Agent 接口分别进入对应专项文档。
 
-你是接手「公众号排版助手 by Yoru」（曾用名「墨排」，公众号 Markdown 排版工具，准备开源）的本地 Agent。它**已经上线并在正常使用**，线上地址 <https://wechat.yoru-and-akari.dev>（旧域名 mopai.yoru-and-akari.dev 已于 2026-10-07 下线）。你的任务是**找 bug、做优化**，不是重写。
-
-先通读本文件，再读代码。**不要凭空假设结构。**
-
-**先说最重要的一条工作方式**：这个项目前一轮交了三轮才把功能做对，原因全都一样——**靠读代码推理，而不是把界面真跑起来看**。所以：
-
-> **改任何前端行为，必须在真实浏览器里点一遍再交付。** 用无头 Chrome + CDP 驱动真实应用（本文件末尾有可复制的脚本骨架），不要只跑 tsc 和单元测试就说"好了"。前一轮的假绿就是这么来的。
-
----
+线上实例：[公众号排版助手](https://wechat.yoru-and-akari.dev)；公开源码：
+[yoruuuchan/wechat-md-studio](https://github.com/yoruuuchan/wechat-md-studio)。
+下列环境与历史记录截至 2026-10-09，运行状态、凭证权限与边缘设置在操作前重新核对。
 
 ## 一、项目位置与环境
 
@@ -34,23 +29,12 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 3. **部署只许从 master 主工作区执行**：线上只有一个。功能在分支上验证全绿（check + verify:themes + test + CDP）后合回 `master`，由主工作区统一构建、scp、`install.sh`。分支上的人不碰服务器。
 4. **合并顺序**：分支开工前先 `git merge master` 同步；交付在分支上提交，回合由主工作区执行，冲突按功能归属取舍。
 
-- Node 20+（本机 v24），`npm ci` 装依赖
+- Node.js 24（当前开发与验收版本，使用内置 `node:sqlite`），`npm ci` 装依赖
 - `.env` 从 `.env.example` 复制（`.env` 已被 gitignore，**永远不要提交**）
-- 常用命令：
-  - `npm run check` — tsc，必须 0 错误
-  - `npm run build` — 产出 `dist/boot.js`（自包含）+ `dist/public/`
-  - `npm run verify:themes` — 111 项离线校验（主题红线、比例、删除、驱动契约）
-  - `npm run verify:sources` — 来源/致谢/许可数据自洽 + README、THEME-SOURCES.md、LICENSES/NOTICE.md 的生成区块与数据一致（改了主题、来源或 credits 后必跑）
-  - `npm run sync:docs` — 重新生成上面三个文档里带 `BEGIN GENERATED` 标记的区块（新增主题/来源/credit 后先跑它）
-  - `npm run import:themes` — 从上游克隆重新生成 `src/lib/themes-imported/`（上游位置见 THEME-SOURCES.md）
-  - `node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` — 模板库页的真实浏览器验收
-  - `node scripts/cdp-verify-favorites.mjs <url> [CDP端口]` — 收藏流转 + /references 页面的真实浏览器验收（无需登录）
-  - `node scripts/cdp-verify-public-access.mjs <url> 9335` — **不登录**走一遍上传全链路的真实浏览器验收
-  - `node scripts/cdp-verify-docs-sync.mjs [端口] [CDP端口]` — 稿件同步模型验收：登录合并不丢本地稿、stale 保存出冲突弹窗且云端新版不被覆盖、三条冲突处理路径、草稿箱服务端卡片与搜索。**自带临时数据库和 mock 图床，不碰线上**
-  - `bash scripts/cf-open-public.sh --check|--plan|（空）` — Cloudflare 门禁开关（撤 Access + 并入威胁分数规则）
-  - `npm run dev` — 本地开发
+- 项目级命令与按范围选择的验收脚本见 [AGENTS](AGENTS.md#验证与完成报告) 和 [验证导航](docs/verification.md)。
 
-本地身份可以随便填，`ACCESS_KEY` / `SESSION_SECRET` 用 `.env.example` 里的占位值即可。
+开发模式下 `ACCESS_KEY` / `SESSION_SECRET` 可使用示例占位值；`.env` 中设 `NODE_ENV=development`。
+生产模式会拒绝占位值，完整变量与启动方式见 [配置文档](docs/configuration.md)。
 测匿名额度不用等一天：起服务时压小就行，例如
 `ANON_DAILY_IMAGES=2 ANON_DAILY_BYTES=1048576 ANON_TOTAL_BYTES=10485760`。
 
@@ -62,83 +46,18 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 
 ---
 
-## 二、它在做什么
+## 二、应用技术资料入口
 
-左侧 CodeMirror 6 写 Markdown，右侧 375/677 实时预览，三套主题一键切换，一键复制富文本进公众号后台。
-
-### 根本设计（改动时不得破坏）
-
-```
-Markdown → 语义 AST（src/lib/parse.ts）→ 主题模板函数（src/lib/themes.ts）→ 全内联样式 HTML
-```
-
-**新增主题 = 加一个 Theme 对象**，解析层和已有稿件零改动。这条线是这个项目存在的理由，别绕过去在解析层塞视觉判断。
-
-主题库在 2026-10-07 扩成多来源聚合（219 套），分层如下，改主题相关代码先看清归属：
-
-| 文件 | 职责 |
+| 内容 | 事实源与说明 |
 |---|---|
-| `src/lib/theme-kit.ts` | Theme 契约、渲染原语（esc / carouselFrame / baseTableBlock / makeCarousel / makeImageBlock）、微信红线消毒 `sanitizeStyle`、由样式规格装配 Theme 的 `buildTheme` |
-| `src/lib/theme-meta.ts` | 分类维度（风格标签 / 复杂度 / 色系）与来源档案类型；许可证白名单 |
-| `src/lib/themes.ts` | 三套自研主题 + `THEMES` 总注册表 |
-| `src/lib/themes-extra.ts` | 六套 gzh-design-skill 移植主题（AGPL，见 THEME-SOURCES.md） |
-| `src/lib/themes-imported/*.ts` | **生成物**，由 `npm run import:themes` 产出，不要手改 |
-| `scripts/themes/import.ts` + `scripts/themes/lib/*` | 各来源的 importer：抽取 → 归一 → 色板反推 → 分类推导 → 落盘 |
-| `src/lib/theme-sources.ts` | **来源注册表**：每个上游项目的仓库/作者/默认许可证/许可证文件/格式/审计备注。主题的 `meta.origin.project` 必须命中这里 |
-| `src/lib/credits.ts` / `src/lib/favorites.ts` | 代码层面的致谢数据（borrowed/declined）/ 主题收藏的本地存储（`mopai.theme-favorites.v1`） |
-| `scripts/sources/*` + `scripts/verify-sources.ts` | 从数据生成 README / THEME-SOURCES.md / NOTICE.md 的区块（`npm run sync:docs`）并机器校验（`npm run verify:sources`） |
+| 语义 AST、Theme、微信 HTML、公式、Mermaid、图片与多图 | [渲染与图片](docs/rendering.md)，规则以 renderer / tests / `verify:themes` 为准 |
+| 本地防丢、云端归档、并发锁、回收站、导入导出 | [稿件与编辑器](docs/documents.md)，事实以 hooks / API / schema / tests 为准 |
+| REST API、令牌、客户端与覆盖语义 | [Agent API](docs/agent-api.md) 与 [wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) |
+| 主题来源与许可 | [THEME-SOURCES](THEME-SOURCES.md)，数量由 `THEMES` / `verify:themes` 复算 |
+| 开源致谢与技术取舍 | [References](https://wechat.yoru-and-akari.dev/references)、[credits 数据](src/lib/credits.ts)、[许可核实记录](LICENSES/NOTICE.md) |
+| 来源与生成文档 | [theme-sources.ts](src/lib/theme-sources.ts)、[credits.ts](src/lib/credits.ts)、[sources/report.ts](scripts/sources/report.ts)；`sync:docs` 更新区块，`verify:sources` 复核，完整致谢在 NOTICE |
 
-每套 Theme 必须带 `meta`（风格标签、复杂度、色系、来源项目/作者/仓库/许可证/署名/lineage）。
-`npm run verify:themes` 会校验 catalog 完整性与许可证文件存在性——**新加主题不写 meta 过不了校验**，这是刻意的。
-来源项目与文档的一致性（新来源必须登记进 `theme-sources.ts`、许可证文件大小写精确存在、
-README/NOTICE 的统计与 catalog 同步）归 `npm run verify:sources` 管。
-来源审计、未接入清单与「应用整体许可证」的待拍板事项都在 `THEME-SOURCES.md`。
-
-### 自研公众号语法
-
-| 语法 | 效果 |
-|---|---|
-| `==重点==` | 关键词下划线标记 |
-| `## KICKER \| 标题` | 章节标题，序号自动编号 |
-| `> 金句卡片` | 金句卡片 |
-| `:::quote` … `:::` | 引文框 |
-| `:::center` … `:::` | 居中强调句 |
-| `![图注](src)` | 图片；`src` 留空 = 占位，图号自动编排 |
-| `:::carousel 4:3 标题` … `:::` | 轮播；比例可省略，默认 4:3 |
-| GFM 表格（`\|` 分隔，支持 `:---` 逐列对齐） | 真 `<table>`，逐列对齐落到单元格 |
-| `@signature` | 署名块 |
-| front matter `titles` / `cover` | 只进侧栏，不进正文 |
-
-### 图片链路
-
-```
-上传（编辑器拖拽 / 侧栏素材清单按钮）
-  → 浏览器内裁切（可选：自动居中裁切 or 手动拖拽裁切）
-  → tRPC storage.upload → mopai-images Worker → R2 桶 mopai-assets
-  → Markdown 回填 img:<key>
-渲染时 resolveImg 把 img:<key> 展开为 `<当前访问域>/api/img/<key>`（`window.location.origin`，无硬编码域名，换域不用改代码）
-  → 站点 302 → https://mopai-img.yoru-and-akari.dev/img/<key>（R2 真图）
-```
-
-`img:<key>` 是内部协议，**渲染前必须过 `resolveImg`**（轮播的 items 曾经漏了，整条轮播裂图）。
-
-### 稿件与草稿箱
-
-| 存哪 | 什么时候写 |
-|---|---|
-| 浏览器 IndexedDB（正文）+ localStorage（索引） | 每次改动（防丢，纯本地）。只缓存正文真的在手的稿件；纯元数据 stub 不写缓存 |
-| 云端数据库 | 只在该稿件**已经保存过**（`docs.savedAt` 有值）时随改动更新 |
-| 云端 + 打 `savedAt` 时间戳 | **只有点顶栏「保存到草稿箱」** |
-
-正文进 IndexedDB（`src/lib/body-store.ts`），名字、时间戳这类索引留在 localStorage（`src/lib/store.ts`）：localStorage 只有约 5 MB，写满时 `setItem` 抛异常，而旧代码把异常吞掉——编辑器照常打字，刷新后正文退回上一版。升级时老的 `mopai.docs.v1` 会被迁进新存储，读完校验通过才删旧键；迁移失败、写失败、没有 IndexedDB（降级回 localStorage）一律进 `persistenceStatus()`，顶栏状态位显示「本地未存」并弹一次说明。迁移失败时旧键原地保留，下次打开重试。
-
-`docs.savedAt` 为 null = 编辑中的工作稿，不进草稿箱。一篇稿件一条记录，**没有版本历史**（这是用户明确的选择）。
-
-**并发模型（2026-10-08 起）**：`docs.hash`（正文 sha256 前 16 位，`api/lib/doc-hash.ts`）是唯一的乐观锁令牌。浏览器读取时拿到 hash，保存时作为 `baseHash` 回传，服务端单条 UPDATE 做 compare-and-swap；对不上回 `conflict` + 云端当前版本（正文原样保留），客户端弹窗让用户选「保留我的 / 用云端的 / 两边都留」。Agent 门的 `baseHash` 是同一把锁，没有 baseHash 又不带 `force: true` 的 PUT 会被 400 拒绝。`updatedAt` 只是展示时间，**不是锁**（秒级精度 + 客户端时钟，靠它并发判断必错）。
-
-**登录合并（`src/lib/docs-merge.ts`，纯函数）**：登录后拉全量**元数据**（`docs.list` 只给 id/name/时间/hash，不给正文），然后：local-only 稿件上传成工作稿；云端独有稿件保留成 stub（打开才拉正文，`docs.get`）；同 id 同内容静默合并；同 id 内容不同 → 云端版保留原 id，本机版另存为新 id 并收进草稿箱（两边都不丢，有提示）；云端回收站里的稿件当作"存在、只是不在列表"。缓存里没有 baseHash 的旧数据（升级场景）用浏览器端 sha256 对比内容，避免假冲突。
-
-**草稿箱列表**：卡片统计（字数/图数/轮播数/小标题）由服务端算好再下发（`docs.drafts`），搜索、排序、只看有图都在服务端；正文只在「打开」和「复制 md」时按需取。整包备份导出会先补全所有缺失正文（`docs.getMany`），补不齐就拒绝导出空稿。
+本文件保留真实环境操作与历史排障记录；旧记录的功能状态以当前实现和验收为准。
 
 ---
 
@@ -151,13 +70,70 @@ README/NOTICE 的统计与 catalog 同步）归 `npm run verify:sources` 管。
 | 入口 | Cloudflare Tunnel → `wechat.yoru-and-akari.dev`，tunnel id `1c05edf4-f1f1-4156-9aa2-8a1ddca0fa14`（ingress 在服务器 `/etc/cloudflared/mopai.yml`） |
 | 门禁 | **站点公开，没有 Cloudflare Access**（2026-10-08 撤掉，之前是邮箱验证只放行站长）。撤的方式：本机的 CF token 只读写不动，于是借一个已登录 dashboard 的浏览器会话，走它的同源代理 `dash.cloudflare.com/api/v4/...` 删掉了两个 Access 应用；同一会话把本站并入了 zone 上那条高威胁分数 challenge 规则（现在 `http.host in {"app..." "wechat..."}`）。`ACCESS_KEY` 只决定谁能用云端草稿箱；排版、上传、复制、导出都不用登录 |
 | 图片公网读 | 站点公开之后 `/api/img/*` 自然是公网可读（微信抓图必须匿名可达）。以前那个 bypass Access 应用已随之删除。若将来把门禁关回去，必须同时建一个 bypass 应用放行 `/api/img/*`（`cf-create-access.sh` 里已有这段，路径最具体者优先）；同理若放行 `/api/agent/*`，**绝不能连带放行 `/api/trpc/*`**——那里有 `auth.login` |
-| 防滥用 | 应用层额度（IP 突发限流 / 每 IP 每日 / 访客 24h / 匿名总量封顶 / 字节头判类型）+ **匿名图回收**（`api/lib/anon-gc.ts`：启动 1 分钟后跑一次、之后每 24h，删掉超过 `ANON_GC_DAYS` 且没有云端稿件引用的 `ownerId=0` 图，先 Worker 确认对象已删再删账本行）+ zone 上已有的 WAF 规则。细节与「刻意没做的三件事」见 `app/README.md`「公开之后靠什么挡滥用」 |
+| 防滥用 | 应用层额度（IP 突发限流 / 每 IP 每日 / 访客 24h / 匿名总量封顶 / 字节头判类型）+ **匿名图回收**（`api/lib/anon-gc.ts`：启动 1 分钟后跑一次、之后每 24h，删掉超过 `ANON_GC_DAYS` 且没有云端稿件引用的 `ownerId=0` 图，先 Worker 确认对象已删再删账本行）+ zone 上已有的 WAF 规则。额度、日志与既定取舍见下文 [安全与匿名资源回收](#安全与匿名资源回收) |
 | 图片存储 | Worker `mopai-images` → R2 `mopai-assets`；Worker 持有 R2 binding，**服务器上不存在任何 S3 凭证** |
 | 数据 | SQLite，`/opt/mopai/app/data/mopai.db` |
 | SSH | `ssh cc-tokyo-01` |
 | Cloudflare token | 环境里的 `CLOUDFLARE_API_TOKEN` **是只读的**：读接口正常，写接口一律回 `HTTP 405` + 错误码 `10405 Method not allowed for this authentication scheme`（看着像方法不对，其实是 token scope 不够）。改 Access / WAF 规则要先换一个带 `Zone → Rulesets Edit` + `Account → Access → Apps and Policies Edit` 的 token。**不要硬编码、不要提交**。`~/.config/codex/private.env` 里已经没有这个变量了（只剩 SILICONFLOW_API_KEY），旧脚本的 `source` 那行会静默拿到空值 |
 | Cloudflare 标识 | account `5e96dfd2bf22d385e4ffdaa794d74676`；zone `yoru-and-akari.dev` = `4f9b5c7236e63090439676eec70031e2`（**Free 计划**）；ruleset：自定义规则 `3478aaf3df1b4d8eb385f7dadc47d3c6`、速率限制 `b002f9cb15564f3a9b560efe95f138eb` |
 | Cloudflare 免费额度现状 | 自定义规则 **5/5 已用满**（telegram webhook、扫描器 UA、app 域威胁分数 challenge、路径穿越、危险方法），速率限制 **1/1 已用掉**（`feedback-rl-5pm`，`/feedback` POST 5 req/10s）。所以本项目**不能再加规则**，只能并入既有的；上传防洪放在应用层。别以为 zone 是空的——`GET /zones/{z}/rulesets` 的列表里 `rules` 是空的，必须逐个 `GET /zones/{z}/rulesets/{id}` 才看得到规则 |
+
+### 安全与匿名资源回收
+
+以下是既定防护与当前代码默认额度，配置旋钮见 [配置文档](docs/configuration.md#匿名额度与回收)。
+站点公开、上传不用登录；应用规则由代码与测试定义，边缘状态以实际账户核对为准：
+
+| 层 | 措施 | 位置 |
+|---|---|---|
+| 应用 | 每 IP 每分钟 12 次上传（内存计数，重启即清） | `api/lib/burst.ts` |
+| 应用 | 每 IP 每 UTC 日 100 张（内存计数）——访客额度挂在可删的 Cookie 上，这条让换 Cookie 慢灌变贵 | 同上，`ANON_IP_DAILY_IMAGES` |
+| 应用 | 每 IP 每分钟 10 次登录尝试（内存计数）。站点公开之后，`auth.login` 是全站唯一能被人坐在那儿一直试的门；超了答 429，口令比较本身仍是常数时间 | 同上，`AUTH_LOGIN_PER_MINUTE`；`api/auth-router.ts` |
+| 应用 | 配置错了不启动：生产环境缺 `ACCESS_KEY` / `SESSION_SECRET`，或用了仓库里公开的占位值，或任何数值旋钮写了非整数 / 越界值，启动时直接报错并点名变量——**不再有「静默拿开发默认值上线」这条路** | `api/lib/env.ts` |
+| 应用 | 安全响应头由代码统一设置（HTML / 静态资源 / API 一致）：CSP、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`，以及只在 HTTPS 请求上发的 HSTS | `api/lib/security-headers.ts` |
+| 应用 | 每访客滚动 24 小时 30 张 / 100 MiB | `api/lib/anon-quota.ts` |
+| 应用 | 全部匿名上传合计 1.5 GiB 封顶 | 同上，`ANON_TOTAL_BYTES` |
+| 应用 | 匿名图回收（GC）：`ownerId=0`、超过 `ANON_GC_DAYS`（默认 14 天）、且没有任何云端稿件引用（正文里搜不到 `img:<key>`）的图删掉——上面那个 1.5 GiB 池子因此是循环的，不会填满一次就永久拒客。启动 1 分钟后跑一次，之后每 24 小时一次；先让 Worker 确认对象已删，再删账本行，Worker 失败就留着下次重试 | `api/lib/anon-gc.ts` |
+| 应用 | 只认字节头是 jpeg / png / gif / webp 的图；**对外提供的 Content-Type 由字节决定，不信请求头** | `api/lib/image-type.ts` |
+| 应用 | 匿名图片按访客 Cookie 的哈希归属，别人列不出也删不掉 | `api/lib/visitor.ts` |
+| 运维 | 每次拒收写一行 `[upload-deny] 原因 key=value` 到服务日志（burst / ip-daily / quota / bad-magic，两扇门都写），晨报定时任务 grep 它；被限流的登录写 `[auth-deny] login-burst ip=…` | `api/lib/deny-log.ts` |
+| 运维 | 每次 GC 跑完写一行 `[anon-gc] deleted=N bytes=B failed=F days=D` 到服务日志（删不掉的另写 `[anon-gc] delete-failed key=… reason=…`）。格式固定，晨报定时任务一起 grep | `api/lib/anon-gc.ts` |
+| 运维 | 匿名池应急清理：`sudo bash /opt/mopai/scripts/server-anon-purge.sh --days N` 先干跑、`--apply` 才删，只碰 ownerId=0 | `scripts/server-anon-purge.sh` |
+| 既定 | agent 门上传落 ownerId=1，**不计入**匿名池封顶——它是站长自己的流量，匿名池只度量陌生人；agent 门默认关（`AGENT_TOKENS` 留空），开不开由站长配令牌决定 | 2026-10-08 拍板 |
+| 边缘 | 高威胁分数请求走 managed challenge、扫描器 UA 直接拦、路径穿越与危险方法拦掉 | zone 上已有的 WAF 自定义规则 |
+| 边缘 | AI 爬虫保护 = block | Cloudflare 账户设置 |
+
+GC 有一个**明知且接受**的漏洞：匿名访客的稿件只存在他们自己浏览器的 IndexedDB / localStorage 里，服务端看不见，所以「14 天前传的图，某个访客的本地草稿还在引用」这种情况会被误删。这和应急脚本 `server-anon-purge.sh` 是同一个口径，不是遗漏——匿名图本来就是用完即走的，而池子填满会让**所有**真实访客传不了图，两边权衡之后选择让池子循环。有了 GC 之后那个脚本降级成手动超驰（想立刻收回空间、或想把阈值临时改小时用），不再是唯一的清理入口。要图片长期有效就走登录后的云端草稿箱：站长的图 `ownerId≠0`，GC 永远不碰。
+
+三条刻意**没做**的，别当成遗漏：
+
+- **Bot Fight Mode 不开**。它按 zone 拦已知机器人，而微信抓图的服务端客户端正是这种机器人——开了会导致粘贴到公众号的文章图片全丢。
+- **不占 Cloudflare 速率限制规则**。免费计划每个 zone 只有 1 条，已经被同 zone 的另一个项目用掉了；上传的防洪改由上面的应用层承担。
+- **Turnstile 先不接**。它免费且不限量，是下一层该加的东西，但验证失败会让大陆访客彻底传不了图，所以等到配额被证明太松再加。
+
+`scripts/cf-open-public.sh` 负责开：撤掉 Access 应用，并把本站域名加进 zone 上那条已有的高威胁分数规则（免费计划只有 5 条自定义规则，已经用满，所以是**并入**而不是新增）。三种模式：
+
+```bash
+export CLOUDFLARE_API_TOKEN=...   # 需要 Zone→Rulesets Edit + Account→Access Edit
+bash scripts/cf-open-public.sh --check   # 只读，看现在是什么
+bash scripts/cf-open-public.sh --plan    # 算出要改成什么，不发请求
+bash scripts/cf-open-public.sh           # 执行
+```
+
+要重新关回门禁：`bash scripts/cf-create-access.sh`（会重建 Access 应用与 `/api/img/*` 的 bypass）。
+
+补充运维记录：请求没有可识别来源头时会落入同一个 `ip=unattributed` 限流桶。服务器验收套件后立刻再次登录，
+可能由自家请求触发 429；先检查 `[auth-deny] login-burst ip=unattributed` 与时间窗口，再判断是否受攻击。
+
+
+### 运维脚本导航
+
+脚本在应用根目录的 `scripts/`，环境变量与参数先读脚本；操作真实资源前按上表核对环境：
+
+- [cf-create-bucket.sh](scripts/cf-create-bucket.sh) / [cf-create-tunnel.sh](scripts/cf-create-tunnel.sh)：R2 与 Tunnel 资源。
+- [cf-create-access.sh](scripts/cf-create-access.sh) / [cf-open-public.sh](scripts/cf-open-public.sh)：门禁与公开访问。
+- [server-bootstrap.sh](scripts/server-bootstrap.sh)：用户、目录、systemd 与 cloudflared 配置。
+- [server-install-release.sh](scripts/server-install-release.sh)：安装构建并重启；[stage-to-tokyo.sh](scripts/stage-to-tokyo.sh) 保持脚本 LF 字节传输。
+- [server-verify-all.sh](scripts/server-verify-all.sh)：服务器验收入口；分项与应急清理见下文。
 
 ### 部署流程（**服务器上不要跑 npm ci**，2GB 内存会 OOM）
 
@@ -287,7 +263,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 
 `/opt/mopai/scripts/` 下有三套，`verify-all.sh` 一次跑完：
 
-- `server-acceptance-test.sh` — 站点可达、登录、上传、公网 302→200、未登录被拦
+- `server-acceptance-test.sh` — 站点可达、登录、站长上传归属、公网 302→200、匿名上传与图片隔离
 - `server-e2e-check.sh` — 图片全链路（上传→公网取回→删除）
 - `server-round2-check.sh` — 稿件 CRUD、草稿箱语义、存储统计、孤儿图清理
 - `server-anon-purge.sh` — 匿名池应急清理：`--days N` 默认干跑、`--apply` 才删，只碰 ownerId=0。
@@ -301,20 +277,11 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 
 ---
 
-## 四、绝对不能破坏的约束（验收红线）
+## 四、微信输出约束入口
 
-这些都是公众号平台的硬要求，破坏了粘贴到公众号会掉样式或裂图：
-
-- 正文根节点唯一 `<section>`（**嵌套 section 允许**，顶层只能一个）
-- 全内联样式；所有文字节点包 `<span leaf="">`
-- 不用 `class` / `id` / `<script>` / `<style>` / `<div>`
-- 不用 `position:fixed|absolute|sticky`、`float`、`display:grid`、`@media`、`@keyframes`
-- 盒式模块（卡片 / 引文框 / 轮播）前后必须有独立空行 `<p style="margin:0;"><span leaf="">&nbsp;</span></p>`
-- 无 src 的图片占位渲染为独立普通段落（`图N 说明`），删掉即可在公众号后台直接插图
-- 轮播里所有图必须同比例——**比例靠上传前真实裁切保证**，不许用 `object-fit` / 固定高度 / 留白补框伪造
-- `img:<key>` 协议形状不变
-
-`npm run verify:themes` 会机器校验以上大部分，**每次改渲染层都要跑**。
+核心边界是单一正文根 `section`、全内联 HTML、图片短引用解析与真实裁切。
+具体标签 / 样式 / 公式 / 比例规则统一见 [渲染与图片](docs/rendering.md#正文兼容规则)、
+[verify-themes.ts](scripts/verify-themes.ts) 和模块相邻测试；渲染改动运行 `npm run verify:themes`。
 
 ---
 
@@ -324,19 +291,19 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 2. **sqlite 驱动的命/未命中契约**：`get` 命中要返回 `Object.values(row)`，未命中要返回 `undefined`。返回 `[]` 会让 drizzle 把它读成"一行全 null"，于是「先查再插」永远以为记录已存在、静默不插入。
 3. **`DialogContent` 没有 max-height 和滚动**（`src/components/ui/dialog.tsx`）。弹窗比窗口高时上下被裁且够不到。现有两个弹窗自己加了 `max-h-[90vh] overflow-y-auto` 和吸底按钮——**新加弹窗要注意同样问题**。
 4. **`react-easy-crop` 的样式表必须手动 import**（`import 'react-easy-crop/react-easy-crop.css'`），否则裁切框不可见。
-5. **tRPC 的错误是 HTTP 200 + error 信封**，`curl | head -c` 会吞掉信号。测试脚本要显式检查有没有 `result` 信封、有没有 `NaN`。
+5. **tRPC 错误要检查状态与 error 信封**，不能只截前几个字节判断成功。测试脚本显式检查 `result` / `error`，以及不合法的数值（例如 `NaN`）。
 6. **会话 cookie 是 `Secure`**，本地/服务器上用纯 HTTP 测试时 curl 的 cookie jar 会静默丢弃它——改成手工捕获 `set-cookie` 头回放。
 7. **round2 验收脚本**断言的是"增量"而不是绝对值（别的脚本会留下自己的测试图），并且预清理只删**它自己生成的文件名**。别改成"把现有的都删掉"——前一轮就是这样误删了用户的真实上传。
 8. **默认示例稿已脱敏**（2026-10-07）：`src/lib/sample.ts` 的 `SAMPLE_DOC` 以前是站长公司的宣传稿，随公开仓库外泄过，现已换成中性的「示例稿 · 语法速览」（覆盖全部语法，同时是 golden 主题的验收样例）。**服务器数据库里还留着改名前的那一行默认稿**（`ownerId=1`、`savedAt` 为 null），那是站长私有数据、登录后才读得到；别在诊断时对它跑无差别 DELETE。旧文本仍存在于公开仓库的历史提交里——工作树已经干净，要连历史一起清掉只能走全量重建（见「公开仓库与发布流水线」）。
 9. **给 `files` 加列必须加在最后**。drizzle 的 `sqlite-proxy` 驱动按**位置**映射行，而 `ALTER TABLE ... ADD COLUMN` 只会追加到末尾；`db/schema.ts` 里声明的顺序一旦和物理顺序不一致，读出来的字段会整体错位，而且**不报错**。`api/queries/files-upgrade.test.ts` 就是钉这件事的。同理，`CREATE INDEX` 引用新列必须放在 `ALTER` 之后——旧库上 `CREATE TABLE IF NOT EXISTS` 是 no-op，先建索引会直接 `no such column`。
 10. **改 Cloudflare 之前先确认 token 能写**。只读 token 的写操作回 `HTTP 405 / 10405`，不是「权限不足」那种一眼能认的错。免费额度已经用满（见部署形态表），加规则前先 `bash scripts/cf-open-public.sh --check` 看清 zone 上已有什么。
-11. **脚本里调 tRPC：查询用 GET，变更用 POST**。用 POST 打查询会得到 `Unsupported POST-request to query procedure`，而 HTTP 状态还是 200，很容易误判成"接口坏了"。
+11. **脚本里调 tRPC：查询用 GET，变更用 POST**。用 POST 打查询会得到 `Unsupported POST-request to query procedure`；检查完整响应与错误信封，避免误判。
 12. **编辑备注 `<!-- … -->` 曾经根本没被隐藏**（2026-10-09 修）：markdown-it 用 `html: false`（这是红线，原样 HTML 不能进正文），于是注释被转义成普通文字，预览和复制都带着它——示例稿里「渲染和复制都不会带上它」那句话是 2026-10-07 重写示例时写下的空头支票。现在 `src/lib/comments.ts` 在解析前做**等长空格化**（围栏代码块里的不动），行号与字符偏移完全不变，所以块偏移和图片 occurrence 编号都不受影响；两处原始正文扫描（`parse.ts` 的 `scanImageOccurrences`、`render.ts` 的 `findImageSpan`）对称跳过注释范围，注释里的 `![…](…)` 不打乱图号。**动这两处扫描器时保持对称，否则上传的图会写错位置。** 已知限制（与图片扫描同源）：行内代码里的注释也会被空格化。
 13. **控制台里那条「Cloudflare 探针被 CSP 拦掉」的报错不是 bug**（2026-10-09 决定容忍）：zone 开着 JavaScript Detections（`bot_management.enable_js=true`），CF 会往 HTML 注入内联探针 `window.__CF$cv$params={r:'<ray id>',…}`，正文每次请求都不同（**用哈希放行不可行**），于是一律被 `script-src 'self'` 拦下——页面功能不受影响，只是每次访问多一条 violation。保留该设置是因为同 zone 其他子域没有严格 CSP、仍然受益，而探针本来也拿不到本站信号；要根除只能去 dashboard 关掉 zone 级的 `enable_js`（本机 token 只读，改不了）。
 
 ---
 
-## 六、已知但**没修**的问题（建议从这里开始）
+## 六、历史变更与当前注意事项
 
 > 2026-10-06 更新：撤销删除、删稿复活竞态、轮播批量传图定位、编辑器快捷键、Home.tsx 残留已修（`scripts/cdp-verify-round5.mjs` 是验收脚本）。另外 **`docs.save` 现在是 update-only**：新行只能走 `saveToDrafts` / `importLocal`，别给 `save` 加回 insert 分支——那是删稿复活的闸门。
 >
@@ -345,12 +312,8 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 导致**加粗/下划线/斜体在标记结束后泄漏到同段剩余文字**（线上一直存在，截图可见整段被划线）。
 > 现改为整体换回快照，回归测试在 `src/lib/parse.test.ts`。
 >
-> 2026-10-07 发现但**没修**（属编辑器分支的文件范围）：`src/components/EditorPane.tsx` 的
-> `buildDeco` 给 `Decoration.line()` 传了 `(line.from, line.to)`，而 CodeMirror 要求行装饰区间
-> 零长度，于是任何含 front matter / `:::` / `@signature` 的稿件每次更新都抛
-> `RangeError: Line decoration ranges must be zero-length`。CodeMirror 会吞掉异常，
-> 编辑器仍可用，但**语法高亮静默失效**。修法是把四处 `to: line.to` 改成 `to: line.from`。
-> 主题库分支的 CDP 验收对它单独归因，不算主题库的失败。
+> 2026-10-07 的 CodeMirror 行装饰零长度问题已在当前实现修正：四处 `Decoration.line`
+> 均使用 `from=to=line.from`，不再列为未修问题；真实编辑器验收见 `cdp-verify-editor-upgrades.mjs`。
 >
 > 2026-10-07 更新：更名「公众号排版助手 by Yoru」+ Yoru 阴文印 logo + 弦月 favicon（`src/lib/brand.ts`、`src/components/YoruMark.tsx`）；新增模板专区页 `/themes`（`src/pages/Themes.tsx`，验收 `scripts/cdp-verify-rebrand.mjs`）；前端按设计系统铁律进一步内凹化（carriers 用 `ya-well`/inset，`ya-selected` 自带 sunken 底+1.5px 描边）；域名从 mopai 切到 wechat（Tunnel ingress + DNS + Access 放行三处都要动）。同日晚些时候 `/themes` 升级为多来源模板库（见上表与 THEME-SOURCES.md）。
 >
@@ -358,7 +321,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 与 `api/boot.ts` 生产分支里的排程，旋钮 `ANON_GC_DAYS`（默认 14）/ `ANON_GC_ENABLED`（默认开）。
 > 匿名池从「只进不出、填满即永久拒客」变成循环的，下面第 2 条因此结案；
 > `scripts/server-anon-purge.sh` 保留不动，降级成手动超驰。误删面（访客本地草稿的引用服务端看不见）
-> 是**刻意接受**的取舍，细节在第 2 条与 `app/README.md`「公开之后靠什么挡滥用」。
+> 是**刻意接受**的取舍，细节在第 2 条与 [安全与匿名资源回收](#安全与匿名资源回收)。
 >
 > 2026-10-08 晚（服务端加固分支）：四件事一起落地——`api/lib/env.ts` 重写成统一的解析/校验
 > （生产缺 `ACCESS_KEY` / `SESSION_SECRET` / `IMG_ADMIN_KEY`、留 `change-me` 这类公开占位值、
@@ -426,9 +389,9 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 
 ### 产品方向（用户明确拍板的）
 
-- **准备开源**：功能完善后开源，GitHub 仓库地址定了之后填进 `src/lib/brand.ts` 的 `REPO_URL`（顶栏 GitHub 图标自动出现）。
+- **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
 - **许可证已定（2026-10-07）**：仓库整体 **AGPL-3.0-or-later**。三处声明：根目录 `LICENSE`、
-  `app/package.json` 的 `license` 字段、`app/README.md` 的「许可证与第三方主题署名」章节。
+  [package.json](package.json) 的 `license` 字段与 [README](README.md#license-与来源)。
   选它是因为主题库含 6 套 AGPL 与 2 套 GPL-3.0 主题（兼容性逐族核对见 `THEME-SOURCES.md` 第四节）。
   操作红线：**开源发布不得晚于部署**——AGPL 第 13 条覆盖线上服务，仓库没公开之前
   部署含 copyleft 主题的构建就是未履行源码提供义务。
@@ -444,7 +407,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 
 ### 中
 
-1. **`storage.orphans` 不覆盖另一台设备的未同步草稿**：本地草稿 key 通过 `alsoKeep` 传，但只覆盖**本机** localStorage。另一台设备的草稿引用的图可能被误判为孤儿。要根治得让草稿也同步。
+1. **`storage.orphans` 不覆盖另一台设备的未同步草稿**：本地草稿 key 通过 `alsoKeep` 传，但只覆盖**本机**浏览器存储。另一台设备的草稿引用的图可能被误判为孤儿。要根治得让草稿也同步。
 2. **匿名图片没有回收机制 → 已修（2026-10-08，`api/lib/anon-gc.ts`）**：以前清理只能由上传者自己在素材库里点，
    而他大概率再也不回来，总量撞到 `ANON_TOTAL_BYTES`（1.5 GB）之后**所有人都传不了图**且不会自愈。
    现在启动 1 分钟后跑一次、之后每 24h 一次：删掉 `ownerId=0`、比 `ANON_GC_DAYS`（默认 14 天）更旧、
@@ -452,15 +415,15 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
    顺序是先 `storage.deleteFile` 让 Worker 确认对象已删，**再**删 `files` 行；Worker 拒绝或连不上就保留行、
    写一行 `[anon-gc] delete-failed key=… reason=…`，下次重试。每次运行结束写一行
    `[anon-gc] deleted=N bytes=B failed=F days=D`（格式固定，晨报 grep 它）。旋钮见 `.env.example`。
-   **残留取舍，刻意保留、别当 bug 修**：匿名访客的稿件只在他们自己浏览器的 localStorage 里，服务端看不见，
+   **残留取舍，刻意保留、别当 bug 修**：匿名访客的稿件只在他们自己浏览器的 IndexedDB / localStorage 里，服务端看不见，
    所以「14 天前传的图还被某访客的本地草稿引用」会被误删——和 `scripts/server-anon-purge.sh` 同口径。
    还没实测的：线上第一次 sweep 的真实规模，14 天这个默认值是按估计的增长速率定的，跑完看 `deleted=` 再调。
 
 ### 低
 
-3. **没有导出/导入整包稿件**：多设备迁移或备份只能靠逐篇复制。
+3. **整包稿件导入 / 导出已落地**：`import-export.ts` 提供 JSON 备份；云端正文先补全再导出，见 [稿件文档](docs/documents.md#编辑与导入导出)。
 4. **`useDocs` 脏标记全量比较**：`lastSavedRef` 是 Map<id, content>，每次改动全量比较，稿多了可能变慢。
-5. **代码块里的 `![](...)` 会被图片扫描器计数**：`scanImageOccurrences` 对原文做纯正则、不剔除 ``` 围栏，正文里贴 markdown 示例代码会让 occurrence 错位（上传回填/轮播比例可能写错位置）。概率低，修法是把 fence 区间从扫描里排除。
+5. **围栏代码图片错位已修**：parser 扫描与 renderer 回填对称跳过 fence，编辑备注也保持同样的计数边界；回归在 `fences.test.ts` 与 `comments.test.ts`。
 
 ### 探索性
 
@@ -469,19 +432,15 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 
 ---
 
-## 七、交付要求
+## 七、交付与部署验收
 
-改任何东西之后：
+开发完成检查和报告格式统一见 [AGENTS](AGENTS.md#验证与完成报告)；
+浏览器脚本选择见 [验证导航](docs/verification.md)。
+本地功能验证通过后，合回主线，由主工作区统一发布源码与部署。
 
-1. `npm run check` → 0 错误
-2. `npm run verify:themes` → `ALL CHECKS PASSED`
-3. **主题 / 来源 / 致谢数据有改动时**：先 `npm run sync:docs` 重新生成文档区块，再 `npm run verify:sources` → `ALL CHECKS PASSED`
-4. **前端行为改动**：用无头 Chrome + CDP 在真实应用里点一遍，截图或贴出实测数据
-5. **API / 数据改动**：在服务器上重跑 `sudo bash /opt/mopai/scripts/verify-all.sh`，exit code 必须是 0
-6. 部署后核对本地与线上的文件 hash
-7. `git commit`，commit message 用**英文**，写清楚"为什么"而不只是"改了什么"
-
-**报告时区分「实测到的」和「推断的」。** 这个项目最贵的教训就是拿推断当结论。
+部署 API / 数据改动后，在服务器重跑 `sudo bash /opt/mopai/scripts/verify-all.sh`，检查退出码；
+脚本自身变更需单独安装，部署 `dist` 不会更新它们。每次部署核对文件哈希和进程重启时间，
+记录实测范围与真实问题。
 
 ---
 
@@ -582,10 +541,7 @@ chrome.kill()
 
 ---
 
-## 九、工作方式
+## 九、维护文档
 
-- **改了就在真实应用里验一遍**，再决定要不要报"完成"
-- **不确定用户想要什么就问一句**，别自己拍方案（"一轮播一个比例 vs 每张各自选"这种分叉，问一句省一小时）
-- 报告要区分**实测**和**推断**；失败和不确定性照实说
-- 用户是代码小白，说人话，技术概念翻译成她能懂的
-- 代码注释和 commit message 用**英文**
+新增或改变行为先修改事实源与测试，再更新对应专项文档；通用规则维护在 [AGENTS](AGENTS.md)。
+本文件只追加影响运行、部署或真实环境诊断的记录，写清日期与实测范围。
