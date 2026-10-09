@@ -446,6 +446,25 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > （`index-QCLeONym.js`），`NODE_ENV=production npm run build` 可复现，且与干净 worktree 构建字节一致
 > （入口 sha256 `d87e6206…`）；服务端 `dist/boot.js` 两种模式同哈希，不受影响。此前版本未逐版回查。
 > 要不要切生产版、部署构建是否固定 `NODE_ENV=production`，由站长决定后另行处理。
+>
+> 2026-10-09 部署记录（/terms 使用规范页 + README 配图上线）：合并 `qoder/readme-shots-and-terms` →
+> master `5968fce`。合并冲突只有一处（AGENTS 的必读资料表被三方各自追加行），保留全部三条。
+> 合并态在主工作区重跑 `check`、`verify:themes`（ALL CHECKS PASSED）、`test`（1366 项全过）、`build`，
+> 再对本地 vite 跑 `cdp-verify-terms.mjs`（新，12 项）与 `cdp-verify-dark-theme.mjs`（全绿）。
+> 33.7MB 包按分块红线走（9×4MB，逐块 sha256，整包 `26f5efab…` 对上）；`flock` 安装于 12:25:31 UTC。
+> **抢锁前重查 tip 仍是 `5968fce`**，照 08:44 那次的教训收严执行。三重核对全过：线上 `dist/boot.js`
+> sha256 = 本地 `b4840d2f…`（API 层未变）、`index.html` 资产名 `index-BbB82EWp.js` / `index-BqizAfmg.css`
+> 本地 = 线上 = 公网、重启时间即本次安装。部署后对**公网**再跑一遍 `cdp-verify-terms.mjs` 12/12。
+> 本轮线上 bundle 仍是 React 开发版（入口 2,684,681 字节、含 `jsxDEV`），与上面那条待拍板的发现同源，
+> 不是本轮引入的回归。
+>
+> **两条操作教训**：① 分块上传脚本写成**可续传**的（每块先在服务器上对 sha256，已过的跳过），
+> 这次 p06 连撞三次 `10054` 整脚本退出，重跑只补那一块，不用重传 33MB。② `api/lib/vite.ts` 的 SPA
+> fallback 只在请求 `Accept` 含 `text/html` 时回 index.html，否则 404 JSON——裸 `curl` 探 `/terms`
+> 拿到 404 看着像路由没注册，带 `-H "Accept: text/html"` 才是真相（安装脚本里 `/login` 那步早就这么写了）。
+>
+> 发布到公开仓库：区间 `b6d792e..5968fce`（深色修复 + 收尾文档同步 + /terms + README 配图），
+> 走不走、何时走由站长定。
 
 ### 产品方向（用户明确拍板的）
 
