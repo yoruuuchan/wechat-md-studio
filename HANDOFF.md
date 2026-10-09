@@ -463,8 +463,14 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > fallback 只在请求 `Accept` 含 `text/html` 时回 index.html，否则 404 JSON——裸 `curl` 探 `/terms`
 > 拿到 404 看着像路由没注册，带 `-H "Accept: text/html"` 才是真相（安装脚本里 `/login` 那步早就这么写了）。
 >
-> 发布到公开仓库：区间 `b6d792e..5968fce`（深色修复 + 收尾文档同步 + /terms + README 配图），
-> 走不走、何时走由站长定。
+> 2026-10-10 发布记录（区间已推上公开仓库）：伞提交 `f30b771..52915ea` → 公开 `5f3caa6..b45e8de`，
+> 普通 push 不是 force。**base 要实测不要推断**：先前记的 `b6d792e` 已经旧了——公开侧在 16:38 之后
+> 又收了深色修复与 docs-sync 两批，逐 blob 比对（1099 个文件）证实真实 base 是 `f30b771`，
+> 公开侧只多一个根 `LICENSE`，另有 5 个脚本（四个 `cf-*.sh` + `themes/import.ts`）是 rebuild-only
+> 占位符的既有差异，属正常状态而非泄漏。7 个补丁走 `format-patch --binary` → `publish-scrub.py
+> --incremental`（3 处 `<local workspace>` 替换）→ `git am -p2 --3way`；AGENTS 必读资料表那处
+> 三方追加冲突按合并时的同一解法保留全部三条。推前用脱敏表自己的 19 条左值扫公开工作树与新增行，
+> **零命中**才推。配图 1.7MB 随 `--binary` 正常进出，GitHub raw 取回字节与本地一致。
 
 ### 产品方向（用户明确拍板的）
 
