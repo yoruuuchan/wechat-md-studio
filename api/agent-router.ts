@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { and, desc, eq, isNotNull, isNull, like, or, sql } from "drizzle-orm";
 import type {
@@ -20,6 +19,7 @@ import { requireAgent } from "./lib/agent-auth";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
 import { denyLog } from "./lib/deny-log";
 import { storage, StorageError } from "./lib/storage";
+import { contentHash } from "./lib/doc-hash";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
 import { THEMES } from "@/lib/themes";
@@ -79,19 +79,8 @@ function deriveDocName(content: string): string {
 }
 
 /**
- * The optimistic lock. First 16 hex chars of sha256 over the Markdown.
- *
- * Not `updatedAt`: that column is stored at second granularity and carries the
- * *client's* clock, so two writes inside one second compare equal and an agent
- * would overwrite the owner's edit without ever seeing a conflict. A content
- * hash detects any change regardless of clocks, and makes an idempotent re-push
- * of identical text succeed instead of failing.
+ * Live (not trashed) articles for the owner, newest first.
  */
-function contentHash(content: string): string {
-  return createHash("sha256").update(content, "utf8").digest("hex").slice(0, 16);
-}
-
-/** Live (not trashed) articles for the owner, newest first. */
 async function findLiveDoc(id: string) {
   const rows = await getDb()
     .select()
@@ -219,6 +208,7 @@ agentRouter.post("/docs", requireAgent("write"), async (c) => {
     // Saved from birth — see the invariant at the top of this file.
     savedAt: now,
     source,
+    hash: contentHash(content),
   });
 
   const body: AgentCreateDocResult = {
@@ -251,7 +241,14 @@ agentRouter.get("/docs/:id", requireAgent("read"), async (c) => {
 const UpdateInput = z.object({
   name: z.string().max(200).optional(),
   content: z.string().min(1),
+  /**
+   * `hash` from the last read (`GET /docs/:id`). Required: a blind overwrite is
+   * how an agent silently discards the owner's edits, so "I know what I am
+   * replacing" has to be either proven (`baseHash`) or declared (`force`).
+   */
   baseHash: z.string().max(64).optional(),
+  /** Explicit permission to overwrite whatever is there. */
+  force: z.boolean().optional(),
 });
 
 agentRouter.put("/docs/:id", requireAgent("write"), async (c) => {
@@ -266,16 +263,25 @@ agentRouter.put("/docs/:id", requireAgent("write"), async (c) => {
   if (!parsed.success) {
     return c.json({ error: `参数不对：${parsed.error.issues[0]?.message ?? "unknown"}`, hint: "content 必填且不能为空" }, 400);
   }
-  const { content, baseHash } = parsed.data;
+  const { content, baseHash, force } = parsed.data;
   if (content.length > MAX_CONTENT_CHARS) {
     return c.json({ error: `正文超过 ${MAX_CONTENT_CHARS} 字符` }, 413);
+  }
+  if (!force && baseHash === undefined) {
+    return c.json(
+      {
+        error: "缺少 baseHash：不能盲覆盖",
+        hint: "先 GET /api/agent/docs/:id 拿 hash，改完把它作为 baseHash 带上；确定要盖掉最新版（包括人在浏览器里的修改）就显式传 force: true",
+      },
+      400,
+    );
   }
 
   const row = await findLiveDoc(id);
   if (!row) return c.json({ error: "稿件不存在，或已在回收站里" }, 404);
 
-  const currentHash = contentHash(row.content);
-  if (baseHash !== undefined && baseHash !== currentHash) {
+  const currentHash = row.hash ?? contentHash(row.content);
+  if (!force && baseHash !== currentHash) {
     // Someone (usually the owner, in the browser) changed it since the agent
     // read it. Handing back the current text and its hash is what makes this
     // recoverable without a merge strategy we do not have.
@@ -295,17 +301,42 @@ agentRouter.put("/docs/:id", requireAgent("write"), async (c) => {
 
   const now = new Date();
   const name = parsed.data.name?.trim() || row.name;
-  await getDb()
+  const nextHash = contentHash(content);
+  // Compare-and-swap even for `force`: an unconditional write still names the
+  // hash it produced, so the browser door's next save (which carries the
+  // pre-force hash) comes back as a conflict instead of clobbering this text.
+  const guard = force
+    ? and(eq(docs.id, id), eq(docs.ownerId, OWNER_ID))
+    : and(eq(docs.id, id), eq(docs.ownerId, OWNER_ID), eq(docs.hash, currentHash));
+  const res = (await getDb()
     .update(docs)
-    .set({ name, content, updatedAt: now })
-    .where(eq(docs.id, id));
+    .set({ name, content, updatedAt: now, hash: nextHash })
+    .where(guard)) as unknown as { rows?: { changes?: number | bigint }[] };
+  if (Number(res?.rows?.[0]?.changes ?? 0) === 0) {
+    // Lost the race between the read and the write (or the row vanished).
+    const fresh = await findLiveDoc(id);
+    if (!fresh) return c.json({ error: "稿件不存在，或已在回收站里" }, 404);
+    const freshHash = fresh.hash ?? contentHash(fresh.content);
+    const body: AgentUpdateDocResult = {
+      ok: false,
+      error: "conflict",
+      current: {
+        name: fresh.name,
+        content: fresh.content,
+        updatedAt: fresh.updatedAt.getTime(),
+        source: fresh.source,
+        hash: freshHash,
+      },
+    };
+    return c.json(body, 409);
+  }
 
   const body: AgentUpdateDocResult = {
     ok: true,
     id,
     name,
     updatedAt: now.getTime(),
-    hash: contentHash(content),
+    hash: nextHash,
   };
   return c.json(body);
 });

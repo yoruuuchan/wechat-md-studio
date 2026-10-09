@@ -8,8 +8,13 @@ import { createContext } from "./context";
 import { storage } from "./lib/storage";
 import { startAnonGc } from "./lib/anon-gc";
 import { env } from "./lib/env";
+import { securityHeaders } from "./lib/security-headers";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+
+// First, so every response that follows — API, static assets, the SPA fallback,
+// the /api/img redirect — carries the same baseline headers.
+app.use("*", securityHeaders());
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 
@@ -49,12 +54,12 @@ if (env.isProduction) {
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
 
-  const port = parseInt(process.env.PORT || "3100");
-  // Loopback by default: the only intended entry point is the Cloudflare Tunnel,
-  // so the app must not be reachable by hitting the host's public IP directly.
-  const hostname = process.env.HOST || "127.0.0.1";
-  serve({ fetch: app.fetch, port, hostname }, () => {
-    console.log(`公众号排版助手 running on http://${hostname}:${port}/`);
+  // Port and bind address come from lib/env.ts, which validates them (an
+  // unparsable PORT used to become NaN and hand the failure to the OS).
+  // Loopback by default: the only intended entry point is the Cloudflare
+  // Tunnel, so the app must not be reachable by hitting the host's public IP.
+  serve({ fetch: app.fetch, port: env.port, hostname: env.host }, () => {
+    console.log(`公众号排版助手 running on http://${env.host}:${env.port}/`);
   });
 
   // The anonymous image pool recycles itself: one sweep shortly after boot, then

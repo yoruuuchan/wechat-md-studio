@@ -80,8 +80,17 @@ export interface AgentCreateDocResult {
 export interface AgentUpdateDocInput {
   name?: string;
   content: string;
-  /** `hash` from the last read. Omit to overwrite unconditionally. */
+  /**
+   * `hash` from the last read. Required unless `force` is set — an update
+   * without a base is a blind overwrite of whatever the owner has done since,
+   * so the server rejects it (400) rather than guessing.
+   */
   baseHash?: string;
+  /**
+   * Explicit permission to overwrite the current version, whatever it is.
+   * Deliberate and loud: this discards the owner's edits without recovery.
+   */
+  force?: boolean;
 }
 
 export type AgentUpdateDocResult =

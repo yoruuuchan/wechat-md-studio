@@ -1,28 +1,27 @@
 /**
- * Per-IP burst limit for the open upload endpoint.
+ * Per-IP burst limits, applied in the app rather than at the edge.
  *
  * Cloudflare's free plan allows exactly one rate limiting rule per zone, and
  * this zone already spends it elsewhere — see scripts/cf-open-public.sh. The
  * daily quota in anon-quota.ts bounds how much one visitor can store, but not
- * how fast they can hammer the endpoint; this is the other half.
+ * how fast they can hammer the endpoint; this is the other half. The same
+ * sliding-window primitive also backs the login door (checkLoginAttempt), where
+ * the point is not storage but not letting one address sit there guessing the
+ * access key.
  *
  * Deliberately in-memory: it is best-effort, resets on restart, and is not
  * shared between instances. That is enough to stop a flood, and it costs a
  * self-hosted deployment nothing.
  */
+import { env } from './env'
+
 const WINDOW_MS = 60 * 1000
-const MAX_PER_WINDOW = Number(process.env.ANON_BURST_PER_MINUTE || 12)
-/**
- * Per-IP ceiling per UTC day. The visitor quota is keyed on a cookie an
- * attacker can delete, so without this one IP could rotate cookies and drip
- * uploads all day; the global byte cap still bounds the damage either way.
- */
-const MAX_PER_DAY = Number(process.env.ANON_IP_DAILY_IMAGES || 100)
 /** Past this many tracked IPs, sweep the ones whose window has expired. */
 const SWEEP_AT = 5000
 
 const hits = new Map<string, number[]>()
 const days = new Map<string, { day: string; count: number }>()
+const loginHits = new Map<string, number[]>()
 
 export interface BurstVerdict {
   ok: boolean
@@ -34,9 +33,10 @@ export function allowBurst(
   store: Map<string, number[]>,
   key: string,
   now: number,
-  limit = MAX_PER_WINDOW,
+  limit: number,
+  windowMs = WINDOW_MS,
 ): boolean {
-  const recent = (store.get(key) ?? []).filter((t) => now - t < WINDOW_MS)
+  const recent = (store.get(key) ?? []).filter((t) => now - t < windowMs)
   if (recent.length >= limit) {
     store.set(key, recent)
     return false
@@ -46,7 +46,7 @@ export function allowBurst(
 
   if (store.size > SWEEP_AT) {
     for (const [k, times] of store) {
-      const live = times.filter((t) => now - t < WINDOW_MS)
+      const live = times.filter((t) => now - t < windowMs)
       if (live.length === 0) store.delete(k)
       else store.set(k, live)
     }
@@ -54,12 +54,18 @@ export function allowBurst(
   return true
 }
 
-/** Pure like allowBurst: `day` is injected so a date roll can be tested. */
+/**
+ * Pure like allowBurst: `day` is injected so a date roll can be tested.
+ *
+ * The per-IP ceiling per UTC day. The visitor quota is keyed on a cookie an
+ * attacker can delete, so without this one IP could rotate cookies and drip
+ * uploads all day; the global byte cap still bounds the damage either way.
+ */
 export function allowIpDaily(
   store: Map<string, { day: string; count: number }>,
   key: string,
   day: string,
-  limit = MAX_PER_DAY,
+  limit = env.anonIpDailyImages,
 ): boolean {
   const bucket = store.get(key)
   if (!bucket || bucket.day !== day) {
@@ -77,15 +83,28 @@ export function allowIpDaily(
 }
 
 export function checkBurst(ip: string): BurstVerdict {
-  if (!allowBurst(hits, ip, Date.now())) {
-    return { ok: false, message: `上传太频繁了，每分钟最多 ${MAX_PER_WINDOW} 张，稍等一下再试` }
+  if (!allowBurst(hits, ip, Date.now(), env.anonBurstPerMinute)) {
+    return { ok: false, message: `上传太频繁了，每分钟最多 ${env.anonBurstPerMinute} 张，稍等一下再试` }
   }
   return { ok: true }
 }
 
 export function checkIpDaily(ip: string): BurstVerdict {
   if (!allowIpDaily(days, ip, new Date().toISOString().slice(0, 10))) {
-    return { ok: false, message: `这个地址今天传得够多了（每日最多 ${MAX_PER_DAY} 张），明天再来` }
+    return { ok: false, message: `这个地址今天传得够多了（每日最多 ${env.anonIpDailyImages} 张），明天再来` }
+  }
+  return { ok: true }
+}
+
+/**
+ * The login door. Every attempt counts, right or wrong: the access key is long
+ * and random, so the goal here is not incremental lockout arithmetic but a hard
+ * per-address ceiling on how fast anyone can push on `/api/trpc` at all.
+ * The owner logging in on a new device stays far below the default.
+ */
+export function checkLoginAttempt(ip: string): BurstVerdict {
+  if (!allowBurst(loginHits, ip, Date.now(), env.authLoginPerMinute)) {
+    return { ok: false, message: `尝试太频繁了，每分钟最多 ${env.authLoginPerMinute} 次，等一分钟再来` }
   }
   return { ok: true }
 }

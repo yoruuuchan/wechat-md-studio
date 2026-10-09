@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
@@ -7,10 +7,18 @@ import { loadDocs, saveActiveId, type DocRecord } from '@/lib/store'
 import { UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
+/**
+ * 草稿箱列表由服务端派生：卡片的字数、图片数、轮播数、小标题都是在服务端
+ * 从正文算好再发过来的，正文本身（content）不随列表下发——「复制 md」和
+ * 打开稿件这两处真正需要全文的动作才去 docs.get 取。
+ */
+
+/** Rows per request; "加载更多" appends the next page. */
+const PAGE_SIZE = 100
+
 interface DraftCard {
   id: string
   name: string
-  content: string
   savedAt: number
   chars: number
   images: number
@@ -19,28 +27,6 @@ interface DraftCard {
   hasImages: boolean
   /** `agent:<token name>` when it arrived through /api/agent; null when written here. */
   source: string | null
-}
-
-function toCard(d: {
-  id: string
-  name: string
-  content: string
-  savedAt: Date | null
-  source?: string | null
-}): DraftCard {
-  const headings = [...d.content.matchAll(/^##\s+(?:\S+\s*\|\s*)?(.+)$/gm)].map((m) => m[1].trim())
-  return {
-    id: d.id,
-    name: d.name,
-    content: d.content,
-    savedAt: d.savedAt ? d.savedAt.getTime() : 0,
-    chars: d.content.replace(/\s/g, '').length,
-    images: (d.content.match(/!\[[^\]]*\]\(/g) || []).length,
-    carousels: (d.content.match(/:::carousel/g) || []).length,
-    headings: headings.slice(0, 3),
-    hasImages: /!\[[^\]]*\]\(/.test(d.content),
-    source: d.source ?? null,
-  }
 }
 
 function formatDate(ts: number): string {
@@ -105,11 +91,30 @@ export default function Drafts() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const utils = trpc.useUtils()
   const [query, setQuery] = useState('')
+  /** The debounced copy of `query`; the server does the matching. */
+  const [serverQuery, setServerQuery] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copiesBusy, setCopiesBusy] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'savedAt' | 'chars' | 'images'>('savedAt')
   const [onlyWithImages, setOnlyWithImages] = useState(false)
+  /** Pages fetched after the first one, oldest press of 加载更多 last. */
+  const [more, setMore] = useState<DraftCard[]>([])
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  const draftsQuery = trpc.docs.drafts.useQuery(undefined, { enabled: isAuthenticated, retry: false })
+  useEffect(() => {
+    const t = window.setTimeout(() => setServerQuery(query), 300)
+    return () => window.clearTimeout(t)
+  }, [query])
+
+  // Any filter change starts a fresh first page.
+  useEffect(() => {
+    setMore([])
+  }, [serverQuery, sortBy, onlyWithImages])
+
+  const draftsQuery = trpc.docs.drafts.useQuery(
+    { q: serverQuery, sort: sortBy, withImages: onlyWithImages, limit: PAGE_SIZE, offset: 0 },
+    { enabled: isAuthenticated, retry: false },
+  )
   const trashQuery = trpc.docs.trash.useQuery(undefined, { enabled: isAuthenticated, retry: false })
   const removeMutation = trpc.docs.remove.useMutation({
     onSuccess: async () => {
@@ -137,6 +142,7 @@ export default function Drafts() {
   /** 移入回收站；撤销走 restore，10 秒窗口之外还能在回收站里找回。 */
   const deleteDraft = (card: DraftCard) => {
     removeMutation.mutate({ id: card.id })
+    setMore((m) => m.filter((c) => c.id !== card.id))
     toast(`「${card.name || '未命名稿件'}」已移入回收站`, {
       description: '10 秒内可以撤销，之后去回收站找回',
       duration: UNDO_DELETE_MS,
@@ -184,52 +190,59 @@ export default function Drafts() {
       }))
     : localBin
 
-  const cards = useMemo(() => (draftsQuery.data ?? []).map(toCard), [draftsQuery.data])
-
-  const sorted = useMemo(() => {
-    const key = sortBy === 'chars' ? 'chars' : sortBy === 'images' ? 'images' : 'savedAt'
-    return [...cards].sort((a, b) => b[key] - a[key])
-  }, [cards, sortBy])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return sorted.filter((c) => {
-      if (onlyWithImages && !c.hasImages) return false
-      if (!q) return true
-      return c.name.toLowerCase().includes(q) || c.content.toLowerCase().includes(q)
-    })
-  }, [sorted, query, onlyWithImages])
-
-  /** 打开这篇：写进本地「当前稿件」，回到编辑器。 */
-  const openDraft = (card: DraftCard) => {
-    try {
-      const local = loadDocs()
-      const others = local.docs.filter((d) => d.id !== card.id)
-      const doc = {
-        id: card.id,
-        name: card.name,
-        content: card.content,
-        updatedAt: Date.now(),
-        savedAt: card.savedAt,
-        deletedAt: null,
-        source: card.source,
-      }
-      localStorage.setItem('mopai.docs.v1', JSON.stringify([doc, ...others]))
-      saveActiveId(card.id)
-    } catch {
-      // 本地写不进去也让编辑器去云端拉
+  const items = useMemo(() => {
+    const seen = new Set<string>()
+    const out: DraftCard[] = []
+    for (const c of [...(draftsQuery.data?.items ?? []), ...more]) {
+      if (seen.has(c.id)) continue
+      seen.add(c.id)
+      out.push(c)
     }
+    return out
+  }, [draftsQuery.data, more])
+  const total = draftsQuery.data?.total ?? 0
+
+  const loadMore = async () => {
+    if (loadingMore || items.length >= total) return
+    setLoadingMore(true)
+    try {
+      const res = await utils.docs.drafts.fetch({
+        q: serverQuery,
+        sort: sortBy,
+        withImages: onlyWithImages,
+        limit: PAGE_SIZE,
+        offset: items.length,
+      })
+      setMore((m) => [...m, ...res.items])
+    } catch {
+      toast.error('加载更多失败，稍后再试')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  /** 打开这篇：记住「上次看的那篇」，回到编辑器；正文由编辑器按需拉取。 */
+  const openDraft = (card: DraftCard) => {
+    saveActiveId(card.id)
     navigate('/')
   }
 
   const copyBody = async (card: DraftCard) => {
+    setCopiesBusy(card.id)
     try {
-      await navigator.clipboard.writeText(card.content)
+      const res = await utils.docs.get.fetch({ id: card.id })
+      if (!res.doc) {
+        toast.error('这篇稿件的正文读不到了，可能刚被删掉')
+        return
+      }
+      await navigator.clipboard.writeText(res.doc.content)
       setCopiedId(card.id)
       setTimeout(() => setCopiedId(null), 1500)
       toast.success('Markdown 已复制')
     } catch {
       toast.error('复制失败')
+    } finally {
+      setCopiesBusy(null)
     }
   }
 
@@ -257,7 +270,7 @@ export default function Drafts() {
   }
 
   return (
-    <Shell onBack={() => navigate('/')} count={cards.length}>
+    <Shell onBack={() => navigate('/')} count={total}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input
           value={query}
@@ -294,76 +307,87 @@ export default function Drafts() {
 
       {draftsQuery.isLoading ? (
         <p className="text-[13px] text-ink-3">读取中…</p>
-      ) : cards.length === 0 ? (
+      ) : total === 0 ? (
         <div className="ya-well p-8 text-center">
-          <p className="text-[13px] font-medium text-ink-2">草稿箱还是空的</p>
+          <p className="text-[13px] font-medium text-ink-2">
+            {serverQuery || onlyWithImages ? '没有符合条件的稿件' : '草稿箱还是空的'}
+          </p>
           <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
             在编辑器里写完一篇，点顶栏的「保存到草稿箱」，它就会出现在这里。<br />
             编辑过程中的自动保存不会往这里塞东西。
           </p>
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="ya-well p-6 text-[13px] text-ink-3">
-          没有匹配「{query}」的稿件。
-        </p>
       ) : (
-        <ul className="space-y-2.5">
-          {filtered.map((c) => (
-            <li key={c.id} className="ya-well p-4">
-              <div className="flex items-start gap-3">
-                <button onClick={() => openDraft(c)} className="min-w-0 flex-1 text-left">
-                  <p className="truncate text-[14px] font-semibold text-ink-1">{c.name || '未命名稿件'}</p>
-                  <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <span>保存于 {formatDate(c.savedAt)}</span>
-                    <span className="text-ink-4">·</span>
-                    <span>{c.chars} 字</span>
-                    <span className="text-ink-4">·</span>
-                    <span>{c.images} 图</span>
-                    {c.carousels > 0 && (
-                      <>
-                        <span className="text-ink-4">·</span>
-                        <span>{c.carousels} 轮播</span>
-                      </>
-                    )}
-                    {c.source?.startsWith('agent:') && (
-                      <>
-                        <span className="text-black/15">·</span>
-                        <span title="由 Agent 通过 /api/agent 推进来，在编辑器里改动会自动同步回云端">
-                          Agent 推的（{c.source.slice('agent:'.length)}）
-                        </span>
-                      </>
-                    )}
-                  </p>
-                  {c.headings.length > 0 && (
-                    <p className="mt-2 truncate text-[12px] text-ink-2">
-                      {c.headings.join(' / ')}
+        <>
+          <ul className="space-y-2.5">
+            {items.map((c) => (
+              <li key={c.id} className="ya-well p-4">
+                <div className="flex items-start gap-3">
+                  <button onClick={() => openDraft(c)} className="min-w-0 flex-1 text-left">
+                    <p className="truncate text-[14px] font-semibold text-ink-1">{c.name || '未命名稿件'}</p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>
+                      <span>保存于 {formatDate(c.savedAt)}</span>
+                      <span className="text-ink-4">·</span>
+                      <span>{c.chars} 字</span>
+                      <span className="text-ink-4">·</span>
+                      <span>{c.images} 图</span>
+                      {c.carousels > 0 && (
+                        <>
+                          <span className="text-ink-4">·</span>
+                          <span>{c.carousels} 轮播</span>
+                        </>
+                      )}
+                      {c.source?.startsWith('agent:') && (
+                        <>
+                          <span className="text-black/15">·</span>
+                          <span title="由 Agent 通过 /api/agent 推进来，在编辑器里改动会自动同步回云端">
+                            Agent 推的（{c.source.slice('agent:'.length)}）
+                          </span>
+                        </>
+                      )}
                     </p>
-                  )}
-                </button>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <button
-                    onClick={() => openDraft(c)}
-                    className="ya-btn-secondary ya-btn ya-btn-sm"
-                  >
-                    打开
+                    {c.headings.length > 0 && (
+                      <p className="mt-2 truncate text-[12px] text-ink-2">
+                        {c.headings.join(' / ')}
+                      </p>
+                    )}
                   </button>
-                  <button
-                    onClick={() => void copyBody(c)}
-                    className="ya-link-btn"
-                  >
-                    {copiedId === c.id ? '已复制' : '复制 md'}
-                  </button>
-                  <button
-                    onClick={() => deleteDraft(c)}
-                    className="ya-link-btn danger"
-                  >
-                    删除
-                  </button>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <button
+                      onClick={() => openDraft(c)}
+                      className="ya-btn-secondary ya-btn ya-btn-sm"
+                    >
+                      打开
+                    </button>
+                    <button
+                      onClick={() => void copyBody(c)}
+                      className="ya-link-btn"
+                    >
+                      {copiesBusy === c.id ? '读取中…' : copiedId === c.id ? '已复制' : '复制 md'}
+                    </button>
+                    <button
+                      onClick={() => deleteDraft(c)}
+                      className="ya-link-btn danger"
+                    >
+                      删除
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+          {items.length < total && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="ya-btn ya-btn-secondary"
+              >
+                {loadingMore ? '读取中…' : `加载更多（还有 ${total - items.length} 篇）`}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       <BinSection rows={binRows} onRestore={restoreBin} onPurge={purgeBin} />

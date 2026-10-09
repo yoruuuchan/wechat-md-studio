@@ -43,6 +43,13 @@ export const docs = sqliteTable("docs", {
   savedAt: integer("savedAt", { mode: "timestamp" }),
   deletedAt: integer("deletedAt", { mode: "timestamp" }),
   source: text("source"),
+  // sha256-16 of `content` (see api/lib/doc-hash.ts), maintained on every write
+  // and used as the compare-and-swap predicate for both doors. Declared last on
+  // purpose: the column was added after release with ALTER TABLE, which appends,
+  // and the sqlite-proxy driver maps rows positionally — a different order here
+  // silently shifts every field. NULL only on rows older than the column; the
+  // boot migration backfills them.
+  hash: text("hash"),
 });
 
 export type DocRow = typeof docs.$inferSelect;

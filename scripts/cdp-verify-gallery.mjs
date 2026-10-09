@@ -122,7 +122,7 @@ const app = spawn(process.execPath, ['dist/boot.js'], {
     IMG_BASE_URL: `http://127.0.0.1:${WORKER_PORT}`,
     IMG_ADMIN_KEY: ADMIN_KEY,
     ACCESS_KEY,
-    SESSION_SECRET: 'gallery-acceptance-session',
+    SESSION_SECRET: 'gallery-acceptance-session-secret-7b3e',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 })

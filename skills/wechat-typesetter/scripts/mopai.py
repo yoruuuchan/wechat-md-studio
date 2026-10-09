@@ -644,9 +644,12 @@ def cmd_update(args):
         payload["name"] = args.name
 
     if args.force:
-        # No baseHash at all = overwrite whatever is there, including the
-        # human's edits in the browser. That is why it needs a flag.
+        # Explicit permission flag, not the absence of one: the server rejects
+        # an update that carries neither a baseHash nor force, so "overwrite
+        # whatever is there, including the human's edits in the browser" has to
+        # be declared as such.
         base_hash = None
+        payload["force"] = True
     elif args.base_hash:
         base_hash = args.base_hash
     else:

@@ -1,8 +1,11 @@
 import { timingSafeEqual } from 'node:crypto'
 import * as cookie from 'cookie'
+import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { Session } from '@contracts/constants'
+import { checkLoginAttempt, clientIp } from './lib/burst'
 import { getSessionCookieOptions } from './lib/cookies'
+import { authDenyLog } from './lib/deny-log'
 import { env } from './lib/env'
 import { createRouter, publicQuery } from './middleware'
 import { signSessionToken } from './session'
@@ -21,6 +24,19 @@ export const authRouter = createRouter({
   login: publicQuery
     .input(z.object({ accessKey: z.string().min(1).max(200) }))
     .mutation(async ({ ctx, input }) => {
+      // The site is public and this is the one door a stranger can sit at and
+      // knock on, so the per-IP ceiling is checked before the key comparison —
+      // a flood never reaches it, and neither does a guessing loop.
+      const ip = clientIp(ctx.req.headers)
+      const attempt = checkLoginAttempt(ip)
+      if (!attempt.ok) {
+        authDenyLog('login-burst', { ip })
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: attempt.message ?? '尝试太频繁了，稍等一下再试',
+        })
+      }
+
       if (!keyMatches(input.accessKey)) {
         return { success: false as const, message: '口令不对' }
       }

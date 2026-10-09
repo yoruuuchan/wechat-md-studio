@@ -43,6 +43,7 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
   - `npm run import:themes` — 从上游克隆重新生成 `src/lib/themes-imported/`（上游位置见 THEME-SOURCES.md）
   - `node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` — 模板库页的真实浏览器验收
   - `node scripts/cdp-verify-public-access.mjs <url> 9335` — **不登录**走一遍上传全链路的真实浏览器验收
+  - `node scripts/cdp-verify-docs-sync.mjs [端口] [CDP端口]` — 稿件同步模型验收：登录合并不丢本地稿、stale 保存出冲突弹窗且云端新版不被覆盖、三条冲突处理路径、草稿箱服务端卡片与搜索。**自带临时数据库和 mock 图床，不碰线上**
   - `bash scripts/cf-open-public.sh --check|--plan|（空）` — Cloudflare 门禁开关（撤 Access + 并入威胁分数规则）
   - `npm run dev` — 本地开发
 
@@ -117,11 +118,17 @@ Markdown → 语义 AST（src/lib/parse.ts）→ 主题模板函数（src/lib/th
 
 | 存哪 | 什么时候写 |
 |---|---|
-| 浏览器 localStorage | 每次改动（防丢，纯本地） |
+| 浏览器 localStorage | 每次改动（防丢，纯本地）。只缓存正文真的在手的稿件；纯元数据 stub 不写缓存 |
 | 云端数据库 | 只在该稿件**已经保存过**（`docs.savedAt` 有值）时随改动更新 |
 | 云端 + 打 `savedAt` 时间戳 | **只有点顶栏「保存到草稿箱」** |
 
 `docs.savedAt` 为 null = 编辑中的工作稿，不进草稿箱。一篇稿件一条记录，**没有版本历史**（这是用户明确的选择）。
+
+**并发模型（2026-10-08 起）**：`docs.hash`（正文 sha256 前 16 位，`api/lib/doc-hash.ts`）是唯一的乐观锁令牌。浏览器读取时拿到 hash，保存时作为 `baseHash` 回传，服务端单条 UPDATE 做 compare-and-swap；对不上回 `conflict` + 云端当前版本（正文原样保留），客户端弹窗让用户选「保留我的 / 用云端的 / 两边都留」。Agent 门的 `baseHash` 是同一把锁，没有 baseHash 又不带 `force: true` 的 PUT 会被 400 拒绝。`updatedAt` 只是展示时间，**不是锁**（秒级精度 + 客户端时钟，靠它并发判断必错）。
+
+**登录合并（`src/lib/docs-merge.ts`，纯函数）**：登录后拉全量**元数据**（`docs.list` 只给 id/name/时间/hash，不给正文），然后：local-only 稿件上传成工作稿；云端独有稿件保留成 stub（打开才拉正文，`docs.get`）；同 id 同内容静默合并；同 id 内容不同 → 云端版保留原 id，本机版另存为新 id 并收进草稿箱（两边都不丢，有提示）；云端回收站里的稿件当作"存在、只是不在列表"。缓存里没有 baseHash 的旧数据（升级场景）用浏览器端 sha256 对比内容，避免假冲突。
+
+**草稿箱列表**：卡片统计（字数/图数/轮播数/小标题）由服务端算好再下发（`docs.drafts`），搜索、排序、只看有图都在服务端；正文只在「打开」和「复制 md」时按需取。整包备份导出会先补全所有缺失正文（`docs.getMany`），补不齐就拒绝导出空稿。
 
 ---
 
@@ -312,6 +319,29 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 匿名池从「只进不出、填满即永久拒客」变成循环的，下面第 2 条因此结案；
 > `scripts/server-anon-purge.sh` 保留不动，降级成手动超驰。误删面（访客本地草稿的引用服务端看不见）
 > 是**刻意接受**的取舍，细节在第 2 条与 `app/README.md`「公开之后靠什么挡滥用」。
+>
+> 2026-10-08 晚（服务端加固分支）：四件事一起落地——`api/lib/env.ts` 重写成统一的解析/校验
+> （生产缺 `ACCESS_KEY` / `SESSION_SECRET` / `IMG_ADMIN_KEY`、留 `change-me` 这类公开占位值、
+> 或任何数值旋钮写错，都在**启动时**报错点名变量；不再有回退到源码里那个公开默认口令的 fail-open），
+> 新增 `AUTH_LOGIN_PER_MINUTE`（默认 10，每 IP 每分钟登录尝试，超了 429 + `[auth-deny] login-burst`），
+> 新增 `api/lib/security-headers.ts`（CSP / nosniff / Referrer-Policy / Permissions-Policy，HSTS 只在
+> HTTPS 请求上发；CSP 的 `img-src` 从 `IMG_BASE_URL` 取 Worker 源，因为 `/api/img` 是 302）。
+> 回归测试：`api/lib/env.test.ts`、`api/boot.test.ts`（走真实 Hono 应用拿 429）、
+> `api/lib/security-headers.test.ts`。**开发环境不受影响**（占位值照用，缺密钥回退并打印 `[env]` 警告）。
+> 注意：本地 `.env` 的 `NODE_ENV` 是 `development`，用 `NODE_ENV=production npm start` 跑本地时
+> 会先过一遍生产校验——真实值在服务器 `.env` 里，别拿占位值起生产模式。
+>
+> 2026-10-08 更新（稿件同步，同日第二组）：**并发与合并模型重做**。`docs.hash` 列 + 两扇门统一的
+> compare-and-swap（浏览器 `baseHash`、Agent `baseHash`/`force: true`，旧库启动时自动回填 hash）；
+> 登录合并（`src/lib/docs-merge.ts`）不再用云端列表覆盖本地——local-only 上传、diverged 另存为
+> 「（本机版本）」收进草稿箱、云端回收站里的当存在处理；冲突在编辑器里弹窗三选一，任何一边都
+> 不会被静默覆盖。列表/草稿箱改元数据模型（正文按需取、分页；草稿卡片统计服务端算）。验收脚本
+> `scripts/cdp-verify-docs-sync.mjs`（全绿）；回归测试在 `src/lib/docs-merge.test.ts` 与
+> `api/docs-router.test.ts`（双客户端 stale save、Agent force 语义见 `api/agent-router.test.ts`）。
+> 升级注意：**`docs.hash` 必须保持 `db/schema.ts` 里声明在最后**（ALTER 追加 + 位置映射，见坑 9），
+> 且**每一条写正文的路径都要同时写 hash**（save / saveToDrafts / importLocal / Agent create+update 都
+> 已经这么做了）——hash 和 content 一旦不同步，compare-and-swap 就会朝错误方向判；加新的写入路径时
+> 这是第一件要检查的事。旧库升级由启动时的 `backfill-doc-hash-from-content` 自动补齐。
 
 ### 产品方向（用户明确拍板的）
 

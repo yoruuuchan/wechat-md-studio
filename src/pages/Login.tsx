@@ -23,7 +23,13 @@ export default function Login() {
     },
   })
 
-  const rejected = loginMutation.data && !loginMutation.data.success
+  // A wrong key is a normal 200 with {success:false}; a refused rate limit is a
+  // thrown TOO_MANY_REQUESTS. Both have to land under the field — silently
+  // swallowing the second one would make "too many attempts" look like a dead
+  // button.
+  const failure =
+    loginMutation.error?.message ??
+    (loginMutation.data && !loginMutation.data.success ? loginMutation.data.message : null)
 
   return (
     <div className="ya-page flex min-h-screen items-center justify-center">
@@ -53,15 +59,13 @@ export default function Login() {
             value={accessKey}
             onChange={(e) => setAccessKey(e.target.value)}
             className="ya-input w-full"
-            style={rejected ? { boxShadow: 'inset 3px 3px 6px rgba(143,158,191,0.40), inset -2px -2px 5px rgba(255,255,255,0.95), 0 0 0 2px var(--error-500)' } : undefined}
+            style={failure ? { boxShadow: 'inset 3px 3px 6px rgba(143,158,191,0.40), inset -2px -2px 5px rgba(255,255,255,0.95), 0 0 0 2px var(--error-500)' } : undefined}
           />
           <button className="ya-btn ya-btn-primary w-full !h-10" type="submit" disabled={!accessKey || loginMutation.isPending}>
             {loginMutation.isPending ? '验证中…' : '进入'}
           </button>
         </form>
-        {rejected && (
-          <p className="mt-3 text-center text-[12px] text-bad-700">{loginMutation.data?.message}</p>
-        )}
+        {failure && <p className="mt-3 text-center text-[12px] text-bad-700">{failure}</p>}
         <p className="mt-4 space-y-1 text-center text-[11px] leading-relaxed text-ink-3">
           <span className="block">不登录就能用：排版、上传、复制、导出、换主题。</span>
           <span className="block">口令只打开一样东西：云端草稿箱（跨设备保存、永久保留）。</span>

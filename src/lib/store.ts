@@ -12,6 +12,18 @@ export interface DocRecord {
   deletedAt: number | null
   /** `agent:<token name>` when an agent pushed it through /api/agent; null = written here. */
   source?: string | null
+  /**
+   * The server hash of the last version this browser synced against (what the
+   * server calls `baseHash`). Every save carries it, which is how a stale save
+   * becomes a conflict instead of an overwrite. null/undefined = never synced.
+   */
+  baseHash?: string | null
+  /**
+   * false = metadata-only stub: `content` is a placeholder, not the article.
+   * The editor fetches the body before showing or saving it, and the stub is
+   * never written to the local cache.
+   */
+  contentLoaded?: boolean
 }
 
 export interface AppSettings {
@@ -30,7 +42,7 @@ const SETTINGS_KEY = 'mopai.settings.v1'
 const SAMPLE_SEEDED_KEY = 'mopai.sample.v1'
 const SAMPLE_MARKER = '欢迎使用公众号排版助手'
 
-function uid(): string {
+export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 }
 
@@ -46,12 +58,16 @@ export function loadDocs(): { docs: DocRecord[]; activeId: string } {
     if (raw) {
       const docs = JSON.parse(raw) as DocRecord[]
       if (Array.isArray(docs) && docs.length) {
-        // Tolerate records written before savedAt / deletedAt / source existed.
+        // Tolerate records written before savedAt / deletedAt / source /
+        // baseHash existed. Everything in the cache holds a real body (stubs
+        // are never persisted), so contentLoaded is true by construction.
         let out: DocRecord[] = docs.map((d) => ({
           ...d,
           savedAt: d.savedAt ?? null,
           deletedAt: d.deletedAt ?? null,
           source: d.source ?? null,
+          baseHash: d.baseHash ?? null,
+          contentLoaded: true,
         }))
         let active = out.some((d) => d.id === activeId) ? activeId : out[0].id
         // Browsers that stored docs before the sample existed keep their old
@@ -85,7 +101,11 @@ export function loadDocs(): { docs: DocRecord[]; activeId: string } {
 
 export function saveDocs(docs: DocRecord[], activeId: string) {
   try {
-    localStorage.setItem(DOCS_KEY, JSON.stringify(docs))
+    // Metadata-only stubs are never persisted: their `content` is a
+    // placeholder, and a cache holding one would make the next session treat an
+    // empty string as the article. Only bodies this browser actually has go in.
+    const cacheable = docs.filter((d) => d.contentLoaded !== false)
+    localStorage.setItem(DOCS_KEY, JSON.stringify(cacheable))
     localStorage.setItem(ACTIVE_KEY, activeId)
   } catch {
     // 存储失败不阻塞编辑
@@ -148,6 +168,8 @@ export function createDoc(): DocRecord {
     updatedAt: Date.now(),
     savedAt: null,
     deletedAt: null,
+    baseHash: null,
+    contentLoaded: true,
   }
 }
 
@@ -159,5 +181,7 @@ export function createSampleDoc(): DocRecord {
     updatedAt: Date.now(),
     savedAt: null,
     deletedAt: null,
+    baseHash: null,
+    contentLoaded: true,
   }
 }

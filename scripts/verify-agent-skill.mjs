@@ -91,7 +91,7 @@ const app = spawn(process.execPath, ['dist/boot.js'], {
     IMG_BASE_URL: `http://127.0.0.1:${WORKER_PORT}`,
     IMG_ADMIN_KEY: ADMIN_KEY,
     ACCESS_KEY,
-    SESSION_SECRET: 'skill-acceptance-session',
+    SESSION_SECRET: 'skill-acceptance-session-secret-5a8d',
     AGENT_TOKENS: `skill-test:${WRITE_TOKEN},reviewer:${READ_TOKEN}:read`,
   },
   stdio: ['ignore', 'pipe', 'pipe'],

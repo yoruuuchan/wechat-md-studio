@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { allowBurst, allowIpDaily, clientIp } from './burst'
+import { allowBurst, allowIpDaily, checkLoginAttempt, clientIp } from './burst'
+import { env } from './env'
 
 const NOW = 1_800_000_000_000
 const MINUTE = 60_000
@@ -34,6 +35,43 @@ describe('allowBurst', () => {
     for (let i = 0; i < 12; i++) allowBurst(store, 'ip-a', NOW + i, 12)
     allowBurst(store, 'ip-a', NOW + MINUTE + 1000, 12)
     expect(store.get('ip-a')).toEqual([NOW + MINUTE + 1000])
+  })
+
+  it('honours a caller-supplied window (the login door uses its own)', () => {
+    const store = new Map<string, number[]>()
+    const WINDOW = 10_000
+    expect(allowBurst(store, 'ip-a', NOW, 2, WINDOW)).toBe(true)
+    expect(allowBurst(store, 'ip-a', NOW + 1, 2, WINDOW)).toBe(true)
+    expect(allowBurst(store, 'ip-a', NOW + 2, 2, WINDOW)).toBe(false)
+    // Still inside the shorter window.
+    expect(allowBurst(store, 'ip-a', NOW + WINDOW - 1, 2, WINDOW)).toBe(false)
+    expect(allowBurst(store, 'ip-a', NOW + WINDOW + 1, 2, WINDOW)).toBe(true)
+  })
+
+  it('a zero limit closes the door without special-casing', () => {
+    const store = new Map<string, number[]>()
+    expect(allowBurst(store, 'ip-a', NOW, 0)).toBe(false)
+    expect(store.get('ip-a')).toEqual([])
+  })
+})
+
+describe('checkLoginAttempt', () => {
+  it(`allows ${env.authLoginPerMinute} attempts from one address per minute, then refuses`, () => {
+    const ip = `198.51.100.${Math.floor(Math.random() * 200) + 1}-${Date.now()}`
+    for (let i = 0; i < env.authLoginPerMinute; i++) {
+      expect(checkLoginAttempt(ip).ok).toBe(true)
+    }
+    const refused = checkLoginAttempt(ip)
+    expect(refused.ok).toBe(false)
+    expect(refused.message).toContain('频繁')
+  })
+
+  it('keeps counting each address separately', () => {
+    const stamp = Date.now()
+    const blocked = `203.0.113.9-${stamp}`
+    for (let i = 0; i < env.authLoginPerMinute; i++) checkLoginAttempt(blocked)
+    expect(checkLoginAttempt(blocked).ok).toBe(false)
+    expect(checkLoginAttempt(`203.0.113.10-${stamp}`).ok).toBe(true)
   })
 })
 

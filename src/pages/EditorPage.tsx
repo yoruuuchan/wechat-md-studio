@@ -2,6 +2,13 @@ import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } f
 import { useNavigate, useSearchParams } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import TopBar from '@/components/TopBar'
 import EditorPane, { type EditorHandle } from '@/components/EditorPane'
 import PreviewPane from '@/components/PreviewPane'
@@ -80,6 +87,17 @@ function formatBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
+/** When the cloud version of a conflicted article was last written. */
+function formatMoment(ts: number): string {
+  if (!ts) return '未知时间'
+  const d = new Date(ts)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** The cloud side of a conflict can be megabytes; a long look, not a full one. */
+const CONFLICT_PREVIEW_CHARS = 20_000
+
 /** One pending upload: the files, where they go, and whether a ratio is required. */
 interface FrameTask {
   files: File[]
@@ -116,6 +134,10 @@ export default function EditorPage() {
   const [frameTask, setFrameTask] = useState<FrameTask | null>(null)
   const [manualOpen, setManualOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  // The conflict dialog opens by itself when a save comes back conflicting, and
+  // can be postponed (the pending conflict stays visible as a bar over the
+  // editor) — deciding is required before that article syncs again.
+  const [conflictOpen, setConflictOpen] = useState(false)
   const importKindRef = useRef<'markdown' | 'docx' | 'bundle'>('markdown')
   const importRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<EditorHandle>(null)
@@ -145,6 +167,14 @@ export default function EditorPage() {
     activeId,
     setActiveId,
     activeDoc,
+    activeLoading,
+    activeError,
+    retryHydrate,
+    activeConflict,
+    resolveConflictKeepLocal,
+    resolveConflictUseRemote,
+    resolveConflictKeepBoth,
+    hydrateAllForExport,
     syncState,
     notice,
     clearNotice,
@@ -179,6 +209,13 @@ export default function EditorPage() {
     toast.info(notice, { duration: 6000 })
     clearNotice()
   }, [notice, clearNotice])
+
+  // A conflict on the open article pulls the dialog up on its own; a postponed
+  // one leaves the bar above the editor until it is resolved.
+  const conflictKey = activeConflict ? `${activeId}:${activeConflict.hash}` : null
+  useEffect(() => {
+    if (conflictKey) setConflictOpen(true)
+  }, [conflictKey])
 
   const theme = getTheme(settings.themeId)
 
@@ -284,8 +321,18 @@ export default function EditorPage() {
       return
     }
     if (kind === 'bundle') {
-      downloadFile(bundleFilename(docs.length), toBundle(docs, settings), 'application/json')
-      toast.success(`已导出 ${docs.length} 篇稿件`, { description: '含主题与署名设置，可在另一台设备导回' })
+      // The list holds metadata only, so most articles' bodies are not in
+      // memory. Fetch every missing one first — a backup that silently
+      // contained empty articles would be worse than no backup at all.
+      void (async () => {
+        const res = await hydrateAllForExport()
+        if (!res.ok) {
+          toast.error('整包备份没有导出', { description: res.message, duration: 9000 })
+          return
+        }
+        downloadFile(bundleFilename(res.docs.length), toBundle(res.docs, settings), 'application/json')
+        toast.success(`已导出 ${res.docs.length} 篇稿件`, { description: '含主题与署名设置，可在另一台设备导回' })
+      })()
       return
     }
     const safe = safeFilename(name, '推文', 'html')
@@ -896,16 +943,40 @@ export default function EditorPage() {
               </Popover>
             </div>
             <div className="min-h-0 flex-1">
-              <EditorPane
-                ref={editorRef}
-                value={activeDoc?.content || ''}
-                docKey={activeId}
-                onChange={(content) => updateActive({ content })}
-                onScroll={onEditorScroll}
-                onFiles={handleEditorFiles}
-                onHtml={handleHtml}
-              />
+              {activeLoading || activeError ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  {activeLoading ? (
+                    <p className="text-[13px] text-ink-3">正在从云端读取这篇稿件…</p>
+                  ) : (
+                    <>
+                      <p className="text-[13px] text-ink-2">{activeError}</p>
+                      <button onClick={retryHydrate} className="ya-btn ya-btn-secondary">
+                        重试
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <EditorPane
+                  ref={editorRef}
+                  value={activeDoc?.content || ''}
+                  docKey={activeId}
+                  onChange={(content) => updateActive({ content })}
+                  onScroll={onEditorScroll}
+                  onFiles={handleEditorFiles}
+                  onHtml={handleHtml}
+                />
+              )}
             </div>
+            {activeConflict && !conflictOpen && (
+              <button
+                onClick={() => setConflictOpen(true)}
+                className="flex shrink-0 items-center gap-2 border-t border-warn/40 bg-warn/10 px-4 py-2 text-left text-[12px] text-warn-700 transition-colors hover:bg-warn/20"
+              >
+                <span className="ya-unsaved-dot" />
+                这篇稿件在别处也被改过，两边的文字都还在——点这里选保留哪一版
+              </button>
+            )}
           </div>
         </ResizablePanel>
 
@@ -1009,6 +1080,65 @@ export default function EditorPage() {
           if (task) void uploadCroppedBlob(blob, mime, task)
         }}
       />
+
+      <Dialog open={conflictOpen && activeConflict !== null} onOpenChange={setConflictOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>「{activeDoc?.name || '未命名稿件'}」在别处也被改过</DialogTitle>
+            <DialogDescription>
+              你这边改着的时候，云端这篇（{formatMoment(activeConflict?.updatedAt ?? 0)} 更新）也变了。
+              两边都不会被自动覆盖——选一个处理方式，没选之前这篇不会继续同步。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-w-0">
+            <p className="ya-eyebrow mb-1.5">云端现在的版本（开头预览）</p>
+            <pre
+              className="max-h-[32vh] overflow-auto whitespace-pre-wrap rounded-xl bg-surface-sunken p-3 text-[12px] leading-relaxed text-ink-2"
+              style={{ fontFamily: 'var(--font-mono)', boxShadow: 'var(--shadow-inset)' }}
+            >
+              {(activeConflict?.content ?? '').slice(0, CONFLICT_PREVIEW_CHARS)}
+              {(activeConflict?.content.length ?? 0) > CONFLICT_PREVIEW_CHARS
+                ? `\n\n……（云端正文更长，共 ${activeConflict?.content.length.toLocaleString()} 字符，这里只显示开头）`
+                : ''}
+            </pre>
+            <p className="mt-2 text-[11px] text-ink-3">
+              「你这一版」就是编辑器里和本地缓存里的内容，不会因为选错就消失——除非你选「用云端那一版」。
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                if (!activeDoc) return
+                setConflictOpen(false)
+                void resolveConflictKeepLocal(activeDoc.id)
+              }}
+              className="ya-btn ya-btn-primary"
+            >
+              保留我这一版（云端会更新成我这边的内容）
+            </button>
+            <button
+              onClick={() => {
+                if (!activeDoc) return
+                setConflictOpen(false)
+                resolveConflictUseRemote(activeDoc.id)
+              }}
+              className="ya-btn ya-btn-secondary"
+            >
+              用云端那一版（放弃我这边的改动）
+            </button>
+            <button
+              onClick={() => {
+                if (!activeDoc) return
+                setConflictOpen(false)
+                void resolveConflictKeepBoth(activeDoc.id)
+              }}
+              className="ya-btn ya-btn-secondary"
+            >
+              两边都留（我这一版另存为新稿件，进草稿箱）
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <input
         ref={importRef}

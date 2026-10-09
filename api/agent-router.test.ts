@@ -117,8 +117,8 @@ describe('the agent door', () => {
     // The invariant that matters: savedAt must not be null, or useDocs.flush
     // skips the article forever and the owner's edits vanish on reload.
     const drafts = await browser.drafts()
-    expect(drafts.map((d) => d.id)).toContain(created.id)
-    expect(drafts.find((d) => d.id === created.id)?.savedAt).not.toBeNull()
+    expect(drafts.items.map((d) => d.id)).toContain(created.id)
+    expect(drafts.items.find((d) => d.id === created.id)?.savedAt).not.toBeNull()
   })
 
   it('falls back to the first heading, then to a placeholder, when there is no title', async () => {
@@ -222,19 +222,86 @@ describe('the agent door', () => {
     })
     expect(same.status).toBe(200)
 
-    // Forcing is explicit: no baseHash means "overwrite whatever is there".
-    const forced = await call('PUT', `/docs/${created.id}`, { headers: WRITE, body: { content: '强制覆盖' } })
+    // A bare PUT with neither baseHash nor force is a blind overwrite: refused,
+    // with a hint that names both ways forward.
+    const blind = await call('PUT', `/docs/${created.id}`, { headers: WRITE, body: { content: '盲覆盖' } })
+    expect(blind.status).toBe(400)
+    const blindBody = await json<{ error: string; hint: string }>(blind)
+    expect(blindBody.error).toContain('baseHash')
+    expect(blindBody.hint).toContain('force: true')
+    // …and nothing was written.
+    const afterBlind = await json<{ content: string }>(await call('GET', `/docs/${created.id}`, { headers: READ }))
+    expect(afterBlind.content).toBe('在最新内容上接着改')
+
+    // Overwriting the latest version is possible — but only when declared.
+    const forced = await call('PUT', `/docs/${created.id}`, {
+      headers: WRITE,
+      body: { content: '强制覆盖', force: true },
+    })
     expect(forced.status).toBe(200)
     const after = await json<{ content: string }>(
       await call('GET', `/docs/${created.id}`, { headers: READ }),
     )
     expect(after.content).toBe('强制覆盖')
+
+    // A stale baseHash is still a conflict even when force is merely available.
+    const staleAgain = await call('PUT', `/docs/${created.id}`, {
+      headers: WRITE,
+      body: { content: '又一次过期的改动', baseHash: read.hash },
+    })
+    expect(staleAgain.status).toBe(409)
+    expect((await json<{ content: string }>(await call('GET', `/docs/${created.id}`, { headers: READ }))).content).toBe('强制覆盖')
+  })
+
+  it('shares the concurrency hash with the browser door', async () => {
+    const created = await push('两个门用同一把锁')
+    const agentRead = await json<{ hash: string }>(await call('GET', `/docs/${created.id}`, { headers: READ }))
+    const browserRead = (await browser.get({ id: created.id })).doc!
+    expect(browserRead.hash).toBe(agentRead.hash)
+
+    // The agent writes first, with the hash it read…
+    const ok = await call('PUT', `/docs/${created.id}`, {
+      headers: WRITE,
+      body: { content: '代理先改一版', baseHash: agentRead.hash },
+    })
+    expect(ok.status).toBe(200)
+
+    // …and the browser, still holding the old base, must not clobber it.
+    const staleSave = await browser.save({
+      id: created.id,
+      name: '代理先改一版',
+      content: '浏览器拿着过期版本直接写',
+      updatedAt: Date.now(),
+      baseHash: browserRead.hash,
+    })
+    expect(staleSave.ok).toBe(false)
+    if (staleSave.ok) throw new Error('unreachable')
+    expect(staleSave.conflict).toBe(true)
+    expect(staleSave.current.content).toBe('代理先改一版')
+    // The conflict payload's hash is immediately usable as the next base.
+    const retry = await browser.save({
+      id: created.id,
+      name: '代理先改一版',
+      content: '在代理版本上接着改',
+      updatedAt: Date.now(),
+      baseHash: staleSave.current.hash,
+    })
+    expect(retry.ok).toBe(true)
+    const after = await json<{ content: string }>(await call('GET', `/docs/${created.id}`, { headers: READ }))
+    expect(after.content).toBe('在代理版本上接着改')
   })
 
   it('hands back the owner’s own edits, which is the whole point of the round trip', async () => {
     const created = await push('Agent 推的初稿')
-    // The owner polishes it in the browser; the auto-save path writes it back.
-    await browser.save({ id: created.id, name: '精修过的标题', content: '人工精修后的正文', updatedAt: Date.now() })
+    // The owner polishes it in the browser; the auto-save path writes it back
+    // with the hash it last synced from.
+    await browser.save({
+      id: created.id,
+      name: '精修过的标题',
+      content: '人工精修后的正文',
+      updatedAt: Date.now(),
+      baseHash: created.hash,
+    })
     const readBack = await json<{ content: string; name: string }>(
       await call('GET', `/docs/${created.id}`, { headers: READ }),
     )
@@ -249,8 +316,16 @@ describe('the agent door', () => {
     expect((await call('GET', `/docs/${created.id}`, { headers: READ })).status).toBe(404)
     const listed = await json<{ items: { id: string }[] }>(await call('GET', '/docs', { headers: READ }))
     expect(listed.items.map((i) => i.id)).not.toContain(created.id)
-    // An agent must not resurrect what was just deleted.
-    expect((await call('PUT', `/docs/${created.id}`, { headers: WRITE, body: { content: '复活' } })).status).toBe(404)
+    // An agent must not resurrect what was just deleted — the 404 wins over the
+    // update itself, whatever base it came with.
+    const revive = await call('PUT', `/docs/${created.id}`, {
+      headers: WRITE,
+      body: { content: '复活', baseHash: created.hash },
+    })
+    expect(revive.status).toBe(404)
+    expect(
+      (await call('PUT', `/docs/${created.id}`, { headers: WRITE, body: { content: '复活', force: true } })).status,
+    ).toBe(404)
   })
 
   it('rejects an empty body and a JSON body that is not JSON', async () => {

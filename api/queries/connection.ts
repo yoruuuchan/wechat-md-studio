@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import fs from 'node:fs'
 import path from 'node:path'
 import { env } from '../lib/env'
+import { contentHash } from '../lib/doc-hash'
 import * as schema from '@db/schema'
 
 /**
@@ -44,7 +45,8 @@ function openDatabase(): DatabaseSync {
       content TEXT NOT NULL,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL,
-      savedAt INTEGER
+      savedAt INTEGER,
+      hash TEXT
     );
 
     CREATE INDEX IF NOT EXISTS docs_owner_updated
@@ -66,6 +68,12 @@ function openDatabase(): DatabaseSync {
   // reads as "written in the browser" — the same as a row created there.
   if (!columns.some((c) => c.name === 'source')) {
     db.exec('ALTER TABLE docs ADD COLUMN source TEXT')
+  }
+  // …and for the concurrency token (api/lib/doc-hash.ts). NULL on rows written
+  // before it existed; runMigrations backfills them so compare-and-swap has a
+  // real value to compare against. Appended last — the schema declares it last.
+  if (!columns.some((c) => c.name === 'hash')) {
+    db.exec('ALTER TABLE docs ADD COLUMN hash TEXT')
   }
 
   // Same for uploads that arrive without a login: older databases have no
@@ -120,16 +128,58 @@ export function backfillSavedAt(db: DatabaseSync, cutoffSeconds = Math.floor(Dat
   return Number(result.changes)
 }
 
+export const DOCHASH_BACKFILL = 'backfill-doc-hash-from-content'
+
+/**
+ * Compute `docs.hash` for articles written before the column existed.
+ *
+ * The concurrency token is derived from the content, so backfilling it is
+ * mechanical — but it has to actually be done: NULL would make the
+ * compare-and-swap predicate match nothing and every save would come back as a
+ * conflict. Runs once at boot against upgraded databases only (fresh tables get
+ * the column filled by their writers).
+ */
+export function backfillDocHashes(db: DatabaseSync): number {
+  const rows = db.prepare('SELECT id, content FROM docs WHERE hash IS NULL').all() as {
+    id: string
+    content: string
+  }[]
+  if (!rows.length) return 0
+  const update = db.prepare('UPDATE docs SET hash = ? WHERE id = ?')
+  for (const row of rows) update.run(contentHash(row.content), row.id)
+  return rows.length
+}
+
+function migrationRan(db: DatabaseSync, name: string): boolean {
+  return db.prepare('SELECT name FROM _migrations WHERE name = ?').get(name) !== undefined
+}
+
+function recordMigration(db: DatabaseSync, name: string, at: number): void {
+  db.prepare('INSERT INTO _migrations (name, runAt) VALUES (?, ?)').run(name, at)
+}
+
+/** Runs every one-off migration that has not run yet; returns rows touched. */
 export function runMigrations(db: DatabaseSync, cutoffSeconds = Math.floor(Date.now() / 1000)): number {
-  const done = db.prepare('SELECT name FROM _migrations WHERE name = ?').get(SAVEDAT_BACKFILL)
-  if (done) return 0
+  let changed = 0
 
-  const changed = backfillSavedAt(db, cutoffSeconds)
-  db.prepare('INSERT INTO _migrations (name, runAt) VALUES (?, ?)').run(SAVEDAT_BACKFILL, cutoffSeconds)
-
-  if (changed > 0) {
-    console.log(`[migrate] archived ${changed} article(s) written before the drafts box existed`)
+  if (!migrationRan(db, SAVEDAT_BACKFILL)) {
+    const n = backfillSavedAt(db, cutoffSeconds)
+    recordMigration(db, SAVEDAT_BACKFILL, cutoffSeconds)
+    if (n > 0) {
+      console.log(`[migrate] archived ${n} article(s) written before the drafts box existed`)
+    }
+    changed += n
   }
+
+  if (!migrationRan(db, DOCHASH_BACKFILL)) {
+    const n = backfillDocHashes(db)
+    recordMigration(db, DOCHASH_BACKFILL, cutoffSeconds)
+    if (n > 0) {
+      console.log(`[migrate] computed the concurrency hash for ${n} article(s)`)
+    }
+    changed += n
+  }
+
   return changed
 }
 

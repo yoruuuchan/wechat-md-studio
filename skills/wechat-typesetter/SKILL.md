@@ -164,8 +164,9 @@ python <技能目录>/scripts/mopai.py token-status
 
 - `GET` 一篇稿件会返回 `hash`：正文 sha256 的前 16 位。它不是时间戳，所以不受客户端时钟和秒级精度影响，内容一样 hash 就一样（重推同样的文本不会假冲突）。
 - `PUT` 时把它作为 `baseHash` 带上，服务端发现当前 hash 对不上就拒绝写入，回 **409** 和 `current`（现在的 `name` / `content` / `updatedAt` / `source` / `hash`）。
+- **服务端不接受"什么都不带"的写法**：没有 `baseHash` 又没有 `force: true` 的更新会被 **400** 拒绝（提示写明要 baseHash 还是要 force）。这是刻意的——盲覆盖会把人在浏览器里的修改直接冲掉，覆盖必须是一次显式声明。
 - **409 的意思是"重新读一遍再决定"**，不是失败重试。stdout 上会给出完整的 `current`，`hint` 里直接写好下一步：把人的版本作为基础改，然后 `--base-hash <current.hash>` 重试。默认退出码 1。
-- `--force` 不带 `baseHash`，无条件覆盖，**会把人在浏览器里的修改直接冲掉**。所以它必须是一次明确的决定，不要当默认。
+- `--force` 会发送 `force: true`（不带 `baseHash`），无条件覆盖最新版，**会把人在浏览器里的修改直接冲掉**。所以它必须是一次明确的决定，不要当默认。
 - 不带 `--base-hash` 也不带 `--force` 时，脚本会先 `GET` 一次拿当前 hash 再写：这把锁只保护"读和写之间"那一小段，防不住更早之前的人工修改。要真正不覆盖人的劳动，**把上次 `push` / `get` 拿到的 hash 用 `--base-hash` 传进来**。`get --out` 就是为这个流程准备的：正文进文件，hash 进 stdout。
 
 推荐的往返：
@@ -194,6 +195,7 @@ python <技能目录>/scripts/mopai.py update abc123 --file draft.md --base-hash
 - **HTTP 403 `令牌 X 只有 read 权限`** → 令牌有效但权限不够（401 是"不认识你"，403 是"认识你但这件事不许做"）→ 在服务端把那行改成 `name:token`（默认 read+write），或换一个可写令牌。
 - **HTTP 404（`get` / `update`）** → 稿件 id 不对，**或者它已经被删进回收站**。agent 看不到也不能复活回收站里的稿件 → `list` 找 id；确实被删了就重新 `push` 一篇，别指望 `update`。
 - **HTTP 409 `conflict`** → 你上次读到之后有人在浏览器里改了 → 读 stdout 的 `current.content`，在它基础上改，再 `--base-hash <current.hash>` 重试；确认要覆盖才 `--force`。
+- **HTTP 400 `缺少 baseHash：不能盲覆盖`** → 直接 `PUT` 时既没有 `baseHash` 也没有 `force: true`。用脚本不会遇到（脚本会自动补一个：先 GET 再写，或 `--force`）；手写 curl 时按提示二选一。
 - **HTTP 413** → 正文超 200 万字符，或单张图超 20MB → 拆篇；图片先压缩。
 - **HTTP 400 `参数不对`** → `content` 空了或缺了 → 检查文件路径和文件内容。
 - **HTTP 500 `图床未配置` / `图片上传失败`** → 服务端到图床（R2 worker）不通或 `IMG_BASE_URL` / `IMG_ADMIN_KEY` 没配 → 这是服务端问题，把报错原样转给站长；稿件本身已经推进去了，图留在 `warnings` 里。

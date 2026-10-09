@@ -144,12 +144,15 @@ MathJax 默认的红色错误盒子（那个盒子带 `data-mjx-error` 和一个
 |---|---|---|
 | 应用 | 每 IP 每分钟 12 次上传（内存计数，重启即清） | `api/lib/burst.ts` |
 | 应用 | 每 IP 每 UTC 日 100 张（内存计数）——访客额度挂在可删的 Cookie 上，这条让换 Cookie 慢灌变贵 | 同上，`ANON_IP_DAILY_IMAGES` |
+| 应用 | 每 IP 每分钟 10 次登录尝试（内存计数）。站点公开之后，`auth.login` 是全站唯一能被人坐在那儿一直试的门；超了答 429，口令比较本身仍是常数时间 | 同上，`AUTH_LOGIN_PER_MINUTE`；`api/auth-router.ts` |
+| 应用 | 配置错了不启动：生产环境缺 `ACCESS_KEY` / `SESSION_SECRET`，或用了仓库里公开的占位值，或任何数值旋钮写了非整数 / 越界值，启动时直接报错并点名变量——**不再有「静默拿开发默认值上线」这条路** | `api/lib/env.ts` |
+| 应用 | 安全响应头由代码统一设置（HTML / 静态资源 / API 一致）：CSP、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`，以及只在 HTTPS 请求上发的 HSTS | `api/lib/security-headers.ts` |
 | 应用 | 每访客滚动 24 小时 30 张 / 100 MB | `api/lib/anon-quota.ts` |
 | 应用 | 全部匿名上传合计 1.5 GB 封顶 | 同上，`ANON_TOTAL_BYTES` |
 | 应用 | 匿名图回收（GC）：`ownerId=0`、超过 `ANON_GC_DAYS`（默认 14 天）、且没有任何云端稿件引用（正文里搜不到 `img:<key>`）的图删掉——上面那个 1.5 GB 池子因此是循环的，不会填满一次就永久拒客。启动 1 分钟后跑一次，之后每 24 小时一次；先让 Worker 确认对象已删，再删账本行，Worker 失败就留着下次重试 | `api/lib/anon-gc.ts` |
 | 应用 | 只认字节头是 jpeg / png / gif / webp 的图；**对外提供的 Content-Type 由字节决定，不信请求头** | `api/lib/image-type.ts` |
 | 应用 | 匿名图片按访客 Cookie 的哈希归属，别人列不出也删不掉 | `api/lib/visitor.ts` |
-| 运维 | 每次拒收写一行 `[upload-deny] 原因 key=value` 到服务日志（burst / ip-daily / quota / bad-magic，两扇门都写），晨报定时任务 grep 它 | `api/lib/deny-log.ts` |
+| 运维 | 每次拒收写一行 `[upload-deny] 原因 key=value` 到服务日志（burst / ip-daily / quota / bad-magic，两扇门都写），晨报定时任务 grep 它；被限流的登录写 `[auth-deny] login-burst ip=…` | `api/lib/deny-log.ts` |
 | 运维 | 每次 GC 跑完写一行 `[anon-gc] deleted=N bytes=B failed=F days=D` 到服务日志（删不掉的另写 `[anon-gc] delete-failed key=… reason=…`）。格式固定，晨报定时任务一起 grep | `api/lib/anon-gc.ts` |
 | 运维 | 匿名池应急清理：`sudo bash /opt/mopai/scripts/server-anon-purge.sh --days N` 先干跑、`--apply` 才删，只碰 ownerId=0 | `scripts/server-anon-purge.sh` |
 | 既定 | agent 门上传落 ownerId=1，**不计入**匿名池封顶——它是站长自己的流量，匿名池只度量陌生人；agent 门默认关（`AGENT_TOKENS` 留空），开不开由站长配令牌决定 | 2026-10-08 拍板 |
@@ -278,17 +281,22 @@ python -c "import secrets,base64;print('mopai_'+base64.urlsafe_b64encode(secrets
 
 ## 环境变量
 
-复制 `.env.example` 为 `.env`。生产环境必需的六项：
+复制 `.env.example` 为 `.env`。所有变量在启动时由 `api/lib/env.ts` 解析校验一次，
+**生产环境缺变量、留占位值、或数值写错都会拒绝启动**，并在报错里点名是哪一个
+（占位值 = `change-me` 和 `mopai-dev-only-…` 那几个，它们在仓库里就是公开的）。
+开发环境不受这些限制：缺密钥回退到 dev-only 值并打印一行 `[env]` 警告。
+
+生产环境必需的七项：
 
 | 变量 | 用途 |
 |---|---|
 | `NODE_ENV` | 生产下必须为 `production` |
 | `PORT` | 默认 3100 |
 | `DATABASE_URL` | `file:./data/mopai.db` |
-| `ACCESS_KEY` | 站长口令：登录后才有云端草稿箱。**上传图片不需要它**。`openssl rand -hex 24` |
-| `SESSION_SECRET` | 会话签名。`openssl rand -hex 32` |
+| `ACCESS_KEY` | 站长口令：登录后才有云端草稿箱。**上传图片不需要它**。`openssl rand -hex 24`，生产下至少 16 字符 |
+| `SESSION_SECRET` | 会话签名。`openssl rand -hex 32`，生产下至少 32 字符 |
 | `IMG_BASE_URL` | 图片 Worker 地址 |
-| `IMG_ADMIN_KEY` | 与 Worker secret 同值。`openssl rand -hex 32` |
+| `IMG_ADMIN_KEY` | 与 Worker secret 同值。`openssl rand -hex 32`，生产下至少 16 字符 |
 
 可选项，用来收紧「不登录也能上传」的额度、以及决定这个池子怎么回收（默认值就是线上跑的）：
 
@@ -299,6 +307,7 @@ python -c "import secrets,base64;print('mopai_'+base64.urlsafe_b64encode(secrets
 | `ANON_TOTAL_BYTES` | 1.5 GB | 所有匿名上传加起来的总上限——桶是共享免费额度 |
 | `ANON_BURST_PER_MINUTE` | 12 | 每个来源 IP 每分钟，内存计数，用来挡住灌水 |
 | `ANON_IP_DAILY_IMAGES` | 100 | 每个来源 IP 每 UTC 日，内存计数；访客额度挂在可删的 Cookie 上，这条让换 Cookie 慢灌变贵 |
+| `AUTH_LOGIN_PER_MINUTE` | 10 | 每个来源 IP 每分钟的登录尝试上限，内存计数。对错都算一次，超了直接 429（`[auth-deny] login-burst`） |
 | `ANON_GC_DAYS` | 14 | 回收的年龄阈值（天）：`ownerId=0`、比这更旧、又没有云端稿件引用的图会被删。写 `0` 等于「只要没被引用就删」 |
 | `ANON_GC_ENABLED` | `true` | 只有写成字符串 `false` 才关闭回收；关掉之后池子只进不出，回到 2026-10-08 之前那个填满即拒客的行为 |
 

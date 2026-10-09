@@ -85,7 +85,7 @@ const app = spawn(process.execPath, ['dist/boot.js'], {
     IMG_BASE_URL: `http://127.0.0.1:${WORKER_PORT}`,
     IMG_ADMIN_KEY: ADMIN_KEY,
     ACCESS_KEY,
-    SESSION_SECRET: 'agent-acceptance-session',
+    SESSION_SECRET: 'agent-acceptance-session-secret-2d4f',
     AGENT_TOKENS: `claude-code:${WRITE_TOKEN},reviewer:${READ_TOKEN}:read`,
   },
   stdio: ['ignore', 'pipe', 'pipe'],

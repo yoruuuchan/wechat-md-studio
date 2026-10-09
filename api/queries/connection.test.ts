@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { backfillSavedAt, runMigrations, SAVEDAT_BACKFILL } from './connection'
+import { backfillDocHashes, backfillSavedAt, DOCHASH_BACKFILL, runMigrations, SAVEDAT_BACKFILL } from './connection'
+import { contentHash } from '../lib/doc-hash'
 
 // Timestamp columns declared with `mode: 'timestamp'` are stored in *seconds*.
 // Getting that wrong makes the cut-off comparison always true and archives
@@ -15,7 +16,8 @@ function makeDb() {
       content TEXT NOT NULL,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL,
-      savedAt INTEGER
+      savedAt INTEGER,
+      hash TEXT
     );
     CREATE TABLE _migrations (
       name TEXT PRIMARY KEY,
@@ -61,13 +63,36 @@ describe('backfillSavedAt', () => {
   })
 })
 
-describe('runMigrations', () => {
-  it('archives legacy articles once and records the run', () => {
+describe('backfillDocHashes', () => {
+  it('computes the concurrency token for rows written before the column existed', () => {
     const db = makeDb()
     insert(db, 'old', LONG_AGO)
-    expect(runMigrations(db, NOW)).toBe(1)
+    expect(backfillDocHashes(db)).toBe(1)
+    const row = db.prepare('SELECT hash FROM docs WHERE id = ?').get('old') as { hash: string }
+    expect(row.hash).toBe(contentHash('body'))
+  })
+
+  it('leaves rows that already carry a hash alone', () => {
+    const db = makeDb()
+    insert(db, 'done', LONG_AGO)
+    db.prepare('UPDATE docs SET hash = ? WHERE id = ?').run('deadbeefdeadbeef', 'done')
+    expect(backfillDocHashes(db)).toBe(0)
+    const row = db.prepare('SELECT hash FROM docs WHERE id = ?').get('done') as { hash: string }
+    expect(row.hash).toBe('deadbeefdeadbeef')
+  })
+})
+
+describe('runMigrations', () => {
+  it('archives and hashes legacy articles once, and records both runs', () => {
+    const db = makeDb()
+    insert(db, 'old', LONG_AGO)
+    // two rows touched: one by the savedAt backfill, one by the hash backfill
+    expect(runMigrations(db, NOW)).toBe(2)
     const mark = db.prepare('SELECT name FROM _migrations').all()
-    expect(mark.map((r) => (r as { name: string }).name)).toEqual([SAVEDAT_BACKFILL])
+    // No ORDER BY in the query: the primary-key index returns them by name.
+    expect(mark.map((r) => (r as { name: string }).name).sort()).toEqual(
+      [SAVEDAT_BACKFILL, DOCHASH_BACKFILL].sort(),
+    )
   })
 
   it('does not run a second time, so later working copies stay unarchived', () => {
