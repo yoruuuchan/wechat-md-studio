@@ -275,13 +275,41 @@ check('the preview settles instead of jittering', Math.abs(settleA - settleB) <=
 
 // ---------------------------------------------------------------------------
 console.log('\n=== sync toggle ===')
+// The toggle sits on the side panel's 设置 tab, and Radix only mounts a tab's
+// content once its trigger has been pressed - by a real pointer event, which a
+// synthetic click() is not. The button itself carries an 开/关 label and the
+// title of the behaviour, so that is what it is found by.
+async function clickPoint(x, y) {
+  await send(
+    'Input.dispatchMouseEvent',
+    { type: 'mousePressed', x, y, button: 'left', clickCount: 1, buttons: 1 },
+    sessionId,
+  )
+  await send(
+    'Input.dispatchMouseEvent',
+    { type: 'mouseReleased', x, y, button: 'left', clickCount: 1, buttons: 1 },
+    sessionId,
+  )
+}
+const toggleLookup = `[...document.querySelectorAll('button')].find(b => /一起滚动|独立滚动/.test(b.getAttribute('title') || ''))`
+const tabPoint = JSON.parse(
+  await evaluate(`(() => {
+    const tab = [...document.querySelectorAll('[role=tab]')].find(t => t.textContent.trim() === '设置')
+    if (!tab) return 'null'
+    const r = tab.getBoundingClientRect()
+    return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) })
+  })()`),
+)
+if (tabPoint) await clickPoint(tabPoint.x, tabPoint.y)
+await sleep(400)
 const toggled = await evaluate(`(() => {
-  const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '同步滚动')
+  const btn = ${toggleLookup}
   if (!btn) return 'no toggle'
+  const was = btn.getAttribute('aria-pressed') === 'true'
   btn.click()
-  return 'clicked'
+  return was ? 'turned off' : 'turned on'
 })()`)
-check('the sync toggle exists', toggled === 'clicked', String(toggled))
+check('the sync toggle exists and was on', toggled === 'turned off', String(toggled))
 await sleep(300)
 await setEditorScroll(0)
 await sleep(200)
@@ -295,7 +323,7 @@ check(
   `${pvOff} -> ${pvOffAfter}`,
 )
 await evaluate(`(() => {
-  const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '同步滚动')
+  const btn = ${toggleLookup}
   btn && btn.click()
 })()`)
 await sleep(200)
@@ -416,6 +444,42 @@ const undo2 = await evaluate(`(async () => {
 })()`)
 const u2 = JSON.parse(undo2)
 check('Ctrl+Z on a freshly opened article changes nothing', u2.unchanged === true, undo2)
+
+// ---------------------------------------------------------------------------
+console.log('\n=== inline markers beside Chinese punctuation reach the preview ===')
+// CommonMark's flanking rule counts full-width punctuation as punctuation, so a
+// marker glued to a Chinese sentence - which is how Chinese is written - could
+// neither open nor close: the `**` and `==` came out as literal text.
+const inlineCjk = await evaluate(`(async () => {
+  const view = window.__mopaiCodemirror
+  const doc = [
+    '赛事采用==“专家评审70% + 大众投票30%”==的综合评审法。',
+    '',
+    '构建**“需求发布—智能拆解—模型调用—智能体开发—接单协作—合同履约—成果交付—数字资产沉淀与变现”**的全链路服务体系。',
+    '',
+    '这是==标记中包含**加粗**==的测试。',
+    '',
+  ].join('\\n')
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } })
+  await new Promise(r => setTimeout(r, 1500))
+  const paper = document.querySelector('div.px-1.py-6')
+  const text = paper.innerText
+  const html = paper.innerHTML
+  return JSON.stringify({
+    noDelimiters: !text.includes('==') && !text.includes('**'),
+    keepsMark: text.includes('“专家评审70% + 大众投票30%”'),
+    keepsLong: text.includes('数字资产沉淀与变现'),
+    nested: text.includes('标记中包含加粗') && text.includes('的测试'),
+    highlighted: (html.match(/border-bottom/g) || []).length >= 2,
+    bolded: html.includes('font-weight:700'),
+  })
+})()`)
+const cjk = JSON.parse(inlineCjk)
+check('no `**` or `==` survives into the article', cjk.noDelimiters === true, inlineCjk)
+check('the marked phrase is rendered', cjk.keepsMark === true, inlineCjk)
+check('the long bold phrase is rendered', cjk.keepsLong === true, inlineCjk)
+check('a mark around bold renders both', cjk.nested === true, inlineCjk)
+check('the highlight and bold styles are applied', cjk.highlighted && cjk.bolded, inlineCjk)
 
 // ---------------------------------------------------------------------------
 console.log('\n=== references page ===')

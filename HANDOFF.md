@@ -383,6 +383,22 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 且**每一条写正文的路径都要同时写 hash**（save / saveToDrafts / importLocal / Agent create+update 都
 > 已经这么做了）——hash 和 content 一旦不同步，compare-and-swap 就会朝错误方向判；加新的写入路径时
 > 这是第一件要检查的事。旧库升级由启动时的 `backfill-doc-hash-from-content` 自动补齐。
+>
+> 2026-10-09 更新（两处已确认的小 bug）：**中文标点旁的行内标记失效** + **窗口缩放后同步滚动失准**。
+> 一、行内解析：CommonMark 的 flanking 判定把全角标点算作标点，`这是**“重点”**内容`、
+> `赛事采用==“专家评审70% + 大众投票30%”==的…` 于是「不能开合」，`**` / `==` 原样留在正文里
+> （`**` 与 `==` 走的是同一段 `scanDelims`）。新增 `src/lib/cjk-inline.ts`：**中文标点与 Markdown
+> 自己的定界符都按普通字参与 flanking**，ASCII 标点仍是标点、`_` 的 canSplitWord 判定仍用标准
+> 标点集，因此 `（_重点_）`、`_重点_。`、`甲_重点_乙` 行为不变；`==…**加粗**==` 这类相邻定界符
+> 也因此能配对。markdown-it 没有暴露 flanking 钩子，实现挂在 `StateInline.prototype.scanDelims`
+> 上并只对本项目的解析器生效——**不要改成在最终 HTML 上做字符串替换**。
+> 二、同步滚动：块内插值从「源码行数比例」换成**像素比例**（编辑器 `lineBlockAt().top` ↔ 预览元素
+> top），并新增 `onLayoutChange(source)`：编辑器重排（`scrollDOM` 尺寸变化）时以**预览**为锚，
+> 预览内容高度变化（`ResizeObserver`：迟到图片、375↔677 换纸）时以**编辑器**为锚；180ms 合并突发、
+> 写入前 1px 内直接跳过（这正是防反馈循环的那道闸）。验收脚本 `scripts/cdp-verify-scroll-sync.mjs`
+> （新，含窄窗口、resize、换纸、图片变化、往返漂移）；同时修好了侧栏改版后失效的「同步滚动」开关
+> 选择器（`cdp-verify-editor-upgrades.mjs` 现在全绿）。回归测试：`src/lib/inline-cjk.test.ts`、
+> `src/lib/sync-scroll.test.ts`。
 
 ### 产品方向（用户明确拍板的）
 

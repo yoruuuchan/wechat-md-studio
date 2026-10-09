@@ -282,12 +282,17 @@ export default function EditorPage() {
   )
   const materials = useMemo(() => collectMaterials(parsed, resolveDiagram), [parsed, resolveDiagram])
 
-  const { onEditorScroll, onPreviewScroll } = useSyncScroll({
+  const { onEditorScroll, onPreviewScroll, onLayoutChange } = useSyncScroll({
     enabled: settings.syncScroll,
     blocks: parsed.blocks,
     editorRef,
     previewRef,
   })
+  // A rewrap or a resize invalidates the *other* pane's anchor: the editor's own
+  // position survives being resized, the preview's survives an image arriving
+  // late, and each re-anchor keeps whichever one did not move.
+  const onEditorLayout = useCallback(() => onLayoutChange('preview'), [onLayoutChange])
+  const onPreviewLayout = useCallback(() => onLayoutChange('editor'), [onLayoutChange])
 
   const updateActive = (patch: Partial<DocRecord>) => {
     setDocs((ds) => ds.map((d) => (d.id === activeId ? { ...d, ...patch, updatedAt: Date.now() } : d)))
@@ -963,6 +968,7 @@ export default function EditorPage() {
                   docKey={activeId}
                   onChange={(content) => updateActive({ content })}
                   onScroll={onEditorScroll}
+                  onLayout={onEditorLayout}
                   onFiles={handleEditorFiles}
                   onHtml={handleHtml}
                 />
@@ -992,6 +998,7 @@ export default function EditorPage() {
             width={previewWidth}
             onWidthChange={setPreviewWidth}
             onScroll={onPreviewScroll}
+            onLayout={onPreviewLayout}
           />
         </ResizablePanel>
 

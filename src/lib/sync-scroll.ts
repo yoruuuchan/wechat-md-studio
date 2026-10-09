@@ -24,7 +24,7 @@ interface Spanned {
  * screen lines, and the gap between blocks is what both panes actually agree on.
  * The last block has no next, so it falls back to its own end.
  */
-function rangeOf(blocks: Spanned[], i: number): { start: number; end: number } {
+export function rangeOf(blocks: Spanned[], i: number): { start: number; end: number } {
   const start = blocks[i]?.line ?? 0
   const end = blocks[i + 1]?.line ?? blocks[i]?.lineEnd ?? start + 1
   return { start, end: Math.max(end, start + 1) }
@@ -58,6 +58,31 @@ export function lineAtProgress(blocks: Spanned[], i: number, frac: number): numb
   const { start, end } = rangeOf(blocks, i)
   const clamped = Math.min(1, Math.max(0, frac))
   return Math.round(start + clamped * (end - start))
+}
+
+/**
+ * Where a pixel offset sits inside the pixel span [start, end], as 0..1.
+ *
+ * A block's extent is measured in pixels on both sides - the editor's lines are
+ * not all one screen row tall (a wrapped line is three or four), and the preview
+ * is proportional type with images - so a fraction may only be compared with
+ * another fraction of the same block. Counting source lines instead mixed two
+ * different rulers, and how badly they disagreed depended on how much the editor
+ * happened to wrap, which is exactly what a narrow window changes.
+ *
+ * A collapsed span (a block that rendered to the same pixel as its neighbour)
+ * reports 0 rather than dividing by zero.
+ */
+export function fractionInSpan(value: number, start: number, end: number): number {
+  const span = end - start
+  if (!(span > 0)) return 0
+  return Math.min(1, Math.max(0, (value - start) / span))
+}
+
+/** Inverse of fractionInSpan: the pixel offset `frac` of the way through [start, end]. */
+export function pointInSpan(frac: number, start: number, end: number): number {
+  const span = Math.max(0, end - start)
+  return start + Math.min(1, Math.max(0, frac)) * span
 }
 
 /**

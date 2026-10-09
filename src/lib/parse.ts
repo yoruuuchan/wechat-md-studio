@@ -12,6 +12,7 @@ import {
 } from './types'
 import { fencedRanges, isInFence } from './fences'
 import { blankComments } from './comments'
+import { cjkFlanking } from './cjk-inline'
 
 // ---------- front matter ----------
 // 只支持简单键值与列表，刻意不引入 YAML 依赖：
@@ -50,6 +51,9 @@ function parseFrontMatter(src: string): { meta: DocMeta; body: string; offset: n
 // ---------- markdown-it ----------
 
 const md = new MarkdownIt({ html: false, linkify: false, breaks: false })
+  // 中文标点不参与定界符的 flanking 判定，否则「这是**“重点”**内容」这类写法
+  // 会被 CommonMark 判为不能开合，`**` / `==` 原样留在正文里。
+  .use(cjkFlanking)
   .use(markdownItMark)
   .use(markdownItContainer, 'quote')
   .use(markdownItContainer, 'center')

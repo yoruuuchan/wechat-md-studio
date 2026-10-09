@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { blockIndexAtLine, fillBlockOffsets, lineAtProgress, progressInBlock } from './sync-scroll'
+import {
+  blockIndexAtLine,
+  fillBlockOffsets,
+  fractionInSpan,
+  lineAtProgress,
+  pointInSpan,
+  progressInBlock,
+  rangeOf,
+} from './sync-scroll'
 
 // Blocks as parseMarkdown emits them: one entry per rendered block, in document
 // order, carrying the whole-file line it starts on.
@@ -95,5 +103,58 @@ describe('fillBlockOffsets', () => {
   it('is monotonic for already-sound input', () => {
     const filled = fillBlockOffsets([0, 1, 2, 3])
     expect(filled).toEqual([0, 1, 2, 3])
+  })
+})
+
+describe('rangeOf', () => {
+  it('ends a block where the next one starts', () => {
+    expect(rangeOf(blocks, 2)).toEqual({ start: 8, end: 12 })
+  })
+
+  it('falls back to the block own span when there is no next block', () => {
+    expect(rangeOf([{ line: 20, lineEnd: 30 }], 0)).toEqual({ start: 20, end: 30 })
+  })
+
+  it('never collapses to zero lines, which would divide by zero later', () => {
+    // Two blocks on one line is legal in the AST (a heading and the paragraph
+    // that follows it on the same source line), and the range still has to have
+    // a size.
+    expect(rangeOf([{ line: 4 }, { line: 4 }], 0)).toEqual({ start: 4, end: 5 })
+  })
+})
+
+// The preview is proportional type with images and the editor wraps its own
+// lines, so the two panes only agree about a block's *ends*. Everything between
+// them is interpolated, and these two functions are that interpolation: the
+// panes measure the same block in their own pixels and hand each other a
+// fraction of it.
+describe('fractionInSpan / pointInSpan', () => {
+  it('agrees with the ends of the span', () => {
+    expect(fractionInSpan(120, 100, 300)).toBeCloseTo(0.1)
+    expect(fractionInSpan(100, 100, 300)).toBe(0)
+    expect(fractionInSpan(300, 100, 300)).toBe(1)
+    expect(pointInSpan(0, 100, 300)).toBe(100)
+    expect(pointInSpan(1, 100, 300)).toBe(300)
+  })
+
+  it('round-trips, which is what keeps the two panes from creeping apart', () => {
+    for (const frac of [0, 0.13, 0.5, 0.87, 1]) {
+      expect(fractionInSpan(pointInSpan(frac, 40, 900), 40, 900)).toBeCloseTo(frac, 10)
+    }
+  })
+
+  it('clamps a value outside the span', () => {
+    expect(fractionInSpan(-50, 100, 300)).toBe(0)
+    expect(fractionInSpan(9999, 100, 300)).toBe(1)
+    expect(pointInSpan(-1, 100, 300)).toBe(100)
+    expect(pointInSpan(4, 100, 300)).toBe(300)
+  })
+
+  it('reports zero rather than dividing when a block has no pixels', () => {
+    // A block whose element rendered with no height would otherwise produce
+    // Infinity, which a scrollTop assignment turns into a jump to the top.
+    expect(fractionInSpan(500, 200, 200)).toBe(0)
+    expect(Number.isFinite(pointInSpan(0.5, 200, 200))).toBe(true)
+    expect(pointInSpan(0.5, 200, 200)).toBe(200)
   })
 })

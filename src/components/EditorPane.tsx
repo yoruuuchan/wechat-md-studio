@@ -341,6 +341,11 @@ interface Props {
   /** Called on every scroll of the editor viewport; the page forwards it to sync. */
   onScroll?: () => void
   /**
+   * Called when the editor rewrapped itself — the pane was resized, so the same
+   * source now occupies a different number of screen rows.
+   */
+  onLayout?: () => void
+  /**
    * Image files from the clipboard or a drop. `at` is the document position the
    * drop landed on, or null when it came from a paste and belongs at the cursor.
    */
@@ -353,7 +358,7 @@ interface Props {
 }
 
 const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
-  { value, docKey, onChange, onScroll, onFiles, onHtml },
+  { value, docKey, onChange, onScroll, onLayout, onFiles, onHtml },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -366,6 +371,10 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
   onFilesRef.current = onFiles
   const onHtmlRef = useRef(onHtml)
   onHtmlRef.current = onHtml
+  const onLayoutRef = useRef(onLayout)
+  onLayoutRef.current = onLayout
+  /** Last seen scroller size, so the update listener reports real layout changes only. */
+  const lastSize = useRef({ w: 0, h: 0 })
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -427,12 +436,22 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
         }),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChangeRef.current(u.state.doc.toString())
+          // The scroller's own size is the one signal that means "the text just
+          // wrapped differently": the pane got narrower or shorter. Scroll sync
+          // has to re-anchor after that, and a wrapped line's height cannot be
+          // predicted from the text alone, so it has to come from the view.
+          const el = u.view.scrollDOM
+          if (el.clientWidth !== lastSize.current.w || el.clientHeight !== lastSize.current.h) {
+            lastSize.current = { w: el.clientWidth, h: el.clientHeight }
+            onLayoutRef.current?.()
+          }
         }),
         EditorView.lineWrapping,
       ],
     })
     const view = new EditorView({ state, parent: hostRef.current })
     viewRef.current = view
+    lastSize.current = { w: view.scrollDOM.clientWidth, h: view.scrollDOM.clientHeight }
     // Exposed so the headless-browser check in scripts/cdp-verify-image-ops.mjs
     // can type into the real editor instead of guessing at the DOM.
     ;(window as unknown as { __mopaiCodemirror?: EditorView }).__mopaiCodemirror = view
@@ -475,6 +494,14 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
       const block = view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop))
       return view.state.doc.lineAt(block.from).number - 1
     },
+    lineTop: (line: number) => {
+      const view = viewRef.current
+      if (!view) return null
+      // Clamped like every other line lookup: sync asks for the line a block ends
+      // on, which for the last block is one past the document.
+      const ln = Math.max(1, Math.min(view.state.doc.lines, line + 1))
+      return view.lineBlockAt(view.state.doc.line(ln).from).top
+    },
     scrollToLine: (line: number) => {
       const view = viewRef.current
       if (!view) return
@@ -491,7 +518,11 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
     },
     setScroll: (top: number) => {
       const view = viewRef.current
-      if (view) view.scrollDOM.scrollTop = top
+      if (!view) return
+      // Writing a position the pane is already at only bounces a scroll event
+      // back at the pane we just read, which is how a sync starts to oscillate.
+      if (Math.abs(view.scrollDOM.scrollTop - top) < 1) return
+      view.scrollDOM.scrollTop = top
     },
     insertText: (text: string) => {
       const view = viewRef.current

@@ -12,13 +12,19 @@ interface Props {
   blockOffsets: number[]
   /** Called on every scroll of the preview; the page forwards it to sync. */
   onScroll?: () => void
+  /**
+   * Called when the rendered article changed height on its own — a late image,
+   * or the paper being switched between 375 and 677 so the text reflows. The
+   * page re-anchors scroll sync on it.
+   */
+  onLayout?: () => void
 }
 
 // 预览 DOM 即复制 DOM：dangerouslySetInnerHTML 渲染的就是复制出去的同一字符串。
 // 同步滚动因此不能往输出里塞 id/class 锚点（两者都是公众号红线），改成由
 // renderDoc 给出「第 i 个 block 落在第几个顶层子元素」，在这里量像素位置。
 const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
-  { html, stats, width, onWidthChange, blockOffsets, onScroll },
+  { html, stats, width, onWidthChange, blockOffsets, onScroll, onLayout },
   ref,
 ) {
   const article = useMemo(() => ({ __html: html }), [html])
@@ -26,6 +32,8 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   const contentRef = useRef<HTMLDivElement>(null)
   const onScrollRef = useRef(onScroll)
   onScrollRef.current = onScroll
+  const onLayoutRef = useRef(onLayout)
+  onLayoutRef.current = onLayout
 
   // Measuring every block on every scroll event would read layout hundreds of
   // times a second. Cache the offsets and drop the cache when anything that can
@@ -42,8 +50,12 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   useEffect(() => {
     const el = contentRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
+    // The cached pixel tops are measured, so a content box that changed size
+    // invalidates them — and the panes have to be put back in step, because an
+    // image that arrived late moved everything below it.
     const ro = new ResizeObserver(() => {
       topsRef.current = null
+      onLayoutRef.current?.()
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -92,7 +104,11 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
       const i = Math.min(Math.max(index, 0), tops.length - 1)
       const next = tops[i + 1]
       const span = next === undefined ? 0 : next - tops[i]
-      scroller.scrollTop = tops[i] + Math.min(1, Math.max(0, frac)) * span
+      const target = tops[i] + Math.min(1, Math.max(0, frac)) * span
+      // Already there: writing would only bounce a scroll event back at the pane
+      // this position was read from.
+      if (Math.abs(scroller.scrollTop - target) < 1) return
+      scroller.scrollTop = target
     },
     getScroll: () => {
       const scroller = scrollerRef.current
@@ -104,7 +120,9 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
     },
     setScroll: (top: number) => {
       const scroller = scrollerRef.current
-      if (scroller) scroller.scrollTop = top
+      if (!scroller) return
+      if (Math.abs(scroller.scrollTop - top) < 1) return
+      scroller.scrollTop = top
     },
   }))
 
