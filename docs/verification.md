@@ -63,6 +63,13 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 图片操作 / 重裁 / 清除 | [cdp-verify-image-ops.mjs](../scripts/cdp-verify-image-ops.mjs)：`node scripts/cdp-verify-image-ops.mjs <url> <key>`；CDP 固定 9333；另有 [recrop](../scripts/cdp-verify-recrop.mjs) / [resize](../scripts/cdp-verify-resize.mjs) |
 | 导入导出菜单 | [cdp-verify-io-menus.mjs](../scripts/cdp-verify-io-menus.mjs)：本地 URL 固定 `http://127.0.0.1:3202/`，CDP 固定 9337 |
 | 草稿箱 / 素材 / 回收站 | [cdp-verify-drafts-materials.mjs](../scripts/cdp-verify-drafts-materials.mjs)、[cdp-verify-trash.mjs](../scripts/cdp-verify-trash.mjs)：先读文件确认当前参数与隔离环境 |
+| 预览区局部复制 | [cdp-verify-selection-copy.mjs](../scripts/cdp-verify-selection-copy.mjs)：`node scripts/cdp-verify-selection-copy.mjs <url> [key] [CDP端口]`；默认 `http://127.0.0.1:3205/` 与 9338 |
+| UI 深色模式 | [cdp-verify-dark-theme.mjs](../scripts/cdp-verify-dark-theme.mjs)：`node scripts/cdp-verify-dark-theme.mjs <url> [key] [CDP端口]`；默认同样 3205，CDP 默认 9339，与公式脚本的固定 9339 相同，勿并发 |
+
+两个新脚本都自起无头 Chrome，只连接已启动的应用，Chrome 路径同样按 Windows 写定。
+`cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；
+折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
+`cdp-verify-dark-theme.mjs` 覆盖 `akari` / `yoru` 两态：`<html>` 上 `data-theme` 与 `.dark` 的同步、shadcn / Tailwind `dark:` 变体生效（侧栏 Tabs 在深色下可读，对比度 ≥ 3:1）并留两主题截图。
 
 单测与浏览器各有验收层级：逻辑、字符串输出、浏览器交互、微信实际粘贴不能互相替代。
 修改真实交互时运行对应现有脚本；涉及微信粘贴体验时照实记录是否在微信编辑器验证。

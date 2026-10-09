@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mopai.py - agent client for the mopai (墨排) WeChat Markdown editor.
+"""mopai.py - agent client for 公众号排版助手 by Yoru (wechat-md-studio), a WeChat Markdown editor.
 
 Talks to the REST door at `<base>/api/agent/*` with a Bearer token, so a coding
 agent can push a Markdown draft into the web editor, hand the human a link, and
@@ -876,7 +876,7 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog="mopai.py",
         parents=[common],
-        description="墨排 agent 客户端：把 Markdown 推进网页编辑器，人工润色后再读回来。"
+        description="「公众号排版助手 by Yoru」的 agent 客户端：把 Markdown 推进网页编辑器，人工润色后再读回来。"
                     "零依赖，只用 Python 3 标准库。",
         epilog="配置只来自 <技能目录>/.env（MOPAI_API_URL / MOPAI_TOKEN）。"
                "直接跑命令就行，不用先检查 .env：缺令牌时错误信息里会带上路径和补救命令。",

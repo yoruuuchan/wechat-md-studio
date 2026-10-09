@@ -1,13 +1,13 @@
 ---
 name: wechat-typesetter
-description: 墨排（mopai）公众号排版线上协作技能。当用户要把写好的 Markdown 稿件推进公众号排版编辑器、要一个能直接发给人的编辑链接、要把浏览器里润色过的稿子读回来、要查/搜线上稿件、要列出可用排版主题，或者说"推到墨排""发给我改""排版这篇公众号文章""看看草稿箱里的稿子"时使用。纯线上流程：脚本不做任何本地渲染，只通过 REST（`/api/agent/*`，Bearer 令牌）把 Markdown 写进线上编辑器，返回 `editorUrl` 交给人去浏览器里排版、换主题、复制成公众号格式，之后再用 `get` 读回润色结果；稿件里的本地图片（Markdown `![]()` 与 HTML `<img src>`）在推送时自动上传到图床并把引用改写成 `img:<key>`，无需人工处理。配置只来自本技能目录下的 `.env`（`MOPAI_API_URL` 与 `MOPAI_TOKEN`，脚本不读环境变量）；正常路径不需要预先检查 `.env`，直接推送，报缺令牌再按本文「令牌」一节补。零依赖，Python 3 标准库，Windows 与 Linux 通用。
+description: 公众号排版助手 by Yoru（仓库 wechat-md-studio）的公众号排版线上协作技能。当用户要把写好的 Markdown 稿件推进公众号排版编辑器、要一个能直接发给人的编辑链接、要把浏览器里润色过的稿子读回来、要查/搜线上稿件、要列出可用排版主题，或者说"推到排版助手""发给我改""排版这篇公众号文章""看看草稿箱里的稿子"时使用。纯线上流程：脚本不做任何本地渲染，只通过 REST（`/api/agent/*`，Bearer 令牌）把 Markdown 写进线上编辑器，返回 `editorUrl` 交给人去浏览器里排版、换主题、复制成公众号格式，之后再用 `get` 读回润色结果；稿件里的本地图片（Markdown `![]()` 与 HTML `<img src>`）在推送时自动上传到图床并把引用改写成 `img:<key>`，无需人工处理。配置只来自本技能目录下的 `.env`（`MOPAI_API_URL` 与 `MOPAI_TOKEN`，脚本不读环境变量）；正常路径不需要预先检查 `.env`，直接推送，报缺令牌再按本文「令牌」一节补。零依赖，Python 3 标准库，Windows 与 Linux 通用。
 ---
 
-# 墨排 wechat-typesetter — 把 Markdown 交给人在浏览器里排完
+# 公众号排版助手 by Yoru · wechat-typesetter — 把 Markdown 交给人在浏览器里排完
 
 ## 概述
 
-`scripts/mopai.py` 是墨排（公众号 Markdown 排版 Web 应用）的 agent 客户端：把 Markdown 稿件推进线上编辑器，拿回一个 `editorUrl`，交给人在浏览器里排版、选主题、微调，最后把润色过的稿子读回来。**脚本本身不做任何渲染和排版**——排版只发生在网页里，人也在网页里完成这篇文章。所以这个技能的正确用法是"推上去 → 把链接给人 → 等改完再读回来"，而不是"在本地生成公众号 HTML"。
+`scripts/mopai.py` 是「公众号排版助手 by Yoru」（公众号 Markdown 排版 Web 应用）的 agent 客户端：把 Markdown 稿件推进线上编辑器，拿回一个 `editorUrl`，交给人在浏览器里排版、选主题、微调，最后把润色过的稿子读回来。**脚本本身不做任何渲染和排版**——排版只发生在网页里，人也在网页里完成这篇文章。所以这个技能的正确用法是"推上去 → 把链接给人 → 等改完再读回来"，而不是"在本地生成公众号 HTML"。
 
 脚本是零依赖的 Python 3 标准库实现，Windows 和 Linux 都能直接跑，不用装任何东西。下面命令里的 `mopai.py` 指 `<技能目录>/scripts/mopai.py`（`<技能目录>` 就是本 `SKILL.md` 所在目录）；Windows 用 `python`，Linux/macOS 用 `python3`。**每条错误信息里都带 `script` 和 `envFile` 的绝对路径**，不用猜文件在哪，直接从那句报错里复制。
 
@@ -118,7 +118,7 @@ python <技能目录>/scripts/mopai.py push --file draft.md --open
 {"ok":true,"id":"abc123","name":"十月复盘","editorUrl":"https://wechat.yoru-and-akari.dev/?doc=abc123","hash":"9f2c1a7b4d5e6f80","savedAt":1730000000000,"source":"agent:claude-code","uploadedImages":2}
 ```
 
-把 `editorUrl` 原样交给用户——那是唯一能让人接着排版的入口。`hash` 存下来，回推时用得上（见「关于稿件的改动与冲突」）。图片没全传上去时多一个 `warnings` 数组，同时逐条打到 stderr，但推送本身算成功。
+把 `editorUrl` 原样交给用户——那是进入云端稿件的编辑入口。**打开它需要浏览器侧有效的登录会话**：稿件只存在服务端，链接本身不构成匿名编辑授权；未登录时会被送到登录页，登录后回到这篇稿件（这条行为以 [Agent API](../../docs/agent-api.md) 的说明为准）。`hash` 存下来，回推时用得上（见「关于稿件的改动与冲突」）。图片没全传上去时多一个 `warnings` 数组，同时逐条打到 stderr，但推送本身算成功。
 
 ```bash
 # 2. 读回人工润色过的稿子
@@ -216,5 +216,6 @@ python <技能目录>/scripts/mopai.py update abc123 --file draft.md --base-hash
 - **`连不上 <url>` / 超时 / 403 HTML 页** → 部署在 Cloudflare Access 后面，`/api/agent/*` 没被放行。Access 是按路径策略工作的，需要在 Access 应用里给 `/api/agent/*` 加一条 **Bypass** 策略（认证交给脚本的 Bearer 令牌）。**这是运维在 Cloudflare 控制台做的动作，脚本改不了**；改完用 `curl -s -o /dev/null -w '%{http_code}' <base>/api/agent/whoami` 应返回 401 而不是 302/403。
 - **改了 `.env` 却不生效** → 文件位置不对，`.env` 必须和 `SKILL.md` 同级，丢进 `scripts/` 不会被读 → `token-status` 看 `envFile` 指的是哪个路径。
 - **`editorUrl` 打开是另一个域名 / 相对地址不对** → 服务端 `PUBLIC_BASE_URL` 没配，`editorUrl` 会退回用请求的 origin 拼 → 在服务端 `.env` 里配 `PUBLIC_BASE_URL` 并重启。
+- **`editorUrl` 打开先跳登录页** → 正常行为：云端稿件需要浏览器侧的有效登录会话，链接本身不是匿名编辑授权 → 用站长口令登录后会自动回到这篇稿件。
 - **中文输出乱码或 `UnicodeEncodeError`** → cp936 控制台的老问题；脚本启动时已把 stdout/stderr 重配成 UTF-8，并对写不出的字符降级替换 → 如果仍然乱码，是终端字体/代码页的问题，`chcp 65001` 或换 Windows Terminal。
 - **推送卡住不动** → 大图在慢链路上，或 `--text`/stdin 在等输入（不是 tty 就会读 stdin）→ 加 `--timeout`，或改用 `--file`。

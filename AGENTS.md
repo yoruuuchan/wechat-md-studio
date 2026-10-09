@@ -14,7 +14,8 @@
 | Parser / renderer | [types.ts](src/lib/types.ts)、[parse.ts](src/lib/parse.ts)、[render.ts](src/lib/render.ts)：语义节点、源位置、图号、素材定位、HTML；[clipboard.ts](src/lib/clipboard.ts)：复制和 HTML 导出 |
 | Theme system | [theme-kit.ts](src/lib/theme-kit.ts)：Theme 契约、共享构件、样式消毒；[themes.ts](src/lib/themes.ts)：总注册表；[theme-fallbacks.ts](src/lib/theme-fallbacks.ts)：扩展组件；[themes-extra.ts](src/lib/themes-extra.ts)：手写移植；[importer](scripts/themes/import.ts) → [生成目录](src/lib/themes-imported/) |
 | Metadata / credits | [theme-meta.ts](src/lib/theme-meta.ts) 定义结构，[theme-sources.ts](src/lib/theme-sources.ts) 注册来源，各 Theme 的 `meta.origin` 引用它；[credits.ts](src/lib/credits.ts) 驱动 [References 页面](src/pages/References.tsx) 与完整致谢；[sources/report.ts](scripts/sources/report.ts) 生成文档区块，许可统一在 `LICENSES/` |
-| Editor | [EditorPage.tsx](src/pages/EditorPage.tsx) 编排；[EditorPane.tsx](src/components/EditorPane.tsx)、[PreviewPane.tsx](src/components/PreviewPane.tsx)、[SidePanel.tsx](src/components/SidePanel.tsx) 分工；[MarkdownToolbar.tsx](src/components/MarkdownToolbar.tsx) 调用 [md-format.ts](src/lib/md-format.ts) 的语义变换；[sync-scroll.ts](src/lib/sync-scroll.ts) / [useSyncScroll.ts](src/hooks/useSyncScroll.ts) 负责块映射滚动 |
+| Editor | [EditorPage.tsx](src/pages/EditorPage.tsx) 编排；[EditorPane.tsx](src/components/EditorPane.tsx)、[PreviewPane.tsx](src/components/PreviewPane.tsx)、[SidePanel.tsx](src/components/SidePanel.tsx) 分工；[MarkdownToolbar.tsx](src/components/MarkdownToolbar.tsx) 调用 [md-format.ts](src/lib/md-format.ts) 的语义变换；[sync-scroll.ts](src/lib/sync-scroll.ts) / [useSyncScroll.ts](src/hooks/useSyncScroll.ts) 负责块映射滚动；[selection-copy.ts](src/lib/selection-copy.ts) 负责预览区局部复制，从用户 Range 保留真实选区，并克隆祖先结构与内联样式直到正文根 `section` |
+| UI theme | [ui-theme.ts](src/lib/ui-theme.ts)：应用级浅色 / 深色 / 跟随系统，`yoru` 模式同步设置 `.dark`，是当前 UI theme 切换入口；[ThemeToggle.tsx](src/components/ThemeToggle.tsx) 是各页面里的三态切换控件 |
 | Image pipeline | [image.ts](src/lib/image.ts)、[image-compress.ts](src/lib/image-compress.ts)：真实裁切与压缩；[storage-router.ts](api/storage-router.ts) / [storage.ts](api/lib/storage.ts) → [Worker](mopai-worker/src/index.ts)；[math.ts](src/lib/math.ts)、[math-sanitize.ts](src/lib/math-sanitize.ts)、[diagram-raster.ts](src/lib/diagram-raster.ts) 处理公式与图表 |
 | Local / cloud documents | [store.ts](src/lib/store.ts) + [body-store.ts](src/lib/body-store.ts)：本机索引与正文；[useDocs.ts](src/hooks/useDocs.ts) + [docs-merge.ts](src/lib/docs-merge.ts)：同步与冲突；[docs-router.ts](api/docs-router.ts)、[schema.ts](db/schema.ts)、[connection.ts](api/queries/connection.ts)：云端保存、表结构与升级 |
 | Import / export | [import-export.ts](src/lib/import-export.ts)：Markdown、整包备份、DOCX；[rich-paste.ts](src/lib/rich-paste.ts)：HTML 转公众号方言；文件与 UI 接线在 `EditorPage.tsx` |
@@ -32,6 +33,8 @@
 | 微信排版 / renderer | [渲染与图片](docs/rendering.md)、`parse.ts` / `render.ts` / `theme-kit.ts`、相关测试、`scripts/verify-themes.ts`；公式另读 `math-sanitize.ts` |
 | 保存 / 同步 / 导入导出 | [稿件与编辑器](docs/documents.md)、相关 hooks / API / schema 及其测试 |
 | Agent 接入 | [Agent API](docs/agent-api.md)、`contracts/agent.ts`、路由 / 鉴权与客户端实现及验收脚本 |
+| 复制 / 剪贴板 / 预览选区行为 | `selection-copy.ts`、`PreviewPane.tsx`、`selection-copy.test.ts`、`scripts/cdp-verify-selection-copy.mjs`；整篇复制另见 `clipboard.ts` |
+| UI 明暗主题 / shadcn / Tailwind dark variant | `ui-theme.ts`、`ThemeToggle.tsx`、`tailwind.config.js` 的 `darkMode` 与 `src/index.css` 双主题 token、`scripts/cdp-verify-dark-theme.mjs` |
 | 使用规范 / 责任边界 | [Terms.tsx](src/pages/Terms.tsx) 与 README 的「使用规范与责任边界」是派生文档：额度读 `api/lib/anon-quota.ts` 与 `api/lib/burst.ts`、回收读 `api/lib/anon-gc.ts`、正文落在哪里读 `src/lib/store.ts` 与 `body-store.ts`。改这些行为时同步两处措辞，只写实现兑现得了的处置 |
 
 实现、schema、测试与验证脚本定义可执行规则；命令以 `package.json` 和脚本参数为准。
@@ -61,7 +64,7 @@ npm run verify:themes
 npm run build
 ```
 
-涉及真实 UI、复制、上传、同步、Agent 往返等行为时，构建后再运行仓库已有的对应浏览器验收。
+涉及真实 UI、复制、上传、同步、Agent 往返等行为时，构建后再运行仓库已有的对应浏览器验收：预览局部复制用 `scripts/cdp-verify-selection-copy.mjs`，UI 明暗主题用 `scripts/cdp-verify-dark-theme.mjs`；其余入口见[验证导航](docs/verification.md)。
 改主题 / 来源 / 致谢或生成文档时，先 `npm run sync:docs`，再 `npm run verify:sources`。
 纯文档调整检查链接、命令、路径和事实一致性；不需要启动线上验收。
 报告写明实际修改、运行的验证、结果和尚存在的真实问题；`SKIP` 与未执行不能报成通过。
