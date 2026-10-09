@@ -407,6 +407,21 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `index-BwLwt3me.css`），公网已在服务新资产名且 bundle 里能 grep 到「已复制选中内容」。
 > **公开仓库增量发布仍欠着**：区间现为 `47ddeb2..93a1d81`（工具栏 + 格式刷 + 局部复制 + 文档），
 > 走不走、何时走仍由站长定。
+>
+> 2026-10-09 补记（16:38）：**公开仓库已发布**——并行会话以单个 sync 提交 `5dddd1b` 同步到
+> `b6d792e` 并推上 GitHub，待发布区间清零。核验过：selection-copy 三文件与部署版字节一致，
+> HANDOFF 仅差 4 处路径脱敏块。
+>
+> 2026-10-09 部署记录（深色模式修复上线）：`b695c04`——`applyTheme()` 之前只挂 `data-theme`，
+> 从不加 Tailwind 的 `.dark` 类（`darkMode: ["class"]`），所有 shadcn 组件的 `dark:` 变体在
+> 深色下全部失效：侧栏未选中标签是浅色语义的近黑文字，压在深色轨道上直接隐形（站长截图报障）。
+> 现在 `applyTheme` 同步切换 `.dark`，index.css 里早就写好的深色语义块终于生效；激活态标签
+> 也从深色下的突兀白底变回正常深色胶囊。验收脚本 `scripts/cdp-verify-dark-theme.mjs`（新）：
+> 两套主题下量未选中标签对轨道的对比度（yoru 修复后 7.56:1，修复前约 1:1；akari 15.45:1
+> 不变）并截图。`flock` 安装于 08:14:48 UTC，三重核对全过（`index-Baubn_TV.js` 已上公网，
+> 线上跑同脚本 ALL CHECKS PASSED）。**通道备注**：本次 xray 代理通道握手即断
+> （`Connection closed by UNKNOWN`），改走 `cc-tokyo-01-direct` 全程顺畅——家里直连 22 端口
+> 这次没有被 KEX 重置，两条通道都值得下次先试。
 
 ### 产品方向（用户明确拍板的）
 
