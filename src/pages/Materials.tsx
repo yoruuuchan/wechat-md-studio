@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
@@ -23,18 +23,21 @@ function formatDate(ts: number | null): string {
  * Image keys referenced by drafts that only exist in this browser. The server
  * cannot see them, so without this an image someone is still working on would
  * be offered up as an orphan.
+ *
+ * Bodies live in IndexedDB now, so this is a promise: the orphan query waits for
+ * it rather than running with an empty keep-list and calling live images dead.
  */
-function localDraftKeys(): string[] {
+async function localDraftKeys(): Promise<string[]> {
   const out = new Set<string>()
   try {
-    for (const d of loadDocs().docs) {
+    for (const d of (await loadDocs()).docs) {
       for (const m of d.content.matchAll(/img:([^\s)\]]+)/g)) out.add(m[1])
     }
     // A diagram's PNG is referenced only here: the fence in the document holds
     // mermaid source, so the server-side scan of 稿件 content cannot see it.
     for (const ref of loadDiagramCache().values()) out.add(ref.replace(/^img:/, ''))
   } catch {
-    // localStorage 不可用时，孤儿判定退回只看云端稿件
+    // 本地读不出来时，孤儿判定退回只看云端稿件
   }
   return [...out]
 }
@@ -48,9 +51,17 @@ export default function Materials() {
   // 图片按「账号或这台浏览器」归属，未登录也能看自己的
   const enabled = !authLoading
   // 本地草稿引用的图也算“在用”，避免误判成可清理的旧图
-  const draftKeys = useMemo(() => localDraftKeys(), [])
+  const [draftKeys, setDraftKeys] = useState<string[] | null>(null)
+  useEffect(() => {
+    // StrictMode runs this twice; reading the drafts twice is harmless.
+    void localDraftKeys().then(setDraftKeys)
+  }, [])
   const stats = trpc.storage.stats.useQuery(undefined, { enabled, retry: false })
-  const orphans = trpc.storage.orphans.useQuery({ alsoKeep: draftKeys }, { enabled, retry: false })
+  const orphans = trpc.storage.orphans.useQuery(
+    { alsoKeep: draftKeys ?? [] },
+    // Reading the local drafts can fail; it is not a reason to leave the page empty.
+    { enabled: enabled && draftKeys !== null, retry: false },
+  )
   const files = trpc.storage.list.useQuery(undefined, { enabled, retry: false })
 
   const removeMutation = trpc.storage.removeOrphans.useMutation({
@@ -61,10 +72,18 @@ export default function Materials() {
         utils.storage.orphans.invalidate(),
         utils.storage.list.invalidate(),
       ])
+      const freed = `腾出 ${formatBytes(res.freedBytes)}`
+      // 没删掉的连账目一起留着，说清楚它们还在，别让人以为清干净了
+      if (res.failed.length) {
+        toast.warning(`已清理 ${res.deleted} 张，${res.failed.length} 张没删掉`, {
+          description: `${freed}；没删掉的图还在素材库里，可以重试`,
+        })
+        return
+      }
       toast.success(`已清理 ${res.deleted} 张图`, {
         description: res.skipped.length
-          ? `腾出 ${formatBytes(res.freedBytes)}；${res.skipped.length} 张仍被稿件引用，已跳过`
-          : `腾出 ${formatBytes(res.freedBytes)}`,
+          ? `${freed}；${res.skipped.length} 张仍被稿件引用，已跳过`
+          : freed,
       })
     },
     onError: () => toast.error('清理失败，稍后再试'),
@@ -79,7 +98,8 @@ export default function Materials() {
       ])
       toast.success('已删除')
     },
-    onError: () => toast.error('删除失败'),
+    // 服务端只在图床确认删掉之后才销账；失败时这张图仍在列表里，原因也带回来
+    onError: (e) => toast.error('删除失败', { description: e.message }),
   })
 
   const orphanKeys = useMemo(() => (orphans.data ?? []).map((o) => o.key), [orphans.data])

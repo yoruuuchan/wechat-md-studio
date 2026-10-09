@@ -118,9 +118,11 @@ Markdown → 语义 AST（src/lib/parse.ts）→ 主题模板函数（src/lib/th
 
 | 存哪 | 什么时候写 |
 |---|---|
-| 浏览器 localStorage | 每次改动（防丢，纯本地）。只缓存正文真的在手的稿件；纯元数据 stub 不写缓存 |
+| 浏览器 IndexedDB（正文）+ localStorage（索引） | 每次改动（防丢，纯本地）。只缓存正文真的在手的稿件；纯元数据 stub 不写缓存 |
 | 云端数据库 | 只在该稿件**已经保存过**（`docs.savedAt` 有值）时随改动更新 |
 | 云端 + 打 `savedAt` 时间戳 | **只有点顶栏「保存到草稿箱」** |
+
+正文进 IndexedDB（`src/lib/body-store.ts`），名字、时间戳这类索引留在 localStorage（`src/lib/store.ts`）：localStorage 只有约 5 MB，写满时 `setItem` 抛异常，而旧代码把异常吞掉——编辑器照常打字，刷新后正文退回上一版。升级时老的 `mopai.docs.v1` 会被迁进新存储，读完校验通过才删旧键；迁移失败、写失败、没有 IndexedDB（降级回 localStorage）一律进 `persistenceStatus()`，顶栏状态位显示「本地未存」并弹一次说明。迁移失败时旧键原地保留，下次打开重试。
 
 `docs.savedAt` 为 null = 编辑中的工作稿，不进草稿箱。一篇稿件一条记录，**没有版本历史**（这是用户明确的选择）。
 

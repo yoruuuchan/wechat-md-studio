@@ -57,6 +57,26 @@ function safeName(name: string): string {
   return cleaned || 'image'
 }
 
+/**
+ * `deleteFile` never throws and never guesses. Every caller has to decide what
+ * "not confirmed" means for its own ledger, and the one thing they must not do
+ * is treat it as done.
+ */
+export interface DeleteResult {
+  /**
+   * True only when the worker answered 2xx, which for this worker means the
+   * object is not in the bucket any more - its DELETE is idempotent and answers
+   * 200 even for a key that was never there. Nothing else counts as gone: a 404
+   * means the request did not reach that route (wrong IMG_BASE_URL, a proxy in
+   * between, an older worker), so the object may well still exist.
+   */
+  gone: boolean
+  reason: 'ok' | 'not-found' | 'refused' | 'unconfigured' | 'network'
+  /** HTTP status when there was a response at all. */
+  status: number | null
+  detail: string
+}
+
 export const storage = {
   async uploadFile(opts: {
     fileContent: Uint8Array
@@ -100,13 +120,31 @@ export const storage = {
     return Promise.resolve({ url: publicImageUrl(opts.key) })
   },
 
-  async deleteFile(opts: { fileKey: string }): Promise<boolean> {
-    const resp = await fetch(
-      endpoint(`/api/upload?key=${encodeURIComponent(opts.fileKey)}`),
-      { method: 'DELETE', headers: adminHeaders() },
-    )
-    return resp.ok
+  async deleteFile(opts: { fileKey: string }): Promise<DeleteResult> {
+    const key = opts.fileKey
+    let resp: Response
+    try {
+      resp = await fetch(endpoint(`/api/upload?key=${encodeURIComponent(key)}`), {
+        method: 'DELETE',
+        headers: adminHeaders(),
+      })
+    } catch (e) {
+      const err = e as { code?: string; message?: string }
+      const code = err?.code === 'STORAGE_NOT_CONFIGURED' ? 'unconfigured' : 'network'
+      return { gone: false, reason: code, status: null, detail: reasonOf(e) }
+    }
+    if (resp.ok) return { gone: true, reason: 'ok', status: resp.status, detail: '' }
+    const detail = (await resp.text().catch(() => '')).slice(0, 200)
+    if (resp.status === 404) {
+      return { gone: false, reason: 'not-found', status: 404, detail: detail || 'worker route not reached' }
+    }
+    return { gone: false, reason: 'refused', status: resp.status, detail }
   },
+}
+
+function reasonOf(e: unknown): string {
+  const err = e as { code?: string; message?: string; cause?: { code?: string } }
+  return (err?.cause?.code || err?.code || err?.message || String(e)).replace(/\s+/g, ' ').slice(0, 160)
 }
 
 export function publicImageUrl(key: string): string {

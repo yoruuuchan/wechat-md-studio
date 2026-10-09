@@ -57,14 +57,37 @@ export function cleanHtml(bodyHtml: string): string {
   return bodyHtml
 }
 
+/**
+ * Escape a string for an HTML text sink.
+ *
+ * A document title is whatever the author typed, so it can contain `</title>`,
+ * `<script>`, quotes - anything. Inside `<title>` (an RCDATA element) and text
+ * nodes only `&` and `<` can change how the markup is read; the quotes are
+ * escaped too so the same helper stays correct if a caller ever drops the value
+ * into an attribute. Unicode, CJK and emoji pass through untouched.
+ *
+ * This is the HTML half of the job and has nothing to do with file names -
+ * `safeFilename` handles those, because a name that is legal in HTML (`<`) is
+ * illegal on disk and the other way round (`·`).
+ */
+export function escapeHtmlText(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // 完整预览页：正文之外包复制按钮，方便离线校对
 export function previewPage(bodyHtml: string, title: string): string {
+  const safeTitle = escapeHtmlText(title)
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>${title}</title>
+<title>${safeTitle}</title>
 <style>
   body{margin:0;background:#f3f6fa;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;}
   .bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid #e6edf6;}
@@ -75,7 +98,7 @@ export function previewPage(bodyHtml: string, title: string): string {
 </style>
 </head>
 <body>
-<div class="bar"><div class="hint">${title} · 预览页</div><button onclick="copyToWechat()">复制到公众号</button></div>
+<div class="bar"><div class="hint">${safeTitle} · 预览页</div><button onclick="copyToWechat()">复制到公众号</button></div>
 <div class="stage" id="gzh-shell">
 ${bodyHtml}
 </div>

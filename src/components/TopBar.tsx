@@ -23,7 +23,7 @@ interface Props {
   /** Open a fresh copy of the syntax-showcase article. */
   onCreateSample: () => void
   onDeleteDoc: (id: string) => void
-  syncState: 'loading' | 'synced' | 'saving' | 'local' | 'error'
+  syncState: 'loading' | 'synced' | 'saving' | 'local' | 'error' | 'local-error'
   /** Put the open article into 草稿箱. Nothing else does that. */
   onSaveDraft: () => void
   saving: boolean
@@ -60,6 +60,11 @@ const SYNC_LABEL: Record<Props['syncState'], { text: string; color: string; titl
   synced: { text: '已保存', color: 'var(--success-500)', title: '这篇已经在草稿箱里了' },
   local: { text: '仅本机', color: 'var(--warning-700)', title: '未登录：内容只存在这个浏览器里' },
   error: { text: '未保存', color: 'var(--error-500)', title: '写入草稿箱失败，本地内容仍保留' },
+  'local-error': {
+    text: '本地未存',
+    color: 'var(--error-500)',
+    title: '这个浏览器没能把内容写下来（存储空间可能不够），请先导出 Markdown 备份',
+  },
 }
 
 export default function TopBar(p: Props) {

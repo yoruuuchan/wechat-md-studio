@@ -6,13 +6,36 @@
  * null, and the caller re-renders once the cache fills. That keeps the 38 MB
  * dependency off the first-load bundle and keeps the renderer usable in Node.
  *
- * The SVG is MathJax's own output with only its <mjx-container> wrapper removed.
+ * What reaches renderDoc is not raw MathJax output: every formula is filtered by
+ * `sanitizeMathSvg` first. Two independent layers do that work, on purpose -
+ *
+ *   1. The TeX package allowlist in TEX_PACKAGES. Only packages this tool needs
+ *      are compiled in, which is what removes `html` (`\href`, `\style`,
+ *      `\class`, `\cssId`), the loaders that could pull it back in at runtime
+ *      (`require`, `autoload`), and `setoptions`, which could rewrite the
+ *      parser's own options from inside a formula.
+ *   2. MathJax's own Safe extension, which screens URLs, classes, ids and styles
+ *      as the formula is parsed, plus `sanitizeMathSvg` over the serialized
+ *      markup. Neither alone is enough: Safe trusts its own default scheme list
+ *      (`https:` is allowed through) and knows nothing about our rules - WeChat
+ *      strips class/id anyway - and the sanitizer cannot know what an extension
+ *      intended.
+ *
  * Measured against a real paste into the WeChat backend: the raw output, with its
  * `ex` units and currentColor, survives intact, so any further rewriting would
  * only be a chance to introduce an error. currentColor is resolved by an explicit
  * `color` on the wrapper paragraph instead.
+ *
+ * Version note: `mathjax-full` is the v3 API. Its v4 successor moved to
+ * `@mathjax/src` plus a separate font package, and in v4 the default font loads
+ * `\mathbb`, `\mathfrak` and `\mathcal` asynchronously ("MathJax retry -- an
+ * asynchronous action is required" from `MathDocument.convert()`), which are
+ * everyday commands in this tool's technical content. So this stays on the v3
+ * line, pinned to its final release - see the exact pin in package.json.
  */
 
+import mathjaxPkg from 'mathjax-full/package.json'
+import { sanitizeMathSvg } from './math-sanitize'
 import { mathFailure } from './theme-fallbacks'
 
 export interface MathEngine {
@@ -22,40 +45,94 @@ export interface MathEngine {
 let engine: MathEngine | null = null
 let loading: Promise<MathEngine> | null = null
 
+/**
+ * The TeX packages a formula here may use, paired with the module that registers
+ * each one.
+ *
+ * This is an allowlist, not "everything MathJax ships". Importing a package's
+ * configuration module is what registers it; naming it in the parser options
+ * alone is not enough (an unknown name is dropped with a warning and its
+ * commands stay undefined). Keeping both halves in one object is what stops them
+ * from drifting apart. Left out, and why:
+ *
+ *   html        `\href` (emits a live `<a href>`), `\style`, `\class`, `\cssId`
+ *   require     loads arbitrary packages at typeset time - including `html`
+ *   autoload    same, on first use of a command
+ *   setoptions  rewrites the parser's options from inside a formula
+ *   action      interactive tooltips: they need a live DOM, throw under the lite
+ *               adaptor, and a pasted article is static
+ *   noerrors, noundefined
+ *               typeset broken TeX as red boxes instead of failing, which would
+ *               paste the error as if it were the formula
+ */
+export const TEX_PACKAGES = {
+  base: () => import('mathjax-full/js/input/tex/base/BaseConfiguration.js'),
+  ams: () => import('mathjax-full/js/input/tex/ams/AmsConfiguration.js'),
+  amscd: () => import('mathjax-full/js/input/tex/amscd/AmsCdConfiguration.js'),
+  bbox: () => import('mathjax-full/js/input/tex/bbox/BboxConfiguration.js'),
+  boldsymbol: () => import('mathjax-full/js/input/tex/boldsymbol/BoldsymbolConfiguration.js'),
+  braket: () => import('mathjax-full/js/input/tex/braket/BraketConfiguration.js'),
+  bussproofs: () => import('mathjax-full/js/input/tex/bussproofs/BussproofsConfiguration.js'),
+  cancel: () => import('mathjax-full/js/input/tex/cancel/CancelConfiguration.js'),
+  cases: () => import('mathjax-full/js/input/tex/cases/CasesConfiguration.js'),
+  centernot: () => import('mathjax-full/js/input/tex/centernot/CenternotConfiguration.js'),
+  color: () => import('mathjax-full/js/input/tex/color/ColorConfiguration.js'),
+  colorv2: () => import('mathjax-full/js/input/tex/colorv2/ColorV2Configuration.js'),
+  colortbl: () => import('mathjax-full/js/input/tex/colortbl/ColortblConfiguration.js'),
+  configmacros: () => import('mathjax-full/js/input/tex/configmacros/ConfigMacrosConfiguration.js'),
+  empheq: () => import('mathjax-full/js/input/tex/empheq/EmpheqConfiguration.js'),
+  enclose: () => import('mathjax-full/js/input/tex/enclose/EncloseConfiguration.js'),
+  extpfeil: () => import('mathjax-full/js/input/tex/extpfeil/ExtpfeilConfiguration.js'),
+  gensymb: () => import('mathjax-full/js/input/tex/gensymb/GensymbConfiguration.js'),
+  mathtools: () => import('mathjax-full/js/input/tex/mathtools/MathtoolsConfiguration.js'),
+  mhchem: () => import('mathjax-full/js/input/tex/mhchem/MhchemConfiguration.js'),
+  newcommand: () => import('mathjax-full/js/input/tex/newcommand/NewcommandConfiguration.js'),
+  physics: () => import('mathjax-full/js/input/tex/physics/PhysicsConfiguration.js'),
+  tagformat: () => import('mathjax-full/js/input/tex/tagformat/TagFormatConfiguration.js'),
+  textcomp: () => import('mathjax-full/js/input/tex/textcomp/TextcompConfiguration.js'),
+  textmacros: () => import('mathjax-full/js/input/tex/textmacros/TextMacrosConfiguration.js'),
+  upgreek: () => import('mathjax-full/js/input/tex/upgreek/UpgreekConfiguration.js'),
+  unicode: () => import('mathjax-full/js/input/tex/unicode/UnicodeConfiguration.js'),
+  verb: () => import('mathjax-full/js/input/tex/verb/VerbConfiguration.js'),
+} as const
+
+export const TEX_PACKAGE_NAMES = Object.keys(TEX_PACKAGES)
+
 async function loadEngine(): Promise<MathEngine> {
   // mathjax-full's components/version.js reads its own package.json through an
   // eval'd require, which does not exist in a browser bundle. It checks for a
   // PACKAGE_VERSION global first - the escape hatch its own bundlers use - so
-  // define one and the require path is never taken. Keep in step with the
-  // dependency version in package.json.
-  ;(globalThis as Record<string, unknown>).PACKAGE_VERSION ??= '3.2.2'
-  const [{ mathjax }, { TeX }, { SVG }, { liteAdaptor }, { RegisterHTMLHandler }, { AllPackages }] =
+  // define one and the require path is never taken. The value comes from the
+  // installed package, so it cannot drift from package.json / the lockfile.
+  ;(globalThis as Record<string, unknown>).PACKAGE_VERSION ??= mathjaxPkg.version
+  // Package registration is a side effect of importing each configuration.
+  await Promise.all(Object.values(TEX_PACKAGES).map((load) => load()))
+  const [{ mathjax }, { TeX }, { SVG }, { liteAdaptor }, { RegisterHTMLHandler }, { SafeHandler }] =
     await Promise.all([
       import('mathjax-full/js/mathjax.js'),
       import('mathjax-full/js/input/tex.js'),
       import('mathjax-full/js/output/svg.js'),
       import('mathjax-full/js/adaptors/liteAdaptor.js'),
       import('mathjax-full/js/handlers/html.js'),
-      import('mathjax-full/js/input/tex/AllPackages.js'),
+      import('mathjax-full/js/ui/safe/SafeHandler.js'),
     ])
   const adaptor = liteAdaptor()
-  RegisterHTMLHandler(adaptor)
-  // AllPackages turns on noerrors and noundefined, whose whole job is to typeset
-  // broken TeX as a red box instead of failing. Without them the error reaches
-  // the document hooks below, which rethrow it to the caller.
-  const packages = AllPackages.filter((p: string) => p !== 'noerrors' && p !== 'noundefined')
-  // fontCache:'none' inlines every glyph as <path>. The alternative shares a
-  // global <defs> cache across formulas, which WeChat would strip and leave the
-  // article full of dangling <use> references.
+  // One registration only: SafeHandler rewrites the handler's document class in
+  // place, and `mathjax.document` picks the first handler registered for the
+  // document - registering a plain one first would quietly bypass Safe.
+  SafeHandler(RegisterHTMLHandler(adaptor))
   const doc = mathjax.document('', {
     InputJax: new TeX({
-      packages,
+      packages: [...TEX_PACKAGE_NAMES],
       // The TeX jax turns a parse error into an merror node here, before the
       // document ever sees it. Rethrow so the failure reaches the caller.
       formatError: (_jax: unknown, err: unknown) => {
         throw err
       },
     }),
+    // fontCache:'none' inlines every glyph as <path>. The alternative shares a
+    // global <defs> cache across formulas, which WeChat would strip and leave
+    // the article full of dangling <use> references.
     OutputJax: new SVG({ fontCache: 'none' }),
     // The defaults do not fail: they typeset the problem as a red merror box
     // carrying a mirrored <text> node and a data-mjx-error attribute, which would
@@ -69,11 +146,14 @@ async function loadEngine(): Promise<MathEngine> {
     },
   })
   engine = {
-    convert: (tex, display) =>
-      adaptor
-        .outerHTML(doc.convert(tex, { display }) as never)
-        .replace(/<mjx-container[^>]*>/g, '')
-        .replace(/<\/mjx-container>/g, ''),
+    convert: (tex, display) => {
+      // `doc.convert` builds a fresh MathItem per call and never files it in the
+      // document's math list, so nothing piles up across a long editing session;
+      // measured flat retained heap over 27k conversions. The cache below keeps
+      // only strings, never the adaptor's tree.
+      const container = adaptor.outerHTML(doc.convert(tex, { display }) as never)
+      return sanitizeMathSvg(container)
+    },
   }
   return engine
 }
@@ -130,10 +210,10 @@ export function createMathRenderer(): MathRenderer {
       publish()
       return true
     } catch (e) {
-      // A formula that does not compile must not take the whole article down;
-      // the renderer falls back to showing the TeX as text. But silence here
-      // would leave the author staring at a placeholder with no way to tell a
-      // bad formula from a broken loader.
+      // A formula that does not compile - or whose markup the sanitizer refused
+      // - must not take the whole article down; the renderer falls back to
+      // showing the TeX as text. But silence here would leave the author staring
+      // at a placeholder with no way to tell a bad formula from a broken loader.
       console.error('[math] render failed', tex, e)
       failures.add(key)
       publish()

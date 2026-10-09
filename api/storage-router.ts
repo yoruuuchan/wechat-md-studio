@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, type SQL } from "drizzle-orm";
 import { createRouter, visitorQuery } from "./middleware";
-import { storage } from "./lib/storage";
+import { storage, type DeleteResult } from "./lib/storage";
 import { env } from "./lib/env";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
 import { ANON_OWNER_ID, checkAnonQuota, readAnonUsage } from "./lib/anon-quota";
@@ -198,7 +198,7 @@ export const storageRouter = createRouter({
   removeOrphans: visitorQuery
     .input(z.object({ keys: z.array(z.string()).max(500) }))
     .mutation(async ({ ctx, input }) => {
-      if (input.keys.length === 0) return { deleted: 0, freedBytes: 0, skipped: [] as string[] };
+      if (input.keys.length === 0) return { deleted: 0, freedBytes: 0, skipped: [], failed: [] };
 
       const rows = await getDb()
         .select({ key: files.key, size: files.size })
@@ -223,6 +223,7 @@ export const storageRouter = createRouter({
       let deleted = 0;
       let freedBytes = 0;
       const skipped: string[] = [];
+      const failed: string[] = [];
       for (const key of input.keys) {
         const size = owned.get(key);
         // Not in `owned` = not this caller's, so the request is simply ignored.
@@ -231,12 +232,22 @@ export const storageRouter = createRouter({
           skipped.push(key);
           continue;
         }
-        await storage.deleteFile({ fileKey: key });
+        // Same order as a single delete, and as anon-gc: the object goes first,
+        // the ledger row only once the worker says the object is gone. The other
+        // way round leaves a row that looks like a real image and an object that
+        // nothing accounts for.
+        const result = await storage.deleteFile({ fileKey: key });
+        if (!result.gone) {
+          failed.push(key);
+          console.warn(`[materials] orphan-delete-failed key=${key} reason=${result.reason} status=${result.status ?? "-"}`);
+          continue;
+        }
+        // Scoped delete: the row may only go if it is still this caller's.
         await getDb().delete(files).where(and(eq(files.key, key), ownScope(ctx)));
         deleted++;
         freedBytes += size;
       }
-      return { deleted, freedBytes, skipped };
+      return { deleted, freedBytes, skipped, failed };
     }),
 
   remove: visitorQuery
@@ -250,7 +261,33 @@ export const storageRouter = createRouter({
         .where(and(eq(files.key, input.key), ownScope(ctx)))
         .limit(1);
       if (!rows.at(0)) throw new TRPCError({ code: "FORBIDDEN" });
-      await getDb().delete(files).where(eq(files.key, input.key));
-      return { ok: await storage.deleteFile({ fileKey: input.key }) };
+
+      // The object first. Until the worker confirms it is gone the ledger row
+      // stays, which is what makes a failure recoverable: the image is still
+      // listed, so it can be deleted again - and if the object is really still
+      // in the bucket, its row is what keeps it visible to `orphans` and to the
+      // anonymous GC. Dropping the row first (the old order) leaked the object.
+      const result = await storage.deleteFile({ fileKey: input.key });
+      if (!result.gone) {
+        console.warn(
+          `[materials] delete-failed key=${input.key} reason=${result.reason} status=${result.status ?? "-"} detail=${result.detail || "-"}`,
+        );
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DELETE_FAILURE_MESSAGE[result.reason] });
+      }
+      await getDb().delete(files).where(and(eq(files.key, input.key), ownScope(ctx)));
+      return { ok: true };
     }),
 });
+
+/**
+ * Said to the person looking at the button, so it has to be actionable: the
+ * image is still in their library, they can try again, and the reason tells the
+ * owner which knob to check.
+ */
+const DELETE_FAILURE_MESSAGE: Record<DeleteResult["reason"], string> = {
+  ok: "删除没完成",
+  "not-found": "图床没认出这个删除请求（多半是 IMG_BASE_URL 指错了），图还在素材库里，可以重试",
+  refused: "图床拒绝了这次删除，图还在素材库里，可以重试",
+  unconfigured: "图床没配置（IMG_BASE_URL / IMG_ADMIN_KEY），图还在素材库里",
+  network: "连不上图床，图还在素材库里，可以重试",
+};

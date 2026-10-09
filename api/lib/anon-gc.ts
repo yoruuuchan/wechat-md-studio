@@ -141,19 +141,15 @@ export async function runAnonGc(nowSeconds = Math.floor(Date.now() / 1000)): Pro
   let failed = 0
 
   for (const key of candidates) {
-    let gone = false
-    try {
-      gone = await storage.deleteFile({ fileKey: key })
-      // `deleteFile` answers with the worker's `resp.ok`, so a refusal (bad key,
-      // wrong admin key, worker down at the edge) arrives here rather than as a
-      // throw. Either way the object may still be there, so the row stays.
-      if (!gone) console.warn(`[anon-gc] delete-failed key=${key} reason=worker-refused`)
-    } catch (e) {
-      // Worker unreachable, or IMG_BASE_URL / IMG_ADMIN_KEY unset. The next
-      // sweep retries.
-      console.warn(`[anon-gc] delete-failed key=${key} reason=${reason(e)}`)
-    }
-    if (!gone) {
+    // `deleteFile` carries the worker's own verdict and never throws, so a
+    // refusal (bad key, wrong admin key, worker unreachable) arrives as
+    // `gone: false` with a reason. Either way the object may still be there,
+    // and then the row stays for the next sweep to retry.
+    const result = await storage.deleteFile({ fileKey: key })
+    if (!result.gone) {
+      console.warn(
+        `[anon-gc] delete-failed key=${key} reason=${result.reason} status=${result.status ?? "-"} detail=${result.detail || "-"}`,
+      )
       failed++
       continue
     }

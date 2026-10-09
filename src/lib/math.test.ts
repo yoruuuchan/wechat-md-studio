@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createMathRenderer } from './math'
+import { TEX_PACKAGES, TEX_PACKAGE_NAMES, createMathRenderer } from './math'
 import { parseMarkdown } from './parse'
 import { renderDoc } from './render'
 import { mathFailure } from './theme-fallbacks'
@@ -185,5 +185,132 @@ describe('the lazy renderer', () => {
     expect(notified).toBe(1)
     off()
     logged.mockRestore()
+  }, 60000)
+})
+
+describe('the TeX package allowlist', () => {
+  const EXCLUDED = ['html', 'require', 'autoload', 'setoptions', 'action', 'noerrors', 'noundefined']
+
+  it('leaves out every package that can inject markup, load itself, or hide a failure', () => {
+    for (const name of EXCLUDED) expect(TEX_PACKAGE_NAMES, name).not.toContain(name)
+  })
+
+  it('names and modules agree: every listed package has a loader that resolves', async () => {
+    // Registration is a side effect of importing the configuration module, so a
+    // name with no module behind it would be dropped with a console warning and
+    // its commands would silently stop working.
+    const loaded = await Promise.all(Object.values(TEX_PACKAGES).map((load) => load()))
+    expect(loaded).toHaveLength(TEX_PACKAGE_NAMES.length)
+  }, 60000)
+
+  const samples: Record<string, string> = {
+    base: 'a^2 + \\frac{1}{2}',
+    ams: '\\begin{aligned}a &= b \\\\ c &= d\\end{aligned}',
+    amscd: '\\begin{CD}A @>a>> B\\end{CD}',
+    bbox: '\\bbox[5px, border: 1px solid red]{x}',
+    boldsymbol: '\\boldsymbol{\\alpha}',
+    braket: '\\braket{\\phi | \\psi}',
+    bussproofs: '\\begin{prooftree}\\AxiomC{A}\\UnaryInfC{B}\\end{prooftree}',
+    cancel: '\\cancel{x} + \\bcancel{y}',
+    cases: '\\begin{cases}1 & x>0\\\\ 0 & x\\le 0\\end{cases}',
+    centernot: '\\centernot\\longrightarrow',
+    color: '\\textcolor{blue}{x}',
+    colorv2: '\\color{green}y',
+    colortbl: '\\begin{array}{c}\\cellcolor{red}a\\end{array}',
+    empheq: '\\begin{empheq}{align}x&=1\\end{empheq}',
+    enclose: '\\enclose{circle}{x}',
+    gensymb: '\\degree\\celsius\\perthousand',
+    mathtools: '\\coloneqq',
+    mhchem: '\\ce{H2O}',
+    newcommand: '\\def\\z{1}\\z',
+    physics: '\\dv{f}{x}',
+    tagformat: 'x \\tag{1}',
+    textcomp: '\\textdegree',
+    textmacros: '\\text{a \\textbf{b}}',
+    upgreek: '\\upalpha',
+    unicode: '\\unicode{x3B1}',
+    verb: '\\verb|a b|',
+  }
+
+  it('registers each package it claims to support', async () => {
+    const r = createMathRenderer()
+    const missing: string[] = []
+    for (const [name, tex] of Object.entries(samples)) {
+      if (!(await r.warm(tex, true))) missing.push(name)
+    }
+    expect(missing).toEqual([])
+  }, 120000)
+})
+
+describe('hostile TeX', () => {
+  // Every one of these is a command the `html` extension defines. The allowlist
+  // does not load it, so they are not "filtered" - they do not exist, and the
+  // author sees the TeX back instead of markup in the article.
+  const hostile = [
+    ['\\href with a javascript URL', '\\href{javascript:alert(1)}{x}'],
+    ['\\href with an escaped javascript URL', '\\href{java\\script:alert(1)}{x}'],
+    ['\\href with a data URL', '\\href{data:text/html,<script>alert(1)</script>}{x}'],
+    ['\\style with a url()', '\\style{background:url(https://evil.example/pixel.png)}{x}'],
+    ['\\style with behavior', '\\style{behavior:url(#default#time2)}{x}'],
+    ['\\class', '\\class{evil}{x}'],
+    ['\\cssId', '\\cssId{evil}{x}'],
+    ['\\require pulling html back in', '\\require{html}\\href{javascript:alert(1)}{y}'],
+    ['\\autoload pulling html back in', '\\autoload{html}\\href{javascript:alert(1)}{z}'],
+    ['\\setOptions', '\\setOptions{formatError:null}x'],
+  ] as const
+
+  it.each(hostile)('refuses %s', async (_name, tex) => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = createMathRenderer()
+    expect(await r.warm(tex, true)).toBe(false)
+    const shown = r.snapshot().get(tex, true) ?? ''
+    // What the author gets instead is the TeX itself as escaped text. The
+    // payload words do appear - as text, which is the point - so the assertion
+    // is about the tags and their attributes, not about the words.
+    expect(shown).toContain('公式无法编译')
+    expect(shown).not.toContain('<svg')
+    for (const tag of shown.match(/<[^>]*>/g) ?? []) {
+      expect(tag, tag).not.toMatch(/<\/?(svg|a|script|style|iframe|image|use|foreignObject)\b/i)
+      expect(tag, tag).not.toMatch(/\son[a-z]+=/i)
+      expect(tag, tag).not.toMatch(/\s(href|class|id|src|xlink:href)=/i)
+      expect(tag, tag).not.toMatch(/url\(/i)
+    }
+    logged.mockRestore()
+  }, 60000)
+
+  it('leaves no exploitable attribute in the markup of an ordinary formula', async () => {
+    const r = createMathRenderer()
+    const benign = [
+      'E = mc^2',
+      'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}',
+      '\\begin{aligned}a &= b \\\\ c &= d\\end{aligned}',
+      '\\text{速度} = 5\\,\\mathrm{m/s}',
+      '\\color{red}{x}',
+      '\\mathbb{R}^n',
+      '\\sum_{i=1}^{n} i^2',
+    ]
+    for (const tex of benign) {
+      expect(await r.warm(tex, true), tex).toBe(true)
+      const svg = r.snapshot().get(tex, true) ?? ''
+      expect(svg, tex).toMatch(/^<svg/)
+      expect(svg, tex).not.toContain('<mjx-container')
+      expect(svg, tex).not.toMatch(/<a[\s>]/i)
+      expect(svg, tex).not.toMatch(/\shref=/i)
+      expect(svg, tex).not.toMatch(/\son[a-z]+=/i)
+      expect(svg, tex).not.toMatch(/\sclass=/i)
+      expect(svg, tex).not.toMatch(/\sid=/i)
+      expect(svg, tex).not.toMatch(/javascript:|url\(/i)
+    }
+  }, 120000)
+
+  it('keeps the TeX source out of the markup it does emit', async () => {
+    // data-latex would carry the raw formula (including anything the author
+    // typed) into the article as an attribute value.
+    const r = createMathRenderer()
+    const tex = 'x = \\sqrt{2}'
+    expect(await r.warm(tex, true)).toBe(true)
+    const svg = r.snapshot().get(tex, true) ?? ''
+    expect(svg).not.toContain('data-latex')
+    expect(svg).not.toContain('\\sqrt')
   }, 60000)
 })

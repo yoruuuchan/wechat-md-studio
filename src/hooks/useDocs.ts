@@ -5,10 +5,13 @@ import {
   createSampleDoc,
   loadActiveId,
   loadDocs,
+  persistenceStatus,
   saveActiveId,
   saveDocs,
+  subscribePersistence,
   uid,
   type DocRecord,
+  type PersistenceStatus,
 } from '@/lib/store'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
 
@@ -76,9 +79,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
    * bin is the truth and this stays empty; purely local trashed drafts (never
    * saved) live here so they survive a reload.
    */
-  const [localTrash, setLocalTrash] = useState<DocRecord[]>(() =>
-    loadDocs().docs.filter((d) => d.deletedAt),
-  )
+  const [localTrash, setLocalTrash] = useState<DocRecord[]>([])
+  /**
+   * Whether the browser is actually holding what the editor thinks it is. A
+   * failed write used to be invisible: the screen kept the text, the reload did
+   * not. Everything that fails to persist lands here.
+   */
+  const [localFault, setLocalFault] = useState<PersistenceStatus>(() => persistenceStatus())
+  const reportedFault = useRef<string | null>(null)
   /** Articles whose cloud copy moved on under a stale save; keyed by id. */
   const [conflicts, setConflicts] = useState<Map<string, ConflictCurrent>>(new Map())
   /** Id of the article whose body is being fetched, if any. */
@@ -123,13 +131,35 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   useEffect(() => {
     if (bootedRef.current) return
     bootedRef.current = true
-    const local = loadDocs()
-    const live = local.docs.filter((d) => !d.deletedAt)
-    const shown = live.length ? live : [createDoc()]
-    setDocs(shown)
-    setActiveId(shown.some((d) => d.id === local.activeId) ? local.activeId : shown[0].id)
+    // No cancellation guard on purpose: StrictMode mounts effects twice in
+    // development, and dropping the result of the first run - the only one that
+    // loads - would leave the editor empty.
+    void loadDocs().then((local) => {
+      setLocalTrash(local.docs.filter((d) => d.deletedAt))
+      const live = local.docs.filter((d) => !d.deletedAt)
+      const shown = live.length ? live : [createDoc()]
+      setDocs(shown)
+      setActiveId(shown.some((d) => d.id === local.activeId) ? local.activeId : shown[0].id)
+    })
     if (!enabled) setSyncState('local')
   }, [enabled])
+
+  // 本地持久化的健康状况：失败一次提示一次，失败状态本身留在顶部状态位上
+  useEffect(
+    () =>
+      subscribePersistence((s) => {
+        setLocalFault(s)
+        if (s.healthy || !s.failure) {
+          reportedFault.current = null
+          return
+        }
+        const signature = `${s.failure.kind}:${s.failure.message}`
+        if (reportedFault.current === signature) return
+        reportedFault.current = signature
+        setNotice(s.failure.message)
+      }),
+    [],
+  )
 
   // 2a. 读不到云端列表：留在本地编辑，本地内容一个不丢；刷新页面会重试
   useEffect(() => {
@@ -176,7 +206,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         hasMore = page.hasMore
       }
 
-      const local = loadDocs()
+      const local = await loadDocs()
       const trashedIds = new Set((trashQuery.data ?? []).map((t) => t.id))
       const plan = await planMerge({
         local: local.docs.filter((d) => !d.deletedAt),
@@ -302,7 +332,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   //    只有真正拿到正文的稿件会进缓存，纯元数据的 stub 不写。
   useEffect(() => {
     if (!docs.length && !localTrash.length) return
-    saveDocs([...docs, ...localTrash], activeId)
+    void saveDocs([...docs, ...localTrash], activeId)
   }, [docs, localTrash, activeId])
 
   useEffect(() => {
@@ -927,7 +957,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     resolveConflictKeepBoth,
     hydrateAllForExport,
     trashDocs,
-    syncState,
+    // A failed local write is the one state the author must not have to guess
+    // about, so it replaces whatever the cloud is doing.
+    syncState: localFault.healthy ? syncState : ('local-error' as const),
+    localFault,
     notice,
     clearNotice: () => setNotice(null),
     hasUnsavedChanges,

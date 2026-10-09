@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
 import { useAuth } from '@/hooks/useAuth'
-import { loadDocs, saveActiveId, type DocRecord } from '@/lib/store'
+import { loadActiveId, loadDocs, saveActiveId, saveDocs, type DocRecord } from '@/lib/store'
 import { UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -155,32 +155,38 @@ export default function Drafts() {
 
   // Signed-out visitors keep their bin in localStorage; without this the only
   // way back from a delete there would be the 10-second toast.
-  const [localBin, setLocalBin] = useState<BinRow[]>(() =>
-    loadDocs()
-      .docs.filter((d) => d.deletedAt)
-      .map((d) => ({ id: d.id, name: d.name, deletedAt: d.deletedAt as number })),
-  )
-  const rewriteLocal = (fn: (docs: DocRecord[]) => DocRecord[]) => {
-    try {
-      const next = fn(loadDocs().docs)
-      localStorage.setItem('mopai.docs.v1', JSON.stringify(next))
+  const [localBin, setLocalBin] = useState<BinRow[]>([])
+  const [localDocs, setLocalDocs] = useState<DocRecord[] | null>(null)
+  useEffect(() => {
+    // StrictMode runs this twice; the load is idempotent, so both runs may land.
+    void loadDocs().then(({ docs }) => {
+      setLocalDocs(docs)
       setLocalBin(
-        next
+        docs
           .filter((d) => d.deletedAt)
           .map((d) => ({ id: d.id, name: d.name, deletedAt: d.deletedAt as number })),
       )
-    } catch {
-      // 本地写不进去就算了，回收站这层只是保险
-    }
+    })
+  }, [])
+  const rewriteLocal = async (fn: (docs: DocRecord[]) => DocRecord[]) => {
+    const current = localDocs ?? (await loadDocs()).docs
+    const next = fn(current)
+    setLocalDocs(next)
+    setLocalBin(
+      next
+        .filter((d) => d.deletedAt)
+        .map((d) => ({ id: d.id, name: d.name, deletedAt: d.deletedAt as number })),
+    )
+    await saveDocs(next, loadActiveId())
   }
   const restoreBin = (id: string) => {
     if (isAuthenticated) restoreMutation.mutate({ id })
-    else rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
+    else void rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
   }
   const purgeBin = (id: string, name: string) => {
     if (!window.confirm(`彻底删除「${name || '未命名稿件'}」？这一步找不回来。`)) return
     if (isAuthenticated) purgeMutation.mutate({ id })
-    else rewriteLocal((ds) => ds.filter((d) => d.id !== id))
+    else void rewriteLocal((ds) => ds.filter((d) => d.id !== id))
   }
   const binRows: BinRow[] = isAuthenticated
     ? (trashQuery.data ?? []).map((t) => ({
