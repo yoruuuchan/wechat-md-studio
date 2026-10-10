@@ -504,8 +504,8 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `index-CsHyWFhM.js`（生产版、`jsxDEV`=0）、`index-DkOvzaBg.css`；整包 sha256 `0083475e…`
 > （33.6MB，9×4MB 分块逐块核 hash、全部一次通过）；`flock` 安装于 00:31:24 UTC。三重核对全过
 > （本地=线上=公网资产名、`ExecMainStartTimestamp` 即本次），公网复跑 `cdp-verify-terms` 16/16、
-> `cdp-verify-dark-theme` ALL PASSED。**公开仓库增量发布欠着**：待发布区间从上次基线 `52915ea`
-> 起算到本轮（含本条记录）——发布前按惯例实测 base，勿按本条推断。
+> `cdp-verify-dark-theme` ALL PASSED。**公开仓库增量发布**：已由并行会话（Codex 线）随其增量发布
+> 一并带上——本会话两个提交在公开侧对应 `ee3236b` / `2c36cab`；逐 blob 复核见下条记录。
 >
 > 2026-10-10 并行会话教训（主工作区被其他会话当成工地时的构建与合并）：
 > ① 主工作区当时被并行的 Codex 会话占用（`codex/ai-writing-mcp`，AI 写作 MCP 功能，**未提交**，
@@ -521,7 +521,8 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `api/lib/remote-mcp.ts`、`api/lib/writing-skill.ts`、`contracts/remote-mcp.ts`、`src/hooks/useRemoteMcp.ts`、
 > `src/lib/remote-mcp-sync.ts`，以及 `boot.ts` / `env.ts` / `schema.ts` / `store.ts` / `SidePanel.tsx` /
 > `TopBar.tsx` / `EditorPage.tsx` / `useDocs.ts` / `vite.config.ts` / `package.json` 的改动）——
-> **下一个部署者勿把这条线的 WIP 混进构建**，等它提交并走完自己的验收。
+> **下一个部署者勿把这条线的 WIP 混进构建**，等它提交并走完自己的验收。（该 WIP 已于同日提交、
+> 合入 master 并完成部署与公开发布，见下条记录。）
 
 > 2026-10-10 部署记录（AI 写作与当前稿件 Remote MCP）：上面的 MCP WIP 已提交并合入 master。
 > 功能提交 `a20980e` 与现有联系 / star 主线合并为 `4c480cc`；兼容补丁 `98de250` 将公开 Skill
@@ -560,6 +561,15 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 核对边缘设置后，AI search / user 策略均为 disabled（不阻断），此时间窗 `/skill.md` 没有
 > firewallEventsAdaptive 阻断事件；这些证据不用于宣称每个网页版 AI 都能读本站链接。
 > 未改 Cloudflare 全区策略；ChatGPT OAuth 连接器也未计作通过，核心 Bearer MCP 保持独立。
+>
+> 2026-10-10 交叉复核（联系 / star 区间的公开发布对账与线上状态）：按实测复核公开仓库与本站。
+> ① 公开发布完整：公开 `4d63f10` 与伞 `e5839d6:app` 逐 blob 比对，1119 个文件中 1113 个完全一致，
+> 差异恰为已知项——HANDOFF 的 12 行路径脱敏、5 个 rebuild-only 占位符脚本（四个 `cf-*.sh` +
+> `themes/import.ts`），另公开根多一个 `LICENSE`；两张脱敏表的 21 条左值扫公开全树与
+> `b45e8de..4d63f10` 的全部新增补丁文本，**零命中**。
+> ② 线上状态：当时的线上服务（01:09:46 UTC 安装的 Codex 构建）对上面两组脚本复验——
+> `cdp-verify-terms` 16/16、`cdp-verify-dark-theme` ALL PASSED，联系区块默认隐藏 / 点击揭示、
+> star 与 issues 链接都在位。本条记录提交随后同步到公开仓库。
 
 ### 产品方向（用户明确拍板的）
 
