@@ -7,7 +7,7 @@ AGENTS 维护；渲染、图片、稿件和 Agent 接口分别进入对应专项
 
 线上实例：[公众号排版助手](https://wechat.yoru-and-akari.dev)；公开源码：
 [yoruuuchan/wechat-md-studio](https://github.com/yoruuuchan/wechat-md-studio)。
-下列环境与历史记录截至 2026-10-09，运行状态、凭证权限与边缘设置在操作前重新核对。
+下列环境与历史记录截至 2026-10-10，运行状态、凭证权限与边缘设置在操作前重新核对。
 
 ## 一、项目位置与环境
 
@@ -26,8 +26,9 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 
 1. **工作目录**：不管哪棵树、哪个分支，npm 命令（check/build/test/CDP）都在其 `app/` 子目录里跑。新 worktree 建好后要在其 `app/` 里 `npm ci`，并从主工作区复制 `app/.env`（gitignore 不随仓库走）。
 2. **端口错开**：本地测试服与 CDP 调试端口不能撞车。主工作区用 `PORT=3200` + CDP `9333`；第二棵树用 `PORT=3201` + CDP `9334`（CDP 脚本接受端口参数或改文件内常量）。测试数据库按惯例用环境变量覆盖成独立文件（`DATABASE_URL=file:./data/test-xxx.db`），绝不共享。
-3. **部署只许从 master 主工作区执行**：线上只有一个。功能在分支上验证全绿（check + verify:themes + test + CDP）后合回 `master`，由主工作区统一构建、scp、`install.sh`。分支上的人不碰服务器。
+3. **部署只许从 master 执行，且同一时刻只留一个会话在部署**：线上只有一个。功能在分支上验证全绿（check + verify:themes + test + CDP）后合回 `master`，由主工作区统一构建、scp、`install.sh`；主工作区被并行会话占用或弄脏时，改从**目标 commit 的干净 worktree** 构建（`git worktree add <tmp> <commit>`，2026-10-10 起的等效做法）。分支上的人不碰服务器。
 4. **合并顺序**：分支开工前先 `git merge master` 同步；交付在分支上提交，回合由主工作区执行，冲突按功能归属取舍。
+5. **合并前先 `git status -sb` 确认主工作区停在哪个分支**——并行会话会把它切到自己的分支，此时 `--ff-only` 落在的是那个分支而不是 master（2026-10-10 实例：merge 落在 `codex/ai-writing-mcp` 上，master 原地没动；事后用带旧值校验的 `git update-ref refs/heads/master <new> <old>` 补真快进）。事后 `git log -1 master` 回查。
 
 - Node.js 24（当前开发与验收版本，使用内置 `node:sqlite`），`npm ci` 装依赖
 - `.env` 从 `.env.example` 复制（`.env` 已被 gitignore，**永远不要提交**）
@@ -490,6 +491,36 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `cdp-verify-dark-theme` 与 `cdp-verify-favorites` ALL PASSED，确认压缩后的生产 bundle 交互正常；
 > 部署后对公网再跑同样两套，全绿。三重核对全过（`boot.js` `b4840d2f…` 未变、
 > `index-D_Kmk5xT.js` / `index-BqizAfmg.css` 本地=线上=公网、`ExecMainStartTimestamp` 16:34:40 UTC）。
+>
+> 2026-10-10 部署记录（联系邮箱防采集 + star 引导 + 窄屏提示上线）：合并 `qoder/contact-and-star`
+> → `fcdee69`。设置页新增「反馈与联系」区块：邮箱分片存储、点击「显示邮箱」才拼装进 DOM（爬虫与
+> bundle grep 都拿不到明文），剪贴板被拒时自动亮出地址兜底；`/terms` 换用同一组件，旧的明文
+> `mailto:` 从 bundle 里消失。README 与设置页加 star 引导；编辑器 `< md` 宽度显示「目前只做了
+> 网页端适配」提示条。`cdp-verify-terms` 扩到 16 项（含隐藏/揭示与 star/issues 断言），新增
+> `src/lib/contact.test.ts` 防明文回归。构建从**干净的临时 worktree**（`fcdee69` 检出）进行，
+> 理由见下条：check / verify:themes 全过，test 热跑 1368/1368（冷跑偶发单条 5s 超时，单独跑均过，
+> 与本次改动无关）；产物 `boot.js b4840d2f…`（与上一版逐字节相同，API 未动）、入口
+> `index-CsHyWFhM.js`（生产版、`jsxDEV`=0）、`index-DkOvzaBg.css`；整包 sha256 `0083475e…`
+> （33.6MB，9×4MB 分块逐块核 hash、全部一次通过）；`flock` 安装于 00:31:24 UTC。三重核对全过
+> （本地=线上=公网资产名、`ExecMainStartTimestamp` 即本次），公网复跑 `cdp-verify-terms` 16/16、
+> `cdp-verify-dark-theme` ALL PASSED。**公开仓库增量发布欠着**：待发布区间从上次基线 `52915ea`
+> 起算到本轮（含本条记录）——发布前按惯例实测 base，勿按本条推断。
+>
+> 2026-10-10 并行会话教训（主工作区被其他会话当成工地时的构建与合并）：
+> ① 主工作区当时被并行的 Codex 会话占用（`codex/ai-writing-mcp`，AI 写作 MCP 功能，**未提交**，
+> 正持续写文件），在其中连续 `npm run build` 得到的 `boot.js` 在 2.2MB / 3.0MB 之间跳、`dist`
+> 里混进两份构建产物——**不是 esbuild 不确定性，是构建目录里混入了别人未提交的源码**。稳妥做法：
+> `git worktree add <临时目录> <目标commit>` 开干净检出，在其中 `npm ci` / 构建 / 验收，主工作区
+> 一个字节都不碰（本轮即如此执行）。
+> ② 同一场景的另一面：**`git merge --ff-only` 落在我以为还在 master 的主工作区，而它已被对方
+> 切到 `codex/ai-writing-mcp`**——merge 实际快进了对方分支（无害：它本就要基于新 master 继续），
+> master 原地没动，reflog 里没有任何痕迹。用 `git update-ref refs/heads/master fcdee69 f56b863`
+> （带旧值校验的原子快进）补上，纪律条目见第一节第 5 条。
+> ③ 现状留档：`codex/ai-writing-mcp` = `fcdee69` + 未提交 WIP（`api/mcp.ts`、`api/remote-mcp-router.ts`、
+> `api/lib/remote-mcp.ts`、`api/lib/writing-skill.ts`、`contracts/remote-mcp.ts`、`src/hooks/useRemoteMcp.ts`、
+> `src/lib/remote-mcp-sync.ts`，以及 `boot.ts` / `env.ts` / `schema.ts` / `store.ts` / `SidePanel.tsx` /
+> `TopBar.tsx` / `EditorPage.tsx` / `useDocs.ts` / `vite.config.ts` / `package.json` 的改动）——
+> **下一个部署者勿把这条线的 WIP 混进构建**，等它提交并走完自己的验收。
 
 ### 产品方向（用户明确拍板的）
 
