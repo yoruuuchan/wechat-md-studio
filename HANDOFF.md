@@ -582,7 +582,50 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `cdp-verify-terms` 16/16、`cdp-verify-dark-theme` ALL PASSED，联系区块默认隐藏 / 点击揭示、
 > star 与 issues 链接都在位。本条记录提交随后同步到公开仓库。
 
-### 产品方向（用户明确拍板的）
+> 2026-10-10 部署记录（英文界面 + 站内反馈转发上线，品牌更新随本轮上线）：合并
+> `qoder/feedback-i18n`（`92d7511 → d3d4615 → 2bf5559 → f23e601`）→ master `f23e601`，
+> 快进用带旧值校验的 `git update-ref refs/heads/master f23e601 92d7511`（主工作区当时停在
+> master 且干净；每次快进前后都回查 `git log -1 master`）。本轮同时补上了此前未部署的品牌更新。
+> 功能要点：
+> - **界面语言（i18n）**：中文默认，`mopai.lang.v1` 记选择，`<html lang>` 与标题跟随；
+>   文案键的事实源是 `src/lib/i18n.zh.ts`，`i18n.en.ts` 逐键对照（缺键编译不过，
+>   `i18n.test.ts` 复核键位与占位符），References 条目级英文在 `credits.en.ts`（形状由测试对齐）。
+>   稿件正文、主题名称/作者/许可与 `img:`/`mopai_` 等协议标识不随语言改写。
+> - **站内反馈**：`POST /api/feedback` 由服务端转发邮件；凭据只读环境变量
+>   `RESEND_API_KEY` / `RESEND_FROM` / `FEEDBACK_TO`（命名与 is-ai-down、LyricLens 一致），
+>   蜜罐 + 5–2000 字校验 + 可选联系邮箱（一次性域名拒绝）+ 每 IP 分钟/日限流（默认 3 / 20）；
+>   成功只在邮件服务接受后返回，失败给稳定错误码（400/429/502/503）由页面翻译；
+>   公开的 mailto 与 `ContactEmail` 组件已删除，`/terms` 与设置页改为指向 `/feedback`。
+> - 新旋钮 `FEEDBACK_PER_MINUTE` / `FEEDBACK_PER_DAY`；`RESEND_API_URL` 仅供本地端到端
+>   测试或自托管覆盖（生产不设）。未配置三件套时接口答 503，页面显示「暂时发不出去」。
+> 验证：`check` / 1428 项测试 / 219 主题 `verify:themes` / `verify:sources` / `build` 全过；
+> 本地生产模式（反馈接口指向本地 mock 邮件服务）跑 `cdp-verify-i18n` 35/35（含七页 390px
+> 与蜜罐、校验、投递失败、成功路径）、`cdp-verify-terms` 17/17、dark-theme / favorites /
+> toolbar / remote-mcp（OpenCode 部分 SKIP）全绿；README 三张截图已随新顶栏重拍。
+> 部署：包 `mopai-f23e601.tar.gz`（33,906,995 bytes，sha256 `a379cbe1…`，33×1 MiB 分块、
+> 逐块 sha256 核过后 `cat` 重组；中途一次脚本超时后按已传块续传），`flock` 安装于
+> 05:45:16 UTC。三重核对：线上 `boot.js` sha256 `f7c1275f…` = 本地；`index.html` 资产
+> `index-hZ4sN2vY.js` / `index-y282ykD5.css` 本地=线上=公网；重启时间即本次安装。
+> 公网复验：terms 17/17、dark-theme ALL PASSED、favorites ALL PASSED、语言/反馈探针 6/6
+> （默认中文、切 English 后刷新保持、`/feedback` 无 mailto、未配置时 503 显示明确错误、
+> `/boot.js` 404 服务端 bundle 不对外）；接口实测：4 字内容 400、合法内容 503（未发信）。
+>
+> **待办（需要站长一步）**：反馈真实投递尚未验证——在 cc-tokyo-01 的
+> `/opt/mopai/app/.env` 补 `RESEND_API_KEY=`（Resend 面板新建，Sending 权限即可）、
+> `RESEND_FROM=`（账号已验证发件域，如 `reed@yoru-and-akari.dev`）、`FEEDBACK_TO=`（收件箱），
+> 然后 `sudo systemctl restart mopai`，再从 `/feedback` 发一封真信核对收件；完成前接口保持 503。
+> 提交完成后可删服务器 `/tmp/mopai-f23e601*` 与 `/tmp/install-f23e601.sh`。
+>
+> 公开仓库：本轮增量 `04213ca..ca3a854`（功能 `d3d4615`、脚本修复 `2bf5559`；
+> 普通 push 非 force）。期间公开侧先收到一次 README 重排（`df10283` 等 4 个提交，品牌发布后的
+> 线上补充编辑）——公开克隆已 fetch 后 rebase 并解决 README 冲突，重排后的 README 原样收回伞
+> 仓库（`f23e601`），两侧 1133 个 app 文件逐 blob 复核一致，差异仍只有 HANDOFF 路径脱敏、
+> 5 个 rebuild-only 占位脚本与公开根 `LICENSE`；两张脱敏表左值扫公开工作树零命中。
+> **新映射基线：伞 `f23e601` ↔ 公开 `ca3a854`**（本记录的收尾提交与其公开增量随同批发布）。
+> 另：`cdp-verify-terms` / `cdp-verify-i18n` 补了 `--no-proxy-server`（本机系统代理会让无头
+> Chrome 连公网超时，toolbar 脚本早有同样参数），公网复验即用带该参数的脚本完成。
+
+### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
 - **许可证已定（2026-10-07）**：仓库整体 **AGPL-3.0-or-later**。三处声明：根目录 `LICENSE`、

@@ -27,7 +27,7 @@ const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-cdp-t-'))
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const chrome = spawn(
   CHROME,
-  ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-first-run', '--disable-gpu', 'about:blank'],
+  ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-first-run', '--disable-gpu', '--no-proxy-server', 'about:blank'],
   { stdio: 'ignore' },
 )
 
