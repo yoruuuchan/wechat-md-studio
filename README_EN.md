@@ -5,37 +5,51 @@
 > “Man is but a reed, the most feeble thing in nature; but he is a thinking reed.”
 > — Blaise Pascal, [Pensées, §347](https://www.gutenberg.org/files/18269/18269-h/18269-h.htm#SECTION_VI)
 
-Reed is a writing tool where **people and AI work on the same document**. Its current focus is publishing articles to WeChat Official Accounts: write in Markdown, edit and arrange images in the browser, then copy the formatted article into WeChat's editor.
+**A Markdown writing and typesetting workspace for WeChat Official Accounts, built for humans and AI to work on the same draft.**
 
-You can ask AI for a draft, invite your own agent to revise it, or write it entirely yourself. The source remains readable, editable Markdown that you can export.
+Use Reed as a complete WeChat article editor, ask the AI you already use to draft or revise an article, or connect your own agent through MCP and let it work directly on the current document. You still finish the article in the browser: review the text, shape the structure, handle images, choose the presentation, and copy the result into WeChat.
 
-**[Open Reed](https://wechat.yoru-and-akari.dev)** · [Theme library](https://wechat.yoru-and-akari.dev/themes) · [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) · [Acknowledgements](https://wechat.yoru-and-akari.dev/references)
+However much AI is involved, the source remains ordinary Markdown: readable, editable, exportable, and independent of any model or writing platform.
 
-Made by Yoru, as a personal project used and improved over time. The interface is currently in Chinese and designed for desktop browsers. If it helps you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
+**[Open Reed →](https://wechat.yoru-and-akari.dev)**
 
-## Work with AI, then finish the article
+[Theme library](https://wechat.yoru-and-akari.dev/themes) · [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) · [Acknowledgements](https://wechat.yoru-and-akari.dev/references)
 
-### Give your AI the writing rules
+Made by Yoru, as a personal project that is continuously used and improved. The interface is currently in Chinese and designed mainly for desktop browsers. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
 
-The editor's **AI 帮我写** (“Help me write”) button offers three copy actions: a prompt, the public Skill URL, and the full Skill text. Add your topic, audience, source material and desired length, then send them to the AI you already use.
+| Light · akari | Dark · yoru |
+|:--:|:--:|
+| ![Reed with Markdown, a WeChat article preview and an image panel](docs/images/editor-akari.png) | ![Reed in dark mode, with the article kept on white paper](docs/images/editor-yoru.png) |
 
-The [Skill](https://wechat.yoru-and-akari.dev/skill.md) describes Reed's Markdown dialect, article structures, image references and writing precautions. If your AI can open links, share the URL; otherwise paste the full text. Paste the resulting Markdown into Reed to continue editing.
+## Why Reed
 
-No login or model API configuration is required. The website, public endpoint and MCP tool all serve [the same repository file](skills/wechat-typesetter/SKILL.md). The Skill is currently in Chinese; its syntax examples are the shared reference.
+- **Your document stays yours.** Markdown is the single content source. AI, browser editing, preview, copy and export all work around the same draft.
+- **Bring your own AI.** The public Skill can be given to ChatGPT, Claude, Codex, OpenCode or any other AI that can read text or links. Reed itself does not require a model API for this workflow.
+- **Humans keep the final mile.** AI can draft, organize and revise; you can continue in the real editor to review the wording, reshape sections, handle images, switch themes and decide what actually gets published.
+- **Typesetting is inspectable.** All 219 themes consume the same semantic AST and rendering pipeline, so they can be compared against the same content. Author, license and provenance information stay attached to adapted themes.
+- **The output is made for WeChat.** Preview, full-document copy, selection copy and article HTML export share the same renderer and produce fully inline HTML for WeChat Official Accounts.
 
-### Edit, typeset and handle images in the browser
+## Three ways to work
 
-Markdown sits on the left, the live article preview in the middle, and images and settings on the right. Choose a theme, revise the structure, upload and crop images, and adjust the credits. Copy the whole article as rich text, or select a passage in the preview and copy just that part.
+### 1. Write and typeset it yourself
 
-Paste the result into a WeChat Official Account's article editor. WeChat fetches and stores the hosted images during paste; check its preview before publishing. Routine editing, image uploads, copying and exports work without login. Drafts are saved locally in your browser by default.
+Markdown is on the left, the live article preview in the middle, and images and settings on the right. Choose a theme, revise the structure, upload and crop images, adjust credits, copy the entire article as rich text, or select a passage in the preview and copy only that part.
 
-### Connect your own AI through Remote MCP
+Routine drafts are stored locally in your browser by default. Editing, typesetting, image uploads, copying and exports work without login. Hosted images are transferred into WeChat when you paste the article; check WeChat's own preview before publishing.
 
-For direct collaboration, open **设置 → 高级功能 → AI 直接编辑当前稿件** (“Settings → Advanced → Let AI edit this document”) and create a connection. Guests can do this too.
+### 2. Give your AI Reed's writing rules
 
-Reed provides a **Streamable HTTP** endpoint and a Bearer authorization header. A compatible MCP client can read the writing Skill, read the authorized document and update its Markdown. Each connection is scoped to one visitor and one document; changing the active article does not retarget an existing connection.
+Open **AI 帮我写** (“Help me write”) in the editor and send your topic, audience, source material and desired length to the AI you already use. The public [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) describes Reed's Markdown dialect, article structures, image references and writing precautions.
 
-AI edits appear automatically in the open browser, and browser edits sync back to the temporary copy. Every write carries the hash from the version it read. Stale writes are rejected; when both sides have unsynced changes, the browser asks you to keep both versions, keep the local version or use the AI version. You can revoke access at any time. Revocation or expiry leaves the complete local draft available for editing.
+If your AI can open links, send it the Skill URL. Otherwise, copy the full Skill text. Paste the generated Markdown back into Reed and continue editing. The interface provides three ready-made actions: **copy prompt, copy Skill URL, and copy full Skill**. No login, AI brand selection or model API configuration is required.
+
+The website, public endpoint and MCP tool all expose [the same repository Skill](skills/wechat-typesetter/SKILL.md). The Skill is currently in Chinese; its syntax examples are the shared reference.
+
+### 3. Let your own AI / agent edit the current document
+
+Open **设置 → 高级功能 → AI 直接编辑当前稿件** (“Settings → Advanced → Let AI edit this document”) and create a **Remote MCP** connection. Guests can use it too. Reed provides a Streamable HTTP endpoint and Bearer authorization header; configure them in a compatible MCP client and the agent can read the writing Skill, read this document and update its Markdown directly.
+
+Authorization is scoped to one visitor and one document. AI edits appear automatically in the open browser, while browser edits sync back to the temporary collaboration copy. Every write carries the hash of the version it read. Stale writes are rejected; if both sides have unsynced changes, the browser pauses synchronization and lets you keep both versions, keep the local version or use the AI version. Revoking access or letting the connection expire leaves the complete local draft intact.
 
 ```mermaid
 flowchart LR
@@ -46,27 +60,23 @@ flowchart LR
   D --> P[Paste into WeChat]
 ```
 
-[Remote MCP documentation](docs/remote-mcp.md) covers configuration, the three tools and synchronization. A native OpenCode client has been tested end to end. Other clients use their own standard HTTP MCP setup. ChatGPT connectors may require a separate OAuth adapter; the core server uses document-scoped Bearer authorization.
+[Remote MCP documentation](docs/remote-mcp.md) covers client configuration, the three MCP tools, synchronization and authorization lifetime. A native OpenCode client has been tested end to end. Other clients use their own standard HTTP MCP setup. ChatGPT connectors may require a separate OAuth adapter; the core server uses document-scoped Bearer authorization.
 
-## What the editor supports
-
-| Light · akari | Dark · yoru |
-|:--:|:--:|
-| ![Reed with Markdown, a WeChat article preview and an image panel](docs/images/editor-akari.png) | ![Reed in dark mode, with the article kept on white paper](docs/images/editor-yoru.png) |
+## Editor and typesetting
 
 - **<!-- gen:theme-count -->219 themes<!-- /gen:theme-count -->** with filters for style, complexity, color and source. Favorite templates and compare them using the same sample. Author, license and provenance are retained.
 - **Article-oriented Markdown**: numbered sections, highlights, pull quotes, quotation boxes, centered text, credits, tables, block equations and Mermaid diagrams.
 - **Images**: upload, compression, automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
-- **Editing**: CodeMirror, a Markdown toolbar, a semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
+- **Editing and preview**: CodeMirror, a Markdown toolbar, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
 - **Storage**: local draft protection, plus the site owner's cloud draft library after login, with synchronization and conflict handling.
 - **Import / export**: import Markdown and DOCX; export Markdown, article HTML, a complete preview page or a full document backup.
 - **Agent REST API**: a separate API and dependency-free Python client for pushing a draft, opening it for human editing and reading it back. This interface accesses the site owner's cloud documents, requires an Agent token, and needs browser login for its editor links. See [Agent API](docs/agent-api.md).
 
-Every theme card renders the same sample article, so comparisons show the theme rather than different content.
+Every theme card renders the same sample article, so comparisons show the theme rather than different content. Author, color and license information are shown directly on each card.
 
 ![Theme library with filters and real rendered previews](docs/images/theme-library.png)
 
-A closer look at the default `golden` theme, including numbered headings, highlights, link footnotes, pull quotes and quotation boxes:
+A closer look at the default `golden` theme, including first-line indentation, numbered headings, highlights, link footnotes, pull quotes and quotation boxes:
 
 <img src="docs/images/typeset-golden.png" width="420" alt="An article rendered with the golden theme" />
 
@@ -102,8 +112,7 @@ cp .env.example .env
 npm run dev
 ```
 
-In PowerShell, use `Copy-Item .env.example .env`. Open `http://localhost:3000`.
-Remove `NODE_ENV` from the development `.env`: setting it to `development` also affects Vite's React production build. See [Configuration](docs/configuration.md) for image hosting, production secrets and startup commands.
+In PowerShell, use `Copy-Item .env.example .env`. Open `http://localhost:3000`. Remove `NODE_ENV` from the development `.env`: setting it to `development` also affects Vite's React production build. See [Configuration](docs/configuration.md) for image hosting, production secrets and startup commands.
 
 | Command | Purpose |
 |---|---|
@@ -114,7 +123,7 @@ Remove `NODE_ENV` from the development `.env`: setting it to `development` also 
 | `npm run build` | Build `dist/boot.js` and `dist/public/` |
 | `npm start` | Start production; see Configuration for PowerShell |
 
-The rendering pipeline is `Markdown → semantic AST → Theme → fully inline WeChat-compatible HTML`. Preview, copy and article HTML export share the same result. React, Vite and CodeMirror handle editing; Hono provides tRPC, REST and MCP. IndexedDB / localStorage hold local drafts, SQLite holds cloud documents and explicitly authorized temporary collaboration copies, and a Worker with R2 hosts images.
+The rendering pipeline is `Markdown → semantic AST → Theme → fully inline WeChat-compatible HTML`. React, Vite and CodeMirror handle editing; Hono provides tRPC, REST and MCP. IndexedDB / localStorage hold local drafts, SQLite holds cloud documents and explicitly authorized temporary collaboration copies, and a Worker with R2 hosts images. Preview, copy and article HTML export share the same result.
 
 ## Data and publishing boundaries
 
