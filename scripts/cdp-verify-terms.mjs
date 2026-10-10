@@ -19,9 +19,9 @@ import path from 'node:path'
 const APP = (process.argv[2] || 'http://127.0.0.1:3201').replace(/\/$/, '')
 const PORT = Number(process.argv[3] || 9349)
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-terms-'))
-// The retired relay address, assembled so this file itself stays free of the
-// plain string — the same rule the app used to follow.
-const RETIRED = ['yoruandakari', 'duck.com'].join('@')
+// No public surface may expose a contact address: page text is checked against
+// a generic email shape, and the plain address itself stays out of this file
+// too, so neither the assertion nor the fixture can leak one.
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-cdp-t-'))
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
@@ -141,7 +141,7 @@ const page = JSON.parse(
       theme: document.documentElement.dataset.theme,
       pageBg: getComputedStyle(document.querySelector('.ya-page')).backgroundColor,
       mailtos: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
-      plainRetired: t.includes(${JSON.stringify(RETIRED)}),
+      emailish: (t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []),
       feedbackLinks: [...document.querySelectorAll('a[href="/feedback"]')].length,
       themeCount: (t.match(/(\\d+)\\s*套主题/) || [])[1],
       mentionsIndexedDB: t.includes('IndexedDB'),
@@ -154,7 +154,7 @@ const page = JSON.parse(
 check('/terms renders as a page, not a blank route', page.path === '/terms' && page.textLen > 1200, `textLen=${page.textLen}`)
 check('every section is present', page.headings.length >= 6, page.headings.join(' / '))
 check('no mailto link survives on the page', page.mailtos.length === 0, page.mailtos.join(','))
-check('the retired relay address is nowhere in the text', page.plainRetired === false)
+check('no email address appears in the page text', page.emailish.length === 0, page.emailish.join(','))
 check('the complaints section links to the feedback form', page.feedbackLinks >= 1, `links=${page.feedbackLinks}`)
 check('theme count comes from the THEMES registry', Number(page.themeCount) > 200, `count=${page.themeCount}`)
 check('the page states where drafts actually live', page.mentionsIndexedDB === true)
@@ -197,7 +197,7 @@ check(
 
 const settingsContact = JSON.parse(
   await evaluate(`JSON.stringify({
-    plainRetired: document.body.innerText.includes(${JSON.stringify(RETIRED)}),
+    emailish: (document.body.innerText.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []),
     mailtos: [...document.querySelectorAll('[role=tabpanel] a[href^="mailto:"]')].length,
     hasFeedback: [...document.querySelectorAll('[role=tabpanel] a[href="/feedback"]')].length,
     ghLinks: [...document.querySelectorAll('[role=tabpanel] a[href^="https://github.com/"]')].map(a => a.getAttribute('href')),
@@ -205,7 +205,7 @@ const settingsContact = JSON.parse(
 )
 check(
   '设置 tab carries the feedback entry instead of an address',
-  settingsContact.plainRetired === false && settingsContact.mailtos === 0 && settingsContact.hasFeedback >= 1,
+  settingsContact.emailish.length === 0 && settingsContact.mailtos === 0 && settingsContact.hasFeedback >= 1,
   JSON.stringify(settingsContact),
 )
 check(
