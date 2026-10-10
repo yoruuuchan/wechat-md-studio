@@ -1,6 +1,8 @@
 // Real Chrome + MCP SDK + optional real OpenCode client, private production DB.
 // node scripts/cdp-verify-remote-mcp.mjs [appPort=3227] [cdpPort=9355]
 // MOPAI_OPENCODE_BIN=<native executable> adds the client acceptance test.
+// MOPAI_MCP_PUBLIC_URL=https://... runs against the live service using fresh visitors;
+// forced database expiry is skipped and every test grant is revoked afterward.
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -13,7 +15,8 @@ import { verifyOpenCodeMcp } from './lib/verify-opencode-mcp.mjs'
 
 const APP_PORT = Number(process.argv[2] || 3227)
 const CDP_PORT = Number(process.argv[3] || 9355)
-const appUrl = `http://127.0.0.1:${APP_PORT}/`
+const publicUrl = process.env.MOPAI_MCP_PUBLIC_URL
+const appUrl = publicUrl ? `${publicUrl.replace(/\/$/, '')}/` : `http://127.0.0.1:${APP_PORT}/`
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-mcp-browser-'))
 const dbFile = path.join(dir, 'test.db')
 const profile = path.join(dir, 'chrome')
@@ -27,9 +30,9 @@ const check = (name, ok, detail = '') => {
   if (!ok) failures++
   console.log(`[${ok ? 'PASS' : 'FAIL'}] ${name}${detail ? ` — ${detail}` : ''}`)
 }
-const worker = http.createServer((req, res) => res.writeHead(404).end())
-await new Promise((resolve) => worker.listen(0, '127.0.0.1', resolve))
-const app = spawn(process.execPath, ['dist/boot.js'], {
+const worker = publicUrl ? null : http.createServer((req, res) => res.writeHead(404).end())
+if (worker) await new Promise((resolve) => worker.listen(0, '127.0.0.1', resolve))
+const app = publicUrl ? null : spawn(process.execPath, ['dist/boot.js'], {
   env: { ...process.env, NODE_ENV: 'production', PORT: String(APP_PORT), DATABASE_URL: `file:${dbFile}`,
     PUBLIC_BASE_URL: appUrl, ACCESS_KEY: 'mcp-test-access-key-4e17', SESSION_SECRET: 'mcp-test-session-secret-32-characters-4e17',
     IMG_BASE_URL: `http://127.0.0.1:${worker.address().port}`, IMG_ADMIN_KEY: 'mcp-test-image-key-4e17', AGENT_TOKENS: '', ANON_GC_ENABLED: 'false',
@@ -37,10 +40,11 @@ const app = spawn(process.execPath, ['dist/boot.js'], {
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 let appLog = ''
-app.stdout.on('data', (d) => { appLog += d })
-app.stderr.on('data', (d) => { appLog += d })
+app?.stdout.on('data', (d) => { appLog += d })
+app?.stderr.on('data', (d) => { appLog += d })
 let chrome, ws, sql
 const clients = []
+const grantCleanups = []
 
 try {
   for (let i = 0; i < 80; i++) {
@@ -94,7 +98,10 @@ try {
     throw new Error(`Browser timeout: ${label}\n${detail}\n${appLog.slice(-500)}`)
   }
   const click = async (expression) => {
-    const point = await ev(`(() => { const e = ${expression}; if (!e) return null; e.scrollIntoView({block:'center'}); const r = e.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2} })()`)
+    // Radix entrance animations move the dialog after its DOM has appeared.
+    // Wait for that short motion, then reject an occluded/off-screen click.
+    await sleep(250)
+    const point = await ev(`(() => { const e = ${expression}; if (!e) return null; e.scrollIntoView({block:'center'}); const r = e.getBoundingClientRect(); const p={x:r.left+r.width/2,y:r.top+r.height/2}; const hit=document.elementFromPoint(p.x,p.y); return e===hit || e.contains(hit) ? p : null })()`)
     if (!point) throw new Error(`Missing button: ${expression}`)
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 }, sessionId)
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 }, sessionId)
@@ -108,6 +115,12 @@ try {
   const editor = () => ev('window.__mopaiCodemirror.state.doc.toString()')
   const edit = (content) => ev(`(() => { const v=window.__mopaiCodemirror; v.dispatch({changes:{from:0,to:v.state.doc.length,insert:${JSON.stringify(content)}}}); return true })()`)
   const activeId = () => ev(`localStorage.getItem('mopai.active.v1')`)
+  const cleanupGrant = (id, session = sessionId) => ev(`(async () => {
+    const path='/api/remote-mcp/connections/'+${JSON.stringify(id)}
+    const snapshot=await fetch(path).then(r=>r.json())
+    if(snapshot) await fetch(path,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({connectionId:snapshot.connection.id})})
+    return true
+  })()`, session)
   const localBodies = () => ev(`new Promise((resolve,reject) => { const o=indexedDB.open('mopai'); o.onsuccess=()=>{const db=o.result; const r=db.transaction('bodies','readonly').objectStore('bodies').getAll(); r.onsuccess=()=>{resolve(r.result);db.close()};r.onerror=()=>reject(r.error)};o.onerror=()=>reject(o.error) })`)
   const openMcp = async () => {
     await click(`[...document.querySelectorAll('[role="tab"]')].find(e => e.textContent.includes('设置'))`)
@@ -155,6 +168,7 @@ try {
   await waitFor(`Boolean(document.querySelector('input[aria-label="MCP Authorization"]'))`, 'anonymous grant')
   let token = (await ev(`document.querySelector('input[aria-label="MCP Authorization"]').value`)).replace(/^Bearer /, '')
   const id = await activeId()
+  grantCleanups.push(() => cleanupGrant(id))
   await click(select('[data-mcp-copy="config"]'))
   await sleep(150)
   const copiedConfig = JSON.parse(await ev('navigator.clipboard.readText()'))
@@ -245,11 +259,13 @@ try {
   const sessionB = await send('Target.attachToTarget', { targetId: targetB.targetId, flatten: true })
   await sleep(2500)
   const other = await ev(`fetch('/api/remote-mcp/connections',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localDocId:${JSON.stringify(id)},name:'另一位游客',content:'游客 B 的独立稿件'})}).then(r=>r.json())`, sessionB.sessionId)
+  grantCleanups.push(() => cleanupGrant(id, sessionB.sessionId))
   const otherClient = await connect(other.token)
   check('another visitor gets an isolated document', (await read(otherClient)).doc.content === '游客 B 的独立稿件')
   const forbidden = await ev(`fetch('/api/remote-mcp/connections/'+${JSON.stringify(id)},{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({connectionId:${JSON.stringify(first.connection.id)},name:'cross',content:'不可跨游客覆盖',baseHash:${JSON.stringify(first.doc.hash)}})}).then(r=>r.status)`, sessionB.sessionId)
   check('cross-visitor write fails', forbidden === 410)
   check('original visitor remains unchanged', !(await read(client)).doc.content.includes('不可跨游客'))
+  await cleanupGrant(id, sessionB.sessionId)
   await send('Target.disposeBrowserContext', { browserContextId: context.browserContextId })
 
   // Reload proves both body persistence and a token-free local binding.
@@ -277,20 +293,22 @@ try {
   await waitFor('Boolean(window.__mopaiCodemirror)', 'revoked draft reload')
   check('revoked local draft remains complete and editable', await editor() === afterRevoke)
 
-  await openMcp()
-  await click(select('[data-mcp-create]'))
-  await waitFor(`Boolean(document.querySelector('input[aria-label="MCP Authorization"]'))`, 'new grant')
-  token = (await ev(`document.querySelector('input[aria-label="MCP Authorization"]').value`)).replace(/^Bearer /, '')
-  await closeDialog()
-  sql = new DatabaseSync(dbFile)
-  sql.prepare('UPDATE remote_mcp_connections SET expiresAt = ? WHERE localDocId = ?').run(Date.now() - 1, id)
-  check('expired token fails before cleanup', (await probe(token)).status === 401)
-  await waitFor(`!document.querySelector('[data-mcp-editor-status]')`, 'expired binding detached')
-  check('expiry preserves browser body', await editor() === afterRevoke)
-  await sleep(700)
-  await send('Page.reload', {}, sessionId)
-  await waitFor('Boolean(window.__mopaiCodemirror)', 'expired draft reload')
-  check('expired local draft survives reopen', await editor() === afterRevoke)
+  if (!publicUrl) {
+    await openMcp()
+    await click(select('[data-mcp-create]'))
+    await waitFor(`Boolean(document.querySelector('input[aria-label="MCP Authorization"]'))`, 'new grant')
+    token = (await ev(`document.querySelector('input[aria-label="MCP Authorization"]').value`)).replace(/^Bearer /, '')
+    await closeDialog()
+    sql = new DatabaseSync(dbFile)
+    sql.prepare('UPDATE remote_mcp_connections SET expiresAt = ? WHERE localDocId = ?').run(Date.now() - 1, id)
+    check('expired token fails before cleanup', (await probe(token)).status === 401)
+    await waitFor(`!document.querySelector('[data-mcp-editor-status]')`, 'expired binding detached')
+    check('expiry preserves browser body', await editor() === afterRevoke)
+    await sleep(700)
+    await send('Page.reload', {}, sessionId)
+    await waitFor('Boolean(window.__mopaiCodemirror)', 'expired draft reload')
+    check('expired local draft survives reopen', await editor() === afterRevoke)
+  } else console.log('[SKIP] forced expiry: validated on the private database, no live SQL change')
 
   // Current editor screenshots, with no token-bearing dialog visible.
   await edit(demoContent)
@@ -300,21 +318,22 @@ try {
   await send('Page.reload', {}, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'light screenshot')
   await ev('document.fonts.ready.then(()=>true)')
-  await shot(path.resolve('docs/images/editor-akari.png'))
+  await shot(publicUrl ? path.join(shots, 'public-editor-akari.png') : path.resolve('docs/images/editor-akari.png'))
   await ev(`localStorage.setItem('mopai.theme.v1','yoru'); true`)
   await send('Page.reload', {}, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'dark screenshot')
   await ev('document.fonts.ready.then(()=>true)')
-  await shot(path.resolve('docs/images/editor-yoru.png'))
+  await shot(publicUrl ? path.join(shots, 'public-editor-yoru.png') : path.resolve('docs/images/editor-yoru.png'))
   check('dark theme wires the new entry', await ev(`document.documentElement.dataset.theme==='yoru' && document.documentElement.classList.contains('dark') && Boolean(document.querySelector('[data-open-ai-writing]'))`))
   console.log(`Screenshots: ${shots}`)
 } finally {
+  for (const cleanup of grantCleanups) await cleanup().catch(() => {})
   for (const client of clients) await client.close().catch(() => {})
   sql?.close()
   ws?.close()
   chrome?.kill()
-  app.kill()
-  await new Promise((resolve) => worker.close(resolve))
+  app?.kill()
+  if (worker) await new Promise((resolve) => worker.close(resolve))
   await sleep(500)
   // Exact mkdtemp directory, never user data; Chrome may briefly retain a lock.
   try { fs.rmSync(dir, { recursive: true, force: true }) } catch { /* disposable profile still closing */ }

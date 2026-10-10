@@ -24,7 +24,9 @@ app.use("*", securityHeaders());
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 
 app.get("/skill.md", (c) => {
-  c.header("Content-Type", "text/markdown; charset=utf-8");
+  // Serve the raw Markdown as plain text: web readers commonly support this
+  // MIME type even when they cannot fetch a text/markdown response.
+  c.header("Content-Type", "text/plain; charset=utf-8");
   c.header("Cache-Control", "no-cache");
   c.header("Access-Control-Allow-Origin", "*");
   return c.body(writingSkill);

@@ -18,7 +18,7 @@ export default function AiWritingDialog({ open, onOpenChange }: { open: boolean;
     if (!open || skill !== null) return
     const controller = new AbortController()
     void fetch('/skill.md', { signal: controller.signal }).then(async (response) => {
-      if (!response.ok || !response.headers.get('content-type')?.includes('text/markdown')) throw new Error('写作规则暂时没读下来，请稍后重新打开')
+      if (!response.ok || !/^text\/(plain|markdown)\b/.test(response.headers.get('content-type') || '')) throw new Error('写作规则暂时没读下来，请稍后重新打开')
       setSkill(await response.text())
       setError(null)
     }).catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '写作规则读取失败') })

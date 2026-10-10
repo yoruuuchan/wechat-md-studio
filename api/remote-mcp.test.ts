@@ -58,7 +58,7 @@ describe('writing Skill', () => {
   it('is public and embeds exactly the tracked Skill source', async () => {
     const response = await browser('/skill.md')
     expect(response.status).toBe(200)
-    expect(response.headers.get('content-type')).toContain('text/markdown')
+    expect(response.headers.get('content-type')).toContain('text/plain; charset=utf-8')
     const text = await response.text()
     expect(text).toBe(fs.readFileSync(path.resolve('skills/wechat-typesetter/SKILL.md'), 'utf8').replace(/\r\n/g, '\n'))
     expect(text.indexOf('先写稿')).toBeLessThan(text.indexOf('Remote MCP 修改'))
