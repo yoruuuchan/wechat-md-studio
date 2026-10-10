@@ -1,6 +1,6 @@
 # NOTICE — Third-party license copies and attribution
 
-本目录收录「公众号排版助手 by Yoru」在开发过程中参考、适配或计划移植的上游开源项目的
+本目录收录「芦苇 by Yoru」在开发过程中参考、适配或计划移植的上游开源项目的
 LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Acceptance test for 公众号排版助手 on cc-tokyo-01.
+# Acceptance test for Reed on cc-tokyo-01.
 # Runs ON the server against 127.0.0.1:3100, so it exercises the full app + R2
 # chain without a browser and without going through Cloudflare.
 set -uo pipefail

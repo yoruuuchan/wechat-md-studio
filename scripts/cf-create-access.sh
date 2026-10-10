@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create the Cloudflare Access application + email policy for 墨排. Idempotent.
+# Create the Cloudflare Access application + email policy for Reed. Idempotent.
 #
 # Scope: wechat.yoru-and-akari.dev only. Image reads go to mopai-img.yoru-and-akari.dev
 # (a Worker custom domain), which is deliberately NOT covered here — WeChat has to
@@ -9,7 +9,7 @@ set -a; source $HOME/.config/codex/private.env 2>/dev/null; set +a
 
 ACC=5e96dfd2bf22d385e4ffdaa794d74676
 AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
-APP_NAME="墨排 Mopai"
+APP_NAME="芦苇 Reed"
 APP_DOMAIN="wechat.yoru-and-akari.dev"
 ALLOW_EMAIL="${ACCESS_ALLOW_EMAIL:?set ACCESS_ALLOW_EMAIL to the Access allowlist email}"
 IDP_ID="02dc55ac-e7e2-4623-b699-ff8bdcb4f825"
@@ -99,7 +99,7 @@ if [ -n "$IMG_APP_ID" ]; then
 else
   echo "creating image app"
   IMG_APP_ID=$(curl -4 -sS -m 30 -X POST -H "$AUTH" -H "Content-Type: application/json" \
-    -d "{\"name\":\"墨排 public images\",\"domain\":\"$IMG_APP_DOMAIN\",\"type\":\"self_hosted\",\"session_duration\":\"24h\",\"app_launcher_visible\":false}" \
+    -d "{\"name\":\"芦苇 public images\",\"domain\":\"$IMG_APP_DOMAIN\",\"type\":\"self_hosted\",\"session_duration\":\"24h\",\"app_launcher_visible\":false}" \
     "https://api.cloudflare.com/client/v4/accounts/$ACC/access/apps" \
     | python3 -c 'import sys,json; d=json.load(sys.stdin); print((d.get("result") or {}).get("id",""))')
   if [ -z "$IMG_APP_ID" ]; then echo "IMAGE APP CREATE FAILED"; exit 1; fi

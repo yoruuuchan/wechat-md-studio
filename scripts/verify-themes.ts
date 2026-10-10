@@ -147,7 +147,7 @@ for (const theme of THEMES) {
   check(theme.id, 'no style attribute is truncated by a raw quote', broken.length === 0, broken[0] ?? '')
 
   const clean = cleanHtml(html)
-  const page = previewPage(html, `墨排-${theme.id}`)
+  const page = previewPage(html, `芦苇-${theme.id}`)
   fs.writeFileSync(`${OUT}/${theme.id}_clean.html`, clean, 'utf8')
   fs.writeFileSync(`${OUT}/${theme.id}_preview.html`, page, 'utf8')
   console.log(`  wrote ${theme.id}_clean.html (${clean.length} B), ${theme.id}_preview.html (${page.length} B)`)

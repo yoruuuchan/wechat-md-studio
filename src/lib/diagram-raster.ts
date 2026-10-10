@@ -132,7 +132,7 @@ export async function renderDiagramPng(code: string): Promise<DiagramPng> {
   document.body.appendChild(host)
   // mermaid draws into the container we hand it but cleans up by selecting
   // "#d<id>" from the whole document, so concurrent renders must not share an id.
-  const id = `mopai-diagram-${++seq}`
+  const id = `reed-diagram-${++seq}`
   let markup: string
   try {
     markup = (await mermaid.render(id, code, host)).svg

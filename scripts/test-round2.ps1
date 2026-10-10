@@ -1,4 +1,4 @@
-# Exercise the round-2 features against a running 墨排 instance.
+# Exercise the round-2 features against a running Reed instance.
 #   pwsh -File scripts/test-round2.ps1 -Base http://127.0.0.1:3199 -EnvFile .env
 #   pwsh -File scripts/test-round2.ps1 -Base https://wechat.yoru-and-akari.dev -AccessEmail you@example.com
 param(

@@ -281,6 +281,18 @@ describe('loading', () => {
     expect(second.docs).toHaveLength(2)
   })
 
+  it.each(['欢迎使用公众号排版助手', '欢迎使用芦苇'])('recognizes an existing %s sample without reseeding or rewriting it', async (marker) => {
+    const content = `---\ntitles:\n  - ${marker}\n---\n\nA sample the user has edited.\n`
+    await saveDocs([doc('existing-sample', content)], 'existing-sample')
+    storage.removeItem('mopai.sample.v1')
+    __resetLocalStoreForTests()
+
+    const loaded = await loadDocs()
+    expect(loaded.docs).toHaveLength(1)
+    expect(loaded.docs[0].content).toBe(content)
+    expect(loaded.activeId).toBe('existing-sample')
+  })
+
   it('falls back to localStorage bodies and reports it when there is no IndexedDB', async () => {
     vi.stubGlobal('indexedDB', undefined)
     __resetLocalStoreForTests()

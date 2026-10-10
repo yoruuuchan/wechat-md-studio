@@ -1,52 +1,106 @@
-# 公众号排版助手 by Yoru
+[中文](README.md) | [English](README_EN.md)
 
-把 Markdown 变成**可以直接粘进微信公众号后台**的排版：左侧写稿，右侧实时预览，一键复制富文本。
-图片通过图床进入正文，微信粘贴时自行转存。目前只做了网页端适配，建议在电脑浏览器上使用。
+# 芦苇
 
-**[在线使用](https://wechat.yoru-and-akari.dev)** · [主题库](https://wechat.yoru-and-akari.dev/themes) · [开源致谢](https://wechat.yoru-and-akari.dev/references) · [使用规范](https://wechat.yoru-and-akari.dev/terms)
+> 人是一根会思考的芦苇。
 
-觉得好用的话，欢迎到 [GitHub 仓库](https://github.com/yoruuuchan/wechat-md-studio) 点个 Star，让更多人发现它。
+芦苇是一套**人与 AI 围绕同一份内容协作的创作工具**，目前主要服务微信公众号。
+AI 可以起稿、整理资料、修改段落；人在网页中校对、编辑、排版和处理图片，最后把正文复制到公众号后台。
+也可以从头到尾自己写。内容始终是一份可读、可编辑、可带走的 Markdown。
+
+**[打开芦苇](https://wechat.yoru-and-akari.dev)** · [主题库](https://wechat.yoru-and-akari.dev/themes) · [写作 Skill](https://wechat.yoru-and-akari.dev/skill.md) · [开源致谢](https://wechat.yoru-and-akari.dev/references)
+
+by Yoru。一个持续使用、慢慢完善的个人项目。觉得好用，欢迎在 [GitHub](https://github.com/yoruuuchan/wechat-md-studio) 留个 Star。
+当前界面主要为电脑浏览器设计。
+
+## 从一份稿件开始
+
+### 让 AI 按芦苇的规则写稿
+
+打开编辑器左栏的「AI 帮我写」，把主题、读者、资料和篇幅交给自己常用的 AI。
+公开 [Skill](https://wechat.yoru-and-akari.dev/skill.md) 说明芦苇支持的 Markdown 方言、文章结构、图片引用与写作注意事项。
+AI 能读取链接，就发 Skill 地址；不能读取链接，就复制完整 Skill。生成后将 Markdown 粘回编辑器。
+
+界面提供**复制提示词、复制 Skill 地址、复制完整 Skill**三个动作。无需登录、选择 AI 品牌或配置模型 API。
+网页、公开地址与 MCP 读取都来自仓库的 [同一份 Skill](skills/wechat-typesetter/SKILL.md)。
+
+### 在网页里把内容做完
+
+左栏编辑 Markdown，中栏实时预览，右栏处理图片、署名和设置。切换主题、调整结构、上传和裁切图片，
+都围绕当前稿件进行。可以复制整篇富文本，也可以在预览中框选一段复制，直接粘进微信公众号后台。
+图片通过图床进入正文，微信粘贴时自行转存；发布前再核对后台预览。
+
+常规稿件默认保存在浏览器本机。编辑、排版、上传、复制和导出都无需登录。
+
+### 让自己的 AI / Agent 直接协作
+
+在右栏「设置 → 高级功能 → AI 直接编辑当前稿件」创建 **Remote MCP** 连接，未登录也能使用。
+把页面给出的 Streamable HTTP 地址与 Bearer 请求头配置到自己的 MCP 客户端，AI 就能读取写作 Skill、
+读取这一篇稿件，并在原稿上修改。授权限定到创建连接的游客和稿件；每篇需单独授权。
+
+打开的浏览器会自动收到 AI 的修改，本机编辑也会同步回临时协作副本。
+更新带上读取时的内容 hash，版本过期会拒绝写入；两边都有未同步修改时，页面暂停同步，
+由你选择两边都留、保留本机版本或采用 AI 版本。可以随时撤销授权，撤销或到期后本机稿件完整保留。
+
+```mermaid
+flowchart LR
+  S[公开 Skill] --> A[AI / Agent]
+  A -->|生成 Markdown| D[当前稿件]
+  H[人在芦苇中编辑和排版] <--> D
+  A <-->|Remote MCP| D
+  D --> P[复制到微信公众号后台]
+```
+
+[接入说明](docs/remote-mcp.md)包含客户端配置、三个 MCP 工具、同步和授权期限。
+已用 OpenCode 原生客户端完成真实往返验证；其他支持标准 HTTP MCP 的客户端按各自方式接入。
+ChatGPT 若需要 OAuth，应另接适配层；当前核心 MCP 使用单稿件 Bearer 授权。
+
+## 编辑器与排版
 
 | akari（亮） | yoru（暗） |
 |:--:|:--:|
-| ![左栏 Markdown 源稿、中栏公众号实时预览、右栏图片清单](docs/images/editor-akari.png) | ![同一份稿子在深色界面下，正文纸面仍是白底](docs/images/editor-yoru.png) |
+| ![芦苇：左栏 Markdown、中栏公众号预览、右栏图片清单](docs/images/editor-akari.png) | ![芦苇深色界面，正文纸面保持白底](docs/images/editor-yoru.png) |
 
-开发 Agent 请先读 [AGENTS.md](AGENTS.md)。
-
-## 核心能力
-
-- **<!-- gen:theme-count -->219 套<!-- /gen:theme-count -->主题**：按风格、复杂度、色系与来源筛选，收藏常用模板，同一份样稿比较；每套保留作者、License 与移植来源。
-- **公众号 Markdown 方言**：自动编号章节、重点标记、金句卡、引文框、署名、表格、公式、Mermaid 图表。
-- **图片与多图布局**：上传、压缩、自动 / 手动真实裁切；支持同比例轮播与 2～4 列网格、素材管理。
-- **编辑与保存**：Markdown 工具栏、语义格式刷、375 / 677 预览、语法补全与同步滚动；预览区框选局部后 `Ctrl/⌘ + C` 直接复制，保留公众号所需的内联样式、可直接粘贴进后台；界面支持浅色 / 深色 / 跟随系统；本机防丢，登录后云端草稿箱与冲突处理。
+- **<!-- gen:theme-count -->219 套<!-- /gen:theme-count -->主题**：按风格、复杂度、色系与来源筛选，收藏常用模板，用同一份样稿比较效果；保留作者、License 与移植来源。
+- **公众号 Markdown 方言**：章节自动编号、重点标记、金句卡、引文框、居中句、署名、表格、公式和 Mermaid 图表。
+- **图片**：上传、压缩、自动 / 手动真实裁切、素材管理；同比例轮播与 2～4 列网格。
+- **编辑与预览**：CodeMirror、Markdown 工具栏、语义格式刷、语法补全、同步滚动、375 / 677 预览；界面支持浅色 / 深色 / 跟随系统。
+- **保存**：本机防丢，登录后使用站长的云端草稿箱；本机与云端同步同样有冲突处理。
 - **导入导出**：Markdown、DOCX 导入；Markdown、正文 HTML、完整预览页与整包稿件备份导出。
-- **Agent 往返**：REST API + Python 客户端推稿、打开网页精修、读回结果，内容 hash 防止静默覆盖。
-- **AI 帮我写**：无需登录，复制提示词、Skill 地址或完整 Skill，把主题与资料交给网页版 AI 写稿；[公开写作规则](https://wechat.yoru-and-akari.dev/skill.md) 与仓库 Skill 同源。
-- **AI 直接编辑当前稿件**：高级功能中创建单篇 Remote MCP 授权，AI 与浏览器双向同步，冲突需确认；撤销或到期后本地稿件继续保存。
+- **Agent REST API**：保留独立的 REST API 和零依赖 Python 客户端，支持推稿 → 网页精修 → 读回结果，使用 hash 防止静默覆盖。它访问站长的云端稿件，需要单独配置 Agent 令牌，打开编辑链接需要浏览器登录；接入见 [Agent API](docs/agent-api.md)。
 
-排版、上传、复制和导出无需登录；口令用于站长云端草稿箱。匿名图片有额度与回收期限，条款见
-[使用规范](https://wechat.yoru-and-akari.dev/terms)，实现口径见 [运维说明](HANDOFF.md#安全与匿名资源回收)。
+模板库中的卡片都渲染同一份样稿，方便比较；作者、色系与许可证直接列在卡片上。
 
-## 界面与效果
+![主题库：筛选模板并查看真实渲染结果](docs/images/theme-library.png)
 
-模板库的每一套都渲染同一份样稿，横向比较才成立；卡片上直接标出作者、色系与许可证。
+默认 `golden` 主题的正文特写：首行缩进、章节编号、重点、链接脚注、金句卡和引文框。
 
-![模板库：按风格、复杂度、色系与来源筛选，卡片里是真实渲染结果](docs/images/theme-library.png)
+<img src="docs/images/typeset-golden.png" width="420" alt="golden 主题的公众号正文排版" />
 
-排版结果特写（golden 主题，即打开时的默认样稿）——首行缩进、章节自动编号、下划线重点、
-链接降级脚注、居中强调句、金句卡片和引文框都在这一屏里：
+## Markdown 方言速览
 
-<img src="docs/images/typeset-golden.png" width="420" alt="golden 主题下的正文排版效果特写" />
+支持常规 Markdown 标题、列表、行内标记、围栏代码块与 GFM 表格。公众号扩展如下：
 
-## 核心架构
+| 语法 | 效果 |
+|---|---|
+| `==重点==` | 关键词标记 |
+| `## KICKER \| 标题` | 自动编号章节，可带短标签 |
+| `> 金句` | 金句卡片 |
+| `:::quote` / `:::center` … `:::` | 引文框 / 居中强调句 |
+| `![图注](src)` | 图片与自动图号；空 `src` 留上传占位 |
+| `![图注](img:key)` | 引用已上传的本站图片；公开 HTTPS 图片地址也可使用 |
+| `:::carousel 4:3 标题` … `:::` | 同比例轮播，默认 `4:3` |
+| `:::gallery 3 1:1 标题` … `:::` | 多图网格，默认两列正方形 |
+| `$$ … $$` 独占一段 | 块级公式，转为 SVG；不支持行内公式 |
+| 围栏代码语言为 `mermaid`，可附图注 | 图表转 PNG，沿图片链路上传 |
+| `@signature` | 署名块 |
+| `<!-- 备注 -->` | 源稿编辑备注，不进入正文；围栏代码中照常显示 |
+| front matter `titles` / `cover` | 标题候选 / 封面建议，仅进入侧栏 |
 
-`Markdown → 语义 AST → Theme → 微信兼容的全内联 HTML`
+完整 [示例稿](src/lib/sample.ts)和 [写作 Skill](skills/wechat-typesetter/SKILL.md)可以直接参照。
+参数、裁切、公式与微信兼容规则见 [渲染与图片](docs/rendering.md)。
 
-[parser](src/lib/parse.ts) 只表达语义，[renderer](src/lib/render.ts) 编排节点，[Theme](src/lib/theme-kit.ts) 决定视觉；预览、复制、正文导出共用渲染结果。
-React + Vite + CodeMirror 负责编辑；Hono 提供浏览器 tRPC 与 Agent REST API。
-IndexedDB / localStorage 保存本机正文与索引，SQLite 保存云端稿件和明确授权的临时 AI 协作副本，图片 Worker + R2 承载图片。
-
-## 快速开始
+## 本地运行
 
 使用 Node.js 24（当前验收版本）。在含 `package.json` 的目录运行；本地伞仓库中先进入 `app/`。
 
@@ -56,83 +110,58 @@ cp .env.example .env
 npm run dev
 ```
 
-PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时把 `.env` 里的 `NODE_ENV` 整行删掉——
-留着 `development` 会让 vite 构建出 React 开发版 bundle 并一路带到线上。默认打开 `http://localhost:3000`。
-图床配置、生产密钥与启动方式见 [配置与本地运行](docs/configuration.md)。
-
-## 公众号 Markdown 方言
-
-同时支持常规 Markdown 的标题、列表、代码块与 GFM 表格；下面是公众号扩展的速览。
-
-| 语法 | 效果 |
-|---|---|
-| `==重点==` | 关键词标记 |
-| `## KICKER \| 标题` | 自动编号的章节标题 |
-| `> 金句` | 金句卡片 |
-| `:::quote` / `:::center` … `:::` | 引文框 / 居中强调句 |
-| `![图注](src)` | 图片与自动图号；空 `src` 留占位 |
-| `:::carousel 4:3 标题` … `:::` | 同比例轮播，默认 `4:3` |
-| `:::gallery 3 1:1 标题` … `:::` | 多图网格，默认两列正方形 |
-| `$$ … $$` 独占一段 | 块级公式，渲染成内联 SVG |
-| ` ```mermaid 图注 ` … ` ``` ` | 图表转 PNG，沿图片链路上传 |
-| `@signature` | 署名块 |
-| `<!-- 备注 -->` | 源稿编辑备注，不进入正文；围栏代码中照常显示 |
-| front matter `titles` / `cover` | 标题候选 / 封面建议，仅进入侧栏 |
-
-完整样稿见 [sample.ts](src/lib/sample.ts)，公式、图表、多图参数与兼容规则见 [渲染与图片](docs/rendering.md)。
-
-## 常用命令
+PowerShell 用 `Copy-Item .env.example .env` 复制配置，默认打开 `http://localhost:3000`。
+开发配置中删掉 `NODE_ENV` 整行：将它写为 `development` 会影响 Vite 的 React 生产构建。
+图床、密钥与生产启动方式见 [配置说明](docs/configuration.md)。
 
 | 命令 | 用途 |
 |---|---|
-| `npm run dev` | 本地开发 |
 | `npm run check` | TypeScript 检查 |
 | `npm test` | Vitest 单元与服务端测试 |
-| `npm run verify:themes` | 全主题渲染、微信规则、来源与许可文件校验 |
-| `npm run verify:sources` | 来源 / 致谢 / 许可数据与生成文档一致性 |
-| `npm run build` | 构建 `dist/boot.js` + `dist/public/` |
-| `npm start` | 生产服务，需真实配置；PowerShell 启动见配置文档 |
+| `npm run verify:themes` | 全主题渲染与微信规则校验 |
+| `npm run sync:docs` / `npm run verify:sources` | 生成并核对中英文 README 的主题统计、来源与致谢 |
+| `npm run build` | 构建 `dist/boot.js` 与 `dist/public/` |
+| `npm start` | 生产服务；PowerShell 启动见配置文档 |
 
-主题重新导入和按功能选择浏览器验收脚本，见 [验证导航](docs/verification.md)。
+核心链路是 `Markdown → 语义 AST → Theme → 微信兼容的全内联 HTML`。
+React + Vite + CodeMirror 负责编辑，Hono 提供 tRPC / REST / MCP；IndexedDB / localStorage 保存本机稿件，
+SQLite 保存云端稿件和明确授权的临时协作副本，图片 Worker + R2 承载图片。
+预览、复制和正文 HTML 导出共用渲染结果。
 
-## 使用规范与责任边界
+## 保存、图片与使用边界
 
-完整条款在 **[/terms](https://wechat.yoru-and-akari.dev/terms)**，这里留下最要紧的三条：
+- **正文默认在本机。** 开启 Remote MCP 后才上传这一篇的临时协作副本，默认 24 小时有效。
+  只有对应游客与持有该篇令牌的客户端能读写；撤销立即删除副本，到期立即拒绝访问并定期清理，本机稿件保留。
+  登录另打开站长云端草稿箱。
+- **上传图片公网可读。** 图片落在本站对象存储，通过 `/api/img/…` 公开提供；拿到链接的人都能看到。
+  匿名图片有上传额度，默认按 14 天期限回收；本机稿件中的引用不保证图片永久保留。
+  微信粘贴成功并转存后，公众号中的图片由微信保存。
+- **内容由执笔与发布的人负责。** 本站做格式、额度与文件类型检查，不审阅稿件或图片内容。
+  禁止用图床传播违法内容、涉及未成年人的性内容、侵权或侵犯隐私的内容、恶意程序与诈骗素材，也禁止当网盘批量灌图。
+  发现违规内容可删除文件并拒绝继续接收。
 
-- **正文默认保存在本机。** 未登录时，常规编辑只写浏览器的 IndexedDB / localStorage；明确开启当前稿件的 Remote MCP 后，
-  本站保存临时协作副本（默认 24 小时），只有该游客与持有该篇令牌的客户端可读写。撤销立即删除副本，到期立即拒绝访问并定期清理；本地稿件保留。
-  登录另打开站长的云端草稿箱。你用本站排出的文字写了什么，责任在执笔和发布它的人。
-- **上传的图片公网可读。** 匿名上传同样不需要登录，文件因此落在本站的对象存储上，并以
-  `https://wechat.yoru-and-akari.dev/api/img/…` **公网可读**——拿到链接的人都能看到。本站不做内容审核，
-  只有字节头校验、额度封顶和 14 天自动回收。不要上传你不愿意公开、或者你不拥有权利的图片。
-- **禁止借本站图床传播**违法内容、涉及未成年人的性内容、侵犯他人著作权或肖像隐私的内容、恶意程序与诈骗素材，
-  以及把图床当网盘批量灌图。发现即删。权利人要投诉：写信到 [yoruandakari@duck.com](mailto:yoruandakari@duck.com)，
-  写清具体地址、你是权利人或受其委托的说明、以及联系方式。
+完整规则见 [使用规范](https://wechat.yoru-and-akari.dev/terms)。权利投诉请写信到
+[yoruandakari@duck.com](mailto:yoruandakari@duck.com)，附具体地址、权利人或受托说明与联系方式。
+服务按现状提供，可能变更、限流或下线；软件无担保。自行部署时，存储、域名与使用规则由部署者管理。
 
-服务按现状提供，可能随时变更、限流或下线；软件本身无担保（AGPL-3.0 第 15 条）。
-本站没有账号体系，能兑现的处置只有删除文件和拒绝继续接收。想要完全不同的责任边界就自己部署一份——
-存储桶、域名、额度和日志都在你手里，这一页的条款对你就不再适用。
-
-## License 与来源
+## 开源与资料
 
 项目采用 **AGPL-3.0-or-later**，见 [LICENSE](https://github.com/yoruuuchan/wechat-md-studio/blob/master/LICENSE)。
+
 <!-- BEGIN GENERATED: readme-theme-sources — npm run sync:docs -->
 主题库共 **219 套**：3 套自研 + 8 个上游项目的 216 套主题，来源与许可维护在统一 metadata 中。
 
 主题审计见 [THEME-SOURCES](THEME-SOURCES.md)；工程借鉴、取舍与完整致谢由 [credits.ts](src/lib/credits.ts) 驱动 [References](https://wechat.yoru-and-akari.dev/references) 与 [LICENSES/NOTICE](LICENSES/NOTICE.md)。
 <!-- END GENERATED: readme-theme-sources -->
 
-## 详细资料
-
-| 入口 | 职责 |
+| 资料 | 内容 |
 |---|---|
-| [AGENTS.md](AGENTS.md) | 开发 Agent 的读取规则、模块导航、工程约束与验证 |
-| [HANDOFF.md](HANDOFF.md) | 部署、服务器、Cloudflare、安全机制与环境记录 |
-| [THEME-SOURCES.md](THEME-SOURCES.md) | 主题来源、License、lineage、移植损耗与导入审计 |
-| [References](https://wechat.yoru-and-akari.dev/references) / [credits.ts](src/lib/credits.ts) / [NOTICE](LICENSES/NOTICE.md) | 统一开源致谢数据、取舍与许可核实记录 |
-| [/terms](https://wechat.yoru-and-akari.dev/terms) / [Terms.tsx](src/pages/Terms.tsx) | 使用规范、图片上传的公开边界、投诉与删除入口 |
-| [配置](docs/configuration.md) / [验证](docs/verification.md) | 环境变量、本地运行、开发与浏览器验收命令 |
-| [渲染与图片](docs/rendering.md) | AST / Theme 边界、微信 HTML、公式、Mermaid、裁切与图片生命周期 |
-| [稿件与编辑器](docs/documents.md) | 本地 / 云端保存、合并与冲突、草稿箱、素材库、导入导出 |
-| [Agent API](docs/agent-api.md) / [wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) | REST 接口、认证、覆盖语义与 Python 客户端 |
-| [AI 写作与 Remote MCP](docs/remote-mcp.md) | 公共 Skill、单稿件匿名授权、标准接入、同步、并发与撤销 |
+| [AGENTS.md](AGENTS.md) | 开发 Agent 入口、模块导航与工程约束 |
+| [AI 写作与 Remote MCP](docs/remote-mcp.md) / [Skill](skills/wechat-typesetter/SKILL.md) | 写稿规则、授权当前稿件与客户端接入 |
+| [稿件与编辑器](docs/documents.md) | 本机 / 云端保存、合并、冲突、草稿箱和导入导出 |
+| [渲染与图片](docs/rendering.md) | Markdown、Theme、微信 HTML 与图片生命周期 |
+| [Agent API](docs/agent-api.md) | REST / Python 推稿与读回 |
+| [配置](docs/configuration.md) / [验证](docs/verification.md) / [HANDOFF](HANDOFF.md) | 运行、测试与部署 |
+| [品牌与兼容标识](docs/branding.md) | 芦苇 / Reed 的命名与保留内部标识的原因 |
+
+仓库名 `wechat-md-studio` 和现有域名保持不变。

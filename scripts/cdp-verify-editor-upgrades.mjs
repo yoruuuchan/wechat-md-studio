@@ -120,7 +120,7 @@ if (accessKey) {
 console.log('=== editor boots ===')
 check('CodeMirror view is exposed', await evaluate(`!!window.__mopaiCodemirror`))
 const docText = await evaluate(`window.__mopaiCodemirror.state.doc.toString()`)
-check('the sample article is loaded', docText.includes('欢迎使用公众号排版助手'), `len=${docText.length}`)
+check('the sample article is loaded', docText.includes('欢迎使用芦苇'), `len=${docText.length}`)
 check(
   'the sample article has front matter',
   docText.startsWith('---'),

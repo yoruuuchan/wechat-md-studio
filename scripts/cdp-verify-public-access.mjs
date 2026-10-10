@@ -168,7 +168,7 @@ const source = await evaluate(`window.__mopaiCodemirror.state.doc.toString()`)
 // Assert on the neutral sample's own marker rather than blacklisting strings
 // that must not appear: a blacklist has to name them, which is exactly what
 // this check exists to keep out of the public repository.
-check('the default draft is the neutral welcome sample', source.includes('欢迎使用公众号排版助手'), source.slice(0, 60))
+check('the default draft is the neutral welcome sample', source.includes('欢迎使用芦苇'), source.slice(0, 60))
 for (const needle of ['==', ':::center', ':::quote', ':::carousel', '@signature', '|:---', '```', '<!--']) {
   check(`sample demonstrates ${needle}`, source.includes(needle))
 }

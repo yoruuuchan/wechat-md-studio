@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap the 墨排 host on cc-tokyo-01. Idempotent — safe to re-run.
+# Bootstrap the Reed host on cc-tokyo-01. Idempotent — safe to re-run.
 #
 #   app user        : mopai (no login shell)
 #   app dir         : /opt/mopai/app   (dist/ + .env + data/)
@@ -56,7 +56,7 @@ echo "== 5. systemd unit =="
 sudo tee /etc/systemd/system/cloudflared-mopai.service >/dev/null <<UNIT
 # /etc/systemd/system/cloudflared-mopai.service
 [Unit]
-Description=Cloudflare Tunnel for 墨排 (mopai)
+Description=Cloudflare Tunnel for Reed
 After=network-online.target mopai.service
 Wants=network-online.target
 Requires=mopai.service
@@ -75,7 +75,7 @@ echo "== 6. app systemd unit =="
 sudo tee /etc/systemd/system/mopai.service >/dev/null <<UNIT
 # /etc/systemd/system/mopai.service
 [Unit]
-Description=墨排 WeChat Markdown Studio
+Description=芦苇 WeChat Markdown Studio
 After=network-online.target
 Wants=network-online.target
 

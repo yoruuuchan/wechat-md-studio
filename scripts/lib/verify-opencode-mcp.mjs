@@ -62,13 +62,13 @@ export async function verifyOpenCodeMcp({ endpoint, token, content }) {
   const modelPort = model.address().port
   const config = {
     $schema: 'https://opencode.ai/config.json',
-    model: 'mopai-test/deterministic', small_model: 'mopai-test/deterministic',
-    enabled_providers: ['mopai-test'], autoupdate: false, share: 'disabled',
-    provider: { 'mopai-test': { npm: '@ai-sdk/openai-compatible', name: 'Local deterministic acceptance driver',
+    model: 'reed-test/deterministic', small_model: 'reed-test/deterministic',
+    enabled_providers: ['reed-test'], autoupdate: false, share: 'disabled',
+    provider: { 'reed-test': { npm: '@ai-sdk/openai-compatible', name: 'Local deterministic acceptance driver',
       options: { baseURL: `http://127.0.0.1:${modelPort}/v1`, apiKey: 'local-test-only' },
       models: { deterministic: { name: 'Deterministic', limit: { context: 200000, output: 8000 } } } } },
-    mcp: { 'mopai-current': { type: 'remote', url: endpoint, oauth: false, headers: { Authorization: `Bearer ${token}` } } },
-    permission: { '*': 'deny', 'mopai-current_*': 'allow' },
+    mcp: { 'reed-current': { type: 'remote', url: endpoint, oauth: false, headers: { Authorization: `Bearer ${token}` } } },
+    permission: { '*': 'deny', 'reed-current_*': 'allow' },
   }
   fs.writeFileSync(path.join(dir, 'opencode.json'), JSON.stringify(config), { mode: 0o600 })
   const env = { ...process.env, OPENCODE_CONFIG: path.join(dir, 'opencode.json'), OPENCODE_CONFIG_DIR: dir,

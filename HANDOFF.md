@@ -1,11 +1,11 @@
-# 公众号排版助手 by Yoru · 部署、运维与环境交接
+# 芦苇 by Yoru · 部署、运维与环境交接
 
 [项目首页](README.md) · [Agent 工作入口](AGENTS.md) · [配置与本地运行](docs/configuration.md) · [验证导航](docs/verification.md)
 
 本文负责服务器、部署流水线、Cloudflare、安全机制与真实环境记录。通用开发规则与模块导航由
 AGENTS 维护；渲染、图片、稿件和 Agent 接口分别进入对应专项文档。
 
-线上实例：[公众号排版助手](https://wechat.yoru-and-akari.dev)；公开源码：
+线上实例：[芦苇](https://wechat.yoru-and-akari.dev)；公开源码：
 [yoruuuchan/wechat-md-studio](https://github.com/yoruuuchan/wechat-md-studio)。
 下列环境与历史记录截至 2026-10-10，运行状态、凭证权限与边缘设置在操作前重新核对。
 
@@ -18,7 +18,17 @@ AGENTS 维护；渲染、图片、稿件和 Agent 接口分别进入对应专项
 
 **仓库结构（2026-10-07 变更）**：app 原本是独立 git 仓库（项目最早只有它，`git init` 在 app/ 里）；为了让 harness 能在父目录层级建分支并行开发，仓库已上移到父目录——app/ 的**全部提交历史原样保留**（hash 不变，作为 merge commit `767661c` 的第二父）。app/.git 已删除，现在全目录只有一个 `.git`（父目录）。旧 .git 备份在 `<local archive>\app-git-backup-20261007\`（确认稳定后可删）。父目录下还有 signin/、vote-slider/、媒体拼图/ 等小项目，已一并纳入版本管理。
 
-品牌：产品名「公众号排版助手」、署名「by Yoru」，常量在 `app/src/lib/brand.ts`；logo 是 YORU 设计系统的月相行「新月-上弦-满月-下弦」（`app/src/components/YoruMark.tsx`，3b 变体，满月用品牌靛青 #2E4A68），favicon 是弦月（`app/public/favicon.svg`）。localStorage key 沿用历史前缀 `mopai.*`（内部标识，用户不可见，不要改，改了丢老数据）。
+代码品牌：中文「芦苇」、英文「Reed」、署名「by Yoru」，品牌句「人是一根会思考的芦苇。」。
+常量在 `app/src/lib/brand.ts`；logo 沿用 YORU 设计系统的月相行（`app/src/components/YoruMark.tsx`），favicon 是弦月。
+已有存储、令牌、MCP 资源与部署名称按 [品牌与兼容标识](docs/branding.md) 保留，本次品牌更新无需数据迁移。
+README / README_EN 的界面截图共用 `docs/images/`。下文历史部署记录不表示这次品牌代码已经上线。
+
+2026-10-10 品牌与文档验收：中英文首页围绕 Skill 写稿、网页精修与单篇 MCP 协作组织，主题统计共用生成器。
+`check`、1397 个测试、219 套主题、`verify:sources` 与生产构建通过；首次并行检查中的 DOCX 初始化超时，
+随后单独运行全量测试通过。Python Skill 客户端完整验收通过；隔离生产服务中的真实 Chrome / OpenCode 1.18.31
+验证了新品牌、三个复制动作、MCP 往返、并发冲突、隔离、撤销与到期，并更新编辑器两态及模板库截图。
+中英文 README 在 Chrome 中渲染 Mermaid SVG、各 4 张图片与 4 张表格，中文标题实际使用本地 Noto Sans SC；
+191 个本地链接 / 图片路径按大小写检查通过。本次只需正常发布应用，无需 migration 或新增环境配置。
 
 ### 多 AI 并行纪律（分支/worktree 都在这个伞仓库上开）
 
@@ -320,7 +330,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 2026-10-07 的 CodeMirror 行装饰零长度问题已在当前实现修正：四处 `Decoration.line`
 > 均使用 `from=to=line.from`，不再列为未修问题；真实编辑器验收见 `cdp-verify-editor-upgrades.mjs`。
 >
-> 2026-10-07 更新：更名「公众号排版助手 by Yoru」+ Yoru 阴文印 logo + 弦月 favicon（`src/lib/brand.ts`、`src/components/YoruMark.tsx`）；新增模板专区页 `/themes`（`src/pages/Themes.tsx`，验收 `scripts/cdp-verify-rebrand.mjs`）；前端按设计系统铁律进一步内凹化（carriers 用 `ya-well`/inset，`ya-selected` 自带 sunken 底+1.5px 描边）；域名从 mopai 切到 wechat（Tunnel ingress + DNS + Access 放行三处都要动）。同日晚些时候 `/themes` 升级为多来源模板库（见上表与 THEME-SOURCES.md）。
+> 2026-10-07 更新：统一旧版产品命名、Yoru 阴文印 logo 与弦月 favicon（`src/lib/brand.ts`、`src/components/YoruMark.tsx`）；新增模板专区页 `/themes`（`src/pages/Themes.tsx`，验收 `scripts/cdp-verify-rebrand.mjs`）；前端按设计系统铁律进一步内凹化（carriers 用 `ya-well`/inset，`ya-selected` 自带 sunken 底+1.5px 描边）；域名从 mopai 切到 wechat（Tunnel ingress + DNS + Access 放行三处都要动）。同日晚些时候 `/themes` 升级为多来源模板库（见上表与 THEME-SOURCES.md）。
 >
 > 2026-10-08 更新：匿名图 GC 落地——`api/lib/anon-gc.ts`（纯函数 `selectGcCandidates` + sweep）
 > 与 `api/boot.ts` 生产分支里的排程，旋钮 `ANON_GC_DAYS`（默认 14）/ `ANON_GC_ENABLED`（默认开）。
@@ -437,7 +447,7 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > sha256 + 凑齐后 `flock` 安装」落地，三重核对全过，线上资产名回到 `index-Baubn_TV.js`。
 >
 > 2026-10-09 部署记录（收尾文档同步上线）：合并 `102567b`（README / AGENTS / 验证导航登记局部复制与深色验收，
-> Skill 更名「公众号排版助手 by Yoru」与 editorUrl 登录边界；纯文档，构建产物不变）。整包 sha256 `c5555bda…`
+> Skill 统一旧版命名与 editorUrl 登录边界；纯文档，构建产物不变）。整包 sha256 `c5555bda…`
 > （33.7MB，9×4MB 分块上传，part-05 撞到一次 `send() failed, 10054`，自动重传补齐后逐块核 hash），
 > `flock` 安装于 10:29:28 UTC，三重核对全过：线上 `dist/boot.js` sha256 = 本地 `b4840d2f…`，`index.html`
 > 资产名 `index-Baubn_TV.js` / `index-BwLwt3me.css` 未变（JS 资产字节 `80bd585b…` 与本地一致），公网 200。

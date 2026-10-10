@@ -92,8 +92,8 @@ try {
       favicon: document.querySelector('link[rel=icon]')?.href || '',
     }
   })()`)
-  check('document title is the new name', brand.title.includes('公众号排版助手'), brand.title)
-  check('top bar shows 公众号排版助手', brand.text.includes('公众号排版助手'))
+  check('document title is the new name', brand.title.includes('芦苇'), brand.title)
+  check('top bar shows 芦苇', brand.text.includes('芦苇'))
   check('top bar shows by Yoru', brand.text.includes('by Yoru'))
   check('Yoru seal mark renders with brand indigo', brand.hasMark && brand.markBg === 'rgb(46, 74, 104)', brand.markBg)
   check('seal shows 夜', brand.markText === '夜')
@@ -178,7 +178,7 @@ try {
     const mark = document.querySelector('[role=img][aria-label=Yoru]')
     return { text: document.body.textContent, hasMark: !!mark, markSize: mark ? mark.getBoundingClientRect().width : 0 }
   })()`)
-  check('login shows 公众号排版助手', login.text.includes('公众号排版助手'))
+  check('login shows 芦苇', login.text.includes('芦苇'))
   check('login shows by Yoru', login.text.includes('by Yoru'))
   check('login seal is the large variant', login.hasMark && login.markSize >= 50, `size=${login.markSize}`)
   await shot('08-login.png')

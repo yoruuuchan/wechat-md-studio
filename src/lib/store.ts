@@ -50,7 +50,8 @@ const ACTIVE_KEY = 'mopai.active.v1'
 const SETTINGS_KEY = 'mopai.settings.v1'
 /** One-time migration marker: browsers whose storage predates the sample. */
 const SAMPLE_SEEDED_KEY = 'mopai.sample.v1'
-const SAMPLE_MARKER = '欢迎使用公众号排版助手'
+// Recognize both sample generations without rewriting a user's saved article.
+const SAMPLE_MARKERS = ['欢迎使用芦苇', '欢迎使用公众号排版助手']
 
 /** How many recently removed ids the index remembers, to keep a stale body from coming back. */
 const TOMBSTONE_LIMIT = 200
@@ -342,7 +343,7 @@ async function applySampleSeed(docs: DocRecord[], activeId: string): Promise<Loa
   if (!docs.length || safeGet(SAMPLE_SEEDED_KEY)) return { docs, activeId }
   safeSet(SAMPLE_SEEDED_KEY, '1')
   let out = docs
-  let sample = out.find((d) => d.content.includes(SAMPLE_MARKER))
+  let sample = out.find((d) => SAMPLE_MARKERS.some((marker) => d.content.includes(marker)))
   if (!sample) {
     sample = createSampleDoc()
     out = [sample, ...out]

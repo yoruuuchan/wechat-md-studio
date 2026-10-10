@@ -83,7 +83,7 @@ describe('anonymous single-document MCP', () => {
     const connection = await create()
     const initialized = await rpc(connection.token, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } })
     expect(initialized.status).toBe(200)
-    expect((await rpcJson(initialized)).result.serverInfo.name).toBe('wechat-md-studio')
+    expect((await rpcJson(initialized)).result.serverInfo).toMatchObject({ name: 'wechat-md-studio', title: '芦苇 Reed' })
     const listed = await rpc(connection.token, 'tools/list')
     expect((await rpcJson(listed)).result.tools.map((t) => t.name)).toEqual(['read_writing_skill', 'read_current_document', 'update_current_document'])
     const skill = await rpc(connection.token, 'tools/call', { name: 'read_writing_skill', arguments: {} })

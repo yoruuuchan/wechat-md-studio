@@ -11,7 +11,7 @@ export default function RemoteMcpDialog({ open, onOpenChange, doc, remote }: {
   const credentials = remote.credentials
   const endpoint = credentials?.endpoint ?? `${window.location.origin}/api/mcp`
   const config = credentials ? JSON.stringify({ mcpServers: {
-    'mopai-current': { type: 'http', url: endpoint, headers: { Authorization: `Bearer ${credentials.token}` } },
+    'reed-current': { type: 'http', url: endpoint, headers: { Authorization: `Bearer ${credentials.token}` } },
   } }, null, 2) : ''
   const connected = Boolean(doc?.remoteMcp)
   return (

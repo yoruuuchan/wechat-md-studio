@@ -28,12 +28,12 @@ function withGrant(token: string, action: () => ReturnType<typeof jsonResult> | 
 
 function createServer(token: string, origin: string): McpServer {
   const server = new McpServer(
-    { name: 'wechat-md-studio', version: '1.0.0' },
+    { name: 'wechat-md-studio', title: '芦苇 Reed', version: '1.0.0' },
     { instructions: '只协作已授权的当前稿件。先 read_writing_skill，再 read_current_document；更新必须回传读取时的 hash 作为 baseHash。冲突时重新读稿并合并，不能盲重试。' },
   )
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
   server.registerTool('read_writing_skill', {
-    title: '读取墨排写作规则', description: '读取公众号 Markdown 方言、图片引用和写作模板的完整 Skill。',
+    title: '读取芦苇写作规则', description: '读取公众号 Markdown 方言、图片引用和写作模板的完整 Skill。',
     inputSchema: {}, annotations: readOnly,
   }, () => withGrant(token, () => ({ content: [{ type: 'text', text: writingSkill }] })))
   server.registerTool('read_current_document', {
@@ -53,7 +53,7 @@ function createServer(token: string, origin: string): McpServer {
     return jsonResult(result, !result.ok)
   }))
   server.registerResource('writing-skill', `${origin}/skill.md`, {
-    title: '墨排写作 Skill', mimeType: 'text/markdown',
+    title: '芦苇写作 Skill', mimeType: 'text/markdown',
   }, (uri) => {
     readTokenConnection(token)
     return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: writingSkill }] }

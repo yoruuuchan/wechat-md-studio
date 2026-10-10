@@ -4,7 +4,7 @@
 
 ## 普通用户：AI 帮我写
 
-编辑器左栏的「AI 帮我写」无需登录。复制提示词后补上主题、读者、资料与篇幅，交给自己常用的 AI；
+芦苇编辑器左栏的「AI 帮我写」无需登录。复制提示词后补上主题、读者、资料与篇幅，交给自己常用的 AI；
 AI 能读链接时发 Skill 地址，不能读链接时复制完整 Skill。最后把 Markdown 粘回编辑器。
 页面不选择 AI，也不配置模型 API。
 
@@ -51,7 +51,7 @@ SDK 客户端按 MCP 标准发送 `Accept: application/json, text/event-stream`�
 ```json
 {
   "mcpServers": {
-    "mopai-current": {
+    "reed-current": {
       "type": "http",
       "url": "https://wechat.yoru-and-akari.dev/api/mcp",
       "headers": { "Authorization": "Bearer <单稿件令牌>" }
@@ -66,7 +66,7 @@ OpenCode 使用自己的 `mcp` / `type: remote` 格式：
 ```json
 {
   "mcp": {
-    "mopai-current": {
+    "reed-current": {
       "type": "remote",
       "url": "https://wechat.yoru-and-akari.dev/api/mcp",
       "headers": { "Authorization": "Bearer <单稿件令牌>" },
@@ -101,7 +101,9 @@ ChatGPT 自定义连接可能额外要求 OAuth。核心 MCP 保持独立；若�
 | `read_current_document` | 无参数；返回 `connection` 与 `doc: {name, content, hash, updatedAt}` |
 | `update_current_document` | 完整 `content`、必需 `baseHash`、可选 `name`；成功返回 `{ok:true, doc}` |
 
-资源包括公开 Skill URI 和 `mopai://document/current`。所有工具 / 资源都重新验证当前令牌。
+资源包括公开 Skill URI 和 `mopai://document/current`。后者是保留兼容的资源标识，展示标题使用芦苇；
+客户端配置里的 `reed-current` 是可自选的连接名，原有连接名也能继续使用。所有工具 / 资源都重新验证当前令牌。
+完整标识说明见 [品牌与兼容](branding.md)。
 工具没有稿件 id 选择器、列表、删除、上传图片、通用 workspace 或 `force` 入口。
 需加图片时在网页上传，再让 AI 保留正文里的 `img:<key>` 短引用。
 

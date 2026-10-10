@@ -81,7 +81,7 @@ if (env.isProduction) {
   // Loopback by default: the only intended entry point is the Cloudflare
   // Tunnel, so the app must not be reachable by hitting the host's public IP.
   serve({ fetch: app.fetch, port: env.port, hostname: env.host }, () => {
-    console.log(`公众号排版助手 running on http://${env.host}:${env.port}/`);
+    console.log(`芦苇 (Reed) running on http://${env.host}:${env.port}/`);
   });
 
   // The anonymous image pool recycles itself: one sweep shortly after boot, then

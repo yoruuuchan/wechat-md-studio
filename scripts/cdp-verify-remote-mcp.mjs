@@ -131,7 +131,7 @@ try {
     await sleep(250)
   }
   const connect = async (token) => {
-    const client = new Client({ name: 'mopai-browser-acceptance', version: '1.0' })
+    const client = new Client({ name: 'reed-browser-acceptance', version: '1.0' })
     await client.connect(new StreamableHTTPClientTransport(new URL(`${appUrl}api/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }))
     clients.push(client)
     return client
@@ -155,7 +155,7 @@ try {
     await click(select(`[data-ai-copy="${type}"]`))
     await sleep(150)
     const copied = (await ev('navigator.clipboard.readText()')).replace(/\r\n/g, '\n')
-    check(`anonymous copy ${type}`, type === 'prompt' ? copied.includes(expected) && copied.includes('主题') : copied === expected)
+    check(`anonymous copy ${type}`, type === 'prompt' ? copied.includes(expected) && copied.includes('主题') && copied.includes('芦苇') && !copied.includes('墨排') : copied === expected)
   }
   const shot = async (file) => {
     const { data } = await send('Page.captureScreenshot', { format: 'png' }, sessionId)
@@ -172,7 +172,7 @@ try {
   await click(select('[data-mcp-copy="config"]'))
   await sleep(150)
   const copiedConfig = JSON.parse(await ev('navigator.clipboard.readText()'))
-  check('copied standard URL and Bearer', copiedConfig.mcpServers['mopai-current'].url === `${appUrl}api/mcp` && copiedConfig.mcpServers['mopai-current'].headers.Authorization === `Bearer ${token}`)
+  check('copied standard URL and Bearer', copiedConfig.mcpServers['reed-current'].url === `${appUrl}api/mcp` && copiedConfig.mcpServers['reed-current'].headers.Authorization === `Bearer ${token}`)
   await shot(path.join(shots, 'remote-mcp-akari.png'))
   await closeDialog()
 
@@ -318,6 +318,7 @@ try {
   await send('Page.reload', {}, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'light screenshot')
   await ev('document.fonts.ready.then(()=>true)')
+  check('Reed brand appears in title, header and sample', await ev(`document.title.startsWith('芦苇') && document.querySelector('header').textContent.includes('芦苇') && window.__mopaiCodemirror.state.doc.toString().includes('欢迎使用芦苇')`))
   await shot(publicUrl ? path.join(shots, 'public-editor-akari.png') : path.resolve('docs/images/editor-akari.png'))
   await ev(`localStorage.setItem('mopai.theme.v1','yoru'); true`)
   await send('Page.reload', {}, sessionId)
@@ -325,6 +326,21 @@ try {
   await ev('document.fonts.ready.then(()=>true)')
   await shot(publicUrl ? path.join(shots, 'public-editor-yoru.png') : path.resolve('docs/images/editor-yoru.png'))
   check('dark theme wires the new entry', await ev(`document.documentElement.dataset.theme==='yoru' && document.documentElement.classList.contains('dark') && Boolean(document.querySelector('[data-open-ai-writing]'))`))
+
+  if (!publicUrl) {
+    // Read-only routes and shared README images use the same isolated browser.
+    await ev(`localStorage.setItem('mopai.theme.v1','akari'); true`)
+    await send('Page.navigate', { url: `${appUrl}themes` }, sessionId)
+    await waitFor(`document.querySelector('[data-theme-card] [data-theme-preview="rendered"]')`, 'rendered theme library')
+    await ev('document.fonts.ready.then(()=>true)')
+    check('theme library uses Reed in header and source filters', await ev(`document.querySelector('header').textContent.includes('芦苇') && document.querySelector('main').textContent.includes('芦苇') && !document.body.textContent.includes('公众号排版助手')`))
+    await shot(path.resolve('docs/images/theme-library.png'))
+    for (const route of ['login', 'references', 'terms']) {
+      await send('Page.navigate', { url: `${appUrl}${route}` }, sessionId)
+      await waitFor(`document.body.textContent.includes('芦苇')`, `${route} brand`)
+      check(`${route} public brand`, await ev(`!document.body.textContent.includes('墨排') && !document.body.textContent.includes('公众号排版助手')`))
+    }
+  }
   console.log(`Screenshots: ${shots}`)
 } finally {
   for (const cleanup of grantCleanups) await cleanup().catch(() => {})

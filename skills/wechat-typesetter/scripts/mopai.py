@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mopai.py - agent client for 公众号排版助手 by Yoru (wechat-md-studio), a WeChat Markdown editor.
+"""mopai.py - agent client for 芦苇 by Yoru (wechat-md-studio), a WeChat Markdown editor.
 
 Talks to the REST door at `<base>/api/agent/*` with a Bearer token, so a coding
 agent can push a Markdown draft into the web editor, hand the human a link, and
@@ -93,7 +93,7 @@ SKILL_ROOT = SCRIPT_PATH.parent.parent
 ENV_FILE = SKILL_ROOT / ".env"
 ENV_EXAMPLE = SKILL_ROOT / ".env.example"
 
-ENV_FALLBACK_TEMPLATE = """# mopai skill config. The only config source for scripts/mopai.py.
+ENV_FALLBACK_TEMPLATE = """# Reed skill config. The only config source for scripts/mopai.py.
 # This file is gitignored; never commit a real token.
 
 # ---- Connection -----------------------------------------------------------
@@ -104,15 +104,15 @@ MOPAI_API_URL=https://wechat.yoru-and-akari.dev
 """
 
 
-class MopaiError(Exception):
+class ReedError(Exception):
     """Anything that should end the run with a JSON error on stderr (exit 1)."""
 
 
-class UsageError(MopaiError):
+class UsageError(ReedError):
     """The command line itself was wrong (exit 2)."""
 
 
-class ServerError(MopaiError):
+class ServerError(ReedError):
     """The server answered with a non-2xx status and, usually, {error, hint}."""
 
     def __init__(self, status, error, hint=None, url=None, payload=None):
@@ -344,7 +344,7 @@ def auth_headers():
     token = env_value("MOPAI_TOKEN")
     if token:
         return {"Authorization": f"Bearer {token}"}
-    raise MopaiError(
+    raise ReedError(
         "缺少令牌：这个命令要带 Authorization: Bearer mopai_… 才能调用。"
         f"请在 {ENV_FILE} 里写 MOPAI_TOKEN=mopai_xxx，"
         f"或执行 {invocation()} set-token mopai_xxx。"
@@ -393,7 +393,7 @@ def read_response(resp):
     try:
         return json.loads(raw)
     except ValueError:
-        raise MopaiError(f"服务端返回的不是 JSON：{' '.join(raw.split())[:200]}")
+        raise ReedError(f"服务端返回的不是 JSON：{' '.join(raw.split())[:200]}")
 
 
 def http_json(url, method="GET", payload=None, headers=None, args=None):
@@ -412,14 +412,14 @@ def http_json(url, method="GET", payload=None, headers=None, args=None):
     except urllib.error.HTTPError as e:
         raise server_error(e.code, e.read().decode("utf-8", errors="replace"), url)
     except urllib.error.URLError as e:
-        raise MopaiError(f"连不上 {url}：{e.reason}")
+        raise ReedError(f"连不上 {url}：{e.reason}")
     except OSError as e:
-        raise MopaiError(f"连不上 {url}：{e}")
+        raise ReedError(f"连不上 {url}：{e}")
 
 
 def upload_image(base, image_path, headers, args=None):
     """POST one file to /api/agent/images; returns the server's JSON."""
-    boundary = f"----mopai{uuid.uuid4().hex}"
+    boundary = f"----reed{uuid.uuid4().hex}"
     mime = MIME_BY_EXT.get(image_path.suffix.lower(), "application/octet-stream")
     body = b"\r\n".join([
         f"--{boundary}".encode(),
@@ -441,9 +441,9 @@ def upload_image(base, image_path, headers, args=None):
     except urllib.error.HTTPError as e:
         raise server_error(e.code, e.read().decode("utf-8", errors="replace"), url)
     except urllib.error.URLError as e:
-        raise MopaiError(f"连不上 {url}：{e.reason}")
+        raise ReedError(f"连不上 {url}：{e.reason}")
     except OSError as e:
-        raise MopaiError(f"连不上 {url}：{e}")
+        raise ReedError(f"连不上 {url}：{e}")
 
 
 # ---- local image references -------------------------------------------------
@@ -504,19 +504,19 @@ def process_images(content, base_dir, base, headers, args=None):
             try:
                 size = path.stat().st_size
                 if size > MAX_IMAGE_BYTES:
-                    raise MopaiError(f"图片 {size // (1024 * 1024)}MB，超过 20MB 上限")
+                    raise ReedError(f"图片 {size // (1024 * 1024)}MB，超过 20MB 上限")
                 if size == 0:
-                    raise MopaiError("图片是空文件")
+                    raise ReedError("图片是空文件")
                 result = upload_image(base, path, headers, args)
                 # `ref` (img:<key>) is what belongs in the Markdown. The `url`
                 # field is a convenience for humans: a raw absolute URL would not
                 # survive WeChat re-hosting the image.
                 ref_value = result.get("ref") or (f"img:{result['key']}" if result.get("key") else None)
                 if not ref_value:
-                    raise MopaiError("服务端没有返回 ref/key")
+                    raise ReedError("服务端没有返回 ref/key")
                 cache[key] = ref_value
                 uploaded += 1
-            except (MopaiError, OSError) as e:
+            except (ReedError, OSError) as e:
                 message = getattr(e, "error", None) or str(e)
                 warnings.append(f"图片上传失败，保留原引用：{ref}（{message}）")
                 cache[key] = None
@@ -724,7 +724,7 @@ def cmd_get(args):
             # server has, so the file can go straight back through `update`.
             out_path.write_bytes(content.encode("utf-8"))
         except OSError as e:
-            raise MopaiError(f"写文件失败 {out_path.resolve()}：{e}")
+            raise ReedError(f"写文件失败 {out_path.resolve()}：{e}")
         meta["out"] = str(out_path.resolve())
         emit_json(meta, getattr(args, "pretty", False))
         if getattr(args, "pretty", False):
@@ -876,7 +876,7 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog="mopai.py",
         parents=[common],
-        description="「公众号排版助手 by Yoru」的 agent 客户端：把 Markdown 推进网页编辑器，人工润色后再读回来。"
+        description="「芦苇 by Yoru」的 agent 客户端：把 Markdown 推进网页编辑器，人工润色后再读回来。"
                     "零依赖，只用 Python 3 标准库。",
         epilog="配置只来自 <技能目录>/.env（MOPAI_API_URL / MOPAI_TOKEN）。"
                "直接跑命令就行，不用先检查 .env：缺令牌时错误信息里会带上路径和补救命令。",
@@ -981,7 +981,7 @@ def main(argv=None):
     except ServerError as e:
         emit_error(error_payload(e))
         return 1
-    except MopaiError as e:
+    except ReedError as e:
         emit_error(error_payload(e))
         return 1
     except KeyboardInterrupt:

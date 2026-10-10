@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create the R2 bucket for 墨排 images. Idempotent.
+# Create the R2 bucket for Reed images. Idempotent.
 set -uo pipefail
 set -a; source $HOME/.config/codex/private.env 2>/dev/null; set +a
 

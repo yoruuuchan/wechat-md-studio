@@ -1,5 +1,5 @@
 /**
- * mopai-images — R2 image host for 墨排.
+ * mopai-images — R2 image host for Reed.
  *
  *   GET    /img/<key>            public read (no secret; the key is the capability)
  *   PUT    /api/upload?key=<key> write, requires X-Admin-Key

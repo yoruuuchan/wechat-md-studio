@@ -366,7 +366,7 @@ try {
   console.log('=== boots ===')
   check('CodeMirror view is exposed', await evaluate(`!!window.__mopaiCodemirror`))
   check('toolbar renders', await evaluate(`!!(${visibleBtn('bold')})`))
-  check('the sample article is loaded', (await doc()).includes('欢迎使用公众号排版助手'))
+  check('the sample article is loaded', (await doc()).includes('欢迎使用芦苇'))
 
   await setEditorDoc(FIXTURE)
   const base = await doc()

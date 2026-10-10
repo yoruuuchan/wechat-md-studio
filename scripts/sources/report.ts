@@ -167,14 +167,19 @@ const COPYLEFTISH = ['GPL', 'AGPL', 'LGPL', 'MPL', 'SSPL', 'BUSL']
 
 // ---------------------------------------------------------------- README
 
-export function buildReadmeThemeCount(): string {
-  return `${THEMES.length} 套`
+export function buildReadmeThemeCount(language: 'zh' | 'en' = 'zh'): string {
+  return language === 'en' ? `${THEMES.length} themes` : `${THEMES.length} 套`
 }
 
 /** A short README source summary; detailed statistics stay in the audit docs. */
-export function buildReadmeThemeSources(): string {
+export function buildReadmeThemeSources(language: 'zh' | 'en' = 'zh'): string {
   const groups = sourceGroups()
   const upstreamThemes = THEMES.length - groups.originals
+  if (language === 'en') return [
+    `The library contains **${THEMES.length} themes**: ${groups.originals} originals and ${upstreamThemes} adapted from ${groups.importedProjects.size + 1} upstream projects. Authors, licenses and provenance are recorded in shared metadata.`,
+    '',
+    'See [THEME-SOURCES](THEME-SOURCES.md) for the audit. Project acknowledgements and adaptation notes come from [credits.ts](src/lib/credits.ts) and appear in [References](https://wechat.yoru-and-akari.dev/references) and [LICENSES/NOTICE](LICENSES/NOTICE.md).',
+  ].join('\n')
   return [
     `主题库共 **${THEMES.length} 套**：${groups.originals} 套自研 + ${groups.importedProjects.size + 1} 个上游项目的 ${upstreamThemes} 套主题，来源与许可维护在统一 metadata 中。`,
     '',
@@ -377,6 +382,8 @@ export function buildNoticeLicenseTally(): string {
 export const DOC_BLOCKS: DocBlock[] = [
   { file: 'README.md', name: 'theme-count', inline: true, build: buildReadmeThemeCount },
   { file: 'README.md', name: 'readme-theme-sources', build: buildReadmeThemeSources },
+  { file: 'README_EN.md', name: 'theme-count', inline: true, build: () => buildReadmeThemeCount('en') },
+  { file: 'README_EN.md', name: 'readme-theme-sources', build: () => buildReadmeThemeSources('en') },
   { file: 'LICENSES/NOTICE.md', name: 'notice-credits', build: buildNoticeAcknowledgements },
   { file: 'THEME-SOURCES.md', name: 'themes-doc-intro', build: buildThemesDocIntro },
   { file: 'THEME-SOURCES.md', name: 'themes-doc-sources', build: buildThemesDocSourceTable },

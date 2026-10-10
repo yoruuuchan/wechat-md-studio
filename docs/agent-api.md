@@ -1,5 +1,8 @@
 # Agent API 与客户端
 
+芦苇的既有 `mopai_` 令牌前缀、`mopai.py` 与 `MOPAI_*` 配置键保持兼容；
+它们是接口标识，产品名称为芦苇 / Reed，详见 [品牌与兼容](branding.md)。
+
 [项目首页](../README.md) · [开发 Agent 入口](../AGENTS.md) · [验证导航](verification.md)
 
 这里是 Agent 调用产品的接口说明。代码事实来源为 [contracts/agent.ts](../contracts/agent.ts)、

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-run every deployed-side check for 墨排.
+# Re-run every deployed-side check for Reed.
 #
 # Every check runs even if an earlier one fails, but the overall exit code is
 # non-zero when any of them did - otherwise a broken deployment reports success.

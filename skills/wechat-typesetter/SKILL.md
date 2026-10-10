@@ -1,9 +1,12 @@
 ---
 name: wechat-typesetter
-description: 为墨排（公众号排版助手 by Yoru，wechat-md-studio）撰写可直接使用的公众号 Markdown，或与浏览器协作改稿。前半部分是独立、完整的写作规则，网页版 AI 无需令牌、API 或本地脚本；后半部分供获授权的 Remote MCP 与 Agent REST / Python 环境读取、更新、推稿和读回结果。适用于“AI 帮我写”“写公众号文章”“排版这篇文章”“推到排版助手”“改当前稿件”“发给我改”。Python 客户端零依赖，配置只来自技能目录的 .env；已有推稿与本地图片上传能力继续保留。
+description: 为芦苇（Reed，wechat-md-studio）撰写可直接使用的公众号 Markdown，或与浏览器协作改稿。前半部分是独立、完整的写作规则，网页版 AI 无需令牌、API 或本地脚本；后半部分供获授权的 Remote MCP 与 Agent REST / Python 环境读取、更新、推稿和读回结果。适用于“AI 帮我写”“写公众号文章”“排版这篇文章”“推到排版助手”“改当前稿件”“发给我改”。Python 客户端零依赖，配置只来自技能目录的 .env；已有推稿与本地图片上传能力继续保留。
 ---
 
-# 墨排 · 公众号写作与协作 Skill
+# 芦苇 · 公众号写作与协作 Skill
+
+芦苇（Reed）是一套人与 AI 围绕同一份内容协作的创作工具，目前主要服务微信公众号。
+品牌句：人是一根会思考的芦苇。
 
 公开地址：<https://wechat.yoru-and-akari.dev/skill.md>。站点与仓库的
 `skills/wechat-typesetter/SKILL.md` 使用同一份源文件。
@@ -14,7 +17,7 @@ description: 为墨排（公众号排版助手 by Yoru，wechat-md-studio）撰�
 以用户资料或核实过的来源为准；缺少依据时写明待补，不能编造人名、引语、统计或图片地址。
 只负责写稿时无需登录、令牌、模型 API、Python 或 MCP，也无需读取本 Skill 的后半部分。
 
-把稿件交给用户粘入 [墨排编辑器](https://wechat.yoru-and-akari.dev/) 左栏，右栏会实时排版。
+把稿件交给用户粘入 [芦苇编辑器](https://wechat.yoru-and-akari.dev/) 左栏，右栏会实时排版。
 默认只输出可粘贴的稿件源文，不加操作说明，也不把整篇稿件包进一个代码块。
 视觉样式由用户在网页里选择主题；写稿时只表达内容与结构。
 
@@ -190,7 +193,10 @@ ChatGPT 的自定义连接若要求 OAuth，应按
 
 ### 概述
 
-`scripts/mopai.py` 是「公众号排版助手 by Yoru」（公众号 Markdown 排版 Web 应用）的 agent 客户端：把 Markdown 稿件推进线上编辑器，拿回一个 `editorUrl`，交给人在浏览器里排版、选主题、微调，最后把润色过的稿子读回来。**脚本本身不做任何渲染和排版**——排版只发生在网页里，人也在网页里完成这篇文章。所以这个技能的正确用法是"推上去 → 把链接给人 → 等改完再读回来"，而不是"在本地生成公众号 HTML"。
+`scripts/mopai.py` 是「芦苇 by Yoru」（公众号 Markdown 排版 Web 应用）的 agent 客户端：把 Markdown 稿件推进线上编辑器，拿回一个 `editorUrl`，交给人在浏览器里排版、选主题、微调，最后把润色过的稿子读回来。**脚本本身不做任何渲染和排版**——排版只发生在网页里，人也在网页里完成这篇文章。所以这个技能的正确用法是"推上去 → 把链接给人 → 等改完再读回来"，而不是"在本地生成公众号 HTML"。
+
+`mopai.py`、`MOPAI_*` 配置键与令牌前缀沿用已有调用约定，保证现有安装、配置和授权继续可用；
+这些内部标识不作为产品名。公开产品名称统一为芦苇 / Reed。
 
 脚本是零依赖的 Python 3 标准库实现，Windows 和 Linux 都能直接跑，不用装任何东西。下面命令里的 `mopai.py` 指 `<技能目录>/scripts/mopai.py`（`<技能目录>` 就是本 `SKILL.md` 所在目录）；Windows 用 `python`，Linux/macOS 用 `python3`。**每条错误信息里都带 `script` 和 `envFile` 的绝对路径**，不用猜文件在哪，直接从那句报错里复制。
 
