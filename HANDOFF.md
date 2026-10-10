@@ -523,6 +523,44 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `TopBar.tsx` / `EditorPage.tsx` / `useDocs.ts` / `vite.config.ts` / `package.json` 的改动）——
 > **下一个部署者勿把这条线的 WIP 混进构建**，等它提交并走完自己的验收。
 
+> 2026-10-10 部署记录（AI 写作与当前稿件 Remote MCP）：上面的 MCP WIP 已提交并合入 master。
+> 功能提交 `a20980e` 与现有联系 / star 主线合并为 `4c480cc`；兼容补丁 `98de250` 将公开 Skill
+> 改为 UTF-8 `text/plain` 原始 Markdown，并加入可安全复验公网版本的脚本模式。公开仓库已正常
+> 增量 push：功能 `7ce84cd`、兼容 `ad8566c`，未重写历史；此前联系 / star 的公开发布欠账也已补齐。
+>
+> 最终构建来自主工作区 master `98de250`，check / 1395 项 test / 219 主题验证 / build 全过。
+> Agent 浏览器往返、Python Skill 与云端稿件同步脚本均通过；新 MCP 脚本在独立生产模式库里验证
+> 匿名授权、完整 Skill、读写、浏览器同步、hash 冲突的三种选择、游客 / 稿件隔离、换令牌、撤销、
+> 强制到期及本机重开。真实 OpenCode 1.18.31 原生客户端完成 Skill / read / update 三个调用，
+> 模型响应使用本地确定性驱动，不使用用户模型账号。公网同一浏览器 + OpenCode 流程全过；
+> 公网的强制数据库到期明确 SKIP（私有测试库已过），没有直接改线上库制造到期。
+> `/terms` 与相邻设置入口公网复验 16/16；README 两态编辑器截图已在功能提交更新。
+>
+> 首次安装前备份 `/opt/mopai/backups/mopai-pre-remote-mcp-4c480cc.db` 与
+> `env-pre-remote-mcp-4c480cc.env`（权限 600），并配置
+> `PUBLIC_BASE_URL=https://wechat.yoru-and-akari.dev`。启动自动增加 `remote_mcp_connections`
+> 表与索引，正文复用 `docs` 的 ownerId=0 临时行；既有列与站长 ownerId=1 路径不变。
+> 新旋钮 `REMOTE_MCP_TTL_HOURS` / `REMOTE_MCP_TOTAL_BYTES` 使用默认 24h / 50 MiB，
+> 无模型密钥或 OAuth 环境配置需求。到期立即拒绝访问，生产每分钟回收临时副本。
+>
+> 最终包 33,828,412 bytes，sha256 `1bd72accd4dc2a83dbe33a4fa82a1887a4b421b779b9a33f64c59ef8d6d2f5cc`；
+> 使用 `/tmp/mopai-deploy.lock` 安装，`ExecMainStartTimestamp` 为 2026-10-10 01:09:46 UTC。
+> 三重核对通过：本机 / 服务器 `boot.js` sha256
+> `8cf94d440976996282e90277e6b881170141c74b7230fb1404de6aed0cc593c4`，首页与公网资产均为
+> `index-BO_dxRPV.js` / `index-BsGB4w3K.css`。公网 `/skill.md` 返回 200，25,973 bytes，
+> 与跟踪 Skill 的 LF 内容完全一致，sha256 `ee1c279f74926c74cd70aebb195666eae0562bcc2bc23923b4cefe0908773890`。
+>
+> 传输补记：本机原生 SSH / Git SSH 的 4 MiB scp 块均出现中途 reset，改为 33 个 1 MiB 块，
+> 每块与重组整包都核 sha256，最多三个独立块并发。Git Bash helper 需
+> `export SHELL=/usr/bin/bash`，否则继承的 PowerShell SHELL 会令 Git SSH 的自动 exec 启动失败。
+> 上传的 installer 在本机显式规范为 LF，再按字节 scp，避免 PowerShell 管道的 CRLF 变形。
+>
+> 网页读取限制按实测保留：普通 HTTP 可取完整 Skill；本会话的网页检索工具对该域返回不可访问，
+> Tavily 提取只保留前段。完整复制与 MCP Skill 读取均得到全文，仓库 Raw 地址也可读完整内容。
+> 核对边缘设置后，AI search / user 策略均为 disabled（不阻断），此时间窗 `/skill.md` 没有
+> firewallEventsAdaptive 阻断事件；这些证据不用于宣称每个网页版 AI 都能读本站链接。
+> 未改 Cloudflare 全区策略；ChatGPT OAuth 连接器也未计作通过，核心 Bearer MCP 保持独立。
+
 ### 产品方向（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。

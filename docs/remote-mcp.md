@@ -13,6 +13,9 @@ AI 能读链接时发 Skill 地址，不能读链接时复制完整 Skill。最�
 [wechat-typesetter/SKILL.md](../skills/wechat-typesetter/SKILL.md)，公开路由、网页复制和 MCP 读取共用它。
 前半部分是可独立使用的写作规则与模板；后半部分保留 Remote MCP、Agent REST / Python 客户端能力。
 它不包含任何访问令牌。
+公开路由返回 UTF-8 `text/plain` 原始 Markdown，方便网页文本读取器读取；MCP 资源仍标记为
+`text/markdown`。网站不为某个 AI 单独维护副本，不能读取链接或提取不完整时使用「复制完整 Skill」。
+也可读取同源仓库的 [Raw Skill](https://raw.githubusercontent.com/yoruuuchan/wechat-md-studio/master/skills/wechat-typesetter/SKILL.md)。
 
 ## 高级用户：授权当前稿件
 
@@ -75,6 +78,11 @@ OpenCode 使用自己的 `mcp` / `type: remote` 格式：
 
 Cherry Studio、Qoder、Claude Code 等按自身界面或配置填写 HTTP 地址和请求头。
 令牌不放 URL，不写进聊天、截图、仓库或公开日志。
+
+2026-10-10 已用 OpenCode 1.18.31 原生客户端完成真实接入：初始化、发现工具、读取完整 Skill、
+读稿、带原 hash 改稿，打开的匿名浏览器自动收到新内容；同一流程也在公网服务通过。
+验收用本地确定性模型响应驱动三个调用，MCP 请求由真实 OpenCode 进程发出，未使用用户模型账号。
+其他客户端保留标准接入方式；尚未运行的客户端不计为实测通过。
 
 ChatGPT 自定义连接可能额外要求 OAuth。核心 MCP 保持独立；若增加适配，应以
 [yoruuuchan/chatgpt-mcp-connect](https://github.com/yoruuuchan/chatgpt-mcp-connect) 的已验证方案为基线，

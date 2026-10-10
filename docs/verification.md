@@ -50,6 +50,19 @@ Remote MCP 脚本设置 `MOPAI_OPENCODE_BIN` 为已安装的 OpenCode 原生可�
 进行 Skill / 读稿 / 改稿三个工具调用；模型响应由本地确定性驱动提供，配置与数据库均在临时目录，
 不读取用户模型账号或修改全局 MCP 配置。未设置时该客户端部分明确 `SKIP`，不能当成客户端验收通过。
 
+需要复验已部署的公网版本时，可在 PowerShell 设置：
+
+```powershell
+$env:MOPAI_MCP_PUBLIC_URL = 'https://wechat.yoru-and-akari.dev'
+$env:MOPAI_OPENCODE_BIN = '<已安装的 OpenCode 原生可执行文件绝对路径>'
+node scripts/cdp-verify-remote-mcp.mjs 3227 9355
+```
+
+公网模式不启动本地应用或图床，3227 不会被监听，9355 仍是 Chrome CDP 端口。
+使用新浏览器 profile / 游客，不读取现有稿件；测试结束撤销测试连接，截图留在 `verify-out/remote-mcp/`，
+不覆盖 README 图片。强制到期需要改测试 SQLite，只在自带私有数据库的模式运行；公网模式明确 `SKIP`，
+不能把它报告为线上到期测试通过。2026-10-10 已用 OpenCode 1.18.31 完成上述公网往返验收。
+
 ## 测试已启动的本地应用
 
 以下脚本不会替你配置完整服务。先按 [配置说明](configuration.md) 起隔离的本地生产应用，
