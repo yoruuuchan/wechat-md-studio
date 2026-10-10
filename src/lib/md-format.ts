@@ -18,6 +18,8 @@
  */
 import { fencedRanges, isInFence } from './fences'
 import type { Block, CarouselRatio } from './types'
+import { t } from './i18n'
+import type { MsgKey } from './i18n.zh'
 
 // ---------- shapes ----------
 
@@ -190,12 +192,12 @@ export const INLINE_PAIR: Record<InlineFormat, [string, string]> = {
   code: ['`', '`'],
 }
 
-const PLACEHOLDER: Record<InlineFormat, string> = {
-  bold: '加粗文字',
-  mark: '重点文字',
-  italic: '斜体文字',
-  strike: '删除文字',
-  code: '代码',
+const PLACEHOLDER_KEY: Record<InlineFormat, MsgKey> = {
+  bold: 'md.bold',
+  mark: 'md.mark',
+  italic: 'md.italic',
+  strike: 'md.strike',
+  code: 'md.code',
 }
 
 function isSpace(c: string | undefined): boolean {
@@ -366,7 +368,7 @@ function wrapInline(text: string, sel: Selection, format: InlineFormat): EditRes
   // A code span cannot cross a line break: markdown-it would leave the
   // backticks as literal text.
   if (format === 'code' && inner.includes('\n')) return null
-  const taken = inner || PLACEHOLDER[format]
+  const taken = inner || t(PLACEHOLDER_KEY[format])
   const [open, close] = INLINE_PAIR[format]
   const doc = text.slice(0, sel.from) + open + taken + close + text.slice(sel.to)
   const from = sel.from + open.length
@@ -445,7 +447,7 @@ export function toggleLink(text: string, sel: Selection, range?: { from: number;
     const at = sel.from + selected.length + 3
     return { doc, from: at, to: at }
   }
-  const label = '链接文字'
+  const label = t('md.linkText')
   const doc = text.slice(0, sel.from) + `[${label}]()` + text.slice(sel.from)
   return { doc, from: sel.from + 1, to: sel.from + 1 + label.length }
 }
@@ -857,7 +859,7 @@ function withCaret(raw: string, marker = '|'): Template {
  */
 export function buildTable(cols: number, rows: number, align: 'none' | 'left' | 'center' | 'right'): Template {
   const dash = align === 'none' ? '---' : align === 'left' ? ':---' : align === 'center' ? ':---:' : '---:'
-  const head = `| ${Array.from({ length: cols }, () => '表头').join(' | ')} |`
+  const head = `| ${Array.from({ length: cols }, () => t('md.tableHeader')).join(' | ')} |`
   const sep = `| ${Array.from({ length: cols }, () => dash).join(' | ')} |`
   const bodyCount = Math.max(0, rows - 1)
   const body = Array.from({ length: bodyCount }, () => `|${'  |'.repeat(cols)}`).join('\n')
@@ -875,7 +877,7 @@ export function buildGallery(cols: number, ratio: CarouselRatio): Template {
 }
 
 export function buildMath(tex: string): Template {
-  const body = tex.trim() || '公式'
+  const body = tex.trim() || t('md.mathBody')
   const text = `$$\n${body}\n$$`
   return { text, caret: 3 }
 }
@@ -887,11 +889,13 @@ export function buildCodeFence(lang: string): Template {
 }
 
 export function buildMermaid(): Template {
-  const text = '```mermaid 图注\n\n```'
-  return { text, caret: 14 }
+  const head = '```mermaid ' + t('md.mermaidCaption')
+  const text = `${head}\n\n\`\`\``
+  return { text, caret: head.length + 1 }
 }
 
 export function buildImagePlaceholder(): Template {
-  const text = '![图注]()'
-  return { text, caret: 2, caretEnd: 4 }
+  const caption = t('md.imageCaption')
+  const text = `![${caption}]()`
+  return { text, caret: 2, caretEnd: 2 + caption.length }
 }

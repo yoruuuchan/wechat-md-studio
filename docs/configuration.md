@@ -41,6 +41,9 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时**删掉 `.e
 | `STORAGE_QUOTA_BYTES` | `2147483648`（2 GiB） | 登录后素材库显示的用量上限 |
 | `REMOTE_MCP_TTL_HOURS` | `24`，整数 1–168 | 单篇 MCP 授权有效期，创建时固定；重新生成令牌不续期 |
 | `REMOTE_MCP_TOTAL_BYTES` | `52428800`（50 MiB），整数 ≥ 0 | 全部临时协作正文的 UTF-8 字节硬顶，与匿名图片额度独立 |
+| `RESEND_API_KEY` / `RESEND_FROM` / `FEEDBACK_TO` | 默认空；三者缺一做反馈接口返回 503 | 站内反馈的邮件转发（Resend）；只存在于服务端配置，页面与接口响应不含这些值 |
+| `RESEND_API_URL` | 默认 `https://api.resend.com/emails` | 仅本地端到端测试或自托管时覆盖邮件接口地址；生产不设 |
+| `FEEDBACK_PER_MINUTE` / `FEEDBACK_PER_DAY` | `3` / `20`，整数 ≥ 0 | 每来源 IP 的反馈提交上限（内存计数）；拒绝写 `[feedback-deny]` 日志 |
 
 生产启动会拒绝缺失 / 占位 / 过短的必需密钥、缺失 `DATABASE_URL`、非法 URL，以及非整数或越界的数值配置，
 错误信息点名变量。生产配置应生成真实密钥；`ACCESS_KEY` 可用 `openssl rand -hex 24`，

@@ -14,6 +14,7 @@ import {
   type PersistenceStatus,
 } from '@/lib/store'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
+import { useI18n } from '@/hooks/useI18n'
 
 export type SyncState = 'loading' | 'synced' | 'saving' | 'local' | 'error'
 
@@ -68,6 +69,7 @@ interface Options {
  * 的 stub 不参与编辑和自动保存，也不会写进本地缓存）。
  */
 export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
+  const { t } = useI18n()
   const [docs, setDocs] = useState<DocRecord[]>([])
   const [activeId, setActiveId] = useState('')
   const [syncState, setSyncState] = useState<SyncState>('loading')
@@ -167,8 +169,8 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     if (!listQuery.isError) return
     setSettled(true)
     setSyncState('error')
-    setNotice('读取云端稿件失败，当前在本地编辑；浏览器里的稿件都还在')
-  }, [enabled, settled, listQuery.isError])
+    setNotice(t('docs.loadCloudFailed'))
+  }, [enabled, settled, listQuery.isError, t])
 
   // 2b. 云端元数据到达 → 合并（local-only 上传、diverged 另存、其余按 id 对齐）
   useEffect(() => {
@@ -283,10 +285,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
               setDocs((ds) => ds.map((x) => (x.id === id ? { ...x, baseHash: hash } : x)))
             }
           }
-          if (imported > 0) notices.push(`已把浏览器里的 ${imported} 篇稿件同步到账号`)
+          if (imported > 0) notices.push(t('docs.importedCount', { n: imported }))
         } catch {
           // 本地副本仍在（state + 缓存），刷新后会重试
-          notices.push('有几篇本地稿件没同步上，内容都还在浏览器里，稍后刷新会自动重试')
+          notices.push(t('docs.importSomeFailed'))
         }
       }
 
@@ -322,12 +324,12 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         reconcilingRef.current = false
         setSettled(true)
         setSyncState('error')
-        setNotice('云端稿件合并失败，当前在本地编辑；浏览器里的稿件都还在')
+        setNotice(t('docs.mergeFailed'))
       })
       .finally(() => {
         reconcilingRef.current = false
       })
-  }, [enabled, listQuery.isSuccess, listQuery.data, trashQuery.isLoading, trashQuery.data, importMutation, saveToDraftsMutation, utils])
+  }, [enabled, listQuery.isSuccess, listQuery.data, trashQuery.isLoading, trashQuery.data, importMutation, saveToDraftsMutation, utils, t])
 
   // 3. 本地缓存始终跟着写一份（每次改动都写，纯本地，不碰网络）；
   //    只有真正拿到正文的稿件会进缓存，纯元数据的 stub 不写。
@@ -355,7 +357,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             const next = ds.filter((d) => d.id !== id)
             return next.length ? next : [createDoc()]
           })
-          setNotice('这篇稿件在云端已经不在了，已从列表里移除')
+          setNotice(t('docs.cloudGone'))
           return
         }
         const row = res.doc
@@ -377,12 +379,12 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           ),
         )
       } catch {
-        setHydrateError({ id, message: '这篇稿件的正文没读下来，检查一下网络' })
+        setHydrateError({ id, message: t('docs.hydrateFailed') })
       } finally {
         setHydrating(null)
       }
     },
-    [utils],
+    [utils, t],
   )
 
   useEffect(() => {
@@ -433,15 +435,15 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           setActiveId(doc.id)
           onDeepLinkSettled?.(true)
         } else {
-          setNotice('链接指向的稿件不在这个账号里，可能已经被删掉了')
+          setNotice(t('docs.linkMissing'))
           onDeepLinkSettled?.(false)
         }
       } catch {
-        setNotice('链接指向的稿件没读下来，检查网络后再点一次')
+        setNotice(t('docs.linkReadFailed'))
         onDeepLinkSettled?.(false)
       }
     })()
-  }, [docs, settled, enabled, onDeepLinkSettled, utils])
+  }, [docs, settled, enabled, onDeepLinkSettled, utils, t])
 
   const flush = useCallback(
     async (ids: string[]) => {
@@ -471,7 +473,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             // the article as a local, unarchived draft instead of retrying
             // forever or reviving it — re-archiving is the owner's call.
             setDocs((ds) => ds.map((x) => (x.id === d.id ? { ...x, savedAt: null } : x)))
-            setNotice(`「${d.name || '未命名稿件'}」在云端已被删除，已转为本地稿；需要时点「保存到草稿箱」重新归档`)
+            setNotice(t('docs.deletedInCloud', { name: d.name || t('common.unnamedDoc') }))
           } else if (!res.ok) {
             found.push([d.id, { ...res.current }])
           } else {
@@ -498,10 +500,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         }
       } catch {
         setSyncState('error')
-        setNotice('有一处改动没同步上，稍后会自动重试')
+        setNotice(t('docs.syncFailed'))
       }
     },
-    [enabled, docs, saveMutation, conflicts],
+    [enabled, docs, saveMutation, conflicts, t],
   )
 
   // 6. 编辑后防抖同步（只针对已保存过、且正文在手、且没卡在冲突里的稿件）
@@ -554,15 +556,15 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   /** 保存到草稿箱：这是唯一让文章进入归档的动作。 */
   const saveCurrentToDrafts = useCallback(async () => {
     const doc = docs.find((d) => d.id === activeId)
-    if (!doc) return { ok: false as const, message: '没有打开的稿件' }
+    if (!doc) return { ok: false as const, message: t('docs.saveNoDoc') }
     if (!enabled) {
-      return { ok: false as const, message: '未登录：草稿箱需要登录后才能用，当前内容已存在浏览器里' }
+      return { ok: false as const, message: t('docs.saveNeedLogin') }
     }
     if (doc.contentLoaded === false) {
-      return { ok: false as const, message: '这篇还在从云端读取，等它读出来再存' }
+      return { ok: false as const, message: t('docs.saveLoading') }
     }
     if (conflicts.has(doc.id)) {
-      return { ok: false as const, message: '这篇在别处被改过：先在弹窗里选一个处理方式' }
+      return { ok: false as const, message: t('docs.saveConflictFirst') }
     }
     setSyncState('saving')
     try {
@@ -578,7 +580,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         setSyncState('error')
         return {
           ok: false as const,
-          message: '这篇在别处被改过：云端的版本没有被覆盖，弹窗里选一下保留哪边',
+          message: t('docs.saveConflictToast'),
         }
       }
       lastSavedRef.current.set(doc.id, doc.content)
@@ -599,9 +601,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       return { ok: true as const, savedAt: res.savedAt }
     } catch {
       setSyncState('error')
-      return { ok: false as const, message: '保存失败，检查一下网络' }
+      return { ok: false as const, message: t('docs.saveFailed') }
     }
-  }, [docs, activeId, enabled, conflicts, saveToDraftsMutation, utils])
+  }, [docs, activeId, enabled, conflicts, saveToDraftsMutation, utils, t])
 
   /**
    * 移入回收站：列表里立刻消失，但服务端只做软删除，所以回收站能原样请回来。
@@ -627,12 +629,12 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         removeMutation
           .mutateAsync({ id })
           .then(() => utils.docs.trash.invalidate())
-          .catch(() => setNotice('删除没同步到云端，回收站里可能还看不到'))
+          .catch(() => setNotice(t('docs.deleteSyncFailed')))
       } else {
-        setLocalTrash((t) => [{ ...doc, deletedAt: Date.now() }, ...t])
+        setLocalTrash((tr) => [{ ...doc, deletedAt: Date.now() }, ...tr])
       }
     },
-    [docs, activeId, enabled, removeMutation, utils],
+    [docs, activeId, enabled, removeMutation, utils, t],
   )
 
   /** 从回收站请回来。匿名时是纯本地操作。 */
@@ -671,11 +673,11 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         await utils.docs.trash.invalidate()
         return true
       } catch {
-        setNotice('恢复失败，稍后再试')
+        setNotice(t('docs.restoreFailed'))
         return false
       }
     },
-    [localTrash, enabled, restoreMutation, utils],
+    [localTrash, enabled, restoreMutation, utils, t],
   )
 
   /** The 10-second toast action; the bin page calls restoreDoc directly. */
@@ -694,11 +696,11 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         await utils.docs.trash.invalidate()
         return true
       } catch {
-        setNotice('彻底删除失败，稍后再试')
+        setNotice(t('docs.purgeFailed'))
         return false
       }
     },
-    [localTrash, enabled, purgeMutation, utils],
+    [localTrash, enabled, purgeMutation, utils, t],
   )
 
   /* ---- conflict resolution: nothing is discarded without this choice ---- */
@@ -739,13 +741,13 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         )
         clearConflict(id)
         setSyncState('synced')
-        setNotice('已用你这一版覆盖云端')
+        setNotice(t('docs.keptLocalOverCloud'))
       } catch {
         setSyncState('error')
-        setNotice('处理冲突时网络出错了，这一版还在编辑器和本地缓存里')
+        setNotice(t('docs.conflictNetwork'))
       }
     },
-    [conflicts, docs, saveMutation, clearConflict],
+    [conflicts, docs, saveMutation, clearConflict, t],
   )
 
   /** 「用云端版本」：本机内容被明确放弃（云端的正文在这里才第一次展示给用户）。 */
@@ -771,9 +773,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         ),
       )
       clearConflict(id)
-      setNotice('已换成云端的版本')
+      setNotice(t('docs.switchedToCloud'))
     },
-    [conflicts, clearConflict],
+    [conflicts, clearConflict, t],
   )
 
   /** 「两边都留」：本机版本另存为一篇新稿件，云端版本回到原位。 */
@@ -805,7 +807,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         })
         if (!res.ok || res.savedAt === null) {
           setSyncState('error')
-          setNotice('另存失败，本机这一版还在编辑器和本地缓存里，稍后再试一次')
+          setNotice(t('docs.copySaveFailed'))
           return
         }
         const saved: DocRecord = { ...copy, savedAt: res.savedAt, baseHash: res.hash ?? null }
@@ -832,13 +834,13 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         clearConflict(id)
         await utils.docs.drafts.invalidate()
         setSyncState('synced')
-        setNotice(`本机那一版已经另存为「${saved.name}」，云端版本保持原样`)
+        setNotice(t('docs.copySavedAs', { name: saved.name }))
       } catch {
         setSyncState('error')
-        setNotice('另存失败，本机这一版还在编辑器和本地缓存里，稍后再试一次')
+        setNotice(t('docs.copySaveFailed'))
       }
     },
-    [conflicts, docs, saveToDraftsMutation, clearConflict, utils],
+    [conflicts, docs, saveToDraftsMutation, clearConflict, utils, t],
   )
 
   /* ---- bulk hydration, for the whole-library backup export ---- */
@@ -867,10 +869,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         for (const row of res.docs) fetched.set(row.id, row)
       }
     } catch {
-      return { ok: false, message: '有几篇稿件的正文没读下来，检查网络后再导出' }
+      return { ok: false, message: t('docs.exportNetwork') }
     }
     if (missing.some((d) => !fetched.has(d.id))) {
-      return { ok: false, message: '有几篇稿件的正文没读下来，检查网络后再导出' }
+      return { ok: false, message: t('docs.exportNetwork') }
     }
 
     const full = current.map((d) => {
@@ -905,7 +907,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       }),
     )
     return { ok: true, docs: full }
-  }, [enabled, utils])
+  }, [enabled, utils, t])
 
   const retryHydrate = useCallback(() => {
     const doc = docsRef.current.find((d) => d.id === activeIdRef.current)

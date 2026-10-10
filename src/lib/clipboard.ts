@@ -1,4 +1,6 @@
 // 富文本复制：优先 ClipboardItem(text/html)，降级 textarea + execCommand
+import { currentLang, t } from './i18n'
+
 export async function copyRichText(html: string, plainText: string): Promise<boolean> {
   try {
     if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
@@ -82,8 +84,9 @@ export function escapeHtmlText(s: string): string {
 // 完整预览页：正文之外包复制按钮，方便离线校对
 export function previewPage(bodyHtml: string, title: string): string {
   const safeTitle = escapeHtmlText(title)
+  const copied = JSON.stringify(t('io.exportPreview.copied'))
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${currentLang() === 'en' ? 'en' : 'zh-CN'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -98,7 +101,7 @@ export function previewPage(bodyHtml: string, title: string): string {
 </style>
 </head>
 <body>
-<div class="bar"><div class="hint">${safeTitle} · 预览页</div><button onclick="copyToWechat()">复制到公众号</button></div>
+<div class="bar"><div class="hint">${safeTitle} · ${escapeHtmlText(t('io.exportPreview.suffix'))}</div><button onclick="copyToWechat()">${escapeHtmlText(t('io.exportPreview.copy'))}</button></div>
 <div class="stage" id="gzh-shell">
 ${bodyHtml}
 </div>
@@ -108,12 +111,12 @@ function copyToWechat(){
   const html=root.outerHTML, text=root.innerText;
   if(navigator.clipboard&&window.ClipboardItem){
     const item=new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})});
-    navigator.clipboard.write([item]).then(()=>alert('已复制，去公众号后台粘贴吧'));
+    navigator.clipboard.write([item]).then(()=>alert(${copied}));
     return;
   }
   const range=document.createRange();range.selectNodeContents(root);
   const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
-  document.execCommand('copy');sel.removeAllRanges();alert('已复制，去公众号后台粘贴吧');
+  document.execCommand('copy');sel.removeAllRanges();alert(${copied});
 }
 </script>
 </body>

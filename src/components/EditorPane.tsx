@@ -23,6 +23,8 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import type { EditorScrollHandle } from '@/hooks/useSyncScroll'
+import { t } from '@/lib/i18n'
+import type { MsgKey } from '@/lib/i18n.zh'
 
 export interface EditorHandle extends EditorScrollHandle {
   jumpToLine: (line: number) => void
@@ -52,23 +54,41 @@ export interface EditorViewState {
 
 // ---------- 公众号语法 snippets ----------
 // "|" 标记插入后光标落点。模板刻意保持短小，插入后直接就能接着写。
-const SNIPPETS: { label: string; detail: string; template: string }[] = [
-  { label: ':::quote', detail: '引文框', template: ':::quote\n|\n:::\n' },
-  { label: ':::center', detail: '居中强调句', template: ':::center\n|\n:::\n' },
-  { label: ':::carousel', detail: '图片轮播（上传时选画幅比例）', template: ':::carousel 4:3 |\n![]()\n![]()\n:::\n' },
-  { label: ':::gallery', detail: '多图网格（列数与比例写在开头）', template: ':::gallery 3 1:1 |\n![]()\n![]()\n![]()\n:::\n' },
-  { label: ':::结束', detail: '闭合当前模块', template: ':::\n|' },
-  { label: '##KICKER', detail: '章节标题，序号自动编号', template: '## KICKER | |\n' },
-  { label: '###', detail: '次级标题，无序号', template: '### |\n' },
-  { label: '>', detail: '金句卡片', template: '> |\n' },
-  { label: '![]()', detail: '图片占位，图号自动编排', template: '![|]()\n' },
-  { label: '==', detail: '下划线重点', template: '==|==' },
-  { label: '@signature', detail: '署名块（人员在设置里配置）', template: '@signature\n' },
-  { label: '$$', detail: '数学公式，独占一段，渲染成矢量图', template: '$$\n|\n$$\n' },
-  { label: 'mermaid', detail: '流程图/时序图，渲染后作为插图上传', template: '```mermaid 图注\n|\n```\n' },
-  { label: '---frontmatter', detail: '标题候选与封面说明', template: '---\ntitles:\n  - |\ncover: \n---\n' },
-  { label: '<!--', detail: '编辑备注，不渲染', template: '<!-- | -->' },
+// Detail text (and the two templates with words in them) come from the i18n
+// dictionaries so the completion popup follows the interface language.
+
+interface Snippet {
+  id: string
+  label: string
+  detailKey: MsgKey
+  template: string | (() => string)
+}
+
+const SNIPPETS: Snippet[] = [
+  { id: 'quote', label: ':::quote', detailKey: 'snippet.quote', template: ':::quote\n|\n:::\n' },
+  { id: 'center', label: ':::center', detailKey: 'snippet.center', template: ':::center\n|\n:::\n' },
+  { id: 'carousel', label: ':::carousel', detailKey: 'snippet.carousel', template: ':::carousel 4:3 |\n![]()\n![]()\n:::\n' },
+  { id: 'gallery', label: ':::gallery', detailKey: 'snippet.gallery', template: ':::gallery 3 1:1 |\n![]()\n![]()\n![]()\n:::\n' },
+  { id: 'end', label: ':::', detailKey: 'snippet.end.detail', template: ':::\n|' },
+  { id: 'kicker', label: '##KICKER', detailKey: 'snippet.kicker', template: '## KICKER | |\n' },
+  { id: 'h3', label: '###', detailKey: 'snippet.h3', template: '### |\n' },
+  { id: 'quoteCard', label: '>', detailKey: 'snippet.quoteCard', template: '> |\n' },
+  { id: 'image', label: '![]()', detailKey: 'snippet.image', template: '![|]()\n' },
+  { id: 'mark', label: '==', detailKey: 'snippet.mark', template: '==|==' },
+  { id: 'signature', label: '@signature', detailKey: 'snippet.signature', template: '@signature\n' },
+  { id: 'math', label: '$$', detailKey: 'snippet.math', template: '$$\n|\n$$\n' },
+  { id: 'mermaid', label: 'mermaid', detailKey: 'snippet.mermaid', template: () => '```mermaid ' + t('md.mermaidCaption') + '\n|\n```\n' },
+  { id: 'frontmatter', label: '---frontmatter', detailKey: 'snippet.frontmatter', template: '---\ntitles:\n  - |\ncover: \n---\n' },
+  { id: 'comment', label: '<!--', detailKey: 'snippet.comment', template: '<!-- | -->' },
 ]
+
+function snippetLabel(s: Snippet): string {
+  return s.id === 'end' ? t('snippet.end.label') : s.label
+}
+
+function snippetTemplate(s: Snippet): string {
+  return typeof s.template === 'function' ? s.template() : s.template
+}
 
 /** Split "a|b" into the text before and after the cursor. */
 function splitTemplate(template: string): { before: string; after: string } {
@@ -77,11 +97,11 @@ function splitTemplate(template: string): { before: string; after: string } {
   return { before: template.slice(0, i), after: template.slice(i + 1) }
 }
 
-function toCompletion(s: (typeof SNIPPETS)[number]): Completion {
-  const { before, after } = splitTemplate(s.template)
+function toCompletion(s: Snippet): Completion {
+  const { before, after } = splitTemplate(snippetTemplate(s))
   return {
-    label: s.label,
-    detail: s.detail,
+    label: snippetLabel(s),
+    detail: t(s.detailKey),
     type: 'keyword',
     apply: (view, _completion, from, to) => {
       view.dispatch({
@@ -116,7 +136,7 @@ function gzhCompletions(context: CompletionContext) {
   // 已经在 ::: 容器里时，把「闭合」排在最前
   const inContainer = /^\s*:::/.test(before)
   const options = inContainer
-    ? [...SNIPPETS].sort((a, b) => (a.label === ':::结束' ? -1 : b.label === ':::结束' ? 1 : 0))
+    ? [...SNIPPETS].sort((a, b) => (a.id === 'end' ? -1 : b.id === 'end' ? 1 : 0))
     : SNIPPETS
 
   return {
@@ -154,8 +174,8 @@ function wrapSelection(view: EditorView, before: string, after: string, placehol
 }
 
 const gzhKeymap = keymap.of([
-  { key: 'Mod-b', run: (v) => wrapSelection(v, '**', '**', '加粗文字') },
-  { key: 'Mod-i', run: (v) => wrapSelection(v, '*', '*', '斜体文字') },
+  { key: 'Mod-b', run: (v) => wrapSelection(v, '**', '**', t('md.bold')) },
+  { key: 'Mod-i', run: (v) => wrapSelection(v, '*', '*', t('md.italic')) },
   {
     key: 'Mod-k',
     run: (v) => {
@@ -168,9 +188,10 @@ const gzhKeymap = keymap.of([
           selection: { anchor: from + selected.length + 3 },
         })
       } else {
+        const placeholder = t('md.linkText')
         v.dispatch({
-          changes: { from, insert: '[链接文字]()' },
-          selection: { anchor: from + 1, head: from + 5 },
+          changes: { from, insert: `[${placeholder}]()` },
+          selection: { anchor: from + 1, head: from + 1 + placeholder.length },
         })
       }
       v.focus()
@@ -183,10 +204,11 @@ const gzhKeymap = keymap.of([
       const pos = v.state.selection.main.head
       const line = v.state.doc.lineAt(pos)
       const before = line.text.trim() ? '\n\n' : ''
-      const mark = '![图注]()'
+      const caption = t('md.imageCaption')
+      const mark = `![${caption}]()`
       v.dispatch({
         changes: { from: pos, insert: before + mark + '\n' },
-        selection: { anchor: pos + before.length + 2, head: pos + before.length + 4 },
+        selection: { anchor: pos + before.length + 2, head: pos + before.length + 2 + caption.length },
       })
       v.focus()
       return true

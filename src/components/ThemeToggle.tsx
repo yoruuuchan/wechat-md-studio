@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { readChoice, setThemeChoice, type ThemeChoice } from '@/lib/ui-theme'
-
-const OPTIONS: { value: ThemeChoice; icon: typeof Sun; label: string }[] = [
-  { value: 'akari', icon: Sun, label: '亮色' },
-  { value: 'system', icon: Monitor, label: '跟随系统' },
-  { value: 'yoru', icon: Moon, label: '暗色' },
-]
+import { useI18n } from '@/hooks/useI18n'
 
 /** 明 / 跟随系统 / 暗 三态。默认跟随系统，点了才记住选择。 */
 export function ThemeToggle() {
+  const { t } = useI18n()
   const [choice, setChoice] = useState<ThemeChoice>(() => readChoice())
+  const OPTIONS: { value: ThemeChoice; icon: typeof Sun; label: string }[] = [
+    { value: 'akari', icon: Sun, label: t('theme.akari') },
+    { value: 'system', icon: Monitor, label: t('theme.system') },
+    { value: 'yoru', icon: Moon, label: t('theme.yoru') },
+  ]
 
   useEffect(() => {
     // 别处（或系统偏好）改了也要跟着亮
@@ -22,7 +23,7 @@ export function ThemeToggle() {
   return (
     <div
       role="radiogroup"
-      aria-label="界面主题"
+      aria-label={t('theme.group')}
       className="flex shrink-0 items-center gap-0.5 rounded-xl p-0.5"
       style={{ background: 'var(--bg-sunken)', boxShadow: 'var(--shadow-inset)' }}
     >

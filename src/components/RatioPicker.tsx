@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { carouselFrame } from '@/lib/themes'
 import { CAROUSEL_RATIOS, type CarouselRatio } from '@/lib/types'
+import { useI18n } from '@/hooks/useI18n'
 
 interface Props {
   open: boolean
@@ -42,6 +43,7 @@ export default function RatioPicker({
   onConfirm,
   onManual,
 }: Props) {
+  const { t } = useI18n()
   const [ratio, setRatio] = useState<CarouselRatio | null>(mode === 'loose' ? null : current ?? '4:3')
   const locked = mode === 'carousel' && Boolean(current)
 
@@ -57,30 +59,26 @@ export default function RatioPicker({
       <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-[15px]">
-            {mode === 'loose' ? '要不要按固定比例裁一下？' : '选一个画幅比例'}
+            {mode === 'loose' ? t('ratio.looseTitle') : t('ratio.carouselTitle')}
           </DialogTitle>
           <DialogDescription className="text-[12px] leading-relaxed">
             {mode === 'loose' ? (
-              <>
-                单张图默认保持原样。要是想让它和别的图并排时高度一致，可以选一个比例，图片会居中裁切后再上传。
-              </>
+              <>{t('ratio.looseDesc')}</>
             ) : locked ? (
               <>
-                这组图片已经定死 <strong className="text-ink-1">{ratio}</strong>。同一组里的图片必须同比例，
-                换比例请先在正文里改 <code className="rounded bg-surface-sunken px-1">{fence}</code> 那一行。
+                {t('ratio.lockedDescA', { ratio: ratio ?? '' })}
+                <code className="rounded bg-surface-sunken px-1">{fence}</code>
+                {t('ratio.lockedDescB')}
               </>
             ) : (
-              <>
-                同一组里的图片必须同比例，所以先定一个。图片会按所选比例居中裁切后再上传，
-                之后这组里剩下的图自动沿用同一个比例。
-              </>
+              <>{t('ratio.freeDesc')}</>
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="mt-1">
           <p className="mb-2 text-[11px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>
-            {label} · {alt || '未命名'}
+            {label} · {alt || t('common.unnamed')}
           </p>
 
           {mode === 'loose' && (
@@ -93,9 +91,9 @@ export default function RatioPicker({
               style={ratio === null ? undefined : { boxShadow: 'var(--shadow-inset)' }}
             >
               <span className={`text-[12px] ${ratio === null ? 'font-semibold text-brand' : 'text-ink-2'}`}>
-                保持原图比例，不裁
+                {t('ratio.keepOriginal')}
               </span>
-              <span className="ml-auto text-[11px] text-ink-3">推荐</span>
+              <span className="ml-auto text-[11px] text-ink-3">{t('ratio.recommended')}</span>
             </button>
           )}
 
@@ -109,7 +107,7 @@ export default function RatioPicker({
                   type="button"
                   disabled={locked}
                   onClick={() => setRatio(r)}
-                  title={`${r} → 裁成 ${f.cropWidth}×${f.cropHeight}`}
+                  title={t('ratio.cropTitle', { r, w: f.cropWidth, h: f.cropHeight })}
                   className={`flex flex-col items-center gap-1.5 rounded-xl px-1 py-2 transition-all ${
                     active ? 'ya-selected' : 'bg-surface-sunken hover:bg-surface-surface'
                   } ${locked && !active ? 'opacity-40' : ''} disabled:cursor-not-allowed`}
@@ -129,8 +127,8 @@ export default function RatioPicker({
 
           <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
             {preview
-              ? `自动居中裁切，尺寸 ${preview.cropWidth}×${preview.cropHeight}。`
-              : '原图按自身尺寸上传，正文里按容器宽度自适应。'}
+              ? t('ratio.cropTip', { w: preview.cropWidth, h: preview.cropHeight })
+              : t('ratio.keepTip')}
           </p>
 
           <button
@@ -138,9 +136,9 @@ export default function RatioPicker({
             onClick={onManual}
             className="mt-2 flex w-full items-center justify-between rounded-xl border border-dashed border-line-strong px-3 py-2 text-left transition-colors hover:border-brand-300 hover:bg-surface-tint"
           >
-            <span className="text-[12px] text-ink-1">手动裁切</span>
+            <span className="text-[12px] text-ink-1">{t('ratio.manual')}</span>
             <span className="text-[11px] text-ink-3">
-              {locked ? `比例锁 ${ratio}，自己拖决定留哪一块 →` : '自己拖，决定留哪一块 →'}
+              {locked ? t('ratio.manualLocked', { ratio: ratio ?? '' }) : t('ratio.manualFree')}
             </span>
           </button>
         </div>
@@ -153,7 +151,7 @@ export default function RatioPicker({
             disabled={busy}
             className="ya-btn ya-btn-secondary"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -161,7 +159,7 @@ export default function RatioPicker({
             disabled={busy}
             className="ya-btn ya-btn-primary"
           >
-            {busy ? '处理中…' : ratio ? '按这个比例上传' : '原样上传'}
+            {busy ? t('ratio.processing') : ratio ? t('ratio.uploadCropped') : t('ratio.uploadOriginal')}
           </button>
         </div>
       </DialogContent>

@@ -1,6 +1,7 @@
 import { carouselFrame } from './themes'
 import { compressImage, drawWithMatte } from './image-compress'
 import type { CarouselRatio } from './types'
+import { t } from './i18n'
 
 export interface CroppedImage {
   blob: Blob
@@ -29,7 +30,7 @@ async function loadImage(file: File): Promise<HTMLImageElement> {
     const img = new Image()
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
-      img.onerror = () => reject(new Error('图片解码失败，换一张试试'))
+      img.onerror = () => reject(new Error(t('img.decodeFailed')))
       img.src = url
     })
     return img
@@ -41,7 +42,7 @@ async function loadImage(file: File): Promise<HTMLImageElement> {
 function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('导出裁切结果失败'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(t('img.cropExportFailed')))),
       mime,
       quality,
     )
@@ -60,7 +61,7 @@ async function renderCrop(
   canvas.width = Math.max(1, Math.round(outW))
   canvas.height = Math.max(1, Math.round(outH))
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('当前浏览器不支持 canvas 裁切')
+  if (!ctx) throw new Error(t('img.noCanvasCrop'))
   ctx.imageSmoothingQuality = 'high'
   drawWithMatte(
     ctx,
@@ -171,7 +172,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()
     r.onload = () => resolve(String(r.result).split(',')[1] || '')
-    r.onerror = () => reject(new Error('读取裁切结果失败'))
+    r.onerror = () => reject(new Error(t('img.cropReadFailed')))
     r.readAsDataURL(blob)
   })
 }
@@ -226,7 +227,7 @@ export async function compressForUpload(file: File): Promise<UploadReady> {
  */
 export async function fileFromImageUrl(url: string, name: string): Promise<File> {
   const resp = await fetch(url, { cache: 'force-cache' })
-  if (!resp.ok) throw new Error(`取回原图失败（${resp.status}）`)
+  if (!resp.ok) throw new Error(t('img.fetchFailed', { status: resp.status }))
   const blob = await resp.blob()
   const ext = blob.type === 'image/jpeg' ? 'jpg' : blob.type === 'image/webp' ? 'webp' : 'png'
   return new File([blob], `${name.replace(/\.[^.]+$/, '')}.${ext}`, { type: blob.type })

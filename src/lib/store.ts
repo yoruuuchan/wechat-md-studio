@@ -2,6 +2,7 @@ import type { SignatureConfig } from './types'
 import { SAMPLE_DOC } from './sample'
 import { createBodyStore, type BodyStore } from './body-store'
 import type { RemoteMcpBinding } from '@contracts/remote-mcp'
+import { t } from './i18n'
 
 export interface DocRecord {
   id: string
@@ -137,7 +138,7 @@ function bodyStore(): Promise<BodyStore> {
   storePromise ??= createBodyStore().then((store) => {
     openStore = store
     if (store.kind === 'localstorage') {
-      reportFailure('unsupported', '这个浏览器不支持 IndexedDB，正文暂存在 localStorage 里，容量小、可能写不进去')
+      reportFailure('unsupported', t('store.idbUnsupported'))
     }
     return store
   })
@@ -198,15 +199,15 @@ function writeIndex(index: DocIndex): boolean {
     localStorage.setItem(INDEX_KEY, JSON.stringify(index))
     return true
   } catch (e) {
-    reportFailure('quota', `本地索引写不进去（${describe(e)}）：浏览器存储可能已满`)
+    reportFailure('quota', t('store.quotaIndex', { err: describe(e) }))
     return false
   }
 }
 
 function describe(e: unknown): string {
   const err = e as { name?: string; message?: string }
-  if (err?.name === 'QuotaExceededError') return '超出配额'
-  return err?.name || err?.message?.slice(0, 60) || '未知错误'
+  if (err?.name === 'QuotaExceededError') return t('store.errQuota')
+  return err?.name || err?.message?.slice(0, 60) || t('store.errUnknown')
 }
 
 /**
@@ -233,7 +234,7 @@ function readLegacyDocs(): DocRecord[] | null {
   } catch {
     // Unreadable, and possibly the last copy of something. Leave the key alone
     // and say so - overwriting it would destroy what the user cannot see either.
-    reportFailure('parse-failed', '浏览器里旧的稿件数据读不出来了，已跳过；原始数据仍在本地，没有被覆盖')
+    reportFailure('parse-failed', t('store.parseFailed'))
     return null
   }
 }
@@ -246,7 +247,7 @@ async function readBodies(): Promise<Map<string, string>> {
     for (const [id, content] of map) written.set(id, content)
     return map
   } catch (e) {
-    reportFailure('read-failed', `本地正文读取失败（${describe(e)}）`)
+    reportFailure('read-failed', t('store.readFailed', { err: describe(e) }))
     return new Map()
   }
 }
@@ -309,7 +310,7 @@ export async function loadDocs(): Promise<Loaded> {
 
   for (const doc of docs) {
     if (!doc.content && doc.contentLoaded !== false) {
-      reportFailure('read-failed', `「${doc.name || '未命名稿件'}」的正文没有读到，可能没有同步完成`)
+      reportFailure('read-failed', t('store.bodyMissing', { name: doc.name || t('common.unnamedDoc') }))
     }
   }
 
@@ -321,7 +322,7 @@ export async function loadDocs(): Promise<Loaded> {
     if (known.has(id) || tombstones.has(id)) continue
     docs.push({
       id,
-      name: '未命名稿件 · 本地恢复',
+      name: t('store.recoveredName'),
       content,
       updatedAt: Date.now(),
       savedAt: null,
@@ -397,12 +398,12 @@ async function migrate(docs: DocRecord[], removed: string[]): Promise<boolean> {
     const read = new Map(back.map((r) => [r.id, r.content]))
     for (const doc of docs) {
       if (read.get(doc.id) !== doc.content) {
-        reportFailure('migration-failed', '本地稿件迁移后校验没通过，已保留原数据，下次打开再试')
+        reportFailure('migration-failed', t('store.migrationFailed'))
         return false
       }
     }
   } catch (e) {
-    reportFailure('migration-failed', `本地稿件迁移失败（${describe(e)}），已保留原数据，下次打开再试`)
+    reportFailure('migration-failed', t('store.migrationFailedError', { err: describe(e) }))
     return false
   }
   for (const doc of docs) written.set(doc.id, doc.content)
@@ -442,7 +443,7 @@ export async function saveDocs(docs: DocRecord[], activeId: string): Promise<boo
   try {
     store = await bodyStore()
   } catch (e) {
-    reportFailure('write-failed', `本地正文存储打不开（${describe(e)}）`)
+    reportFailure('write-failed', t('store.writeOpenFailed', { err: describe(e) }))
     return false
   }
 
@@ -460,7 +461,7 @@ export async function saveDocs(docs: DocRecord[], activeId: string): Promise<boo
       await store.write(changed.map((d) => ({ id: d.id, content: d.content })))
       for (const doc of changed) written.set(doc.id, doc.content)
     } catch (e) {
-      reportFailure('quota', `正文没能写进本地存储（${describe(e)}）：空间可能不够，请先导出 Markdown 备份`)
+      reportFailure('quota', t('store.quotaWrite', { err: describe(e) }))
       ok = false
     }
   }
@@ -473,7 +474,7 @@ export async function saveDocs(docs: DocRecord[], activeId: string): Promise<boo
     } catch (e) {
       // The body is still there; the tombstone in the index keeps it from
       // coming back as a 本地恢复 article.
-      reportFailure('write-failed', `本地正文删除没完成（${describe(e)}）`)
+      reportFailure('write-failed', t('store.writeRemoveFailed', { err: describe(e) }))
       ok = false
     }
   }
@@ -498,7 +499,7 @@ function safeSetBool(key: string, value: string): boolean {
     localStorage.setItem(key, value)
     return true
   } catch (e) {
-    reportFailure('quota', `本地索引写不进去（${describe(e)}）`)
+    reportFailure('quota', t('store.quotaIndex', { err: describe(e) }))
     return false
   }
 }
@@ -541,14 +542,14 @@ export function saveSettings(s: AppSettings) {
   } catch (e) {
     // Settings are small; a failure here means the whole store is full, which
     // the user should hear about before it starts costing them an article.
-    reportFailure('quota', `设置没能存下来（${describe(e)}）：浏览器存储可能已满`)
+    reportFailure('quota', t('store.quotaSettings', { err: describe(e) }))
   }
 }
 
 export function createDoc(): DocRecord {
   return {
     id: uid(),
-    name: '未命名稿件',
+    name: t('common.unnamedDoc'),
     content: '---\ntitles:\n  - \n---\n\n',
     updatedAt: Date.now(),
     savedAt: null,

@@ -15,7 +15,7 @@ However much AI is involved, the source remains ordinary Markdown: readable, edi
 
 [Theme library](https://wechat.yoru-and-akari.dev/themes) · [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) · [Acknowledgements](https://wechat.yoru-and-akari.dev/references)
 
-Made by Yoru, as a personal project that is continuously used and improved. The interface is currently in Chinese and designed mainly for desktop browsers. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
+Made by Yoru, as a personal project that is continuously used and improved. The interface switches between Chinese and English (Chinese by default, remembered per browser) and is designed mainly for desktop browsers. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
 
 | Light · akari | Dark · yoru |
 |:--:|:--:|
@@ -131,7 +131,7 @@ The rendering pipeline is `Markdown → semantic AST → Theme → fully inline 
 - **Uploaded images are public.** Anyone with an `/api/img/…` URL can view the file. Anonymous uploads have quotas and a default 14-day cleanup period; keeping a reference in a local draft does not guarantee indefinite hosting. Once WeChat has copied an image, the published article uses WeChat's stored version.
 - **Authors and publishers are responsible for content.** The service checks file types and quotas, and does not review article or image content. Illegal, exploitative, infringing or privacy-violating content, malware, scams and bulk file-storage abuse are prohibited. Files can be deleted and further uploads refused.
 
-Read the [Terms of use](https://wechat.yoru-and-akari.dev/terms). For rights complaints, email [yoruandakari@duck.com](mailto:yoruandakari@duck.com) with the exact URL, evidence of your rights or authorization, and contact details. The hosted service may change, be limited or go offline; the software is provided without warranty. Self-hosters manage their own storage, domains and terms.
+Read the [Terms of use](https://wechat.yoru-and-akari.dev/terms). Rights complaints go through the in-site feedback form ([wechat.yoru-and-akari.dev/feedback](https://wechat.yoru-and-akari.dev/feedback), or the editor sidebar under Settings → Feedback) with the exact URL, evidence of your rights or authorization, and contact details; no receiving address is published on the page — the server forwards the message. The hosted service may change, be limited or go offline; the software is provided without warranty. Self-hosters manage their own storage, domains and terms.
 
 ## License and further reading
 

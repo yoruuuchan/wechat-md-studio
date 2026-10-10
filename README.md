@@ -14,7 +14,7 @@
 
 [主题库](https://wechat.yoru-and-akari.dev/themes) · [写作 Skill](https://wechat.yoru-and-akari.dev/skill.md) · [开源致谢](https://wechat.yoru-and-akari.dev/references)
 
-by Yoru。一个自己持续使用、慢慢完善的个人项目。当前界面主要为电脑浏览器设计；觉得好用，欢迎在 [GitHub](https://github.com/yoruuuchan/wechat-md-studio) 留个 Star。
+by Yoru。一个自己持续使用、慢慢完善的个人项目。界面支持「中文 / English」切换（默认中文，选择记在本机），主要为电脑浏览器设计；觉得好用，欢迎在 [GitHub](https://github.com/yoruuuchan/wechat-md-studio) 留个 Star。
 
 | akari（亮） | yoru（暗） |
 |:--:|:--:|
@@ -130,7 +130,7 @@ PowerShell 用 `Copy-Item .env.example .env` 复制配置，默认打开 `http:/
 - **上传图片公网可读。** 图片落在本站对象存储，通过 `/api/img/…` 公开提供；拿到链接的人都能看到。匿名图片有上传额度，默认按 14 天期限回收；本机稿件中的引用不保证图片永久保留。微信粘贴成功并转存后，公众号中的图片由微信保存。
 - **内容由执笔与发布的人负责。** 本站做格式、额度与文件类型检查，不审阅稿件或图片内容。禁止用图床传播违法内容、涉及未成年人的性内容、侵权或侵犯隐私的内容、恶意程序与诈骗素材，也禁止当网盘批量灌图。发现违规内容可删除文件并拒绝继续接收。
 
-完整规则见 [使用规范](https://wechat.yoru-and-akari.dev/terms)。权利投诉请写信到 [yoruandakari@duck.com](mailto:yoruandakari@duck.com)，附具体地址、权利人或受托说明与联系方式。服务按现状提供，可能变更、限流或下线；软件无担保。自行部署时，存储、域名与使用规则由部署者管理。
+完整规则见 [使用规范](https://wechat.yoru-and-akari.dev/terms)。权利投诉通过站内反馈表单提交（[wechat.yoru-and-akari.dev/feedback](https://wechat.yoru-and-akari.dev/feedback)，或编辑器右栏「设置 → 反馈」），写明具体地址、权利人或受托说明与联系方式；收件邮箱不公开在页面上，由服务端转发。服务按现状提供，可能变更、限流或下线；软件无担保。自行部署时，存储、域名与使用规则由部署者管理。
 
 ## 开源与资料
 

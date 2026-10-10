@@ -10,7 +10,9 @@
  * Folding is measured, not guessed: a hidden row always renders every item at
  * its natural width, and the visible row keeps the highest-value items until
  * the next one would overflow. Lowest value (images, links) goes into ··· first;
- * undo/redo, the block menu, bold, 重点 and the brush are the last survivors.
+ * undo/redo, the block menu, bold, the highlight and the brush are the last
+ * survivors. A language switch changes every label's width, so `lang` is part
+ * of the measuring pass.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
@@ -55,6 +57,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CAROUSEL_RATIOS, GALLERY_COLS, type CarouselRatio } from '@/lib/types'
 import { CHEATSHEET } from '@/lib/sample'
 import type { InlineFormat, InlineState } from '@/lib/md-format'
+import { useI18n } from '@/hooks/useI18n'
+import type { MsgKey } from '@/lib/i18n'
 
 export type TableAlign = 'none' | 'left' | 'center' | 'right'
 
@@ -111,8 +115,8 @@ const GROUPS: Group[] = [
 ]
 
 /**
- * Who folds into ··· first. The five names the brief pins as always-visible
- * (undo, redo, 标题, B, 重点, 格式刷) are simply absent — they never fold.
+ * Who folds into ··· first. The always-visible names (undo, redo, the heading
+ * menu, B, the highlight, the brush) are simply absent — they never fold.
  */
 const FOLD_ORDER = ['image', 'link', 'list', 'quote', 'strike', 'code', 'clear', 'italic', 'label', 'helpText']
 
@@ -122,12 +126,12 @@ const SEP_FALLBACK = 9
 
 type PanelKind = 'table' | 'carousel' | 'gallery' | 'math' | 'code'
 
-const RATIO_LABEL: Record<CarouselRatio, string> = {
-  '4:3': '4:3 横',
-  '3:4': '3:4 竖',
-  '16:9': '16:9 宽',
-  '9:16': '9:16 竖屏',
-  '1:1': '1:1 方',
+const RATIO_KEYS: Record<CarouselRatio, MsgKey> = {
+  '4:3': 'toolbar.ratio.4:3',
+  '3:4': 'toolbar.ratio.3:4',
+  '16:9': 'toolbar.ratio.16:9',
+  '9:16': 'toolbar.ratio.9:16',
+  '1:1': 'toolbar.ratio.1:1',
 }
 
 /** Common fences offered by the code-block panel. '' means no language. */
@@ -185,17 +189,18 @@ function Chip({ active, onClick, children }: { active?: boolean; onClick: () => 
 // ---------- panels shown inside the ··· menu ----------
 
 function TablePanel({ onInsert, onClose }: { onInsert: (cols: number, rows: number, align: TableAlign) => void; onClose: () => void }) {
+  const { t } = useI18n()
   const [align, setAlign] = useState<TableAlign>('none')
   const [hover, setHover] = useState({ cols: 2, rows: 2 })
   const aligns: { value: TableAlign; label: string }[] = [
-    { value: 'none', label: '默认' },
-    { value: 'left', label: '左对齐' },
-    { value: 'center', label: '居中' },
-    { value: 'right', label: '右对齐' },
+    { value: 'none', label: t('toolbar.table.alignDefault') },
+    { value: 'left', label: t('toolbar.table.alignLeft') },
+    { value: 'center', label: t('toolbar.table.alignCenter') },
+    { value: 'right', label: t('toolbar.table.alignRight') },
   ]
   return (
     <div className="p-1">
-      <p className="ya-eyebrow px-1 pb-1.5">表格 · {hover.cols} × {hover.rows}</p>
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.table.title', { cols: hover.cols, rows: hover.rows })}</p>
       <div className="mb-2 flex gap-1 px-1">
         {aligns.map((a) => (
           <Chip key={a.value} active={align === a.value} onClick={() => setAlign(a.value)}>
@@ -235,14 +240,15 @@ function TablePanel({ onInsert, onClose }: { onInsert: (cols: number, rows: numb
 }
 
 function CarouselPanel({ onInsert, onClose }: { onInsert: (ratio: CarouselRatio) => void; onClose: () => void }) {
+  const { t } = useI18n()
   const [ratio, setRatio] = useState<CarouselRatio>('4:3')
   return (
     <div className="p-1">
-      <p className="ya-eyebrow px-1 pb-1.5">图片轮播 · 所有图统一比例</p>
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.carousel.title')}</p>
       <div className="flex flex-wrap gap-1 px-1 pb-2">
         {CAROUSEL_RATIOS.map((r) => (
           <Chip key={r} active={ratio === r} onClick={() => setRatio(r)}>
-            {RATIO_LABEL[r]}
+            {t(RATIO_KEYS[r])}
           </Chip>
         ))}
       </div>
@@ -255,7 +261,7 @@ function CarouselPanel({ onInsert, onClose }: { onInsert: (ratio: CarouselRatio)
           onClose()
         }}
       >
-        插入轮播
+        {t('toolbar.carousel.insert')}
       </button>
     </div>
   )
@@ -268,24 +274,25 @@ function GalleryPanel({
   onInsert: (cols: number, ratio: CarouselRatio) => void
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const [cols, setCols] = useState<number>(3)
   const [ratio, setRatio] = useState<CarouselRatio>('1:1')
   return (
     <div className="p-1">
-      <p className="ya-eyebrow px-1 pb-1.5">图片网格</p>
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.gallery.title')}</p>
       <div className="flex items-center gap-1 px-1 pb-1.5">
-        <span className="w-8 text-[11px] text-ink-3">列数</span>
+        <span className="w-8 text-[11px] text-ink-3">{t('toolbar.gallery.cols')}</span>
         {GALLERY_COLS.map((c) => (
           <Chip key={c} active={cols === c} onClick={() => setCols(c)}>
-            {c} 列
+            {t('toolbar.gallery.col', { n: c })}
           </Chip>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-1 px-1 pb-2">
-        <span className="w-8 text-[11px] text-ink-3">比例</span>
+        <span className="w-8 text-[11px] text-ink-3">{t('toolbar.gallery.ratio')}</span>
         {CAROUSEL_RATIOS.map((r) => (
           <Chip key={r} active={ratio === r} onClick={() => setRatio(r)}>
-            {RATIO_LABEL[r]}
+            {t(RATIO_KEYS[r])}
           </Chip>
         ))}
       </div>
@@ -298,13 +305,14 @@ function GalleryPanel({
           onClose()
         }}
       >
-        插入网格
+        {t('toolbar.gallery.insert')}
       </button>
     </div>
   )
 }
 
 function MathPanel({ onInsert, onClose }: { onInsert: (tex: string) => void; onClose: () => void }) {
+  const { t } = useI18n()
   const [tex, setTex] = useState('')
   const insert = () => {
     onInsert(tex)
@@ -312,7 +320,7 @@ function MathPanel({ onInsert, onClose }: { onInsert: (tex: string) => void; onC
   }
   return (
     <div className="p-1">
-      <p className="ya-eyebrow px-1 pb-1.5">数学公式 · LaTeX</p>
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.math.title')}</p>
       <textarea
         className="ya-input mb-2 h-16 w-full resize-none py-1.5 text-[12px]"
         placeholder="E = mc^2"
@@ -330,16 +338,17 @@ function MathPanel({ onInsert, onClose }: { onInsert: (tex: string) => void; onC
         onMouseDown={(e) => e.preventDefault()}
         onClick={insert}
       >
-        插入公式
+        {t('toolbar.math.insert')}
       </button>
     </div>
   )
 }
 
 function CodePanel({ onInsert, onClose }: { onInsert: (lang: string) => void; onClose: () => void }) {
+  const { t } = useI18n()
   return (
     <div className="p-1">
-      <p className="ya-eyebrow px-1 pb-1.5">代码块 · 语言</p>
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.codeBlock.title')}</p>
       <div className="flex flex-wrap gap-1 px-1">
         {LANGUAGES.map((l) => (
           <Chip
@@ -349,7 +358,7 @@ function CodePanel({ onInsert, onClose }: { onInsert: (lang: string) => void; on
               onClose()
             }}
           >
-            {l || '无'}
+            {l || t('toolbar.codeBlock.none')}
           </Chip>
         ))}
       </div>
@@ -360,6 +369,7 @@ function CodePanel({ onInsert, onClose }: { onInsert: (lang: string) => void; on
 // ---------- the toolbar ----------
 
 export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Props) {
+  const { t, lang } = useI18n()
   const frameRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
   const [folded, setFolded] = useState<string[]>([])
@@ -388,8 +398,8 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
 
   /**
    * Fold items until the row fits. The hidden measuring row is the source of
-   * every width, so a label that grows ("正文" -> "章节标题") is re-measured
-   * with everything else.
+   * every width, so a label that grows ("正文" -> "章节标题", or a language
+   * switch) is re-measured with everything else.
    */
   const recompute = useCallback(() => {
     const frame = frameRef.current
@@ -434,13 +444,13 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
 
   // The fold decision can only be made once the row is in the DOM, and it has
   // to land before the first paint — otherwise the toolbar shows every item for
-  // a frame and then folds. Widths change with the block label and the brush
-  // badge, so those (and the fold set itself) drive the pass; pane resizes come
-  // in through the ResizeObserver below.
+  // a frame and then folds. Widths change with the block label, the brush badge
+  // and the language, so all three drive the pass; pane resizes come in through
+  // the ResizeObserver below.
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- measured layout: this reads the real widths of the hidden row and only writes state when the set actually changed.
     recompute()
-  }, [recompute, folded, state.block, brush])
+  }, [recompute, folded, state.block, brush, lang])
 
   useEffect(() => {
     const frame = frameRef.current
@@ -473,8 +483,8 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
     onBrush(brush === 'off' ? 'single' : 'off')
   }
 
-  const blockLabel = state.block === 'heading' ? '章节标题' : state.block === 'subheading' ? '小标题' : '正文'
-  const quoteLabel = state.block === 'quoteCard' ? '金句' : state.block === 'quoteBox' ? '引文' : state.block === 'center' ? '居中' : '金句'
+  const blockLabel = state.block === 'heading' ? t('toolbar.block.heading') : state.block === 'subheading' ? t('toolbar.block.subheading') : t('toolbar.block.paragraph')
+  const quoteLabel = state.block === 'quoteCard' ? t('toolbar.quoteFallback') : state.block === 'quoteBox' ? t('toolbar.quoteBox') : state.block === 'center' ? t('toolbar.center') : t('toolbar.quoteFallback')
   const headingValue = ['heading', 'subheading', 'paragraph'].includes(state.block) ? state.block : ''
   const quoteValue = ['quoteCard', 'quoteBox', 'center'].includes(state.block) ? state.block : ''
   const marker = { size: 13, strokeWidth: 2 } as const
@@ -491,13 +501,13 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
     switch (id) {
       case 'undo':
         return (
-          <ToolButton key={id} id={id} title="撤销（⌘Z）" disabled={!state.canUndo} onClick={act({ type: 'undo' })}>
+          <ToolButton key={id} id={id} title={t('toolbar.undo')} disabled={!state.canUndo} onClick={act({ type: 'undo' })}>
             <Undo2 {...marker} />
           </ToolButton>
         )
       case 'redo':
         return (
-          <ToolButton key={id} id={id} title="重做（⇧⌘Z）" disabled={!state.canRedo} onClick={act({ type: 'redo' })}>
+          <ToolButton key={id} id={id} title={t('toolbar.redo')} disabled={!state.canRedo} onClick={act({ type: 'redo' })}>
             <Redo2 {...marker} />
           </ToolButton>
         )
@@ -510,7 +520,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                 data-tool="heading"
                 data-active={state.block === 'heading' || state.block === 'subheading' ? 'true' : undefined}
                 className="ya-tool"
-                title="标题级别"
+                title={t('toolbar.headingTitle')}
                 onMouseDown={(e) => e.preventDefault()}
               >
                 {blockLabel}
@@ -523,16 +533,16 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                 onValueChange={(v) => onAction({ type: 'block', kind: v as 'heading' | 'subheading' | 'paragraph' })}
               >
                 <DropdownMenuRadioItem value="heading" className="rounded-lg">
-                  章节标题
+                  {t('toolbar.block.heading')}
                   <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">## KICKER | 标题</span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="subheading" className="rounded-lg">
-                  小标题
+                  {t('toolbar.block.subheading')}
                   <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">### 标题</span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="paragraph" className="rounded-lg">
-                  普通正文
-                  <span className="ml-auto pl-3 text-[10px] text-ink-3">去掉标记</span>
+                  {t('toolbar.block.paragraphMenu')}
+                  <span className="ml-auto pl-3 text-[10px] text-ink-3">{t('toolbar.block.removeMark')}</span>
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
@@ -548,7 +558,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
           strike: <Strikethrough {...marker} />,
           code: <Code {...marker} />,
         }[id]
-        const title = { bold: '加粗（⌘B）', italic: '斜体（⌘I）', strike: '删除线', code: '行内代码' }[id]
+        const title = { bold: t('toolbar.bold'), italic: t('toolbar.italic'), strike: t('toolbar.strike'), code: t('toolbar.code') }[id]
         return (
           <ToolButton key={id} id={id} title={title} active={state.inline[id as InlineFormat]} onClick={act({ type: 'inline', format: id as InlineFormat })}>
             {icon}
@@ -557,20 +567,20 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
       }
       case 'mark':
         return (
-          <ToolButton key={id} id={id} title="重点（==下划线==）" active={state.inline.mark} onClick={act({ type: 'inline', format: 'mark' })}>
-            <span className="px-0.5 text-[11px] font-semibold">重点</span>
+          <ToolButton key={id} id={id} title={t('toolbar.mark')} active={state.inline.mark} onClick={act({ type: 'inline', format: 'mark' })}>
+            <span className="px-0.5 text-[11px] font-semibold">{t('toolbar.markLabel')}</span>
           </ToolButton>
         )
       case 'brush':
         return (
-          <ToolButton key={id} id={id} title="格式刷：单击刷一次，双击锁定连续刷，Esc 退出" active={brush !== 'off'} onClick={brushClick}>
+          <ToolButton key={id} id={id} title={t('toolbar.brush')} active={brush !== 'off'} onClick={brushClick}>
             <Paintbrush {...marker} />
             {brush === 'locked' && <Lock size={9} strokeWidth={2.6} />}
           </ToolButton>
         )
       case 'clear':
         return (
-          <ToolButton key={id} id={id} title="清除格式" onClick={act({ type: 'clear' })}>
+          <ToolButton key={id} id={id} title={t('toolbar.clear')} onClick={act({ type: 'clear' })}>
             <RemoveFormatting {...marker} />
           </ToolButton>
         )
@@ -583,7 +593,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                 data-tool="quote"
                 data-active={quoteValue ? 'true' : undefined}
                 className="ya-tool"
-                title="金句 / 引文 / 居中强调"
+                title={t('toolbar.quoteTitle')}
                 onMouseDown={(e) => e.preventDefault()}
               >
                 {quoteLabel}
@@ -596,15 +606,15 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                 onValueChange={(v) => onAction({ type: 'quote', kind: v as 'quoteCard' | 'quoteBox' | 'center' })}
               >
                 <DropdownMenuRadioItem value="quoteCard" className="rounded-lg">
-                  金句卡片
+                  {t('toolbar.quoteCard')}
                   <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">&gt; 内容</span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="quoteBox" className="rounded-lg">
-                  引文框
+                  {t('toolbar.quoteBox')}
                   <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">:::quote</span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="center" className="rounded-lg">
-                  居中强调
+                  {t('toolbar.center')}
                   <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">:::center</span>
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
@@ -620,22 +630,22 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                 data-tool="list"
                 data-active={state.block === 'list' ? 'true' : undefined}
                 className="ya-tool"
-                title="列表"
+                title={t('toolbar.list')}
                 onMouseDown={(e) => e.preventDefault()}
               >
-                列表
+                {t('toolbar.list')}
                 <ChevronDown size={10} strokeWidth={2.4} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent data-menu="list" align="start" className="ya-pop w-52 border-none" onCloseAutoFocus={(e) => e.preventDefault()}>
               <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'list', ordered: false })}>
                 <List size={13} strokeWidth={2} />
-                无序列表
+                {t('toolbar.unordered')}
                 <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">- 内容</span>
               </DropdownMenuItem>
               <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'list', ordered: true })}>
                 <ListOrdered size={13} strokeWidth={2} />
-                有序列表
+                {t('toolbar.ordered')}
                 <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">1. 内容</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -643,14 +653,14 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
         )
       case 'link':
         return (
-          <ToolButton key={id} id={id} title="插入链接（⌘K）" active={state.inline.link} onClick={act({ type: 'link' })}>
+          <ToolButton key={id} id={id} title={t('toolbar.link')} active={state.inline.link} onClick={act({ type: 'link' })}>
             <Link2 {...marker} />
           </ToolButton>
         )
       case 'image':
         return (
           <div key={id} className="flex items-center">
-            <ToolButton id="image" title="上传图片，插到光标处" onClick={act({ type: 'image' })}>
+            <ToolButton id="image" title={t('toolbar.image')} onClick={act({ type: 'image' })}>
               <ImagePlus {...marker} />
             </ToolButton>
             <DropdownMenu>
@@ -659,7 +669,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                   type="button"
                   data-tool="image-menu"
                   className="ya-tool -ml-1 px-0"
-                  title="图片选项"
+                  title={t('toolbar.imageMenu')}
                   onMouseDown={(e) => e.preventDefault()}
                 >
                   <ChevronDown size={9} strokeWidth={2.6} />
@@ -667,11 +677,11 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
               </DropdownMenuTrigger>
               <DropdownMenuContent data-menu="image" align="start" className="ya-pop w-52 border-none" onCloseAutoFocus={(e) => e.preventDefault()}>
                 <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'image' })}>
-                  上传图片
-                  <span className="ml-auto pl-3 text-[10px] text-ink-3">拖拽也可以</span>
+                  {t('toolbar.imageUpload')}
+                  <span className="ml-auto pl-3 text-[10px] text-ink-3">{t('toolbar.imageUploadHint')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'imagePlaceholder' })}>
-                  插入图片占位
+                  {t('toolbar.imagePlaceholder')}
                   <span className="ml-auto pl-3 font-mono text-[10px] text-ink-3">![图注]()</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -699,7 +709,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
           className="pointer-events-none absolute left-0 top-0 flex w-max items-center gap-[3px] whitespace-nowrap opacity-0"
         >
           <span data-mid="label" className="px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3">
-            markdown · 语义源
+            {t('toolbar.label')}
           </span>
           {['undo', 'redo', 'heading', 'bold', 'mark', 'italic', 'strike', 'code', 'brush', 'clear', 'quote', 'list', 'link', 'image'].map((id) => (
             <span key={id} data-mid={id} className="inline-flex">
@@ -711,7 +721,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
             <Ellipsis size={13} />
           </span>
           <span data-mid="helpFull" className="ya-tool px-2">
-            语法速查
+            {t('toolbar.help')}
           </span>
           <span data-mid="helpIcon" className="ya-tool w-6">
             <BookOpen size={13} />
@@ -720,7 +730,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
 
         {has('label') && (
           <span className="shrink-0 whitespace-nowrap px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3">
-            markdown · 语义源
+            {t('toolbar.label')}
           </span>
         )}
 
@@ -751,7 +761,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
               data-tool="more"
               data-active={moreOpen ? 'true' : undefined}
               className="ya-tool"
-              title="更多"
+              title={t('toolbar.more')}
               onMouseDown={(e) => e.preventDefault()}
             >
               <Ellipsis {...marker} />
@@ -768,7 +778,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                   {foldedInline.length > 0 || foldedLink || foldedImage || foldedQuote || foldedList ? (
                     <>
                       {foldedInline.map((id) => {
-                        const label = { italic: '斜体', strike: '删除线', code: '行内代码', clear: '清除格式' }[id]
+                        const label = { italic: t('toolbar.italic'), strike: t('toolbar.strike'), code: t('toolbar.code'), clear: t('toolbar.clear') }[id]
                         const icon = {
                           italic: <Italic size={13} strokeWidth={2} />,
                           strike: <Strikethrough size={13} strokeWidth={2} />,
@@ -789,47 +799,47 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                       {foldedLink && (
                         <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'link' })}>
                           <Link2 size={13} strokeWidth={2} />
-                          插入链接
+                          {t('toolbar.linkMenu')}
                         </DropdownMenuItem>
                       )}
                       {foldedQuote && (
                         <DropdownMenuSub>
-                          <DropdownMenuSubTrigger className="rounded-lg">金句 / 引文 / 居中</DropdownMenuSubTrigger>
+                          <DropdownMenuSubTrigger className="rounded-lg">{t('toolbar.quoteMenu')}</DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="ya-pop w-44 border-none">
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'quote', kind: 'quoteCard' })}>
-                              金句卡片
+                              {t('toolbar.quoteCard')}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'quote', kind: 'quoteBox' })}>
-                              引文框
+                              {t('toolbar.quoteBox')}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'quote', kind: 'center' })}>
-                              居中强调
+                              {t('toolbar.center')}
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
                       )}
                       {foldedList && (
                         <DropdownMenuSub>
-                          <DropdownMenuSubTrigger className="rounded-lg">列表</DropdownMenuSubTrigger>
+                          <DropdownMenuSubTrigger className="rounded-lg">{t('toolbar.list')}</DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="ya-pop w-44 border-none">
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'list', ordered: false })}>
-                              无序列表
+                              {t('toolbar.unordered')}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'list', ordered: true })}>
-                              有序列表
+                              {t('toolbar.ordered')}
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
                       )}
                       {foldedImage && (
                         <DropdownMenuSub>
-                          <DropdownMenuSubTrigger className="rounded-lg">图片</DropdownMenuSubTrigger>
+                          <DropdownMenuSubTrigger className="rounded-lg">{t('toolbar.imageMenu')}</DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="ya-pop w-48 border-none">
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'image' })}>
-                              上传图片
+                              {t('toolbar.imageUpload')}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="rounded-lg" onSelect={() => onAction({ type: 'imagePlaceholder' })}>
-                              插入图片占位
+                              {t('toolbar.imagePlaceholder')}
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
@@ -839,27 +849,27 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                   ) : null}
                   <DropdownMenuItem className="rounded-lg" onSelect={(e) => { e.preventDefault(); setPanel('table') }}>
                     <Table2 size={13} strokeWidth={2} />
-                    表格
+                    {t('toolbar.table')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="rounded-lg" onSelect={(e) => { e.preventDefault(); setPanel('carousel') }}>
                     <Images size={13} strokeWidth={2} />
-                    图片轮播
+                    {t('toolbar.carousel')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="rounded-lg" onSelect={(e) => { e.preventDefault(); setPanel('gallery') }}>
                     <LayoutGrid size={13} strokeWidth={2} />
-                    图片网格
+                    {t('toolbar.gallery')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="rounded-lg" onSelect={(e) => { e.preventDefault(); setPanel('math') }}>
                     <Sigma size={13} strokeWidth={2} />
-                    数学公式
+                    {t('toolbar.math')}
                   </DropdownMenuItem>
                   <DropdownMenuItem className="rounded-lg" onSelect={(e) => { e.preventDefault(); setPanel('code') }}>
                     <SquareCode size={13} strokeWidth={2} />
-                    代码块
+                    {t('toolbar.codeBlock')}
                   </DropdownMenuItem>
-                  {menuItem('Mermaid 图表', '```mermaid', <Workflow size={13} strokeWidth={2} />, () => onAction({ type: 'mermaid' }))}
-                  {menuItem('分隔线', '---', <Minus size={13} strokeWidth={2} />, () => onAction({ type: 'hr' }))}
-                  {menuItem('署名', '@signature', <PenLine size={13} strokeWidth={2} />, () => onAction({ type: 'signature' }))}
+                  {menuItem(t('toolbar.mermaid'), '```mermaid', <Workflow size={13} strokeWidth={2} />, () => onAction({ type: 'mermaid' }))}
+                  {menuItem(t('toolbar.hr'), '---', <Minus size={13} strokeWidth={2} />, () => onAction({ type: 'hr' }))}
+                  {menuItem(t('toolbar.signature'), '@signature', <PenLine size={13} strokeWidth={2} />, () => onAction({ type: 'signature' }))}
                 </>
               ) : (
                 <div onKeyDown={(e) => e.stopPropagation()}>
@@ -879,17 +889,17 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
 
         <Popover>
           <PopoverTrigger asChild>
-            <button type="button" data-tool="help" className="ya-tool shrink-0 px-2" title="语法速查" onMouseDown={(e) => e.preventDefault()}>
-              {foldedSet.has('helpText') ? <BookOpen size={13} /> : '语法速查'}
+            <button type="button" data-tool="help" className="ya-tool shrink-0 px-2" title={t('toolbar.help')} onMouseDown={(e) => e.preventDefault()}>
+              {foldedSet.has('helpText') ? <BookOpen size={13} /> : t('toolbar.help')}
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="ya-pop w-80 border-none p-0">
-            <p className="ya-eyebrow border-b border-line-2 px-3 py-2">公众号专用语法</p>
+            <p className="ya-eyebrow border-b border-line-2 px-3 py-2">{t('toolbar.helpTitle')}</p>
             <ul className="max-h-80 overflow-y-auto p-2">
               {CHEATSHEET.map((c) => (
                 <li key={c.syntax} className="flex items-baseline gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-tint">
                   <code className="shrink-0 rounded-md bg-brand-100 px-1.5 py-0.5 font-mono text-[11px] text-brand-600">{c.syntax}</code>
-                  <span className="text-[12px] text-ink-2">{c.desc}</span>
+                  <span className="text-[12px] text-ink-2">{t(c.desc)}</span>
                 </li>
               ))}
             </ul>

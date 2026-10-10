@@ -17,6 +17,7 @@ import TurndownService from 'turndown'
 // highlight-div rule). The individual exports are typed through vendor.d.ts, which
 // cannot see turndown's `highlightedCodeBlock`; going through `gfm` keeps it.
 import { gfm } from 'turndown-plugin-gfm'
+import { t } from './i18n'
 
 // ---------------------------------------------------------------------------
 // public contract
@@ -293,16 +294,16 @@ export function classifyPaste(html: string, plain: string): PasteDecision {
       kind: 'image-placeholder',
       convert: false,
       lang: '',
-      reason: '剪贴板里只有 [Image #N] 占位符，拿不到真实图片。请改用截图工具、浏览器复制或直接拖拽图片文件。',
+      reason: t('paste.imagePlaceholder'),
     }
   }
 
   if (!html || !html.trim()) {
-    return { kind: 'plain-text', convert: false, lang: '', reason: '没有富文本内容。' }
+    return { kind: 'plain-text', convert: false, lang: '', reason: t('paste.plainText') }
   }
 
   if (looksLikeMarkdown(text)) {
-    return { kind: 'already-markdown', convert: false, lang: '', reason: '粘贴的内容已经是 Markdown，按原样插入。' }
+    return { kind: 'already-markdown', convert: false, lang: '', reason: t('paste.alreadyMarkdown') }
   }
 
   if (isIdeFormattedHtml(html, text)) {
@@ -310,7 +311,7 @@ export function classifyPaste(html: string, plain: string): PasteDecision {
       kind: 'ide-code',
       convert: false,
       lang: detectLanguageFromHtml(html),
-      reason: '检测到代码编辑器复制的内容，按代码块插入。',
+      reason: t('paste.ideCode'),
     }
   }
 
@@ -319,7 +320,7 @@ export function classifyPaste(html: string, plain: string): PasteDecision {
       kind: 'code-block',
       convert: false,
       lang: detectLanguageFromHtml(html),
-      reason: '粘贴的内容主体是代码，按代码块插入。',
+      reason: t('paste.codeBlock'),
     }
   }
 

@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { loadActiveId, loadDocs, saveActiveId, saveDocs, type DocRecord } from '@/lib/store'
 import { UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LanguageToggle } from '@/components/LanguageToggle'
+import { useI18n } from '@/hooks/useI18n'
 
 /**
  * 草稿箱列表由服务端派生：卡片的字数、图片数、轮播数、小标题都是在服务端
@@ -50,34 +52,35 @@ function BinSection({
   onRestore: (id: string) => void
   onPurge: (id: string, name: string) => void
 }) {
+  const { t } = useI18n()
   if (!rows.length) return null
   return (
     <section className="mt-8">
       <div className="mb-2 flex items-baseline gap-2">
-        <h2 className="text-[13px] font-bold tracking-wide text-[#0E1525]">回收站</h2>
+        <h2 className="text-[13px] font-bold tracking-wide text-[#0E1525]">{t('drafts.bin')}</h2>
         <span className="text-[11px] text-[#6B7793]">
-          {rows.length} 篇 · 彻底删除之前都找得回来
+          {t('drafts.binCount', { n: rows.length })}
         </span>
       </div>
       <ul className="space-y-2">
-        {rows.map((t) => (
-          <li key={t.id} className="ya-well flex items-center gap-3 p-3">
+        {rows.map((row) => (
+          <li key={row.id} className="ya-well flex items-center gap-3 p-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-medium text-[#394560]">
-                {t.name || '未命名稿件'}
+                {row.name || t('common.unnamedDoc')}
               </p>
               <p className="text-[11px] text-[#6B7793]" style={{ fontFamily: 'var(--font-mono)' }}>
-                删除于 {formatDate(t.deletedAt)}
+                {t('drafts.deletedAt', { time: formatDate(row.deletedAt) })}
               </p>
             </div>
             <button
-              onClick={() => onRestore(t.id)}
+              onClick={() => onRestore(row.id)}
               className="ya-btn-secondary ya-btn ya-btn-sm shrink-0"
             >
-              恢复
+              {t('drafts.restore')}
             </button>
-            <button onClick={() => onPurge(t.id, t.name)} className="ya-link-btn danger shrink-0">
-              彻底删除
+            <button onClick={() => onPurge(row.id, row.name)} className="ya-link-btn danger shrink-0">
+              {t('drafts.purge')}
             </button>
           </li>
         ))}
@@ -87,6 +90,7 @@ function BinSection({
 }
 
 export default function Drafts() {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const utils = trpc.useUtils()
@@ -102,8 +106,8 @@ export default function Drafts() {
   const [loadingMore, setLoadingMore] = useState(false)
 
   useEffect(() => {
-    const t = window.setTimeout(() => setServerQuery(query), 300)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => setServerQuery(query), 300)
+    return () => window.clearTimeout(timer)
   }, [query])
 
   // Any filter change starts a fresh first page.
@@ -122,7 +126,7 @@ export default function Drafts() {
       await utils.docs.drafts.invalidate()
       await utils.docs.list.invalidate()
     },
-    onError: () => toast.error('删除失败'),
+    onError: () => toast.error(t('drafts.deleteFailed')),
   })
   const restoreMutation = trpc.docs.restore.useMutation({
     onSuccess: async () => {
@@ -130,24 +134,24 @@ export default function Drafts() {
       await utils.docs.drafts.invalidate()
       await utils.docs.list.invalidate()
     },
-    onError: () => toast.error('恢复失败'),
+    onError: () => toast.error(t('drafts.restoreFailed')),
   })
   const purgeMutation = trpc.docs.purge.useMutation({
     onSuccess: async () => {
       await utils.docs.trash.invalidate()
     },
-    onError: () => toast.error('彻底删除失败'),
+    onError: () => toast.error(t('drafts.purgeFailed')),
   })
 
   /** 移入回收站；撤销走 restore，10 秒窗口之外还能在回收站里找回。 */
   const deleteDraft = (card: DraftCard) => {
     removeMutation.mutate({ id: card.id })
     setMore((m) => m.filter((c) => c.id !== card.id))
-    toast(`「${card.name || '未命名稿件'}」已移入回收站`, {
-      description: '10 秒内可以撤销，之后去回收站找回',
+    toast(t('drafts.deletedToast', { name: card.name || t('common.unnamedDoc') }), {
+      description: t('drafts.deletedToastDesc'),
       duration: UNDO_DELETE_MS,
       action: {
-        label: '撤销',
+        label: t('common.undo'),
         onClick: () => restoreMutation.mutate({ id: card.id }),
       },
     })
@@ -184,15 +188,15 @@ export default function Drafts() {
     else void rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
   }
   const purgeBin = (id: string, name: string) => {
-    if (!window.confirm(`彻底删除「${name || '未命名稿件'}」？这一步找不回来。`)) return
+    if (!window.confirm(t('drafts.purgeConfirm', { name: name || t('common.unnamedDoc') }))) return
     if (isAuthenticated) purgeMutation.mutate({ id })
     else void rewriteLocal((ds) => ds.filter((d) => d.id !== id))
   }
   const binRows: BinRow[] = isAuthenticated
-    ? (trashQuery.data ?? []).map((t) => ({
-        id: t.id,
-        name: t.name,
-        deletedAt: t.deletedAt ? t.deletedAt.getTime() : 0,
+    ? (trashQuery.data ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        deletedAt: row.deletedAt ? row.deletedAt.getTime() : 0,
       }))
     : localBin
 
@@ -221,7 +225,7 @@ export default function Drafts() {
       })
       setMore((m) => [...m, ...res.items])
     } catch {
-      toast.error('加载更多失败，稍后再试')
+      toast.error(t('drafts.loadMoreFailed'))
     } finally {
       setLoadingMore(false)
     }
@@ -238,22 +242,26 @@ export default function Drafts() {
     try {
       const res = await utils.docs.get.fetch({ id: card.id })
       if (!res.doc) {
-        toast.error('这篇稿件的正文读不到了，可能刚被删掉')
+        toast.error(t('drafts.copyGone'))
         return
       }
       await navigator.clipboard.writeText(res.doc.content)
       setCopiedId(card.id)
       setTimeout(() => setCopiedId(null), 1500)
-      toast.success('Markdown 已复制')
+      toast.success(t('drafts.copyDone'))
     } catch {
-      toast.error('复制失败')
+      toast.error(t('common.copyFailed'))
     } finally {
       setCopiesBusy(null)
     }
   }
 
   if (authLoading) {
-    return <Shell onBack={() => navigate('/')} count={null}><p className="text-[13px] text-ink-3">读取中…</p></Shell>
+    return (
+      <Shell onBack={() => navigate('/')} count={null}>
+        <p className="text-[13px] text-ink-3">{t('common.loading')}</p>
+      </Shell>
+    )
   }
 
   if (!isAuthenticated) {
@@ -261,13 +269,13 @@ export default function Drafts() {
       <Shell onBack={() => navigate('/')} count={null}>
         <div className="ya-well p-6">
           <p className="text-[13px] leading-relaxed text-ink-2">
-            草稿箱需要登录——稿件是跟着账号存的，这样换设备也能打开。
+            {t('drafts.loginNeeded')}
           </p>
           <button
             onClick={() => navigate('/login')}
             className="ya-btn ya-btn-primary mt-4"
           >
-            去登录
+            {t('drafts.goLogin')}
           </button>
         </div>
         <BinSection rows={binRows} onRestore={restoreBin} onPurge={purgeBin} />
@@ -281,18 +289,18 @@ export default function Drafts() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜标题或正文…"
+          placeholder={t('drafts.search')}
           className="ya-input min-w-0 flex-1"
         />
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          title="按什么排序"
+          title={t('drafts.sortTitle')}
           className="ya-input shrink-0 cursor-pointer appearance-none !w-auto pr-8"
         >
-          <option value="savedAt">最近保存</option>
-          <option value="chars">字数最多</option>
-          <option value="images">图片最多</option>
+          <option value="savedAt">{t('drafts.sort.savedAt')}</option>
+          <option value="chars">{t('drafts.sort.chars')}</option>
+          <option value="images">{t('drafts.sort.images')}</option>
         </select>
         <label className="ya-btn-ghost ya-btn shrink-0 cursor-pointer !gap-1.5">
           <input
@@ -301,81 +309,81 @@ export default function Drafts() {
             onChange={(e) => setOnlyWithImages(e.target.checked)}
             className="h-3.5 w-3.5 accent-brand"
           />
-          只看有图
+          {t('drafts.onlyWithImages')}
         </label>
         <button
           onClick={() => navigate('/')}
           className="ya-btn ya-btn-primary shrink-0"
         >
-          新建一篇
+          {t('drafts.new')}
         </button>
       </div>
 
       {draftsQuery.isLoading ? (
-        <p className="text-[13px] text-ink-3">读取中…</p>
+        <p className="text-[13px] text-ink-3">{t('common.loading')}</p>
       ) : total === 0 ? (
         <div className="ya-well p-8 text-center">
           <p className="text-[13px] font-medium text-ink-2">
-            {serverQuery || onlyWithImages ? '没有符合条件的稿件' : '草稿箱还是空的'}
+            {serverQuery || onlyWithImages ? t('drafts.emptyFiltered') : t('drafts.empty')}
           </p>
           <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
-            在编辑器里写完一篇，点顶栏的「保存到草稿箱」，它就会出现在这里。<br />
-            编辑过程中的自动保存不会往这里塞东西。
+            {t('drafts.emptyHint')}<br />
+            {t('drafts.emptyHint2')}
           </p>
         </div>
       ) : (
         <>
           <ul className="space-y-2.5">
-            {items.map((c) => (
-              <li key={c.id} className="ya-well p-4">
+            {items.map((card) => (
+              <li key={card.id} className="ya-well p-4">
                 <div className="flex items-start gap-3">
-                  <button onClick={() => openDraft(c)} className="min-w-0 flex-1 text-left">
-                    <p className="truncate text-[14px] font-semibold text-ink-1">{c.name || '未命名稿件'}</p>
+                  <button onClick={() => openDraft(card)} className="min-w-0 flex-1 text-left">
+                    <p className="truncate text-[14px] font-semibold text-ink-1">{card.name || t('common.unnamedDoc')}</p>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>
-                      <span>保存于 {formatDate(c.savedAt)}</span>
+                      <span>{t('drafts.savedAt', { time: formatDate(card.savedAt) })}</span>
                       <span className="text-ink-4">·</span>
-                      <span>{c.chars} 字</span>
+                      <span>{t('drafts.chars', { n: card.chars })}</span>
                       <span className="text-ink-4">·</span>
-                      <span>{c.images} 图</span>
-                      {c.carousels > 0 && (
+                      <span>{t('drafts.images', { n: card.images })}</span>
+                      {card.carousels > 0 && (
                         <>
                           <span className="text-ink-4">·</span>
-                          <span>{c.carousels} 轮播</span>
+                          <span>{t('drafts.carousels', { n: card.carousels })}</span>
                         </>
                       )}
-                      {c.source?.startsWith('agent:') && (
+                      {card.source?.startsWith('agent:') && (
                         <>
                           <span className="text-black/15">·</span>
-                          <span title="由 Agent 通过 /api/agent 推进来，在编辑器里改动会自动同步回云端">
-                            Agent 推的（{c.source.slice('agent:'.length)}）
+                          <span title={t('drafts.agentTitle')}>
+                            {t('drafts.agent', { name: card.source.slice('agent:'.length) })}
                           </span>
                         </>
                       )}
                     </p>
-                    {c.headings.length > 0 && (
+                    {card.headings.length > 0 && (
                       <p className="mt-2 truncate text-[12px] text-ink-2">
-                        {c.headings.join(' / ')}
+                        {card.headings.join(' / ')}
                       </p>
                     )}
                   </button>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <button
-                      onClick={() => openDraft(c)}
+                      onClick={() => openDraft(card)}
                       className="ya-btn-secondary ya-btn ya-btn-sm"
                     >
-                      打开
+                      {t('drafts.open')}
                     </button>
                     <button
-                      onClick={() => void copyBody(c)}
+                      onClick={() => void copyBody(card)}
                       className="ya-link-btn"
                     >
-                      {copiesBusy === c.id ? '读取中…' : copiedId === c.id ? '已复制' : '复制 md'}
+                      {copiesBusy === card.id ? t('common.loading') : copiedId === card.id ? t('common.copied') : t('drafts.copyMd')}
                     </button>
                     <button
-                      onClick={() => deleteDraft(c)}
+                      onClick={() => deleteDraft(card)}
                       className="ya-link-btn danger"
                     >
-                      删除
+                      {t('common.delete')}
                     </button>
                   </div>
                 </div>
@@ -389,7 +397,7 @@ export default function Drafts() {
                 disabled={loadingMore}
                 className="ya-btn ya-btn-secondary"
               >
-                {loadingMore ? '读取中…' : `加载更多（还有 ${total - items.length} 篇）`}
+                {loadingMore ? t('common.loading') : t('drafts.loadMore', { n: total - items.length })}
               </button>
             </div>
           )}
@@ -411,21 +419,23 @@ function Shell({
   onBack: () => void
   count: number | null
 }) {
+  const { t } = useI18n()
   return (
     <div className="ya-page min-h-screen">
-      <header className="ya-glass sticky top-0 z-10 flex h-14 items-center gap-3 px-4">
+      <header className="ya-glass sticky top-0 z-10 flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
         <button
           onClick={onBack}
-          className="ya-btn-secondary ya-btn ya-btn-sm !h-8"
+          className="ya-btn-secondary ya-btn ya-btn-sm !h-8 shrink-0"
         >
-          ← 回到编辑器
+          ← {t('common.backToEditor')}
         </button>
-        <div className="flex items-baseline gap-2">
-          <span className="text-[15px] font-bold tracking-wide text-ink-1">草稿箱</span>
-          <span className="ya-eyebrow">drafts</span>
-          {count !== null && <span className="text-[12px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>{count} 篇</span>}
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="whitespace-nowrap text-[15px] font-bold tracking-wide text-ink-1">{t('drafts.title')}</span>
+          <span className="ya-eyebrow hidden sm:inline">drafts</span>
+          {count !== null && <span className="text-[12px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>{t('drafts.count', { n: count })}</span>}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LanguageToggle />
           <ThemeToggle />
         </div>
       </header>

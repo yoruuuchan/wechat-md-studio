@@ -12,6 +12,8 @@
  * Only compressImage and drawWithMatte touch the DOM.
  */
 
+import { t } from './i18n'
+
 /**
  * Longest edge in pixels.
  *
@@ -186,7 +188,7 @@ async function loadImage(blob: Blob): Promise<HTMLImageElement> {
     const img = new Image()
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
-      img.onerror = () => reject(new Error('图片解码失败，换一张试试'))
+      img.onerror = () => reject(new Error(t('img.decodeFailed')))
       img.src = url
     })
     return img
@@ -198,7 +200,7 @@ async function loadImage(blob: Blob): Promise<HTMLImageElement> {
 function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('导出压缩结果失败'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(t('img.compressExportFailed')))),
       mime,
       quality,
     )
@@ -269,7 +271,7 @@ export async function compressImage(
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('当前浏览器不支持 canvas 压缩')
+  if (!ctx) throw new Error(t('img.noCanvasCompress'))
   ctx.imageSmoothingQuality = 'high'
   drawWithMatte(ctx, img, 0, 0, sourceWidth, sourceHeight, 0, 0, width, height, mime)
 

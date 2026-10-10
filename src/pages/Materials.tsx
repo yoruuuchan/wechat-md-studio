@@ -5,7 +5,9 @@ import { trpc } from '@/providers/trpc'
 import { useAuth } from '@/hooks/useAuth'
 import { loadDocs } from '@/lib/store'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LanguageToggle } from '@/components/LanguageToggle'
 import { loadDiagramCache } from '@/lib/diagram'
+import { useI18n } from '@/hooks/useI18n'
 
 function formatBytes(n: number): string {
   if (!n) return '0 B'
@@ -14,9 +16,9 @@ function formatBytes(n: number): string {
   return `${(n / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function formatDate(ts: number | null): string {
+function formatDate(ts: number | null, lang: 'zh' | 'en'): string {
   if (!ts) return '—'
-  return new Date(ts).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(ts).toLocaleDateString(lang === 'en' ? 'en-CA' : 'zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 /**
@@ -43,6 +45,7 @@ async function localDraftKeys(): Promise<string[]> {
 }
 
 export default function Materials() {
+  const { t, lang } = useI18n()
   const navigate = useNavigate()
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const utils = trpc.useUtils()
@@ -72,21 +75,21 @@ export default function Materials() {
         utils.storage.orphans.invalidate(),
         utils.storage.list.invalidate(),
       ])
-      const freed = `腾出 ${formatBytes(res.freedBytes)}`
+      const freed = t('materials.freed', { size: formatBytes(res.freedBytes) })
       // 没删掉的连账目一起留着，说清楚它们还在，别让人以为清干净了
       if (res.failed.length) {
-        toast.warning(`已清理 ${res.deleted} 张，${res.failed.length} 张没删掉`, {
-          description: `${freed}；没删掉的图还在素材库里，可以重试`,
+        toast.warning(t('materials.cleanPartial', { n: res.deleted, m: res.failed.length }), {
+          description: t('materials.cleanPartialDesc', { freed }),
         })
         return
       }
-      toast.success(`已清理 ${res.deleted} 张图`, {
+      toast.success(t('materials.cleanDone', { n: res.deleted }), {
         description: res.skipped.length
-          ? `${freed}；${res.skipped.length} 张仍被稿件引用，已跳过`
+          ? t('materials.cleanSkipped', { freed, n: res.skipped.length })
           : freed,
       })
     },
-    onError: () => toast.error('清理失败，稍后再试'),
+    onError: () => toast.error(t('materials.cleanFailed')),
   })
 
   const removeOneMutation = trpc.storage.remove.useMutation({
@@ -96,10 +99,10 @@ export default function Materials() {
         utils.storage.orphans.invalidate(),
         utils.storage.list.invalidate(),
       ])
-      toast.success('已删除')
+      toast.success(t('materials.deleted'))
     },
     // 服务端只在图床确认删掉之后才销账；失败时这张图仍在列表里，原因也带回来
-    onError: (e) => toast.error('删除失败', { description: e.message }),
+    onError: (e) => toast.error(t('materials.deleteFailed'), { description: e.message }),
   })
 
   const orphanKeys = useMemo(() => (orphans.data ?? []).map((o) => o.key), [orphans.data])
@@ -110,7 +113,11 @@ export default function Materials() {
     : 0
 
   if (authLoading) {
-    return <Shell onBack={() => navigate('/')}><p className="text-[13px] text-ink-4">读取中…</p></Shell>
+    return (
+      <Shell onBack={() => navigate('/')}>
+        <p className="text-[13px] text-ink-4">{t('common.loading')}</p>
+      </Shell>
+    )
   }
 
   return (
@@ -120,8 +127,8 @@ export default function Materials() {
         {isAuthenticated ? (
           <section className="ya-well p-5">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-[14px] font-semibold text-ink-1">存储用量</h2>
-              <span className="text-[12px] text-ink-3">最近一张 {formatDate(stats.data?.oldestAt ?? null)} 之前</span>
+              <h2 className="text-[14px] font-semibold text-ink-1">{t('materials.usage')}</h2>
+              <span className="text-[12px] text-ink-3">{t('materials.oldest', { date: formatDate(stats.data?.oldestAt ?? null, lang) })}</span>
             </div>
             <div className="mt-3 flex items-end gap-4">
               <div>
@@ -129,7 +136,7 @@ export default function Materials() {
                   {formatBytes(stats.data?.totalBytes ?? 0)}
                 </p>
                 <p className="mt-1 text-[12px] text-ink-3">
-                  共 {stats.data?.count ?? 0} 张 · 上限 {formatBytes(stats.data?.quotaBytes ?? 0)}
+                  {t('materials.total', { n: stats.data?.count ?? 0, size: formatBytes(stats.data?.quotaBytes ?? 0) })}
                 </p>
               </div>
             </div>
@@ -140,19 +147,17 @@ export default function Materials() {
               />
             </div>
             <p className="mt-2 text-[11px] text-ink-3">
-              图片存在 Cloudflare R2，按整个桶计量。这里显示的是本工具自己记的账。
+              {t('materials.r2Note')}
             </p>
           </section>
         ) : (
           <section className="ya-well p-5">
-            <h2 className="text-[14px] font-semibold text-ink-1">这台浏览器上传的图</h2>
+            <h2 className="text-[14px] font-semibold text-ink-1">{t('materials.browserTitle')}</h2>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
-              共 {stats.data?.count ?? 0} 张 · {formatBytes(stats.data?.totalBytes ?? 0)}。
-              上传不用登录，图片按浏览器归属；换设备或清掉站点数据就看不到了。
+              {t('materials.browserNote', { n: stats.data?.count ?? 0, size: formatBytes(stats.data?.totalBytes ?? 0) })}
             </p>
             <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
-              每 24 小时最多 {stats.data?.dailyImages ?? 0} 张 / {formatBytes(stats.data?.dailyBytes ?? 0)}——
-              图床是共享的免费额度，用完明天自动恢复。
+              {t('materials.dailyNote', { n: stats.data?.dailyImages ?? 0, size: formatBytes(stats.data?.dailyBytes ?? 0) })}
             </p>
           </section>
         )}
@@ -161,28 +166,28 @@ export default function Materials() {
         <section className="ya-well p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-[14px] font-semibold text-ink-1">没在用的旧图</h2>
+              <h2 className="text-[14px] font-semibold text-ink-1">{t('materials.orphans')}</h2>
               <p className="mt-1 text-[12px] leading-relaxed text-ink-3">
-                已经存进云端稿件里的图不在此列。删掉后公众号里已粘贴的文章不受影响——微信发布时已经把图转存到它自己的服务器了。
+                {t('materials.orphansNote')}
               </p>
             </div>
             <button
               disabled={selectedOrphans.length === 0 || removeMutation.isPending}
               onClick={() => {
-                if (!window.confirm(`删掉选中的 ${selectedOrphans.length} 张图？这一步不能撤销。`)) return
+                if (!window.confirm(t('materials.cleanConfirm', { n: selectedOrphans.length }))) return
                 removeMutation.mutate({ keys: selectedOrphans })
               }}
               className="ya-btn ya-btn-danger shrink-0"
             >
-              {removeMutation.isPending ? '清理中…' : `清理选中 (${selectedOrphans.length})`}
+              {removeMutation.isPending ? t('materials.cleaning') : t('materials.cleanSelected', { n: selectedOrphans.length })}
             </button>
           </div>
 
           {orphans.isLoading ? (
-            <p className="mt-4 text-[13px] text-ink-3">读取中…</p>
+            <p className="mt-4 text-[13px] text-ink-3">{t('common.loading')}</p>
           ) : orphanKeys.length === 0 ? (
             <p className="mt-4 rounded-xl bg-ok-100 p-3 text-[13px] text-ok-700">
-              干净，没有多余的图。
+              {t('materials.cleanEmpty')}
             </p>
           ) : (
             <>
@@ -191,13 +196,13 @@ export default function Materials() {
                   onClick={() => setSelected(new Set(orphanKeys))}
                   className="ya-link-btn !text-[12px] !text-brand"
                 >
-                  全选 {orphanKeys.length} 张
+                  {t('materials.selectAll', { n: orphanKeys.length })}
                 </button>
                 <button
                   onClick={() => setSelected(new Set())}
                   className="ya-link-btn !text-[12px]"
                 >
-                  清空选择
+                  {t('materials.clearSelection')}
                 </button>
               </div>
               <ul className="mt-2 divide-y divide-line-2">
@@ -219,7 +224,7 @@ export default function Materials() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[12px] text-ink-1" title={o.key}>{o.name || o.key}</p>
                       <p className="text-[11px] text-ink-3">
-                        {formatBytes(o.size)} · {formatDate(o.createdAt.getTime())}
+                        {formatBytes(o.size)} · {formatDate(o.createdAt.getTime(), lang)}
                       </p>
                     </div>
                   </li>
@@ -231,11 +236,13 @@ export default function Materials() {
 
         {/* 全部图片 */}
         <section className="ya-well p-5">
-          <h2 className="text-[14px] font-semibold text-ink-1">全部图片 <span className="font-normal text-ink-3">（最近 200 张）</span></h2>
+          <h2 className="text-[14px] font-semibold text-ink-1">
+            {t('materials.allImages')} <span className="font-normal text-ink-3">{t('materials.recent200')}</span>
+          </h2>
           {files.isLoading ? (
-            <p className="mt-3 text-[13px] text-ink-3">读取中…</p>
+            <p className="mt-3 text-[13px] text-ink-3">{t('common.loading')}</p>
           ) : (files.data ?? []).length === 0 ? (
-            <p className="mt-3 text-[13px] text-ink-3">还没有上传过图片。</p>
+            <p className="mt-3 text-[13px] text-ink-3">{t('materials.empty')}</p>
           ) : (
             <ul className="mt-2 divide-y divide-line-2">
               {(files.data ?? []).map((f) => {
@@ -258,22 +265,22 @@ export default function Materials() {
                         inUse ? 'bg-ok-100 text-ok-700' : 'bg-warn-100 text-warn-700'
                       }`}
                     >
-                      {inUse ? '在用' : '没在用'}
+                      {inUse ? t('materials.inUse') : t('materials.notInUse')}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[12px] text-ink-1" title={f.key}>{f.name || f.key}</p>
                       <p className="text-[11px] text-ink-3">
-                        {formatBytes(f.size)} · {formatDate(f.createdAt.getTime())}
+                        {formatBytes(f.size)} · {formatDate(f.createdAt.getTime(), lang)}
                       </p>
                     </div>
                     <button
                       onClick={() => {
-                        if (!window.confirm('删掉这张图？引用了它的稿件会显示裂图。')) return
+                        if (!window.confirm(t('materials.deleteConfirm'))) return
                         removeOneMutation.mutate({ key: f.key })
                       }}
                       className="ya-link-btn danger shrink-0"
                     >
-                      删除
+                      {t('common.delete')}
                     </button>
                   </li>
                 )
@@ -288,20 +295,22 @@ export default function Materials() {
 }
 
 function Shell({ children, onBack }: { children: React.ReactNode; onBack: () => void }) {
+  const { t } = useI18n()
   return (
     <div className="ya-page min-h-screen">
-      <header className="ya-glass sticky top-0 z-10 flex h-14 items-center gap-3 px-4">
+      <header className="ya-glass sticky top-0 z-10 flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
         <button
           onClick={onBack}
-          className="ya-btn-secondary ya-btn ya-btn-sm !h-8"
+          className="ya-btn-secondary ya-btn ya-btn-sm !h-8 shrink-0"
         >
-          ← 回到编辑器
+          ← {t('common.backToEditor')}
         </button>
-        <div className="flex items-baseline gap-2">
-          <span className="text-[15px] font-bold tracking-wide text-ink-1">素材库</span>
-          <span className="ya-eyebrow">materials</span>
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="whitespace-nowrap text-[15px] font-bold tracking-wide text-ink-1">{t('materials.title')}</span>
+          <span className="ya-eyebrow hidden sm:inline">materials</span>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LanguageToggle />
           <ThemeToggle />
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { contentHash } from './content-hash'
 import { SAMPLE_DOC } from './sample'
 import { uid, type DocRecord } from './store'
+import { t } from './i18n'
 
 /**
  * The login merge: local cache ⨝ cloud metadata, planned as pure data.
@@ -60,11 +61,12 @@ export interface MergePlan {
   notices: string[]
 }
 
-const COPY_SUFFIX = '（本机版本）'
+const COPY_SUFFIX_KEY = 'mcp.version.local'
 
 /** Name for a kept local divergence, within the server's 200-char limit. */
 export function conflictCopyName(name: string): string {
-  return `${(name || '未命名稿件').slice(0, 200 - COPY_SUFFIX.length)}${COPY_SUFFIX}`
+  const suffix = t(COPY_SUFFIX_KEY)
+  return t('merge.copyName', { name: (name || t('common.unnamedDoc')).slice(0, 200 - suffix.length) })
 }
 
 function stubOf(meta: RemoteDocMeta): DocRecord {
@@ -141,10 +143,7 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
     }
     toArchive.push(copy)
     remoteDocs.push(copy)
-    notices.push(
-      `「${cached.name || '未命名稿件'}」云端和本机各有一版：云端那版保留原名，「${copy.name}」已收进草稿箱，` +
-        '打开对比后删掉不要的那份就行',
-    )
+    notices.push(t('merge.diverged', { name: cached.name || t('common.unnamedDoc'), copy: copy.name }))
   }
 
   for (const d of input.local) {
@@ -168,7 +167,7 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
       // It was archived once, yet the cloud no longer has it (purged on another
       // device). Coming back as an unarchived working copy keeps the text alive
       // without pretending it is still in the drafts box.
-      notices.push(`「${d.name || '未命名稿件'}」在云端已经没有了，本机这份已作为工作稿同步回来`)
+      notices.push(t('merge.cloudGone', { name: d.name || t('common.unnamedDoc') }))
     }
   }
 

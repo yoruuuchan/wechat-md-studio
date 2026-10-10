@@ -1,6 +1,8 @@
 // 默认示例稿：把这个工具支持的语法都用一遍，任何人打开就能照着改。
 // （同时作为 golden 主题的验收样例，改动后跑 npm run verify:themes）
 
+import type { MsgKey } from './i18n.zh'
+
 export const SAMPLE_DOC = `---
 titles:
   - 欢迎使用芦苇
@@ -81,22 +83,22 @@ npm run dev
 @signature
 `
 
-// 语法速查，供编辑器内帮助面板
-export const CHEATSHEET: { syntax: string; desc: string }[] = [
-  { syntax: '==重点==', desc: '下划线重点（行内）' },
-  { syntax: '## KICKER | 标题', desc: '章节标题，序号自动编号' },
-  { syntax: '### 小标题', desc: '次级标题，无序号' },
-  { syntax: '> 金句', desc: '金句卡片' },
-  { syntax: ':::quote … :::', desc: '引文框，可多段' },
-  { syntax: ':::center … :::', desc: '居中强调句' },
-  { syntax: '![图注说明]()', desc: '图片占位，图号自动' },
-  { syntax: ':::carousel 4:3 标题 … :::', desc: '图片轮播；4:3/3:4/16:9/9:16/1:1 任选，上传时裁切统一' },
-  { syntax: ':::gallery 3 1:1 标题 … :::', desc: '多图网格；列数 2/3/4 与比例都可省略，上传时裁成同一画框' },
-  { syntax: '| 表头 | 表头 |', desc: 'GFM 表格，支持逐列对齐（:--- / :---: / ---:）' },
-  { syntax: '@signature', desc: '署名块（人员在设置中配置）' },
-  { syntax: '$$ … $$', desc: '数学公式，独占一段；渲染为矢量图，公众号里不糊' },
-  { syntax: '<!-- 备注 -->', desc: '编辑备注，不渲染' },
-  { syntax: '--- titles: - … ---', desc: 'front matter：标题候选、封面说明' },
+// 语法速查，供编辑器内帮助面板；descriptive text lives in the i18n dictionaries.
+export const CHEATSHEET: { syntax: string; desc: MsgKey }[] = [
+  { syntax: '==重点==', desc: 'cheat.mark' },
+  { syntax: '## KICKER | 标题', desc: 'cheat.kicker' },
+  { syntax: '### 小标题', desc: 'cheat.h3' },
+  { syntax: '> 金句', desc: 'cheat.quoteCard' },
+  { syntax: ':::quote … :::', desc: 'cheat.quoteBox' },
+  { syntax: ':::center … :::', desc: 'cheat.center' },
+  { syntax: '![图注说明]()', desc: 'cheat.image' },
+  { syntax: ':::carousel 4:3 标题 … :::', desc: 'cheat.carousel' },
+  { syntax: ':::gallery 3 1:1 标题 … :::', desc: 'cheat.gallery' },
+  { syntax: '| 表头 | 表头 |', desc: 'cheat.table' },
+  { syntax: '@signature', desc: 'cheat.signature' },
+  { syntax: '$$ … $$', desc: 'cheat.math' },
+  { syntax: '<!-- 备注 -->', desc: 'cheat.comment' },
+  { syntax: '--- titles: - … ---', desc: 'cheat.frontmatter' },
 ]
 
 /**

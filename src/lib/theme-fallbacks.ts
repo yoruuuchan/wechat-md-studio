@@ -1,5 +1,6 @@
 import { esc, type Theme } from './themes'
 import type { CarouselRatio } from './types'
+import { t } from './i18n'
 
 /**
  * Capabilities a theme may optionally implement.
@@ -54,7 +55,7 @@ export function defaultFootnotes(items: FootnoteItem[]): string {
         `<p style="margin:6px 0 0;font-size:12px;line-height:1.7;letter-spacing:.5px;color:#888888;text-align:left;text-indent:0;word-break:break-all;"><span leaf="">${f.index}. ${esc(f.url)}</span></p>`,
     )
     .join('')
-  return `<section style="margin:0;padding-top:14px;border-top:1px solid #E6EDF6;"><p style="margin:0;font-size:12px;line-height:1.5;letter-spacing:2px;color:#888888;text-indent:0;"><span leaf="">参考链接</span></p>${rows}</section>`
+  return `<section style="margin:0;padding-top:14px;border-top:1px solid #E6EDF6;"><p style="margin:0;font-size:12px;line-height:1.5;letter-spacing:2px;color:#888888;text-indent:0;"><span leaf="">${t('render.refsHeading')}</span></p>${rows}</section>`
 }
 
 /**
@@ -78,7 +79,7 @@ export function defaultMath(_tex: string, inner: string, _display: boolean): str
  * the block mapping does not shift when a formula fails.
  */
 export function mathFailure(tex: string): string {
-  return `<p style="margin:0;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:#B42318;text-align:center;text-indent:0;word-break:break-all;"><span leaf="">公式无法编译 ${esc(tex)}</span></p>`
+  return `<p style="margin:0;font-family:Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:#B42318;text-align:center;text-indent:0;word-break:break-all;"><span leaf="">${t('render.mathError')} ${esc(tex)}</span></p>`
 }
 
 /** Every theme caps its root at this width, which is all a placeholder cell needs to size itself. */
@@ -147,7 +148,7 @@ export function defaultGallery(
         .join(';')
       const body = it.src
         ? `<img src="${esc(it.src)}" width="${rw * 100}" height="${rh * 100}" style="display:block;width:100%;height:auto;" />`
-        : `<section style="width:100%;height:${placeholderH}px;box-sizing:border-box;border:1px dashed #B9DAFF;background:#F6FAFF;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#888888;text-indent:0;text-align:center;"><span leaf="">待插入图片</span></p></section>`
+        : `<section style="width:100%;height:${placeholderH}px;box-sizing:border-box;border:1px dashed #B9DAFF;background:#F6FAFF;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#888888;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
       const cap = it.alt
         ? `<p style="margin:6px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(it.alt)}</span></p>`
         : ''

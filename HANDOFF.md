@@ -109,6 +109,7 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 | 应用 | 只认字节头是 jpeg / png / gif / webp 的图；**对外提供的 Content-Type 由字节决定，不信请求头** | `api/lib/image-type.ts` |
 | 应用 | 匿名图片按访客 Cookie 的哈希归属，别人列不出也删不掉 | `api/lib/visitor.ts` |
 | 运维 | 每次拒收写一行 `[upload-deny] 原因 key=value` 到服务日志（burst / ip-daily / quota / bad-magic，两扇门都写），晨报定时任务 grep 它；被限流的登录写 `[auth-deny] login-burst ip=…` | `api/lib/deny-log.ts` |
+| 运维 | 反馈提交被限流写 `[feedback-deny] minute/day ip=…`；未配置邮件凭据写 `[feedback] unavailable`，投递失败写 `[feedback] delivery-failed <reason>`，成功写 `[feedback] sent lang=… ip=…`。格式固定，晨报可 grep | `api/feedback-router.ts` |
 | 运维 | 每次 GC 跑完写一行 `[anon-gc] deleted=N bytes=B failed=F days=D` 到服务日志（删不掉的另写 `[anon-gc] delete-failed key=… reason=…`）。格式固定，晨报定时任务一起 grep | `api/lib/anon-gc.ts` |
 | 运维 | 匿名池应急清理：`sudo bash /opt/mopai/scripts/server-anon-purge.sh --days N` 先干跑、`--apply` 才删，只碰 ownerId=0 | `scripts/server-anon-purge.sh` |
 | 既定 | agent 门上传落 ownerId=1，**不计入**匿名池封顶——它是站长自己的流量，匿名池只度量陌生人；agent 门默认关（`AGENT_TOKENS` 留空），开不开由站长配令牌决定 | 2026-10-08 拍板 |

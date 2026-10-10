@@ -4,6 +4,7 @@ import { ext, type FootnoteItem } from './theme-fallbacks'
 import { diagramOf } from './diagram'
 import { fencedRanges, isInFence } from './fences'
 import { commentRanges, isInComment } from './comments'
+import { t } from './i18n'
 
 // 盒式模块的前后空行由 pushBlock(boxed=true) 统一插入
 
@@ -116,9 +117,9 @@ export function renderDoc(
       case 'image': {
         images++
         imageNo++
-        const alt = b.alt || '未命名图片'
-        if (!b.alt) warnings.push(`图${imageNo} 缺少说明文字（![说明](src)）`)
-        const caption = `图${imageNo} ${alt}`
+        const alt = b.alt || t('render.untitledImage')
+        if (!b.alt) warnings.push(t('render.warn.imageNoAlt', { n: imageNo }))
+        const caption = t('render.captionImage', { n: imageNo, alt })
         parts.push({ html: theme.imageBlock(b.src ? resolveImg(b.src) : '', caption), block: bi })
         break
       }
@@ -126,8 +127,12 @@ export function renderDoc(
         carousels++
         imageNo++
         images += b.items.length
-        if (b.items.length < 2) warnings.push('轮播至少需要 2 张图片')
-        const caption = `图${imageNo} ${b.title || '多图轮播'}（共 ${b.items.length} 张）`
+        if (b.items.length < 2) warnings.push(t('render.warn.carouselTooFew'))
+        const caption = t('render.captionCarousel', {
+          n: imageNo,
+          title: b.title || t('render.defaultCarouselTitle'),
+          count: b.items.length,
+        })
         // Carousel slides go through the same resolver as single images; skipping
         // it left `img:key` untouched and the slides rendered as broken images.
         const items = b.items.map((it) => ({ ...it, src: it.src ? resolveImg(it.src) : '' }))
@@ -138,8 +143,12 @@ export function renderDoc(
         galleries++
         imageNo++
         images += b.items.length
-        if (b.items.length < 2) warnings.push('画廊至少需要 2 张图片')
-        const caption = `图${imageNo} ${b.title || '多图网格'}（共 ${b.items.length} 张）`
+        if (b.items.length < 2) warnings.push(t('render.warn.galleryTooFew'))
+        const caption = t('render.captionGallery', {
+          n: imageNo,
+          title: b.title || t('render.defaultGalleryTitle'),
+          count: b.items.length,
+        })
         // Same resolver as single images and carousel slides: without it the
         // cells keep a raw `img:key` and render as broken images.
         const items = b.items.map((it) => ({ ...it, src: it.src ? resolveImg(it.src) : '' }))
@@ -194,8 +203,8 @@ export function renderDoc(
           // same place in the materials list as an uploaded photograph.
           images++
           imageNo++
-          if (!diagram.title) warnings.push(`图${imageNo} 是图表，可在 \`\`\`mermaid 后面加一句说明`)
-          const caption = `图${imageNo} ${diagram.title || '示意图'}`
+          if (!diagram.title) warnings.push(t('render.warn.diagramTitle', { n: imageNo }))
+          const caption = t('render.captionDiagram', { n: imageNo, title: diagram.title || t('render.defaultDiagramTitle') })
           parts.push({ html: theme.imageBlock(resolveImg(ref), caption), block: bi })
         } else {
           // Still rasterizing, invalid syntax, or no account to upload with. The
@@ -274,7 +283,7 @@ function countSegs(segs: InlineSeg[]): number {
 
 function warnLinks(segs: InlineSeg[], warnings: string[]) {
   if (segs.some((s) => s.link && isFootnotable(s.link))) {
-    warnings.push('检测到链接：公众号正文外链不可点击，已编号并汇总到文末「参考链接」')
+    warnings.push(t('render.warn.links'))
   }
 }
 
@@ -323,9 +332,9 @@ export function collectMaterials(doc: Doc, resolveDiagram: DiagramResolver = () 
     if (b.type === 'image') {
       imageNo++
       out.push({
-        no: `图${imageNo}`,
+        no: t('render.figureNo', { n: imageNo }),
         kind: '单图',
-        desc: b.alt || '未命名图片',
+        desc: b.alt || t('render.untitledImage'),
         alt: b.alt,
         src: b.src,
         hasSrc: !!b.src,
@@ -337,9 +346,9 @@ export function collectMaterials(doc: Doc, resolveDiagram: DiagramResolver = () 
       carouselNo++
       b.items.forEach((it, idx) => {
         out.push({
-          no: `图${imageNo}-${idx + 1}`,
+          no: t('render.figureNoSlide', { n: imageNo, m: idx + 1 }),
           kind: '轮播',
-          desc: `${b.title ? b.title + ' · ' : ''}${it.alt || '未命名'}`,
+          desc: `${b.title ? b.title + ' · ' : ''}${it.alt || t('common.unnamed')}`,
           alt: it.alt,
           src: it.src,
           hasSrc: !!it.src,
@@ -353,9 +362,9 @@ export function collectMaterials(doc: Doc, resolveDiagram: DiagramResolver = () 
       imageNo++
       b.items.forEach((it, idx) => {
         out.push({
-          no: `图${imageNo}-${idx + 1}`,
+          no: t('render.figureNoSlide', { n: imageNo, m: idx + 1 }),
           kind: '画廊',
-          desc: `${b.title ? b.title + ' · ' : ''}${it.alt || '未命名'}`,
+          desc: `${b.title ? b.title + ' · ' : ''}${it.alt || t('common.unnamed')}`,
           alt: it.alt,
           src: it.src,
           hasSrc: !!it.src,

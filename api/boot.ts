@@ -12,6 +12,7 @@ import { securityHeaders } from "./lib/security-headers";
 import { warnAboutWeakTokens } from "./lib/agent-auth";
 import { writingSkill } from "./lib/writing-skill";
 import { remoteMcpRouter } from "./remote-mcp-router";
+import { feedbackRouter } from "./feedback-router";
 import { handleMcpRequest } from "./mcp";
 import { startRemoteMcpCleanup } from "./lib/remote-mcp";
 
@@ -34,6 +35,9 @@ app.get("/skill.md", (c) => {
 
 app.route("/api/remote-mcp", remoteMcpRouter);
 app.all("/api/mcp", handleMcpRequest);
+// In-site feedback: the public form relays to the owner's mailbox through the
+// server (credentials stay server-side; see api/lib/feedback.ts).
+app.route("/api/feedback", feedbackRouter);
 
 // Public image read: stable address, redirects to the R2 worker.
 // Copied WeChat HTML references this stable address, so the key space can never

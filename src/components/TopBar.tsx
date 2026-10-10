@@ -10,9 +10,11 @@ import {
 import { THEMES, type Theme } from '@/lib/themes'
 import { useThemeFavorites } from '@/hooks/useThemeFavorites'
 import type { DocRecord } from '@/lib/store'
-import { APP_NAME, APP_BYLINE, REPO_URL } from '@/lib/brand'
+import { APP_BYLINE, REPO_URL } from '@/lib/brand'
 import { YoruMark } from '@/components/YoruMark'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LanguageToggle } from '@/components/LanguageToggle'
+import { useI18n } from '@/hooks/useI18n'
 
 interface Props {
   docs: DocRecord[]
@@ -25,7 +27,7 @@ interface Props {
   onCreateSample: () => void
   onDeleteDoc: (id: string) => void
   syncState: 'loading' | 'synced' | 'saving' | 'local' | 'error' | 'local-error'
-  /** Put the open article into 草稿箱. Nothing else does that. */
+  /** Put the open article into the drafts box. Nothing else does that. */
   onSaveDraft: () => void
   saving: boolean
   /** Edited since the last explicit save, or never saved at all. */
@@ -56,57 +58,58 @@ const THEME_DOT: Record<string, string> = {
   steady: '#1EA8A0',
 }
 
-const SYNC_LABEL: Record<Props['syncState'], { text: string; color: string; title: string }> = {
-  loading: { text: '读取中', color: 'var(--ink-3)', title: '正在从云端读取稿件' },
-  saving: { text: '保存中', color: 'var(--primary-500)', title: '正在写入草稿箱' },
-  synced: { text: '已保存', color: 'var(--success-500)', title: '这篇已经在草稿箱里了' },
-  local: { text: '仅本机', color: 'var(--warning-700)', title: '未登录：内容只存在这个浏览器里' },
-  error: { text: '未保存', color: 'var(--error-500)', title: '写入草稿箱失败，本地内容仍保留' },
-  'local-error': {
-    text: '本地未存',
-    color: 'var(--error-500)',
-    title: '这个浏览器没能把内容写下来（存储空间可能不够），请先导出 Markdown 备份',
-  },
-}
-
 export default function TopBar(p: Props) {
-  const syncLabel = p.remoteConnected && p.syncState === 'local'
-    ? { text: '本机 + AI', color: 'var(--primary-500)', title: '本机保留稿件，并已授权当前稿件的临时 AI 协作副本；同步状态见编辑器上方' }
-    : SYNC_LABEL[p.syncState]
+  const { t } = useI18n()
+  const syncLabel =
+    p.remoteConnected && p.syncState === 'local'
+      ? { text: t('topbar.sync.localMcp'), color: 'var(--primary-500)', title: t('topbar.sync.localMcpTitle') }
+      : {
+          loading: { text: t('topbar.sync.loading'), color: 'var(--ink-3)', title: t('topbar.sync.loadingTitle') },
+          saving: { text: t('topbar.sync.saving'), color: 'var(--primary-500)', title: t('topbar.sync.savingTitle') },
+          synced: { text: t('topbar.sync.synced'), color: 'var(--success-500)', title: t('topbar.sync.syncedTitle') },
+          local: { text: t('topbar.sync.local'), color: 'var(--warning-700)', title: t('topbar.sync.localTitle') },
+          error: { text: t('topbar.sync.error'), color: 'var(--error-500)', title: t('topbar.sync.errorTitle') },
+          'local-error': {
+            text: t('topbar.sync.localError'),
+            color: 'var(--error-500)',
+            title: t('topbar.sync.localErrorTitle'),
+          },
+        }[p.syncState]
   const [themeOpen, setThemeOpen] = useState(false)
-  const activeTheme = THEMES.find((t) => t.id === p.themeId) || THEMES[0]
+  const activeTheme = THEMES.find((th) => th.id === p.themeId) || THEMES[0]
   const { favorites } = useThemeFavorites()
-  const favoriteThemes = useMemo(() => THEMES.filter((t) => favorites.has(t.id)), [favorites])
+  const favoriteThemes = useMemo(() => THEMES.filter((th) => favorites.has(th.id)), [favorites])
 
   // 快速切换器只放每类前几套：219 套每套都要实时渲染缩略图，
   // 全塞进来既慢也没法扫；完整浏览在下面的「查看全部模板」。
   // 收藏单独一组置顶、且不再进分类组，同一个主题只出现一次。
   const QUICK_PER_CAT = 6
   const QUICK_FAVORITES = 6
+  const CATEGORIES = ['简约', '商务', '杂志', '活力'] as const
 
-  const quickTile = (t: Theme) => (
+  const quickTile = (th: Theme) => (
     <button
-      key={t.id}
-      data-theme-quick={t.id}
+      key={th.id}
+      data-theme-quick={th.id}
       onClick={() => {
-        p.onTheme(t.id)
+        p.onTheme(th.id)
         setThemeOpen(false)
       }}
       className={`group rounded-2xl p-2 text-left transition-all ${
-        t.id === p.themeId ? 'ya-selected' : 'bg-surface-sunken hover:bg-surface-base'
+        th.id === p.themeId ? 'ya-selected' : 'bg-surface-sunken hover:bg-surface-base'
       }`}
-      style={t.id === p.themeId ? undefined : { boxShadow: 'var(--shadow-inset)' }}
+      style={th.id === p.themeId ? undefined : { boxShadow: 'var(--shadow-inset)' }}
     >
       <div className="relative h-20 overflow-hidden rounded-lg bg-white" style={{ boxShadow: 'var(--shadow-inset)' }}>
         <div
           className="pointer-events-none absolute left-0 top-0 origin-top-left"
           style={{ width: 677, transform: 'scale(0.26)' }}
-          dangerouslySetInnerHTML={{ __html: p.miniPreview(t.id) }}
+          dangerouslySetInnerHTML={{ __html: p.miniPreview(th.id) }}
         />
       </div>
       <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
-        <span className="ya-dot" style={{ background: t.ui.accent }} />
-        <span className="text-[12px] font-medium text-ink-1">{t.name}</span>
+        <span className="ya-dot" style={{ background: th.ui.accent }} />
+        <span className="text-[12px] font-medium text-ink-1">{th.name}</span>
       </div>
     </button>
   )
@@ -118,7 +121,7 @@ export default function TopBar(p: Props) {
         <div className="flex items-center gap-2.5">
           <YoruMark height={17} />
           <div className="flex items-baseline gap-2">
-            <span className="whitespace-nowrap text-[14px] font-bold tracking-wide text-ink-1">{APP_NAME}</span>
+            <span className="whitespace-nowrap text-[14px] font-bold tracking-wide text-ink-1">{t('app.name')}</span>
             <span className="ya-eyebrow hidden whitespace-nowrap lg:inline">{APP_BYLINE}</span>
           </div>
         </div>
@@ -127,12 +130,12 @@ export default function TopBar(p: Props) {
           <input
             value={p.docName}
             onChange={(e) => p.onRename(e.target.value)}
-            placeholder="未命名稿件"
+            placeholder={t('common.unnamedDoc')}
             className="w-36 bg-transparent px-1.5 py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4"
-            title="稿件名称"
+            title={t('topbar.docNameTitle')}
           />
           <DropdownMenu>
-            <DropdownMenuTrigger className="rounded-r-lg px-1.5 py-1 outline-none" title="切换稿件">
+            <DropdownMenuTrigger className="rounded-r-lg px-1.5 py-1 outline-none" title={t('topbar.switchDoc')}>
               <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="text-ink-3">
                 <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
@@ -140,7 +143,7 @@ export default function TopBar(p: Props) {
             <DropdownMenuContent align="start" className="ya-pop w-64 border-none">
               {p.docs.map((d) => (
                 <DropdownMenuItem key={d.id} onSelect={() => p.onSelectDoc(d.id)} className="flex items-center justify-between gap-2 rounded-lg">
-                  <span className="truncate">{d.name || '未命名稿件'}</span>
+                  <span className="truncate">{d.name || t('common.unnamedDoc')}</span>
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     {d.id === p.activeId && <span className="ya-dot" style={{ background: 'var(--primary-500)' }} />}
                     {p.docs.length > 1 && (
@@ -151,19 +154,19 @@ export default function TopBar(p: Props) {
                           p.onDeleteDoc(d.id)
                         }}
                         className="ya-link-btn danger"
-                        title="删除这篇稿件"
+                        title={t('topbar.deleteDoc')}
                       >
-                        删除
+                        {t('common.delete')}
                       </button>
                     )}
                   </span>
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={p.onCreateDoc} className="rounded-lg">新建稿件</DropdownMenuItem>
+              <DropdownMenuItem onSelect={p.onCreateDoc} className="rounded-lg">{t('topbar.newDoc')}</DropdownMenuItem>
               <DropdownMenuItem onSelect={p.onCreateSample} className="rounded-lg">
-                新建示例稿
-                <span className="ml-auto text-[11px] text-ink-3">语法速览</span>
+                {t('topbar.newSample')}
+                <span className="ml-auto text-[11px] text-ink-3">{t('topbar.newSampleHint')}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -191,7 +194,7 @@ export default function TopBar(p: Props) {
           </button>
         </PopoverTrigger>
         <PopoverContent align="center" className="ya-pop w-[600px] border-none p-3">
-          <p className="ya-eyebrow mb-2 px-1">排版主题 · 当前稿件实时预览</p>
+          <p className="ya-eyebrow mb-2 px-1">{t('topbar.themes.eyebrow')}</p>
           <div className="max-h-[62vh] overflow-y-auto pr-0.5">
             {favoriteThemes.length > 0 && (
               <div className="mb-3">
@@ -201,7 +204,7 @@ export default function TopBar(p: Props) {
                       <path d="M12 3.2l2.6 5.3 5.9.85-4.25 4.14 1 5.86L12 16.7l-5.25 2.65 1-5.86L3.5 9.35l5.9-.85z" />
                     </svg>
                   </span>
-                  收藏
+                  {t('topbar.themes.favorites')}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {favoriteThemes.slice(0, QUICK_FAVORITES).map(quickTile)}
@@ -214,25 +217,27 @@ export default function TopBar(p: Props) {
                     }}
                     className="mt-1.5 px-1 text-[11px] text-brand-600 hover:underline"
                   >
-                    还有 {favoriteThemes.length - QUICK_FAVORITES} 套收藏，去模板库看全部 →
+                    {t('topbar.themes.moreFavorites', { n: favoriteThemes.length - QUICK_FAVORITES })}
                   </button>
                 )}
               </div>
             )}
-            {(['简约', '商务', '杂志', '活力'] as const).map((cat) => {
-              const all = THEMES.filter((t) => t.category === cat && !favorites.has(t.id))
+            {CATEGORIES.map((cat) => {
+              const all = THEMES.filter((th) => th.category === cat && !favorites.has(th.id))
               const list = all.slice(0, QUICK_PER_CAT)
               if (
                 activeTheme.category === cat &&
                 !favorites.has(activeTheme.id) &&
-                !list.some((t) => t.id === activeTheme.id)
+                !list.some((th) => th.id === activeTheme.id)
               ) {
                 list.unshift(activeTheme)
               }
               if (!list.length) return null
               return (
                 <div key={cat} className="mb-3">
-                  <p className="mb-1.5 px-1 text-[10px] font-semibold tracking-[0.12em] text-ink-4">{cat}</p>
+                  <p className="mb-1.5 px-1 text-[10px] font-semibold tracking-[0.12em] text-ink-4">
+                    {t(`topbar.category.${cat}`)}
+                  </p>
                   <div className="grid grid-cols-3 gap-2">{list.map(quickTile)}</div>
                 </div>
               )
@@ -245,7 +250,7 @@ export default function TopBar(p: Props) {
             }}
             className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl py-2 text-[12px] text-brand-600 transition-colors hover:bg-surface-tint"
           >
-            查看全部 {THEMES.length} 套模板
+            {t('topbar.themes.viewAll', { n: THEMES.length })}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </PopoverContent>
@@ -256,47 +261,47 @@ export default function TopBar(p: Props) {
         <button
           onClick={p.onOpenDrafts}
           className="ya-btn-secondary ya-btn"
-          title="看保存过的所有文章"
+          title={t('topbar.draftsTitle')}
         >
-          草稿箱
+          {t('topbar.drafts')}
         </button>
 
         <button
           onClick={p.onOpenMaterials}
           className="ya-btn-secondary ya-btn"
-          title="查看图片用量、清理没在用的旧图"
+          title={t('topbar.materialsTitle')}
         >
-          素材库
+          {t('topbar.materials')}
         </button>
 
         <button
           onClick={p.onSaveDraft}
           disabled={p.saving}
-          title={p.unsaved ? '这篇有改动还没进草稿箱' : '已经在草稿箱里了，再存一次会更新内容'}
+          title={p.unsaved ? t('topbar.saveTitleUnsaved') : t('topbar.saveTitleSaved')}
           className={`ya-btn ${p.unsaved ? 'ya-btn-primary' : 'ya-btn-secondary'}`}
         >
           {/* warning 小黄点是唯一的未保存指示 */}
           {p.unsaved && <span className="ya-unsaved-dot" />}
-          {p.saving ? '保存中…' : p.unsaved ? '保存到草稿箱' : '已保存'}
+          {p.saving ? t('topbar.saving') : p.unsaved ? t('topbar.save') : t('topbar.saved')}
         </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="ya-btn-secondary ya-btn" disabled={p.importing}>
-              {p.importing ? '导入中…' : '导入'}
+              {p.importing ? t('topbar.importing') : t('topbar.import')}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="ya-pop w-56 border-none">
             <DropdownMenuItem onSelect={() => p.onImport('markdown')} className="rounded-lg">
-              Markdown 文件
+              {t('topbar.import.markdown')}
               <span className="ml-auto text-[11px] text-ink-3">.md</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => p.onImport('docx')} className="rounded-lg">
-              Word 文档
+              {t('topbar.import.docx')}
               <span className="ml-auto text-[11px] text-ink-3">.docx</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => p.onImport('bundle')} className="rounded-lg">
-              整包备份
+              {t('topbar.import.bundle')}
               <span className="ml-auto text-[11px] text-ink-3">.json</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -305,26 +310,26 @@ export default function TopBar(p: Props) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="ya-btn-secondary ya-btn">
-              导出
+              {t('topbar.export')}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="ya-pop w-56 border-none">
             <DropdownMenuItem onSelect={() => p.onExport('markdown')} className="rounded-lg">
-              Markdown 源稿
-              <span className="ml-auto text-[11px] text-ink-3">可再导回</span>
+              {t('topbar.export.markdown')}
+              <span className="ml-auto text-[11px] text-ink-3">{t('topbar.export.markdownHint')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => p.onExport('clean')} className="rounded-lg">
-              干净正文 HTML
-              <span className="ml-auto text-[11px] text-ink-3">仅 section</span>
+              {t('topbar.export.clean')}
+              <span className="ml-auto text-[11px] text-ink-3">{t('topbar.export.cleanHint')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => p.onExport('page')} className="rounded-lg">
-              预览页 HTML
-              <span className="ml-auto text-[11px] text-ink-3">带复制按钮</span>
+              {t('topbar.export.page')}
+              <span className="ml-auto text-[11px] text-ink-3">{t('topbar.export.pageHint')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => p.onExport('bundle')} className="rounded-lg">
-              整包备份
-              <span className="ml-auto text-[11px] text-ink-3">全部稿件</span>
+              {t('topbar.export.bundle')}
+              <span className="ml-auto text-[11px] text-ink-3">{t('topbar.export.bundleHint')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -338,16 +343,16 @@ export default function TopBar(p: Props) {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                 <path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              已复制
+              {t('common.copied')}
             </>
           ) : (
-            '复制到公众号'
+            t('topbar.copy')
           )}
         </button>
 
         <button
           onClick={p.onTogglePanel}
-          title={p.panelOpen ? '收起侧栏' : '展开侧栏'}
+          title={p.panelOpen ? t('topbar.panelCollapse') : t('topbar.panelExpand')}
           className={`ya-btn ya-btn-sm !h-9 !w-9 !p-0 ${p.panelOpen ? 'ya-btn-ghost text-ink-1' : 'ya-btn-secondary'}`}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -356,6 +361,7 @@ export default function TopBar(p: Props) {
           </svg>
         </button>
 
+        <LanguageToggle />
         <ThemeToggle />
 
         <span className="h-4 w-px bg-line-2" />
@@ -364,7 +370,7 @@ export default function TopBar(p: Props) {
             href={REPO_URL}
             target="_blank"
             rel="noreferrer"
-            title="GitHub 仓库"
+            title={t('topbar.github')}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-1 transition-colors hover:bg-line-1"
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
@@ -384,18 +390,18 @@ export default function TopBar(p: Props) {
               <span className="max-w-[80px] truncate">{p.userName}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="ya-pop border-none">
-              <DropdownMenuItem onSelect={p.onOpenReferences} className="rounded-lg">开源与致谢</DropdownMenuItem>
+              <DropdownMenuItem onSelect={p.onOpenReferences} className="rounded-lg">{t('topbar.references')}</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={p.onLogout} className="rounded-lg">退出登录</DropdownMenuItem>
+              <DropdownMenuItem onSelect={p.onLogout} className="rounded-lg">{t('topbar.logout')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
           <button
             onClick={p.onLogin}
             className="ya-link-btn whitespace-nowrap !px-2.5 !py-1.5 !text-[12px]"
-            title="登录后才有云端草稿箱；编辑、上传、复制、导出都不用登录"
+            title={t('topbar.loginTitle')}
           >
-            登录
+            {t('topbar.login')}
           </button>
         )}
       </div>

@@ -1,26 +1,27 @@
-// Browser acceptance for the /terms page and the two sidebar entry points.
+// Browser acceptance for the /terms page and the sidebar entry points.
 //
 // Usage: node scripts/cdp-verify-terms.mjs [appUrl] [cdpPort]
 //   appUrl defaults to http://127.0.0.1:3201 — any running app, dev or production mode.
 //   No login required: /terms and the sidebar notices are anonymous surfaces.
 //
 // It asserts the page renders in both UI themes, keeps its numbers coming from
-// the same sources the app uses (THEMES registry), and that both links to /terms
-// exist — one per sidebar tab, since Radix only mounts the active panel.
-// The contact address is scrape-protected: it must stay out of the DOM until a
-// visitor asks for it, so the checks walk the 显示邮箱 reveal on /terms and the
-// contact block in the settings tab.
+// the same sources the app uses (THEMES registry), and that the settings tab
+// carries the feedback entry (the takedown path) plus the star/issues links.
+// The receiving mailbox is no longer on any public surface: this script fails
+// if a mailto link or the known relay address appears anywhere on the page or
+// in the settings tab, and checks the in-site feedback form link instead.
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const APP = process.argv[2] || 'http://127.0.0.1:3201'
+const APP = (process.argv[2] || 'http://127.0.0.1:3201').replace(/\/$/, '')
 const PORT = Number(process.argv[3] || 9349)
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-terms-'))
-// Assembled, not written whole — the same rule the app follows.
-const ADDRESS = ['yoruandakari', 'duck.com'].join('@')
+// The retired relay address, assembled so this file itself stays free of the
+// plain string — the same rule the app used to follow.
+const RETIRED = ['yoruandakari', 'duck.com'].join('@')
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-cdp-t-'))
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
@@ -139,8 +140,9 @@ const page = JSON.parse(
       headings: [...document.querySelectorAll('h2')].map(h => h.textContent.trim()),
       theme: document.documentElement.dataset.theme,
       pageBg: getComputedStyle(document.querySelector('.ya-page')).backgroundColor,
-      email: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
-      plainEmail: t.includes(${JSON.stringify(ADDRESS)}),
+      mailtos: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
+      plainRetired: t.includes(${JSON.stringify(RETIRED)}),
+      feedbackLinks: [...document.querySelectorAll('a[href="/feedback"]')].length,
       themeCount: (t.match(/(\\d+)\\s*套主题/) || [])[1],
       mentionsIndexedDB: t.includes('IndexedDB'),
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
@@ -151,32 +153,13 @@ const page = JSON.parse(
 )
 check('/terms renders as a page, not a blank route', page.path === '/terms' && page.textLen > 1200, `textLen=${page.textLen}`)
 check('every section is present', page.headings.length >= 6, page.headings.join(' / '))
-check('the contact address stays hidden until asked', page.email.length === 0 && page.plainEmail === false, `mailtos=${page.email.join(',')} plain=${page.plainEmail}`)
+check('no mailto link survives on the page', page.mailtos.length === 0, page.mailtos.join(','))
+check('the retired relay address is nowhere in the text', page.plainRetired === false)
+check('the complaints section links to the feedback form', page.feedbackLinks >= 1, `links=${page.feedbackLinks}`)
 check('theme count comes from the THEMES registry', Number(page.themeCount) > 200, `count=${page.themeCount}`)
 check('the page states where drafts actually live', page.mentionsIndexedDB === true)
 check('no horizontal overflow', page.overflowX <= 0, `overflowX=${page.overflowX}`)
 const akariShot = await shot('terms-akari')
-
-// Revealing is the only path by which the address enters the DOM; a scraper
-// that merely renders the page never sees it.
-await evaluate(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '显示邮箱')
-  if (b) b.scrollIntoView({ block: 'center' })
-  return !!b
-})()`)
-await sleep(600)
-await clickAt('显示邮箱')
-const revealed = JSON.parse(
-  await evaluate(`JSON.stringify({
-    mailto: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
-    plainEmail: document.body.innerText.includes(${JSON.stringify(ADDRESS)}),
-  })`),
-)
-check(
-  'clicking 显示邮箱 reveals the duck.com relay',
-  revealed.mailto.length === 1 && revealed.mailto[0] === 'mailto:' + ADDRESS && revealed.plainEmail === true,
-  revealed.mailto.join(','),
-)
 
 await setTheme('yoru')
 await goto(APP + '/terms')
@@ -208,21 +191,21 @@ const inSettings = await termsLinks()
 check(
   'the 设置 tab carries the takedown entry',
   (await evaluate(`document.querySelector('[role=tab][aria-selected=true]')?.textContent.trim()`)) === '设置' &&
-    inSettings.some((t) => t.includes('投诉删除')),
+    inSettings.some((text) => text.includes('投诉删除')),
   JSON.stringify(inSettings),
 )
 
 const settingsContact = JSON.parse(
   await evaluate(`JSON.stringify({
-    plainEmail: document.body.innerText.includes(${JSON.stringify(ADDRESS)}),
-    hasCopy: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '复制邮箱'),
-    hasReveal: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '显示邮箱'),
+    plainRetired: document.body.innerText.includes(${JSON.stringify(RETIRED)}),
+    mailtos: [...document.querySelectorAll('[role=tabpanel] a[href^="mailto:"]')].length,
+    hasFeedback: [...document.querySelectorAll('[role=tabpanel] a[href="/feedback"]')].length,
     ghLinks: [...document.querySelectorAll('[role=tabpanel] a[href^="https://github.com/"]')].map(a => a.getAttribute('href')),
   })`),
 )
 check(
-  '设置 tab adds the contact block with the address still hidden',
-  settingsContact.plainEmail === false && settingsContact.hasCopy && settingsContact.hasReveal,
+  '设置 tab carries the feedback entry instead of an address',
+  settingsContact.plainRetired === false && settingsContact.mailtos === 0 && settingsContact.hasFeedback >= 1,
   JSON.stringify(settingsContact),
 )
 check(

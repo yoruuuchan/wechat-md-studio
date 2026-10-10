@@ -6,6 +6,7 @@ import Drafts from '@/pages/Drafts'
 import Themes from '@/pages/Themes'
 import References from '@/pages/References'
 import Terms from '@/pages/Terms'
+import Feedback from '@/pages/Feedback'
 import NotFound from '@/pages/NotFound'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
       <Route path="/themes" element={<Themes />} />
       <Route path="/references" element={<References />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/feedback" element={<Feedback />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )

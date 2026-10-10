@@ -21,6 +21,8 @@
 | Import / export | [import-export.ts](src/lib/import-export.ts)：Markdown、整包备份、DOCX；[rich-paste.ts](src/lib/rich-paste.ts)：HTML 转公众号方言；文件与 UI 接线在 `EditorPage.tsx` |
 | Agent API | [agent-router.ts](api/agent-router.ts)、[agent-auth.ts](api/lib/agent-auth.ts)、[contracts/agent.ts](contracts/agent.ts)；[wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) 是 Python 客户端入口 |
 | AI writing / single-document MCP | [wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) 同时是写作事实源；[writing-skill.ts](api/lib/writing-skill.ts) 直接嵌入它；[mcp.ts](api/mcp.ts)、[remote-mcp-router.ts](api/remote-mcp-router.ts)、[remote-mcp.ts](api/lib/remote-mcp.ts)、[useRemoteMcp.ts](src/hooks/useRemoteMcp.ts) 负责临时授权、CAS 与浏览器同步 |
+| UI language (i18n) | [i18n.ts](src/lib/i18n.ts)：语言状态、t()、`mopai.lang.v1` 与 `<html lang>`；[i18n.zh.ts](src/lib/i18n.zh.ts) 是键的事实源，[i18n.en.ts](src/lib/i18n.en.ts) 逐键对照（缺键编译不过），[useI18n.ts](src/hooks/useI18n.ts) 订阅、[LanguageToggle.tsx](src/components/LanguageToggle.tsx) 切换控件；测试 [i18n.test.ts](src/lib/i18n.test.ts)。稿件正文与主题名称/许可不随语言改写 |
+| Feedback relay | [feedback-router.ts](api/feedback-router.ts) 暴露 `POST /api/feedback`；[feedback.ts](api/lib/feedback.ts) 做校验与 Resend 转发（`RESEND_API_KEY` / `RESEND_FROM` / `FEEDBACK_TO` 只读服务端环境变量）；[Feedback.tsx](src/pages/Feedback.tsx) 是站内表单页，设置页与 /terms 是入口；拒绝写 `[feedback-deny]` 日志 |
 | Favorites | [favorites.ts](src/lib/favorites.ts) / [useThemeFavorites.ts](src/hooks/useThemeFavorites.ts)：本机收藏，`mopai.theme-favorites.v1`；主题库与编辑器共用 |
 | Verification | [package.json](package.json)、[verify-themes.ts](scripts/verify-themes.ts)、[verify-sources.ts](scripts/verify-sources.ts)、各模块相邻 `*.test.ts`；[验证导航](docs/verification.md) 对应现有浏览器验收脚本 |
 
@@ -35,6 +37,8 @@
 | 保存 / 同步 / 导入导出 | [稿件与编辑器](docs/documents.md)、相关 hooks / API / schema 及其测试 |
 | Agent 接入 | [Agent API](docs/agent-api.md)、`contracts/agent.ts`、路由 / 鉴权与客户端实现及验收脚本 |
 | AI 写作 / Remote MCP | [AI 写作与 Remote MCP](docs/remote-mcp.md)、现有 Skill、游客 / docs / hash 实现与相邻测试；ChatGPT OAuth 兼容以 `yoruuuchan/chatgpt-mcp-connect` 的已验证实践为事实基线 |
+| 界面语言 / 英文文案 | [i18n.ts](src/lib/i18n.ts) 与两张词典、[i18n.test.ts](src/lib/i18n.test.ts)（键位与占位符一致性）、`cdp-verify-i18n.mjs`；新增文案先改 `i18n.zh.ts` 再补 `i18n.en.ts`，不要在任何组件里写新中文字面量 |
+| 反馈 / 邮件转发 | [feedback-router.ts](api/feedback-router.ts)、[feedback.ts](api/lib/feedback.ts) 与其测试、[配置说明](docs/configuration.md#基础配置)（Resend 变量）；改行为时同步 /terms 措辞与 `cdp-verify-terms.mjs` 断言 |
 | 复制 / 剪贴板 / 预览选区行为 | `selection-copy.ts`、`PreviewPane.tsx`、`selection-copy.test.ts`、`scripts/cdp-verify-selection-copy.mjs`；整篇复制另见 `clipboard.ts` |
 | UI 明暗主题 / shadcn / Tailwind dark variant | `ui-theme.ts`、`ThemeToggle.tsx`、`tailwind.config.js` 的 `darkMode` 与 `src/index.css` 双主题 token、`scripts/cdp-verify-dark-theme.mjs` |
 | 使用规范 / 责任边界 | [Terms.tsx](src/pages/Terms.tsx) 与 README 的「使用规范与责任边界」是派生文档：额度读 `api/lib/anon-quota.ts` 与 `api/lib/burst.ts`、回收读 `api/lib/anon-gc.ts`、正文落在哪里读 `src/lib/store.ts` 与 `body-store.ts`。改这些行为时同步两处措辞，只写实现兑现得了的处置 |
@@ -68,7 +72,7 @@ npm run verify:themes
 npm run build
 ```
 
-涉及真实 UI、复制、上传、同步、Agent 往返等行为时，构建后再运行仓库已有的对应浏览器验收：预览局部复制用 `scripts/cdp-verify-selection-copy.mjs`，UI 明暗主题用 `scripts/cdp-verify-dark-theme.mjs`；其余入口见[验证导航](docs/verification.md)。
+涉及真实 UI、复制、上传、同步、Agent 往返等行为时，构建后再运行仓库已有的对应浏览器验收：预览局部复制用 `scripts/cdp-verify-selection-copy.mjs`，UI 明暗主题用 `scripts/cdp-verify-dark-theme.mjs`，界面语言与反馈表单用 `scripts/cdp-verify-i18n.mjs`；其余入口见[验证导航](docs/verification.md)。
 改主题 / 来源 / 致谢或生成文档时，先 `npm run sync:docs`，再 `npm run verify:sources`。
 纯文档调整检查链接、命令、路径和事实一致性；不需要启动线上验收。
 报告写明实际修改、运行的验证、结果和尚存在的真实问题；`SKIP` 与未执行不能报成通过。

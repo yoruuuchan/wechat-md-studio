@@ -3,6 +3,7 @@ import type { RemoteMcpCredentials, RemoteMcpDoc, RemoteMcpSnapshot, RemoteMcpWr
 import { contentHash } from '@/lib/content-hash'
 import { createDoc, type DocRecord } from '@/lib/store'
 import { remoteSyncDecision } from '@/lib/remote-mcp-sync'
+import { t } from '@/lib/i18n'
 
 type Phase = 'off' | 'synced' | 'saving' | 'error' | 'conflict'
 class RequestError extends Error {
@@ -17,7 +18,7 @@ async function request<T>(path: string, method = 'GET', body?: object): Promise<
   })
   const result = await response.json()
   if (!response.ok && response.status !== 409) {
-    throw new RequestError(response.status, result.error || '协作服务请求失败')
+    throw new RequestError(response.status, result.error || t('mcp.err.service'))
   }
   return result as T
 }
@@ -63,7 +64,7 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
       // On disconnect keep any already-observed divergent AI version too. A
       // server-side expiry/revocation never discards the browser's own body.
       if (remote && remote.content !== local.content) {
-        next.push({ ...createDoc(), name: `${remote.name.slice(0, 188)}（AI 版本）`, content: remote.content })
+        next.push({ ...createDoc(), name: `${remote.name.slice(0, 188)}${t('mcp.version.ai')}`, content: remote.content })
       }
       return next
     })
@@ -93,7 +94,7 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
       const remote = await request<RemoteMcpSnapshot | null>(pathOf(id))
       if (!remote || remote.connection.id !== binding.id) {
         detach(id, binding.id)
-        setError('授权已撤销或到期，本地稿件完整保留；需要时重新创建连接')
+        setError(t('mcp.err.revoked'))
         return
       }
       const hash = await contentHash(local.content)
@@ -120,7 +121,7 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
     } catch (cause) {
       if (cause instanceof RequestError && cause.status === 410) detach(id, binding.id)
       else setPhase({ id, value: 'error' })
-      setError(cause instanceof RequestError ? cause.message : '网络暂时不可用，改动已保留在本机；恢复后会自动重试')
+      setError(cause instanceof RequestError ? cause.message : t('mcp.err.network'))
     }
   }, [detach, applyRemote, markConflict, setDocs])
 
@@ -156,7 +157,7 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
       await runningRef.current
       await action()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '操作失败，本地稿件已保留')
+      setError(cause instanceof Error ? cause.message : t('mcp.err.generic'))
     } finally {
       mutatingRef.current = false
       setBusy(false)
@@ -214,7 +215,7 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
         // Keep-both takes the latest local body, including typing during the read.
         if (choice === 'remote' && (live.content !== local.content || live.name !== local.name)) return prev
         const next = prev.map((d) => d.id === activeId ? { ...d, ...remote.doc, remoteMcp: bindingOf(remote) } : d)
-        if (choice === 'both') next.push({ ...createDoc(), name: `${live.name.slice(0, 186)}（本机版本）`, content: live.content })
+        if (choice === 'both') next.push({ ...createDoc(), name: `${live.name.slice(0, 186)}${t('mcp.version.local')}`, content: live.content })
         return next
       })
       setSnapshot(remote)

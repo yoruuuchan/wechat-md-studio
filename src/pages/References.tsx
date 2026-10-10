@@ -1,29 +1,32 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { YoruMark } from '@/components/YoruMark'
-import { APP_NAME, APP_BYLINE, REPO_URL } from '@/lib/brand'
+import { APP_BYLINE, REPO_URL } from '@/lib/brand'
 import {
   CREDITS,
-  USAGE_HINT,
-  USAGE_LABEL,
   USAGE_ORDER,
   type Credit,
   type Usage,
 } from '@/lib/credits'
+import { CREDITS_EN } from '@/lib/credits.en'
 import { THEMES } from '@/lib/themes'
 import { licenseLabel, tallyByLicense, tallyThemeSources } from '@/lib/theme-sources'
 import { ORIGINAL_LICENSE } from '@/lib/theme-meta'
+import { LanguageToggle } from '@/components/LanguageToggle'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { RichText } from '@/components/RichText'
+import { useI18n } from '@/hooks/useI18n'
 
 /**
  * Acknowledgements / References page. All content comes from src/lib/credits.ts
- * (code-level credits) and src/lib/theme-sources.ts / src/lib/themes.ts (theme
- * material provenance); this file is layout only. `npm run verify:sources`
- * fails if any project name, repo or license literal shows up in here.
+ * (code-level credits), src/lib/credits.en.ts (their English copy) and
+ * src/lib/theme-sources.ts / src/lib/themes.ts (theme material provenance);
+ * this file is layout only. `npm run verify:sources` fails if any project name,
+ * repo or license literal shows up in here.
  *
  * Every colour goes through the Console tokens in index.css (--ink-*, --bg-*,
- * --line-*, --primary-*) instead of hardcoded hex, so the page follows along if
- * data-theme="yoru" is ever hoisted onto <html>. Today data-theme is scoped to
- * the dark well around the code editor in EditorPage, so the app renders akari.
+ * --line-*, --primary-*) instead of hardcoded hex, so the page follows the
+ * active data-theme.
  */
 
 // ---------- Inline SVG, hand-written like TopBar rather than lucide ----------
@@ -125,6 +128,7 @@ function LicensePill({ license }: { license: string }) {
 }
 
 function UsagePill({ usage }: { usage: Usage }) {
+  const { t } = useI18n()
   const active = usage === 'ported' || usage === 'adapted'
   return (
     <span
@@ -139,7 +143,7 @@ function UsagePill({ usage }: { usage: Usage }) {
             }
       }
     >
-      {USAGE_LABEL[usage]}
+      {t(`meta.usage.${usage}`)}
     </span>
   )
 }
@@ -179,6 +183,13 @@ function ItemList({
 }
 
 function CreditCard({ credit }: { credit: Credit }) {
+  const { t, lang } = useI18n()
+  // English copy lives in credits.en.ts, keyed by repo; a missing entry falls
+  // back to the Chinese data rather than rendering nothing.
+  const en = lang === 'en' ? CREDITS_EN[credit.repo] : undefined
+  const borrowed = en?.borrowed ?? credit.borrowed
+  const declined = en?.declined ?? credit.declined
+  const licenseNote = en?.licenseNote ?? credit.licenseNote
   return (
     <article className="ya-well p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
@@ -205,13 +216,13 @@ function CreditCard({ credit }: { credit: Credit }) {
 
       <p className="mt-1.5 text-[11.5px]" style={{ color: 'var(--ink-3)' }}>
         {credit.author}
-        <span style={{ color: 'var(--ink-4)' }}> · 许可证副本 </span>
+        <span style={{ color: 'var(--ink-4)' }}>{t('refs.licenseCopy')}</span>
         <code className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
           LICENSES/{credit.licenseFile}
         </code>
       </p>
 
-      {credit.licenseNote && (
+      {licenseNote && (
         <div
           className="mt-3 flex gap-2.5 rounded-xl p-3"
           style={{ background: 'var(--bg-tint)', boxShadow: 'inset 0 0 0 1px var(--line-2)' }}
@@ -222,7 +233,7 @@ function CreditCard({ credit }: { credit: Credit }) {
             aria-hidden="true"
           />
           <p className="min-w-0 flex-1 text-[11.5px] leading-[1.7]" style={{ color: 'var(--ink-2)' }}>
-            {credit.licenseNote}
+            {licenseNote}
           </p>
         </div>
       )}
@@ -235,23 +246,23 @@ function CreditCard({ credit }: { credit: Credit }) {
           <span style={{ color: 'var(--primary-600)' }}>
             <IconBorrowed />
           </span>
-          借用了什么
-          <span className="ya-eyebrow">{credit.borrowed.length}</span>
+          {t('refs.borrowed')}
+          <span className="ya-eyebrow">{borrowed.length}</span>
         </h4>
-        <ItemList items={credit.borrowed} icon={<IconBorrowed />} tone="borrowed" />
+        <ItemList items={borrowed} icon={<IconBorrowed />} tone="borrowed" />
       </section>
 
-      {credit.declined && credit.declined.length > 0 && (
+      {declined && declined.length > 0 && (
         <section className="mt-4">
           <h4
             className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide"
             style={{ color: 'var(--ink-3)' }}
           >
             <IconDeclined />
-            评估过但没采用
-            <span className="ya-eyebrow">{credit.declined.length}</span>
+            {t('refs.declined')}
+            <span className="ya-eyebrow">{declined.length}</span>
           </h4>
-          <ItemList items={credit.declined} icon={<IconDeclined />} tone="declined" />
+          <ItemList items={declined} icon={<IconDeclined />} tone="declined" />
         </section>
       )}
     </article>
@@ -263,11 +274,9 @@ function CreditCard({ credit }: { credit: Credit }) {
 type Filter = Usage | 'all'
 
 export default function References() {
+  const { t, lang } = useI18n()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>('all')
-  // brand.ts declares REPO_URL as the empty-string literal, which makes the
-  // truthy branch below narrow to `never`. Widen it once so this keeps compiling
-  // both while the constant is empty and after the repo URL gets filled in.
   const repoUrl: string = REPO_URL
 
   const groups = useMemo(
@@ -300,8 +309,8 @@ export default function References() {
     () =>
       [...tallyThemeSources(THEMES)]
         .sort((a, b) => b.count - a.count)
-        .map((s) => ({ ...s, label: s.kind === 'original' ? '本项目自研' : s.project })),
-    [],
+        .map((s) => ({ ...s, label: s.kind === 'original' ? t('meta.license.original') : s.project })),
+    [t],
   )
 
   const visible = groups.filter((g) => filter === 'all' || g.usage === filter)
@@ -319,7 +328,7 @@ export default function References() {
           className="ya-btn ya-btn-secondary ya-btn-sm !h-8 shrink-0"
         >
           <IconBack />
-          <span>回到编辑器</span>
+          <span>{t('common.backToEditor')}</span>
         </button>
         <div className="flex min-w-0 items-center gap-2.5">
           <YoruMark height={15} />
@@ -327,18 +336,21 @@ export default function References() {
             className="truncate text-[15px] font-bold tracking-wide"
             style={{ color: 'var(--ink-1)' }}
           >
-            致谢
+            {t('refs.title')}
           </span>
           <span className="ya-eyebrow hidden sm:inline">
-            {APP_NAME} · {APP_BYLINE}
+            {t('app.name')} · {APP_BYLINE}
           </span>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <LanguageToggle />
+          <ThemeToggle />
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-3 py-5 sm:px-4 sm:py-6">
         <p className="mb-4 text-[13px] leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-          这个工具的能力有一大部分是站在别人的开源工作上长出来的。下面按「我们到底拿了多少」分组，
-          每一条都写清具体是哪个文件的哪套机制，以及——同样重要——我们评估过但主动放弃的部分和放弃的理由。
+          {t('refs.intro')}
         </p>
 
         {/* 许可核实结论 */}
@@ -348,39 +360,38 @@ export default function References() {
               <IconScale />
             </span>
             <h2 className="text-[14px] font-semibold" style={{ color: 'var(--ink-1)' }}>
-              许可证核实
+              {t('refs.license.heading')}
             </h2>
-            <span className="ya-eyebrow">2026-10-07 逐个打开 LICENSE 文件核对</span>
+            <span className="ya-eyebrow">{t('refs.license.eyebrow')}</span>
           </div>
           <p className="mt-2.5 text-[12.5px] leading-[1.75]" style={{ color: 'var(--ink-2)' }}>
-            {CREDITS.length} 个上游项目全部是宽松许可：
+            {t('refs.license.summaryLead', { n: CREDITS.length })}
             {licenseTally.map(([lic, n], i) => (
               <span key={lic}>
-                {i > 0 && '、'}
+                {i > 0 && ' · '}
                 <strong style={{ color: 'var(--ink-1)', fontFamily: 'var(--font-mono)' }}>{lic}</strong>
                 {' ×'}
                 {n}
               </span>
             ))}
-            。
+            {t('refs.license.summaryEnd')}
             {copyleftCredits.length === 0
-              ? '没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件——所以这些上游对本项目自己选开源许可证不构成传染性约束。'
-              : `注意：存在 copyleft 上游（${copyleftCredits.map((c) => c.name).join('、')}），整体许可证选择以它们为准。`}
+              ? t('refs.license.noCopyleft')
+              : t('refs.license.hasCopyleft', { names: copyleftCredits.map((c) => c.name).join(', ') })}
           </p>
           <ul className="mt-3 space-y-2 text-[12px] leading-[1.7]" style={{ color: 'var(--ink-3)' }}>
             {CREDITS.filter((c) => c.licenseNote).map((c) => (
               <li key={c.name} className="flex gap-2">
                 <span className="ya-dot mt-[6px] shrink-0" style={{ background: 'var(--warning-500)' }} />
                 <span>
-                  <strong style={{ color: 'var(--ink-2)' }}>{c.name}</strong>：{c.licenseNote}
+                  <strong style={{ color: 'var(--ink-2)' }}>{c.name}</strong>:{' '}
+                  {(lang === 'en' ? CREDITS_EN[c.repo]?.licenseNote ?? c.licenseNote : c.licenseNote) as string}
                 </span>
               </li>
             ))}
           </ul>
           <p className="mt-3 text-[11.5px] leading-[1.7]" style={{ color: 'var(--ink-4)' }}>
-            每份 LICENSE 的逐字副本、上游 commit、md5 和明细在仓库的{' '}
-            <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/</code> 目录，
-            说明文件是 <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/NOTICE.md</code>。
+            <RichText text={t('refs.license.note')} />
           </p>
         </section>
 
@@ -391,12 +402,12 @@ export default function References() {
               <IconLayers />
             </span>
             <h2 className="text-[14px] font-semibold" style={{ color: 'var(--ink-1)' }}>
-              主题库来源
+              {t('refs.themes.heading')}
             </h2>
-            <span className="ya-eyebrow">模板库 {THEMES.length} 套 · 逐来源</span>
+            <span className="ya-eyebrow">{t('refs.themes.eyebrow', { n: THEMES.length })}</span>
           </div>
           <p className="mt-2.5 text-[12.5px] leading-[1.75]" style={{ color: 'var(--ink-2)' }}>
-            模板库的 {THEMES.length} 套主题按上游许可证分组：{' '}
+            {t('refs.themes.summaryLead', { n: THEMES.length })}
             {themeLicenseTally.map((r, i) => (
               <span key={r.license}>
                 {i > 0 && ' · '}
@@ -406,9 +417,7 @@ export default function References() {
                 {r.count}
               </span>
             ))}
-            。每套主题的卡片上点「来源」可看到它的原项目、原作者与 lineage；许可证原文留存在仓库{' '}
-            <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/</code>，逐来源审计见{' '}
-            <code style={{ fontFamily: 'var(--font-mono)' }}>THEME-SOURCES.md</code>。
+            {t('refs.themes.summaryTail')}
           </p>
           <ul className="mt-3 space-y-2">
             {sourceRows.map((s) => (
@@ -430,7 +439,7 @@ export default function References() {
                 ) : (
                   <span className="font-semibold" style={{ color: 'var(--ink-1)' }}>{s.label}</span>
                 )}
-                <span className="tabular-nums" style={{ color: 'var(--ink-3)' }}>{s.count} 套</span>
+                <span className="tabular-nums" style={{ color: 'var(--ink-3)' }}>{t('refs.themes.count', { n: s.count })}</span>
                 <span className="text-[11px]" style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
                   {s.licenses.map((l) => `${licenseLabel(l.license)} ×${l.count}`).join(' · ')}
                 </span>
@@ -439,41 +448,28 @@ export default function References() {
             ))}
           </ul>
           <p className="mt-3 text-[11.5px] leading-[1.7]" style={{ color: 'var(--ink-4)' }}>
-            这份账与 README、THEME-SOURCES.md 的数字同源（`src/lib/theme-sources.ts` + 主题 catalog），
-            由 <code style={{ fontFamily: 'var(--font-mono)' }}>npm run verify:sources</code> 在构建前机器校验。
+            <RichText text={t('refs.themes.note')} />
           </p>
         </section>
 
         {/* 我们自己的许可声明 */}
         <section className="ya-well mb-5 p-4 sm:p-5">
           <h2 className="text-[14px] font-semibold" style={{ color: 'var(--ink-1)' }}>
-            本项目自己的许可
+            {t('refs.self.heading')}
           </h2>
           {repoUrl ? (
             <p className="mt-2 text-[12.5px] leading-[1.75]" style={{ color: 'var(--ink-2)' }}>
-              「{APP_NAME} {APP_BYLINE}」的源码仓库在{' '}
-              <a
-                href={repoUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="underline decoration-1 underline-offset-2"
-                style={{ color: 'var(--primary-600)' }}
-              >
-                {repoUrl.replace(/^https?:\/\//, '')}
-              </a>
-              ，仓库根目录的 LICENSE 是本项目自己的许可条款；本页列出的上游许可各自独立，
-              副本收在 <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/</code>。
+              <RichText
+                text={t('refs.self.body', {
+                  name: t('app.name'),
+                  byline: APP_BYLINE,
+                  repo: repoUrl.replace(/^https?:\/\//, ''),
+                })}
+              />
             </p>
           ) : (
             <p className="mt-2 text-[12.5px] leading-[1.75]" style={{ color: 'var(--ink-3)' }}>
-              开源仓库地址还没填。等{' '}
-              <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
-                src/lib/brand.ts
-              </code>{' '}
-              里的 <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>REPO_URL</code>{' '}
-              填上之后，这里会自动换成仓库链接，并指向仓库根目录那份属于本项目自己的 LICENSE。
-              在那之前，上游归属以本页和{' '}
-              <code style={{ fontFamily: 'var(--font-mono)' }}>LICENSES/NOTICE.md</code> 为准。
+              <RichText text={t('refs.self.missing')} />
             </p>
           )}
         </section>
@@ -482,7 +478,7 @@ export default function References() {
         <div
           className="ya-well mb-5 flex flex-wrap gap-2 p-2.5"
           role="group"
-          aria-label="按使用性质筛选"
+          aria-label={t('refs.filterGroup')}
         >
           {filters.map((f) => {
             const on = filter === f
@@ -495,7 +491,7 @@ export default function References() {
                 className={`ya-btn ya-btn-sm ${on ? 'ya-selected' : 'ya-btn-ghost'}`}
                 style={on ? { color: 'var(--ink-1)' } : undefined}
               >
-                {f === 'all' ? '全部' : USAGE_LABEL[f]}
+                {f === 'all' ? t('refs.all') : t(`meta.usage.${f}`)}
                 <span className="tabular-nums" style={{ color: 'var(--ink-4)' }}>
                   {count}
                 </span>
@@ -508,13 +504,13 @@ export default function References() {
           <section key={g.usage} className="mb-7">
             <div className="mb-2.5 flex items-center gap-2.5 px-0.5">
               <span className="text-[13px] font-bold tracking-wide" style={{ color: 'var(--ink-1)' }}>
-                {USAGE_LABEL[g.usage]}
+                {t(`meta.usage.${g.usage}`)}
               </span>
-              <span className="ya-eyebrow">{g.credits.length} 个项目</span>
+              <span className="ya-eyebrow">{t('refs.projects', { n: g.credits.length })}</span>
               <span className="h-px flex-1" style={{ background: 'var(--line-2)' }} />
             </div>
             <p className="mb-3 px-0.5 text-[11.5px] leading-relaxed" style={{ color: 'var(--ink-4)' }}>
-              {USAGE_HINT[g.usage]}
+              {t(`meta.usageHint.${g.usage}`)}
             </p>
             <div className="grid gap-4">
               {g.credits.map((c) => (
@@ -525,8 +521,7 @@ export default function References() {
         ))}
 
         <p className="mt-2 text-center text-[11.5px] leading-relaxed" style={{ color: 'var(--ink-4)' }}>
-          发现归属写错、漏了某个上游，或者某条其实已经落地了——开个 issue 告诉我们，改数据只要动{' '}
-          <code style={{ fontFamily: 'var(--font-mono)' }}>src/lib/credits.ts</code> 一个文件。
+          <RichText text={t('refs.footer')} />
         </p>
       </main>
     </div>

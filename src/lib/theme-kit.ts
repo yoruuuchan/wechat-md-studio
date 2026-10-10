@@ -7,6 +7,7 @@
 
 import type { CarouselRatio, CellAlign, InlineSeg, SignatureConfig } from './types'
 import type { ThemeMeta } from './theme-meta'
+import { t } from './i18n'
 
 export type ThemeCategory = '简约' | '商务' | '杂志' | '活力'
 
@@ -334,7 +335,7 @@ export function makeCarousel(opts: CarouselColors) {
       .map((it, i) => {
         const img = it.src
           ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;" />`
-          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed ${opts.placeholderBorder};background:${opts.placeholderBg};display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:${opts.hintColor};text-indent:0;text-align:center;"><span leaf="">待插入图片</span></p></section>`
+          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed ${opts.placeholderBorder};background:${opts.placeholderBg};display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:${opts.hintColor};text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
         const cap = it.alt
           ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:${opts.captionColor};"><span leaf="">${esc(it.alt)}</span></p>`
           : ''
@@ -547,7 +548,7 @@ export function buildTheme(spec: ImportedThemeSpec): Theme {
     }),
 
     signature: (cfg: SignatureConfig) =>
-      `<section style="margin:36px 0 0;padding:16px 0 0;border-top:1px solid ${p.border};text-align:center;"><p style="margin:0 0 6px;font-size:13px;line-height:1.75;letter-spacing:1px;text-indent:0;color:${p.muted};"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p><p style="margin:0;font-size:10px;letter-spacing:2px;text-indent:0;color:${p.soft};"><span leaf="">THE END</span></p></section>`,
+      `<section style="margin:36px 0 0;padding:16px 0 0;border-top:1px solid ${p.border};text-align:center;"><p style="margin:0 0 6px;font-size:13px;line-height:1.75;letter-spacing:1px;text-indent:0;color:${p.muted};"><span leaf="">${t('render.sigLayout')} ${esc(cfg.layout)} · ${t('render.sigProof')} ${esc(cfg.proof)} · ${t('render.sigReview')} ${esc(cfg.review)}</span></p><p style="margin:0;font-size:10px;letter-spacing:2px;text-indent:0;color:${p.soft};"><span leaf="">THE END</span></p></section>`,
 
     listBlock: (ordered, items) => {
       // 上游给了自定义符号（xiaohu 系主题普遍给）就用它的行结构，否则退回标准列表

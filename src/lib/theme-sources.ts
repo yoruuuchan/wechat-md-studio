@@ -17,6 +17,7 @@
 import type { Theme } from './theme-kit'
 import { ORIGINAL_LICENSE, type Complexity, type ColorFamily, type StyleTag, type ThemeLicense } from './theme-meta'
 import { APP_BYLINE, APP_NAME, REPO_URL } from './brand'
+import { t } from './i18n'
 
 export interface ThemeSource {
   /** 连接键：theme.meta.origin.project 必须逐字等于它。 */
@@ -145,7 +146,7 @@ export interface SourceTally extends ThemeSource {
 
 /** License 显示名：Project-Original 是本项目自研的标记，不是上游许可证。 */
 export function licenseLabel(license: ThemeLicense): string {
-  return license === ORIGINAL_LICENSE ? '本项目自研' : license
+  return license === ORIGINAL_LICENSE ? t('meta.license.original') : license
 }
 
 function byCountDesc<T extends { count: number }>(rows: T[]): T[] {

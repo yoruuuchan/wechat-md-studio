@@ -81,6 +81,7 @@ import {
   toBundle,
   toMarkdownFile,
 } from '@/lib/import-export'
+import { useI18n } from '@/hooks/useI18n'
 
 function plainTextOf(html: string): string {
   const div = document.createElement('div')
@@ -114,8 +115,8 @@ function formatBytes(n: number): string {
 }
 
 /** When the cloud version of a conflicted article was last written. */
-function formatMoment(ts: number): string {
-  if (!ts) return '未知时间'
+function formatMoment(ts: number, unknownLabel: string): string {
+  if (!ts) return unknownLabel
   const d = new Date(ts)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
@@ -148,6 +149,7 @@ interface FrameTask {
 }
 
 export default function EditorPage() {
+  const { t } = useI18n()
   const [settings, setSettings] = useState(loadSettings)
   const [panelOpen, setPanelOpen] = useState(true)
   // Read once at mount: the group is uncontrolled, later drags come back
@@ -375,8 +377,8 @@ export default function EditorPage() {
 
   const handleCopy = async () => {
     if (diagramPending > 0) {
-      toast.info('图表还在生成图片', {
-        description: '等它变成插图再复制，否则粘进公众号的是 mermaid 源码',
+      toast.info(t('editor.toast.diagramPending'), {
+        description: t('editor.toast.diagramPendingDesc'),
       })
       return
     }
@@ -384,20 +386,20 @@ export default function EditorPage() {
     if (ok) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-      toast.success(`已复制 ${rendered.stats.chars} 字 · ${rendered.stats.images} 图`, {
-        description: '直接粘贴进公众号后台正文即可',
+      toast.success(t('editor.toast.copied', { chars: rendered.stats.chars, imgs: rendered.stats.images }), {
+        description: t('editor.toast.copiedDesc'),
       })
     } else {
-      toast.error('复制失败', { description: '浏览器拒绝了剪贴板权限，请改用「导出」' })
+      toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedDesc') })
     }
   }
 
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
-    const name = activeDoc?.name || '推文'
+    const name = activeDoc?.name || t('io.fallbackArticle')
     if (kind === 'markdown') {
       const f = toMarkdownFile(name, activeDoc?.content || '')
       downloadFile(f.filename, f.content, f.mime)
-      toast.success('已导出 Markdown 源稿', { description: '方言标记原样保留，可以再导回来' })
+      toast.success(t('editor.toast.exportedMarkdown'), { description: t('editor.toast.exportedMarkdownDesc') })
       return
     }
     if (kind === 'bundle') {
@@ -407,18 +409,18 @@ export default function EditorPage() {
       void (async () => {
         const res = await hydrateAllForExport()
         if (!res.ok) {
-          toast.error('整包备份没有导出', { description: res.message, duration: 9000 })
+          toast.error(t('editor.toast.bundleFailed'), { description: res.message, duration: 9000 })
           return
         }
         downloadFile(bundleFilename(res.docs.length), toBundle(res.docs, settings), 'application/json')
-        toast.success(`已导出 ${res.docs.length} 篇稿件`, { description: '含主题与署名设置，可在另一台设备导回' })
+        toast.success(t('editor.toast.bundleDone', { n: res.docs.length }), { description: t('editor.toast.bundleDoneDesc') })
       })()
       return
     }
-    const safe = safeFilename(name, '推文', 'html')
-    if (kind === 'clean') downloadFile(safe.replace(/\.html$/, '_正文.html'), cleanHtml(rendered.html))
-    else downloadFile(safe.replace(/\.html$/, '_预览页.html'), previewPage(rendered.html, name))
-    toast.success(kind === 'clean' ? '已导出干净正文 HTML' : '已导出预览页 HTML')
+    const safe = safeFilename(name, t('io.fallbackArticle'), 'html')
+    if (kind === 'clean') downloadFile(safe.replace(/\.html$/, `_${t('io.suffixClean')}.html`), cleanHtml(rendered.html))
+    else downloadFile(safe.replace(/\.html$/, `_${t('io.suffixPage')}.html`), previewPage(rendered.html, name))
+    toast.success(kind === 'clean' ? t('editor.toast.exportedClean') : t('editor.toast.exportedPage'))
   }
 
   /** Upload the images a Word document carried and fill them back into the placeholders. */
@@ -443,15 +445,15 @@ export default function EditorPage() {
       )
       markdown = (await import('@/lib/rich-paste')).fillImageSlots(markdown, refs.map((r) => r ?? ''))
       const failed = refs.filter((r) => r === null).length
-      if (failed) toast.warning(`${failed} 张图片没传上去，正文里留了占位`)
+      if (failed) toast.warning(t('editor.toast.docxImagesFailed', { n: failed }))
     }
     const doc = createDoc()
-    doc.name = safeFilename(file.name.replace(/\.[^.]+$/, ''), '导入的稿件', '') || '导入的稿件'
+    doc.name = safeFilename(file.name.replace(/\.[^.]+$/, ''), t('io.importFallback'), '') || t('io.importFallback')
     doc.content = markdown
     setDocs((ds) => [doc, ...ds])
     setActiveId(doc.id)
-    toast.success(`已导入「${doc.name}」`, {
-      description: imported.images.length ? `含 ${imported.images.length} 张图片` : undefined,
+    toast.success(t('editor.toast.imported', { name: doc.name }), {
+      description: imported.images.length ? t('editor.toast.importedImages', { n: imported.images.length }) : undefined,
     })
   }
 
@@ -470,12 +472,12 @@ export default function EditorPage() {
         doc.content = parsedFile.content
         setDocs((ds) => [doc, ...ds])
         setActiveId(doc.id)
-        toast.success(`已导入「${doc.name}」`)
+        toast.success(t('editor.toast.imported', { name: doc.name }))
         return
       }
       const result = parseBundle(text)
       if (!result.ok) {
-        toast.error('这个备份文件读不了', { description: result.reason, duration: 9000 })
+        toast.error(t('editor.toast.bundleUnreadable'), { description: result.reason, duration: 9000 })
         return
       }
       // Ids are kept as they are: the server's own importLocal already resolves a
@@ -486,11 +488,11 @@ export default function EditorPage() {
       const skipped = result.docs.length - incoming.length
       setDocs((ds) => [...incoming, ...ds])
       if (result.settings) setSettings((s) => ({ ...s, ...result.settings! }))
-      toast.success(`已导入 ${incoming.length} 篇稿件`, {
-        description: skipped ? `另有 ${skipped} 篇和本机重名，已跳过` : undefined,
+      toast.success(t('editor.toast.importedCount', { n: incoming.length }), {
+        description: skipped ? t('editor.toast.importedSkipped', { n: skipped }) : undefined,
       })
     } catch (e) {
-      toast.error('导入失败', { description: e instanceof Error ? e.message : '文件格式不认识' })
+      toast.error(t('editor.toast.importFailed'), { description: e instanceof Error ? e.message : t('editor.toast.importUnknown') })
     } finally {
       setImporting(false)
     }
@@ -509,7 +511,7 @@ export default function EditorPage() {
     const res = await uploadMutation.mutateAsync({ name: uploadName, contentBase64, contentType: mime })
     const saved =
       loose && !loose.untouched
-        ? `${formatBytes(loose.sourceBytes)} → ${formatBytes(loose.bytes)}${loose.grew ? '（压完更大，用了原图）' : ''}`
+        ? `${formatBytes(loose.sourceBytes)} → ${formatBytes(loose.bytes)}${loose.grew ? t('editor.compressedLarger') : ''}`
         : null
     return { ref: `img:${res.key}`, saved }
   }
@@ -580,10 +582,10 @@ export default function EditorPage() {
             return next
           })
         } catch (e) {
-          park(code, '图表上传失败，正文里先保留源码', e)
+          park(code, t('editor.diagram.uploadFailed'), e)
         }
       } catch (e) {
-        park(code, '图表语法有误，正文里保留源码', e)
+        park(code, t('editor.diagram.syntaxError'), e)
       } finally {
         diagramBusy.current.delete(code)
         setDiagramPending((n) => n - 1)
@@ -609,10 +611,10 @@ export default function EditorPage() {
    * server cannot see those. The materials page can, so point there.
    */
   const announceReplacedImage = () => {
-    toast.info('旧的那张图已经不再引用', {
-      description: '它还在素材库里，可以去「素材库 → 没在用的旧图」清理',
+    toast.info(t('editor.toast.oldUnreferenced'), {
+      description: t('editor.toast.oldUnreferencedDesc'),
       duration: 8000,
-      action: { label: '去清理', onClick: () => navigate('/materials') },
+      action: { label: t('editor.toast.oldUnreferencedAction'), onClick: () => navigate('/materials') },
     })
   }
 
@@ -625,11 +627,11 @@ export default function EditorPage() {
     if (!task.item || !activeDoc) return
     const next = fillImageSrc(activeDoc.content, task.item.alt, task.item.occurrence, ref)
     if (next === activeDoc.content) {
-      toast.error(`${task.item.no} 定位失败`, { description: '正文里找不到这张图，新图没有回填' })
+      toast.error(t('editor.toast.locateFailed', { no: task.item.no }), { description: t('editor.toast.locateFailedDesc') })
       return
     }
     updateActive({ content: next })
-    toast.success(`${task.item.no} 已按新裁切替换`)
+    toast.success(t('editor.toast.replaced', { no: task.item.no }))
     announceReplacedImage()
   }
 
@@ -637,7 +639,7 @@ export default function EditorPage() {
   const uploadLoose = async (files: File[], ratio?: CarouselRatio | null, task?: FrameTask | null) => {
     for (const file of files) {
       if (!/^image\//.test(file.type)) {
-        toast.error(`${file.name} 不是图片，已跳过`)
+        toast.error(t('editor.toast.notImage', { name: file.name }))
         continue
       }
       setUploadingKey(`drop-${file.name}`)
@@ -650,12 +652,12 @@ export default function EditorPage() {
         }
         const alt = file.name.replace(/\.[^.]+$/, '')
         editorRef.current?.insertAt(task?.at ?? null, `![${alt}](${ref})`)
-        toast.success(files.length > 1 ? `${file.name} 已插入` : '图片已插入', {
+        toast.success(files.length > 1 ? t('editor.toast.imageFileInserted', { name: file.name }) : t('editor.toast.imageInserted'), {
           description: saved ?? undefined,
         })
       } catch (e) {
-        toast.error(`${file.name} 上传失败`, {
-          description: e instanceof Error ? e.message : '请稍后重试',
+        toast.error(t('editor.toast.uploadFailed', { name: file.name }), {
+          description: e instanceof Error ? e.message : t('editor.toast.uploadRetry'),
         })
       } finally {
         setUploadingKey(null)
@@ -668,11 +670,11 @@ export default function EditorPage() {
     if (!activeDoc) return
     const next = clearImageSrc(activeDoc.content, item.alt, item.occurrence)
     if (next === activeDoc.content) {
-      toast.error(`${item.no} 定位失败`, { description: '正文里找不到这张图，请手动修改' })
+      toast.error(t('editor.toast.locateFailed', { no: item.no }), { description: t('editor.toast.locateManual') })
       return
     }
     updateActive({ content: next })
-    toast.success(`${item.no} 已清空，占位保留`)
+    toast.success(t('editor.toast.cleared', { no: item.no }))
   }
 
   /** Remove a standalone image line entirely. */
@@ -680,11 +682,11 @@ export default function EditorPage() {
     if (!activeDoc) return
     const next = removeImageLine(activeDoc.content, item.alt, item.occurrence)
     if (next === activeDoc.content) {
-      toast.error(`${item.no} 定位失败`, { description: '正文里找不到这张图，请手动修改' })
+      toast.error(t('editor.toast.locateFailed', { no: item.no }), { description: t('editor.toast.locateManual') })
       return
     }
     updateActive({ content: next })
-    toast.success(`${item.no} 已从正文移除`)
+    toast.success(t('editor.toast.removed', { no: item.no }))
   }
 
   /**
@@ -696,11 +698,11 @@ export default function EditorPage() {
     updateActive({ content: setCarouselRatio(activeDoc.content, ordinal, ratio) })
     const stale = materials.filter((m) => m.carouselOrdinal === ordinal && m.hasSrc && m.ratio !== ratio)
     if (stale.length) {
-      toast.info(`轮播 ${ordinal} 已改成 ${ratio}`, {
-        description: `已有 ${stale.length} 张图还是旧比例，点每张的「重裁」或「替换」重做一次`,
+      toast.info(t('editor.toast.ratioChanged', { n: ordinal, ratio }), {
+        description: t('editor.toast.ratioChangedStale', { n: stale.length }),
       })
     } else {
-      toast.success(`轮播 ${ordinal} 已改成 ${ratio}`)
+      toast.success(t('editor.toast.ratioChanged', { n: ordinal, ratio }))
     }
   }
 
@@ -712,7 +714,7 @@ export default function EditorPage() {
     if (!activeDoc) return
     const key = item.src.startsWith('img:') ? item.src.slice(4) : ''
     if (!key) {
-      toast.error('这张图不是本工具上传的，无法重裁')
+      toast.error(t('editor.toast.notOwnImage'))
       return
     }
     setUploadingKey(`${item.no}-${item.alt}`)
@@ -729,7 +731,7 @@ export default function EditorPage() {
       })
       setManualOpen(true)
     } catch (e) {
-      toast.error('取回原图失败', { description: e instanceof Error ? e.message : '请稍后重试' })
+      toast.error(t('editor.toast.fetchOriginalFailed'), { description: e instanceof Error ? e.message : t('editor.toast.uploadRetry') })
     } finally {
       setUploadingKey(null)
     }
@@ -750,17 +752,17 @@ export default function EditorPage() {
           content = setCarouselRatio(content, task.item.carouselOrdinal!, task.ratio)
         }
         updateActive({ content: fillImageSrc(content, task.item.alt, task.item.occurrence, ref) })
-        toast.success(`${label} 已按手动裁切上传并回填`)
+        toast.success(t('editor.toast.croppedFilled', { label }))
         if (isRecrop) announceReplacedImage()
       } else if (isRecrop) {
         replaceRecropped(ref, task)
       } else {
         const alt = file.name.replace(/\.[^.]+$/, '')
         editorRef.current?.insertAt(task.at ?? null, `![${alt}](${ref})`)
-        toast.success('已按手动裁切插入')
+        toast.success(t('editor.toast.croppedInserted'))
       }
     } catch (e) {
-      toast.error('上传失败', { description: e instanceof Error ? e.message : '请稍后重试' })
+      toast.error(t('editor.toast.uploadFailedPlain'), { description: e instanceof Error ? e.message : t('editor.toast.uploadRetry') })
     } finally {
       setUploadingKey(null)
     }
@@ -781,7 +783,7 @@ export default function EditorPage() {
     if (item.carouselOrdinal && item.ratio !== ratio) {
       content = setCarouselRatio(content, item.carouselOrdinal, ratio)
     }
-    const where = item.kind === '画廊' ? '网格' : '轮播'
+    const where = item.kind === '画廊' ? t('editor.toast.slotWhereGallery') : t('editor.toast.slotWhereCarousel')
     let okCount = 0
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
@@ -799,8 +801,8 @@ export default function EditorPage() {
         slot?.kind === item.kind &&
         (item.carouselOrdinal ? slot.carouselOrdinal === item.carouselOrdinal : slot.line === item.line)
       if (!slot || !sameGroup || !canLocateImage(content, slot.alt, occurrence)) {
-        toast.warning(`${file.name} 没有对应的空位`, {
-          description: `这个${where}里已经没有更多占位行，多出的图请手动插入`,
+        toast.warning(t('editor.toast.slotMissed', { name: file.name }), {
+          description: t('editor.toast.slotMissedDesc', { where }),
         })
         continue
       }
@@ -810,8 +812,8 @@ export default function EditorPage() {
         content = fillImageSrc(content, slot.alt, occurrence, ref)
         okCount++
       } catch (e) {
-        toast.error(`${file.name} 上传失败`, {
-          description: e instanceof Error ? e.message : '请稍后重试',
+        toast.error(t('editor.toast.uploadFailed', { name: file.name }), {
+          description: e instanceof Error ? e.message : t('editor.toast.uploadRetry'),
         })
       } finally {
         setUploadingKey(null)
@@ -825,13 +827,13 @@ export default function EditorPage() {
       if (okCount > 0) {
         toast.success(
           okCount === files.length
-            ? `${okCount} 张已按 ${ratio} 裁切上传`
-            : `${okCount}/${files.length} 张已按 ${ratio} 裁切上传`,
-          { description: '这个轮播里剩下的占位请逐张点上传，会自动沿用同一比例' },
+            ? t('editor.toast.batchCroppedAll', { n: okCount, ratio })
+            : t('editor.toast.batchCroppedPart', { ok: okCount, total: files.length, ratio }),
+          { description: t('editor.toast.batchCroppedDesc') },
         )
       }
     } else if (okCount > 0) {
-      toast.success(`${item.no} 已按 ${ratio} 裁切上传并回填`)
+      toast.success(t('editor.toast.slotCropped', { no: item.no, ratio }))
     }
   }
 
@@ -844,7 +846,7 @@ export default function EditorPage() {
     const images = files.filter((f) => /^image\//.test(f.type))
     if (images.length < files.length) {
       const bad = files.find((f) => !/^image\//.test(f.type))!
-      toast.error(`${bad.name} 不是图片，已跳过`)
+      toast.error(t('editor.toast.notImage', { name: bad.name }))
     }
     if (!images.length) return
     setFrameTask({ files: images, mode: 'loose', at })
@@ -862,20 +864,20 @@ export default function EditorPage() {
     const d = rp.classifyPaste(html, plain)
     if (d.kind === 'image-placeholder') {
       // Claim the event: inserting "[Image #1]" into the article helps nobody.
-      toast.error('拿不到真实图片', { description: d.reason, duration: 9000 })
+      toast.error(t('editor.toast.noImageFromClipboard'), { description: d.reason, duration: 9000 })
       return true
     }
     if (d.kind === 'ide-code' || d.kind === 'code-block') {
       editorRef.current?.insertAt(null, '```' + d.lang + '\n' + plain.replace(/\s+$/, '') + '\n```')
-      toast.success('已作为代码块插入', { description: d.reason })
+      toast.success(t('editor.toast.insertedCode'), { description: d.reason })
       return true
     }
     if (!d.convert) return false
     const md = rp.htmlToDialect(html)
     if (!md.trim()) return false
     editorRef.current?.insertAt(null, md)
-    toast.success('已按公众号语法转换', {
-      description: '粘贴进来的图片不会自动上传，需要单独插入',
+    toast.success(t('editor.toast.converted'), {
+      description: t('editor.toast.convertedDesc'),
     })
     return true
   }
@@ -884,7 +886,7 @@ export default function EditorPage() {
   const startUpload = (files: File[], item: MaterialItem) => {
     const bad = files.find((f) => !/^image\//.test(f.type))
     if (bad) {
-      toast.error(`${bad.name} 不是图片`)
+      toast.error(t('editor.toast.notImageShort', { name: bad.name }))
       return
     }
     if (item.kind === '单图') {
@@ -1051,16 +1053,16 @@ export default function EditorPage() {
         onCreateDoc={() => addDoc()}
         onCreateSample={() => addSampleDoc()}
         onDeleteDoc={(id) => {
-          const name = docs.find((d) => d.id === id)?.name || '未命名稿件'
+          const name = docs.find((d) => d.id === id)?.name || t('common.unnamedDoc')
           removeDoc(id)
-          toast(`「${name}」已移入回收站`, {
-            description: '10 秒内可以撤销，之后去草稿箱的回收站找回',
+          toast(t('editor.toast.docDeleted', { name }), {
+            description: t('editor.toast.docDeletedDesc'),
             duration: UNDO_DELETE_MS,
             action: {
-              label: '撤销',
+              label: t('common.undo'),
               onClick: () => {
                 void undoRemove(id).then((ok) => {
-                  if (ok) toast.success('已恢复')
+                  if (ok) toast.success(t('editor.toast.restored'))
                 })
               },
             },
@@ -1069,7 +1071,7 @@ export default function EditorPage() {
         syncState={syncState}
         onSaveDraft={() => {
           void saveCurrentToDrafts().then((res) => {
-            if (res.ok) toast.success('已保存到草稿箱')
+            if (res.ok) toast.success(t('editor.toast.savedDraft'))
             else toast.error(res.message)
           })
         }}
@@ -1100,7 +1102,7 @@ export default function EditorPage() {
 
       {/* 窄屏（手机）访客的第一条说明：排版界面是为电脑浏览器设计的 */}
       <div className="flex items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3 md:hidden">
-        本站目前只做了网页端适配，建议在电脑浏览器上打开。
+        {t('editor.narrowNote')}
       </div>
 
       <ResizablePanelGroup
@@ -1134,9 +1136,9 @@ export default function EditorPage() {
               <span className="ya-eyebrow">Markdown</span>
               <div className="flex items-center gap-2">
                 {activeDoc?.remoteMcp && <button data-mcp-editor-status onClick={() => setRemoteMcpOpen(true)} className="ya-link-btn !text-[11px]">
-                  {remoteMcp.phase === 'conflict' ? 'AI 协作有冲突' : remoteMcp.phase === 'error' ? 'AI 同步待重试' : remoteMcp.phase === 'saving' ? 'AI 同步中…' : 'AI 协作已同步'}
+                  {remoteMcp.phase === 'conflict' ? t('editor.mcp.conflict') : remoteMcp.phase === 'error' ? t('editor.mcp.error') : remoteMcp.phase === 'saving' ? t('editor.mcp.saving') : t('editor.mcp.synced')}
                 </button>}
-                <button data-open-ai-writing onClick={() => setAiWritingOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">AI 帮我写</button>
+                <button data-open-ai-writing onClick={() => setAiWritingOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('editor.aiWriting')}</button>
               </div>
             </div>
             <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
@@ -1144,12 +1146,12 @@ export default function EditorPage() {
               {activeLoading || activeError ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   {activeLoading ? (
-                    <p className="text-[13px] text-ink-3">正在从云端读取这篇稿件…</p>
+                    <p className="text-[13px] text-ink-3">{t('editor.loadingDoc')}</p>
                   ) : (
                     <>
                       <p className="text-[13px] text-ink-2">{activeError}</p>
                       <button onClick={retryHydrate} className="ya-btn ya-btn-secondary">
-                        重试
+                        {t('common.retry')}
                       </button>
                     </>
                   )}
@@ -1175,7 +1177,7 @@ export default function EditorPage() {
                 className="flex shrink-0 items-center gap-2 border-t border-warn/40 bg-warn/10 px-4 py-2 text-left text-[12px] text-warn-700 transition-colors hover:bg-warn/20"
               >
                 <span className="ya-unsaved-dot" />
-                这篇稿件在别处也被改过，两边的文字都还在——点这里选保留哪一版
+                {t('editor.conflictBar')}
               </button>
             )}
           </div>
@@ -1213,9 +1215,9 @@ export default function EditorPage() {
                 zoom={settings.zoom}
                 onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
                 onJump={(line) => editorRef.current?.jumpToLine(line)}
-                onCopyTitle={(t) => {
-                  copyPlain(t)
-                  toast.success('标题已复制')
+                onCopyTitle={(title) => {
+                  copyPlain(title)
+                  toast.success(t('editor.toast.titleCopied'))
                 }}
                 onUpload={(files, item) => startUpload(files, item)}
                 onClear={clearImage}
@@ -1291,25 +1293,24 @@ export default function EditorPage() {
       <Dialog open={conflictOpen && activeConflict !== null} onOpenChange={setConflictOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
           <DialogHeader>
-            <DialogTitle>「{activeDoc?.name || '未命名稿件'}」在别处也被改过</DialogTitle>
+            <DialogTitle>{t('editor.conflict.title', { name: activeDoc?.name || t('common.unnamedDoc') })}</DialogTitle>
             <DialogDescription>
-              你这边改着的时候，云端这篇（{formatMoment(activeConflict?.updatedAt ?? 0)} 更新）也变了。
-              两边都不会被自动覆盖——选一个处理方式，没选之前这篇不会继续同步。
+              {t('editor.conflict.desc', { time: formatMoment(activeConflict?.updatedAt ?? 0, t('editor.unknownTime')) })}
             </DialogDescription>
           </DialogHeader>
           <div className="min-w-0">
-            <p className="ya-eyebrow mb-1.5">云端现在的版本（开头预览）</p>
+            <p className="ya-eyebrow mb-1.5">{t('editor.conflict.cloudVersion')}</p>
             <pre
               className="max-h-[32vh] overflow-auto whitespace-pre-wrap rounded-xl bg-surface-sunken p-3 text-[12px] leading-relaxed text-ink-2"
               style={{ fontFamily: 'var(--font-mono)', boxShadow: 'var(--shadow-inset)' }}
             >
               {(activeConflict?.content ?? '').slice(0, CONFLICT_PREVIEW_CHARS)}
               {(activeConflict?.content.length ?? 0) > CONFLICT_PREVIEW_CHARS
-                ? `\n\n……（云端正文更长，共 ${activeConflict?.content.length.toLocaleString()} 字符，这里只显示开头）`
+                ? t('editor.conflict.truncated', { n: (activeConflict?.content.length ?? 0).toLocaleString() })
                 : ''}
             </pre>
             <p className="mt-2 text-[11px] text-ink-3">
-              「你这一版」就是编辑器里和本地缓存里的内容，不会因为选错就消失——除非你选「用云端那一版」。
+              {t('editor.conflict.note')}
             </p>
           </div>
           <div className="flex flex-col gap-2">
@@ -1321,7 +1322,7 @@ export default function EditorPage() {
               }}
               className="ya-btn ya-btn-primary"
             >
-              保留我这一版（云端会更新成我这边的内容）
+              {t('editor.conflict.keepLocal')}
             </button>
             <button
               onClick={() => {
@@ -1331,7 +1332,7 @@ export default function EditorPage() {
               }}
               className="ya-btn ya-btn-secondary"
             >
-              用云端那一版（放弃我这边的改动）
+              {t('editor.conflict.useRemote')}
             </button>
             <button
               onClick={() => {
@@ -1341,7 +1342,7 @@ export default function EditorPage() {
               }}
               className="ya-btn ya-btn-secondary"
             >
-              两边都留（我这一版另存为新稿件，进草稿箱）
+              {t('editor.conflict.keepBoth')}
             </button>
           </div>
         </DialogContent>

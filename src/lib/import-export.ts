@@ -14,6 +14,7 @@
 //    module testable under vitest's `node` environment.
 
 import type { AppSettings, DocRecord } from './store'
+import { t } from './i18n'
 
 /** Bumped whenever the on-disk shape of a backup changes. */
 export const BUNDLE_VERSION = 1
@@ -106,7 +107,7 @@ export function safeFilename(name: string, fallback: string, ext: string): strin
  */
 export function toMarkdownFile(name: string, content: string): ExportFile {
   return {
-    filename: safeFilename(name, '推文', 'md'),
+    filename: safeFilename(name, t('io.fallbackArticle'), 'md'),
     content,
     mime: MARKDOWN_MIME,
   }
@@ -139,7 +140,7 @@ function articleName(content: string, filename: string): string {
   const fromTitles = frontMatter?.[1].match(/^[ \t]+-[ \t]+(\S.*)$/m)?.[1]?.trim()
   const fromHeading = content.match(/^#[ \t]+(\S.*)$/m)?.[1]?.trim()
   const fromFile = sanitizeStem(filename)
-  const raw = fromTitles || fromHeading || fromFile || '导入稿件'
+  const raw = fromTitles || fromHeading || fromFile || t('io.importFallback')
   // Trim to the server's own limit for a doc name (see DocInput in
   // api/docs-router.ts) so an imported article can always be synced.
   return Array.from(raw.replace(/[\u0000-\u001f\u007f]/g, '')).slice(0, 200).join('')
@@ -202,7 +203,7 @@ export function bundleFilename(count: number): string {
   const now = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-  return `公众号稿件备份_${stamp}_${count}篇.json`
+  return `${t('io.bundleName', { date: stamp, n: count })}.json`
 }
 
 export type BundleParseResult =
@@ -225,32 +226,32 @@ export function parseBundle(text: string): BundleParseResult {
   try {
     raw = JSON.parse(stripBom(text))
   } catch {
-    return { ok: false, reason: '这不是一个合法的 JSON 文件，可能下载时被截断，或被编辑器改坏了。' }
+    return { ok: false, reason: t('io.reason.parse') }
   }
 
   if (!isRecord(raw)) {
-    return { ok: false, reason: '这个文件不是备份包：最外层应该是一个对象。' }
+    return { ok: false, reason: t('io.reason.notBundle') }
   }
 
   const { version } = raw
   if (typeof version !== 'number' || !Number.isInteger(version)) {
-    return { ok: false, reason: '文件里没有版本号（version），应该不是本工具导出的备份包。' }
+    return { ok: false, reason: t('io.reason.noVersion') }
   }
   if (version !== BUNDLE_VERSION) {
     return {
       ok: false,
-      reason: `这个备份文件是 v${version} 版本，当前只支持 v${BUNDLE_VERSION}。`,
+      reason: t('io.reason.version', { n: version, m: BUNDLE_VERSION }),
     }
   }
 
   const { docs } = raw
   if (!Array.isArray(docs)) {
-    return { ok: false, reason: '备份包里没有 docs 数组，文件可能不完整。' }
+    return { ok: false, reason: t('io.reason.noDocs') }
   }
   if (docs.length > MAX_DOCS) {
     return {
       ok: false,
-      reason: `备份包里有 ${docs.length} 篇稿件，超过单次导入上限 ${MAX_DOCS} 篇，请拆成几个备份文件。`,
+      reason: t('io.reason.tooMany', { n: docs.length, max: MAX_DOCS }),
     }
   }
 
@@ -260,41 +261,41 @@ export function parseBundle(text: string): BundleParseResult {
   for (let i = 0; i < docs.length; i++) {
     const entry = docs[i]
     // 1-based: the owner counts articles the way a list shows them.
-    const label = `第 ${i + 1} 篇稿件`
+    const label = t('io.entryLabel', { n: i + 1 })
     if (!isRecord(entry)) {
-      return { ok: false, reason: `${label}不是一个对象。` }
+      return { ok: false, reason: t('io.reason.entryNotObject', { label }) }
     }
 
     const id = entry.id
     if (typeof id !== 'string' || id.length === 0) {
-      return { ok: false, reason: `${label}缺少 id。` }
+      return { ok: false, reason: t('io.reason.entryNoId', { label }) }
     }
     if (id.length > MAX_ID_LENGTH) {
-      return { ok: false, reason: `${label}的 id 超过 ${MAX_ID_LENGTH} 个字符。` }
+      return { ok: false, reason: t('io.reason.entryIdLong', { label, n: MAX_ID_LENGTH }) }
     }
     if (seenIds.has(id)) {
-      return { ok: false, reason: `${label}的 id「${id}」在这个备份包里重复出现，文件已损坏。` }
+      return { ok: false, reason: t('io.reason.entryDupId', { label, id }) }
     }
 
     const name = entry.name
     if (typeof name !== 'string') {
-      return { ok: false, reason: `${label}缺少 name（标题）。` }
+      return { ok: false, reason: t('io.reason.entryNoName', { label }) }
     }
     if (name.length > MAX_NAME_LENGTH) {
-      return { ok: false, reason: `${label}的 name 超过 ${MAX_NAME_LENGTH} 个字符。` }
+      return { ok: false, reason: t('io.reason.entryNameLong', { label, n: MAX_NAME_LENGTH }) }
     }
 
     const content = entry.content
     if (typeof content !== 'string') {
-      return { ok: false, reason: `${label}缺少 content（Markdown 正文）。` }
+      return { ok: false, reason: t('io.reason.entryNoContent', { label }) }
     }
     if (content.length > MAX_CONTENT_LENGTH) {
-      return { ok: false, reason: `${label}的正文超过 ${MAX_CONTENT_LENGTH} 个字符。` }
+      return { ok: false, reason: t('io.reason.entryContentLong', { label, n: MAX_CONTENT_LENGTH }) }
     }
 
     const updatedAt = entry.updatedAt
     if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) {
-      return { ok: false, reason: `${label}的 updatedAt 应该是时间戳数字。` }
+      return { ok: false, reason: t('io.reason.entryNoUpdatedAt', { label }) }
     }
 
     // `savedAt` is nullable by design (null = never put into 草稿箱) and a
@@ -304,7 +305,7 @@ export function parseBundle(text: string): BundleParseResult {
     let savedAt: number | null = null
     if (rawSavedAt !== undefined && rawSavedAt !== null) {
       if (typeof rawSavedAt !== 'number' || !Number.isFinite(rawSavedAt)) {
-        return { ok: false, reason: `${label}的 savedAt 应该是时间戳数字或 null。` }
+        return { ok: false, reason: t('io.reason.entryNoSavedAt', { label }) }
       }
       savedAt = rawSavedAt
     }

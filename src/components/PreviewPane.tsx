@@ -4,6 +4,7 @@ import type { RenderStats } from '@/lib/types'
 import { fillBlockOffsets } from '@/lib/sync-scroll'
 import { serializeWechatSelection } from '@/lib/selection-copy'
 import type { PreviewScrollHandle } from '@/hooks/useSyncScroll'
+import { useI18n } from '@/hooks/useI18n'
 
 interface Props {
   html: string
@@ -29,6 +30,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   { html, stats, width, onWidthChange, blockOffsets, onScroll, onLayout },
   ref,
 ) {
+  const { t } = useI18n()
   const article = useMemo(() => ({ __html: html }), [html])
   const scrollerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -51,8 +53,8 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
     event.preventDefault()
     event.clipboardData.setData('text/html', payload.html)
     event.clipboardData.setData('text/plain', payload.plainText)
-    toast.success('已复制选中内容，可直接粘贴到公众号')
-  }, [])
+    toast.success(t('preview.copiedSelection'))
+  }, [t])
 
   // Measuring every block on every scroll event would read layout hundreds of
   // times a second. Cache the offsets and drop the cache when anything that can
@@ -148,7 +150,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-line-1 px-4">
-        <span className="ya-eyebrow">预览 · 所见即所复制</span>
+        <span className="ya-eyebrow">{t('preview.label')}</span>
         <div className="flex items-center gap-2">
           {/* 分段选择：凹陷轨道 + 选中项 1.5px primary 描边，不用实心底色 */}
           <div className="flex items-center rounded-xl bg-surface-sunken p-0.5" style={{ boxShadow: 'var(--shadow-inset)' }}>
@@ -187,11 +189,14 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
 
       <div className="flex h-8 shrink-0 items-center justify-between border-t border-line-1 px-4 text-[11px] text-ink-3">
         <span className={stats.warnings.length ? 'text-warning-700' : ''}>
-          {stats.warnings.length ? `${stats.warnings.length} 条提醒：${stats.warnings[0]}` : '格式检查通过'}
+          {stats.warnings.length
+            ? t('preview.warnings', { n: stats.warnings.length, first: stats.warnings[0] })
+            : t('preview.clean')}
         </span>
         <span className="tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-          {stats.chars} 字 · {stats.images} 图{stats.carousels ? ` · ${stats.carousels} 轮播` : ''}
-          {stats.galleries ? ` · ${stats.galleries} 网格` : ''}
+          {t('preview.chars', { n: stats.chars })} · {t('preview.images', { n: stats.images })}
+          {stats.carousels ? ` · ${t('preview.carousels', { n: stats.carousels })}` : ''}
+          {stats.galleries ? ` · ${t('preview.galleries', { n: stats.galleries })}` : ''}
         </span>
       </div>
     </div>

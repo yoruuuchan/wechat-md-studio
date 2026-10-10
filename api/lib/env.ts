@@ -77,6 +77,12 @@ export interface Env {
   anonIpDailyImages: number;
   authLoginPerMinute: number;
 
+  /** In-site feedback relay ceilings, also in-memory per IP. The relay's mail
+   *  credentials (RESEND_API_KEY / RESEND_FROM / FEEDBACK_TO) are read per
+   *  request by api/lib/feedback.ts, like AGENT_TOKENS. */
+  feedbackPerMinute: number;
+  feedbackPerDay: number;
+
   /** Anonymous, explicitly shared article copies; independent of image quotas. */
   remoteMcpTtlHours: number;
   remoteMcpTotalBytes: number;
@@ -221,6 +227,9 @@ export function parseEnv(input: EnvInput): Env {
     anonBurstPerMinute: readInt(ctx, "ANON_BURST_PER_MINUTE", { fallback: 12, min: 0, max: 100_000 }),
     anonIpDailyImages: readInt(ctx, "ANON_IP_DAILY_IMAGES", { fallback: 100, min: 0, max: 1_000_000 }),
     authLoginPerMinute: readInt(ctx, "AUTH_LOGIN_PER_MINUTE", { fallback: 10, min: 0, max: 100_000 }),
+
+    feedbackPerMinute: readInt(ctx, "FEEDBACK_PER_MINUTE", { fallback: 3, min: 0, max: 100_000 }),
+    feedbackPerDay: readInt(ctx, "FEEDBACK_PER_DAY", { fallback: 20, min: 0, max: 1_000_000 }),
 
     remoteMcpTtlHours: readInt(ctx, "REMOTE_MCP_TTL_HOURS", { fallback: 24, min: 1, max: 168 }),
     remoteMcpTotalBytes: readInt(ctx, "REMOTE_MCP_TOTAL_BYTES", { fallback: 50 * MIB, min: 0 }),

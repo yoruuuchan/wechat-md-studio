@@ -1,6 +1,11 @@
 // 主题库的分类维度与来源档案。
 // 每套主题必须带 meta：风格标签、复杂度、色系，以及可追溯到原仓库、原作者、
 // 许可证与署名要求的来源信息。这是主题库能被合法再分发的前提，不是可选装饰。
+// The stored values below are stable data (they key filters and metadata); the
+// display wording for each lives in the i18n dictionaries and follows the UI
+// language.
+
+import { t } from './i18n'
 
 /** 风格标签：多标签体系，一套主题可以同时属于多个风格。 */
 export const STYLE_TAGS = [
@@ -33,7 +38,11 @@ export const COMPLEXITY_LEVELS = [
 export type Complexity = (typeof COMPLEXITY_LEVELS)[number]['level']
 
 export function complexityLabel(level: Complexity): string {
-  return COMPLEXITY_LEVELS.find((c) => c.level === level)?.label ?? String(level)
+  return t(`meta.complexity.${level}`)
+}
+
+export function complexityHint(level: Complexity): string {
+  return t(`meta.complexityHint.${level}`)
 }
 
 /** 色系：按主色调归组，供"按颜色浏览"用。 */

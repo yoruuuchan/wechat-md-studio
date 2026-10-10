@@ -4,6 +4,7 @@ import { APP_BYLINE, APP_NAME, REPO_URL } from './brand'
 import { baseTableBlock, carouselFrame, esc, type Theme } from './theme-kit'
 import { EXTRA_THEMES } from './themes-extra'
 import { IMPORTED_THEMES } from './themes-imported'
+import { t } from './i18n'
 
 // 主题 = 一组「语义节点 → 内联样式 HTML」的模板函数。
 // 契约、渲染原语、微信红线消毒与导入主题的装配器都在 theme-kit.ts，
@@ -48,7 +49,7 @@ function goldenCarouselItem(it: { src: string; alt: string }, last: boolean, rat
   const frame = `width:${f.width}px;height:${f.height}px`
   const img = it.src
     ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;border-radius:8px;border:1px solid #E6EDF6;background:#F6FAFF;" />`
-    : `<section style="${frame};box-sizing:border-box;border:1px dashed #B9DAFF;background:#F6FAFF;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#888888;text-indent:0;text-align:center;"><span leaf="">待插入图片</span></p></section>`
+    : `<section style="${frame};box-sizing:border-box;border:1px dashed #B9DAFF;background:#F6FAFF;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#888888;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
   const cap = it.alt
     ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(it.alt)}</span></p>`
     : ''
@@ -119,7 +120,7 @@ export const goldenTheme: Theme = {
   },
 
   signature: (cfg) =>
-    `<section style="margin:36px 0 0;padding:8px 0 0;"><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">排版 | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">校对 | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">审核 | ${esc(cfg.review)}</span></p></section>`,
+    `<section style="margin:36px 0 0;padding:8px 0 0;"><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">${t('render.sigLayout')} | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">${t('render.sigProof')} | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">${t('render.sigReview')} | ${esc(cfg.review)}</span></p></section>`,
 
   listBlock: (ordered, items) => {
     const tag = ordered ? 'ol' : 'ul'
@@ -209,7 +210,7 @@ export const minimalTheme: Theme = {
       .map((it, i) => {
         const img = it.src
           ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;" />`
-          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed #DDDDDD;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#9A9A9A;text-indent:0;text-align:center;"><span leaf="">待插入图片</span></p></section>`
+          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed #DDDDDD;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#9A9A9A;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
         const cap = it.alt
           ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(it.alt)}</span></p>`
           : ''
@@ -221,7 +222,7 @@ export const minimalTheme: Theme = {
   },
 
   signature: (cfg) =>
-    `<section style="margin:40px 0 0;padding:16px 0 0;border-top:1px solid #EAEAEA;"><p style="margin:0 0 6px;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">排版 | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">校对 | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">审核 | ${esc(cfg.review)}</span></p></section>`,
+    `<section style="margin:40px 0 0;padding:16px 0 0;border-top:1px solid #EAEAEA;"><p style="margin:0 0 6px;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">${t('render.sigLayout')} | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">${t('render.sigProof')} | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">${t('render.sigReview')} | ${esc(cfg.review)}</span></p></section>`,
 
   listBlock: (ordered, items) => {
     const tag = ordered ? 'ol' : 'ul'
@@ -317,7 +318,7 @@ export const steadyTheme: Theme = {
       .map((it, i) => {
         const img = it.src
           ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;border:1px solid #E4E9F0;" />`
-          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed #C7D8EC;background:#F7F8FA;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#8C9BB3;text-indent:0;text-align:center;"><span leaf="">待插入图片</span></p></section>`
+          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed #C7D8EC;background:#F7F8FA;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#8C9BB3;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
         const cap = it.alt
           ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(it.alt)}</span></p>`
           : ''
@@ -329,7 +330,7 @@ export const steadyTheme: Theme = {
   },
 
   signature: (cfg) =>
-    `<section style="margin:40px 0 0;padding:16px 0 0;border-top:1px solid #E4E9F0;"><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">排版 | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">校对 | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">审核 | ${esc(cfg.review)}</span></p></section>`,
+    `<section style="margin:40px 0 0;padding:16px 0 0;border-top:1px solid #E4E9F0;"><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">${t('render.sigLayout')} | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">${t('render.sigProof')} | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">${t('render.sigReview')} | ${esc(cfg.review)}</span></p></section>`,
 
   listBlock: (ordered, items) => {
     const tag = ordered ? 'ol' : 'ul'

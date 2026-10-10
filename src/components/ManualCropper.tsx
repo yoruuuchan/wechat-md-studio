@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cropToArea, type CropArea } from '@/lib/image'
 import { carouselFrame } from '@/lib/themes'
 import { ratioValue, type CarouselRatio } from '@/lib/types'
+import { useI18n } from '@/hooks/useI18n'
 
 interface Props {
   open: boolean
@@ -25,6 +26,7 @@ interface Props {
  * frame — WeChat drops object-fit, so faking it in CSS is not an option.
  */
 export default function ManualCropper({ open, file, label, alt, ratio, busy, onCancel, onConfirm }: Props) {
+  const { t } = useI18n()
   const [src, setSrc] = useState<string>('')
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -62,7 +64,7 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
       })
       onConfirm(out.blob, out.mime)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '裁切失败')
+      setError(e instanceof Error ? e.message : t('crop.failed'))
     } finally {
       setWorking(false)
     }
@@ -75,22 +77,15 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
     <Dialog open={open} onOpenChange={(v) => (!v && !disabled ? onCancel() : undefined)}>
       <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-[15px]">手动裁切</DialogTitle>
+          <DialogTitle className="text-[15px]">{t('crop.title')}</DialogTitle>
           <DialogDescription className="text-[12px] leading-relaxed">
-            {ratio ? (
-              <>
-                这组图片统一 <strong className="text-ink-1">{ratio}</strong> 比例，所以裁切框锁成该比例——
-                拖动图片决定留下哪一块，滚轮或下面的滑杆缩放。
-              </>
-            ) : (
-              <>拖动图片决定留下哪一块，滚轮或下面的滑杆缩放。比例不限，想裁成什么样都可以。</>
-            )}
+            {ratio ? <>{t('crop.lockedDesc', { ratio })}</> : <>{t('crop.freeDesc')}</>}
           </DialogDescription>
         </DialogHeader>
 
         <div className="mt-1">
           <p className="mb-2 text-[11px] text-ink-3" style={{ fontFamily: 'var(--font-mono)' }}>
-            {label ? `${label} · ` : ''}{alt || '未命名'}
+            {label ? `${label} · ` : ''}{alt || t('common.unnamed')}
           </p>
 
           <div className="relative h-[min(380px,52vh)] w-full overflow-hidden rounded-xl bg-surface-sunken">
@@ -108,12 +103,12 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
                 objectFit="contain"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-[12px] text-ink-3">读取图片中…</div>
+              <div className="flex h-full items-center justify-center text-[12px] text-ink-3">{t('crop.loading')}</div>
             )}
           </div>
 
           <div className="mt-3 flex items-center gap-3">
-            <span className="shrink-0 text-[11px] text-ink-3">缩放</span>
+            <span className="shrink-0 text-[11px] text-ink-3">{t('crop.zoom')}</span>
             <input
               type="range"
               min={1}
@@ -134,13 +129,13 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
               }}
               className="ya-btn-ghost ya-btn ya-btn-sm shrink-0"
             >
-              复位
+              {t('crop.reset')}
             </button>
           </div>
 
           {area && (
             <p className="mt-2 text-[11px] text-ink-3">
-              取 {Math.round(area.width)}×{Math.round(area.height)} 像素
+              {t('crop.area', { w: Math.round(area.width), h: Math.round(area.height) })}
             </p>
           )}
           {error && <p className="mt-2 text-[11px] text-bad-700">{error}</p>}
@@ -154,7 +149,7 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
             disabled={disabled}
             className="ya-btn ya-btn-secondary"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -162,7 +157,7 @@ export default function ManualCropper({ open, file, label, alt, ratio, busy, onC
             disabled={disabled || !area}
             className="ya-btn ya-btn-primary"
           >
-            {working ? '裁切中…' : '用这块区域上传'}
+            {working ? t('crop.working') : t('crop.confirm')}
           </button>
         </div>
       </DialogContent>

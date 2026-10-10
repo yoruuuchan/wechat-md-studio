@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { WRITING_SKILL_URL } from '@contracts/remote-mcp'
-import { AI_WRITING_PROMPT } from '@/lib/ai-writing'
+import { aiWritingPrompt } from '@/lib/ai-writing'
 import { copyPlain } from '@/lib/clipboard'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useI18n } from '@/hooks/useI18n'
+import { t as translate } from '@/lib/i18n'
 
 export async function copyAiText(text: string, label: string): Promise<void> {
-  if (await copyPlain(text)) toast.success(`${label}已复制`)
-  else toast.error('复制失败，请选中文字手动复制')
+  // `label` is the already-translated name of the thing being copied.
+  if (await copyPlain(text)) toast.success(translate('ai.copyDone', { label }))
+  else toast.error(translate('ai.copyFailed'))
 }
 
 export default function AiWritingDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { t } = useI18n()
+  const prompt = aiWritingPrompt()
   const [skill, setSkill] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copying, setCopying] = useState(false)
@@ -18,34 +23,42 @@ export default function AiWritingDialog({ open, onOpenChange }: { open: boolean;
     if (!open || skill !== null) return
     const controller = new AbortController()
     void fetch('/skill.md', { signal: controller.signal }).then(async (response) => {
-      if (!response.ok || !/^text\/(plain|markdown)\b/.test(response.headers.get('content-type') || '')) throw new Error('写作规则暂时没读下来，请稍后重新打开')
+      if (!response.ok || !/^text\/(plain|markdown)\b/.test(response.headers.get('content-type') || '')) throw new Error(t('ai.skillLoadFailed'))
       setSkill(await response.text())
       setError(null)
-    }).catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '写作规则读取失败') })
+    }).catch((cause) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t('ai.skillReadFailed')) })
     return () => controller.abort()
+    // `t` intentionally omitted: the fetch should not restart on a language switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, skill])
+
+  const copyWithToast = (text: string, label: string) => {
+    void copyAiText(text, label)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto !bg-surface-base sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>AI 帮我写</DialogTitle>
-          <DialogDescription className="text-ink-3">把规则、主题和资料交给你常用的 AI，写完后粘回左侧编辑器。</DialogDescription>
+          <DialogTitle>{t('ai.title')}</DialogTitle>
+          <DialogDescription className="text-ink-3">{t('ai.desc')}</DialogDescription>
         </DialogHeader>
         <div className="ya-well space-y-3 p-4 text-[13px] leading-relaxed">
-          <p>复制提示词，补上自己的主题和资料，再发给 AI。</p>
-          <textarea aria-label="写作提示词" readOnly value={AI_WRITING_PROMPT} className="ya-input !h-48 w-full resize-y !py-3 !text-[12px]" />
-          <button data-ai-copy="prompt" onClick={() => void copyAiText(AI_WRITING_PROMPT, '提示词')} className="ya-btn ya-btn-primary">复制提示词</button>
+          <p>{t('ai.promptNote')}</p>
+          <textarea aria-label={t('ai.promptAria')} readOnly value={prompt} className="ya-input !h-48 w-full resize-y !py-3 !text-[12px]" />
+          <button data-ai-copy="prompt" onClick={() => copyWithToast(prompt, t('ai.label.prompt'))} className="ya-btn ya-btn-primary">{t('ai.copyPrompt')}</button>
         </div>
         <div className="space-y-3 text-[12px] text-ink-3">
-          <p>AI 能打开链接时，发 Skill 地址就够了；读不了链接时，粘贴完整 Skill。</p>
+          <p>{t('ai.skillNote')}</p>
+          <p>{t('ai.skillLangNote')}</p>
           <a href={WRITING_SKILL_URL} target="_blank" rel="noreferrer" className="break-all text-brand underline underline-offset-2">{WRITING_SKILL_URL}</a>
           <div className="flex flex-wrap gap-2">
-            <button data-ai-copy="url" onClick={() => void copyAiText(WRITING_SKILL_URL, 'Skill 地址')} className="ya-btn ya-btn-secondary">复制 Skill 地址</button>
+            <button data-ai-copy="url" onClick={() => copyWithToast(WRITING_SKILL_URL, t('ai.label.url'))} className="ya-btn ya-btn-secondary">{t('ai.copyUrl')}</button>
             <button data-ai-copy="skill" disabled={skill === null || copying} onClick={async () => {
               if (skill === null) return
               setCopying(true)
-              try { await copyAiText(skill, '完整 Skill') } finally { setCopying(false) }
-            }} className="ya-btn ya-btn-secondary">{copying ? '复制中…' : '复制完整 Skill'}</button>
+              try { copyWithToast(skill, t('ai.label.skill')) } finally { setCopying(false) }
+            }} className="ya-btn ya-btn-secondary">{copying ? t('ai.copying') : t('ai.copySkill')}</button>
           </div>
           {error && <p role="alert" className="text-warn-700">{error}</p>}
         </div>

@@ -9,6 +9,8 @@
  * imported inside the function and memoised, so nothing runs on first load.
  */
 
+import { t } from './i18n'
+
 /** WeChat lays the article out in a `max-width:677px` container. */
 export const MAX_DIAGRAM_WIDTH = 677
 
@@ -150,7 +152,7 @@ export async function renderDiagramPng(code: string): Promise<DiagramPng> {
     width: svg.getAttribute('width'),
     height: svg.getAttribute('height'),
   })
-  if (!natural) throw new Error('图表没有可测量的尺寸')
+  if (!natural) throw new Error(t('diagram.noSize'))
   const { width, height, pixelWidth, pixelHeight } = rasterSize(natural.width, natural.height)
 
   // mermaid leaves width="100%" plus a max-width style and no height, which Chrome
@@ -166,14 +168,14 @@ export async function renderDiagramPng(code: string): Promise<DiagramPng> {
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve()
     // A blob URL can taint the canvas and make toBlob fail; a data URL cannot.
-    img.onerror = () => reject(new Error('图表无法绘制成图片'))
+    img.onerror = () => reject(new Error(t('diagram.noDraw')))
   })
 
   const canvas = document.createElement('canvas')
   canvas.width = pixelWidth
   canvas.height = pixelHeight
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('当前浏览器不支持 canvas')
+  if (!ctx) throw new Error(t('diagram.noCanvas'))
   // Opaque white: the crop and compress paths re-encode to formats without alpha,
   // which composite transparency over black.
   ctx.fillStyle = '#ffffff'
@@ -181,7 +183,7 @@ export async function renderDiagramPng(code: string): Promise<DiagramPng> {
   ctx.drawImage(img, 0, 0, pixelWidth, pixelHeight)
 
   const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('图表导出失败'))), 'image/png')
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t('diagram.exportFailed')))), 'image/png')
   })
   return { blob, width, height }
 }
