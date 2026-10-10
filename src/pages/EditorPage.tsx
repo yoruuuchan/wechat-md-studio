@@ -1086,6 +1086,11 @@ export default function EditorPage() {
         onLogout={logout}
       />
 
+      {/* 窄屏（手机）访客的第一条说明：排版界面是为电脑浏览器设计的 */}
+      <div className="flex items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3 md:hidden">
+        本站目前只做了网页端适配，建议在电脑浏览器上打开。
+      </div>
+
       <ResizablePanelGroup
         orientation="horizontal"
         className="min-h-0 flex-1"

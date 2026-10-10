@@ -7,6 +7,9 @@
 // It asserts the page renders in both UI themes, keeps its numbers coming from
 // the same sources the app uses (THEMES registry), and that both links to /terms
 // exist — one per sidebar tab, since Radix only mounts the active panel.
+// The contact address is scrape-protected: it must stay out of the DOM until a
+// visitor asks for it, so the checks walk the 显示邮箱 reveal on /terms and the
+// contact block in the settings tab.
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,6 +19,8 @@ import path from 'node:path'
 const APP = process.argv[2] || 'http://127.0.0.1:3201'
 const PORT = Number(process.argv[3] || 9349)
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-terms-'))
+// Assembled, not written whole — the same rule the app follows.
+const ADDRESS = ['yoruandakari', 'duck.com'].join('@')
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-cdp-t-'))
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
@@ -135,6 +140,7 @@ const page = JSON.parse(
       theme: document.documentElement.dataset.theme,
       pageBg: getComputedStyle(document.querySelector('.ya-page')).backgroundColor,
       email: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
+      plainEmail: t.includes(${JSON.stringify(ADDRESS)}),
       themeCount: (t.match(/(\\d+)\\s*套主题/) || [])[1],
       mentionsIndexedDB: t.includes('IndexedDB'),
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
@@ -145,11 +151,32 @@ const page = JSON.parse(
 )
 check('/terms renders as a page, not a blank route', page.path === '/terms' && page.textLen > 1200, `textLen=${page.textLen}`)
 check('every section is present', page.headings.length >= 6, page.headings.join(' / '))
-check('abuse contact is the duck.com relay', JSON.stringify(page.email).includes('yoruandakari@duck.com'), page.email.join(','))
+check('the contact address stays hidden until asked', page.email.length === 0 && page.plainEmail === false, `mailtos=${page.email.join(',')} plain=${page.plainEmail}`)
 check('theme count comes from the THEMES registry', Number(page.themeCount) > 200, `count=${page.themeCount}`)
 check('the page states where drafts actually live', page.mentionsIndexedDB === true)
 check('no horizontal overflow', page.overflowX <= 0, `overflowX=${page.overflowX}`)
 const akariShot = await shot('terms-akari')
+
+// Revealing is the only path by which the address enters the DOM; a scraper
+// that merely renders the page never sees it.
+await evaluate(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '显示邮箱')
+  if (b) b.scrollIntoView({ block: 'center' })
+  return !!b
+})()`)
+await sleep(600)
+await clickAt('显示邮箱')
+const revealed = JSON.parse(
+  await evaluate(`JSON.stringify({
+    mailto: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
+    plainEmail: document.body.innerText.includes(${JSON.stringify(ADDRESS)}),
+  })`),
+)
+check(
+  'clicking 显示邮箱 reveals the duck.com relay',
+  revealed.mailto.length === 1 && revealed.mailto[0] === 'mailto:' + ADDRESS && revealed.plainEmail === true,
+  revealed.mailto.join(','),
+)
 
 await setTheme('yoru')
 await goto(APP + '/terms')
@@ -183,6 +210,30 @@ check(
   (await evaluate(`document.querySelector('[role=tab][aria-selected=true]')?.textContent.trim()`)) === '设置' &&
     inSettings.some((t) => t.includes('投诉删除')),
   JSON.stringify(inSettings),
+)
+
+const settingsContact = JSON.parse(
+  await evaluate(`JSON.stringify({
+    plainEmail: document.body.innerText.includes(${JSON.stringify(ADDRESS)}),
+    hasCopy: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '复制邮箱'),
+    hasReveal: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '显示邮箱'),
+    ghLinks: [...document.querySelectorAll('[role=tabpanel] a[href^="https://github.com/"]')].map(a => a.getAttribute('href')),
+  })`),
+)
+check(
+  '设置 tab adds the contact block with the address still hidden',
+  settingsContact.plainEmail === false && settingsContact.hasCopy && settingsContact.hasReveal,
+  JSON.stringify(settingsContact),
+)
+check(
+  '设置 tab links the repo for a star',
+  settingsContact.ghLinks.includes('https://github.com/yoruuuchan/wechat-md-studio'),
+  JSON.stringify(settingsContact.ghLinks),
+)
+check(
+  '设置 tab links the GitHub issues page',
+  settingsContact.ghLinks.some((href) => href.endsWith('/issues')),
+  JSON.stringify(settingsContact.ghLinks),
 )
 
 await evaluate(`(() => { const a = [...document.querySelectorAll('a[href="/terms"]')].pop(); if (a) a.click(); return !!a })()`)

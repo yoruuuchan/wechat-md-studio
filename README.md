@@ -1,9 +1,11 @@
 # 公众号排版助手 by Yoru
 
 把 Markdown 变成**可以直接粘进微信公众号后台**的排版：左侧写稿，右侧实时预览，一键复制富文本。
-图片通过图床进入正文，微信粘贴时自行转存。
+图片通过图床进入正文，微信粘贴时自行转存。目前只做了网页端适配，建议在电脑浏览器上使用。
 
 **[在线使用](https://wechat.yoru-and-akari.dev)** · [主题库](https://wechat.yoru-and-akari.dev/themes) · [开源致谢](https://wechat.yoru-and-akari.dev/references) · [使用规范](https://wechat.yoru-and-akari.dev/terms)
+
+觉得好用的话，欢迎到 [GitHub 仓库](https://github.com/yoruuuchan/wechat-md-studio) 点个 Star，让更多人发现它。
 
 | akari（亮） | yoru（暗） |
 |:--:|:--:|

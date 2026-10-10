@@ -1,7 +1,9 @@
 import { useMemo, useRef } from 'react'
 import { Link } from 'react-router'
+import { ContactEmail } from '@/components/ContactEmail'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { MaterialItem } from '@/lib/render'
+import { REPO_URL } from '@/lib/brand'
 import { CREDITS } from '@/lib/credits'
 import { ZOOM_STEPS } from '@/lib/store'
 import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type SignatureConfig } from '@/lib/types'
@@ -283,6 +285,36 @@ export default function SidePanel(p: Props) {
           <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
             缩放按浏览器保存，编辑器、侧栏、预览框一起放大缩小。
           </p>
+          <div className="mt-4"><Label>反馈与联系</Label></div>
+          <div className="ya-well p-3">
+            <p className="text-[12px] leading-relaxed text-ink-2">
+              碰上 bug、有想要的功能，或者想谈合作，写封信就行；不承诺回信时限，但邮件会看。
+            </p>
+            <div className="mt-2.5">
+              <ContactEmail variant="panel" />
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
+              有 GitHub 账号的话：觉得好用，欢迎
+              <a
+                href={REPO_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="mx-0.5 text-brand underline decoration-brand/40 underline-offset-2"
+              >
+                点个 star
+              </a>
+              ；碰上问题，直接
+              <a
+                href={`${REPO_URL}/issues`}
+                target="_blank"
+                rel="noreferrer"
+                className="mx-0.5 text-brand underline decoration-brand/40 underline-offset-2"
+              >
+                开 issue
+              </a>
+              。
+            </p>
+          </div>
           <div className="mt-4"><Label>致谢</Label></div>
           <p className="ya-well p-3 text-[12px] leading-relaxed text-ink-2">
             本站站在开源肩膀上：{CREDITS.map((c) => c.name).join('、')}，共 {CREDITS.length}{' '}

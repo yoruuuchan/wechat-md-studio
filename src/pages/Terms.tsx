@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router'
+import { ContactEmail } from '@/components/ContactEmail'
 import { YoruMark } from '@/components/YoruMark'
 import { APP_NAME, APP_BYLINE } from '@/lib/brand'
 import { THEMES } from '@/lib/themes'
@@ -14,8 +15,6 @@ import { THEMES } from '@/lib/themes'
  *
  * Colours go through the Console tokens in index.css, same as References.tsx.
  */
-
-const CONTACT_EMAIL = 'yoruandakari@duck.com'
 
 function IconBack() {
   return (
@@ -198,15 +197,7 @@ export default function Terms() {
         <Section icon={<IconMail />} title="投诉与删除" eyebrow="权利人请走这里">
           <p>
             如果你是权利人，或者你发现本站某个 <Code>/api/img/…</Code> 地址上挂着违法或侵权内容，
-            写信到{' '}
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="underline decoration-1 underline-offset-2"
-              style={{ color: 'var(--primary-600)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-            >
-              {CONTACT_EMAIL}
-            </a>
-            ，写清三样东西：
+            写信到 <ContactEmail />，写清三样东西：
           </p>
           <ul className="space-y-2">
             <Bullet>具体地址（图片 URL，或足够定位到它的描述，比如上传的大致时间）。</Bullet>
