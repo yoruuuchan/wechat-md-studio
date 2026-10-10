@@ -8,7 +8,8 @@
 AI 可以起稿、整理资料、修改段落；人在网页中校对、编辑、排版和处理图片，最后把正文复制到公众号后台。
 也可以从头到尾自己写。内容始终是一份可读、可编辑、可带走的 Markdown。
 
-**[打开芦苇](https://wechat.yoru-and-akari.dev)** 
+**[点击此处在线使用](https://wechat.yoru-and-akari.dev)** 
+
 [主题库](https://wechat.yoru-and-akari.dev/themes) · [写作 Skill](https://wechat.yoru-and-akari.dev/skill.md) · [开源致谢](https://wechat.yoru-and-akari.dev/references)
 
 by Yoru。一个持续使用、慢慢完善的个人项目。觉得好用，欢迎在 [GitHub](https://github.com/yoruuuchan/wechat-md-studio) 留个 Star。
