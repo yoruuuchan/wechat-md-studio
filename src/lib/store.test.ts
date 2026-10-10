@@ -84,6 +84,19 @@ afterEach(() => {
 })
 
 describe('migrating the old localStorage documents', () => {
+  it('retains MCP bases across reloads and the complete local body after disconnection', async () => {
+    const bound = doc('shared-local', '本机完整正文', { remoteMcp: { id: 'lease', baseHash: '0123456789abcdef', name: '稿件' } })
+    await saveDocs([bound], bound.id)
+    __resetLocalStoreForTests()
+    const loaded = (await loadDocs()).docs.find((d) => d.id === bound.id)!
+    expect(loaded.content).toBe(bound.content)
+    expect(loaded.remoteMcp).toEqual(bound.remoteMcp)
+    await saveDocs([{ ...loaded, remoteMcp: null }], loaded.id)
+    __resetLocalStoreForTests()
+    const disconnected = (await loadDocs()).docs.find((d) => d.id === bound.id)!
+    expect(disconnected.content).toBe(bound.content)
+    expect(disconnected.remoteMcp).toBeNull()
+  })
   it('moves bodies into the store, verifies them, then drops the old key', async () => {
     const old = [doc('a', 'A 的正文 '.repeat(50)), doc('b', 'B 的正文', { savedAt: 123 })]
     storage.setItem(LEGACY_KEY, JSON.stringify(old))

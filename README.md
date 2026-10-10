@@ -21,6 +21,8 @@
 - **编辑与保存**：Markdown 工具栏、语义格式刷、375 / 677 预览、语法补全与同步滚动；预览区框选局部后 `Ctrl/⌘ + C` 直接复制，保留公众号所需的内联样式、可直接粘贴进后台；界面支持浅色 / 深色 / 跟随系统；本机防丢，登录后云端草稿箱与冲突处理。
 - **导入导出**：Markdown、DOCX 导入；Markdown、正文 HTML、完整预览页与整包稿件备份导出。
 - **Agent 往返**：REST API + Python 客户端推稿、打开网页精修、读回结果，内容 hash 防止静默覆盖。
+- **AI 帮我写**：无需登录，复制提示词、Skill 地址或完整 Skill，把主题与资料交给网页版 AI 写稿；[公开写作规则](https://wechat.yoru-and-akari.dev/skill.md) 与仓库 Skill 同源。
+- **AI 直接编辑当前稿件**：高级功能中创建单篇 Remote MCP 授权，AI 与浏览器双向同步，冲突需确认；撤销或到期后本地稿件继续保存。
 
 排版、上传、复制和导出无需登录；口令用于站长云端草稿箱。匿名图片有额度与回收期限，条款见
 [使用规范](https://wechat.yoru-and-akari.dev/terms)，实现口径见 [运维说明](HANDOFF.md#安全与匿名资源回收)。
@@ -42,7 +44,7 @@
 
 [parser](src/lib/parse.ts) 只表达语义，[renderer](src/lib/render.ts) 编排节点，[Theme](src/lib/theme-kit.ts) 决定视觉；预览、复制、正文导出共用渲染结果。
 React + Vite + CodeMirror 负责编辑；Hono 提供浏览器 tRPC 与 Agent REST API。
-IndexedDB / localStorage 保存本机正文与索引，SQLite 保存云端稿件，图片 Worker + R2 承载图片。
+IndexedDB / localStorage 保存本机正文与索引，SQLite 保存云端稿件和明确授权的临时 AI 协作副本，图片 Worker + R2 承载图片。
 
 ## 快速开始
 
@@ -97,9 +99,10 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时把 `.env` �
 
 完整条款在 **[/terms](https://wechat.yoru-and-akari.dev/terms)**，这里留下最要紧的三条：
 
-- **正文不经过本站。** 不登录时稿件只存在你自己浏览器的 IndexedDB / localStorage 里，服务器收不到内容；
-  登录只打开站长的云端草稿箱。你用本站排出的文字写了什么，责任在执笔和发布它的人，不在这个编辑器。
-- **图片是唯一的例外。** 匿名上传同样不需要登录，文件因此落在本站的对象存储上，并以
+- **正文默认保存在本机。** 未登录时，常规编辑只写浏览器的 IndexedDB / localStorage；明确开启当前稿件的 Remote MCP 后，
+  本站保存临时协作副本（默认 24 小时），只有该游客与持有该篇令牌的客户端可读写。撤销立即删除副本，到期立即拒绝访问并定期清理；本地稿件保留。
+  登录另打开站长的云端草稿箱。你用本站排出的文字写了什么，责任在执笔和发布它的人。
+- **上传的图片公网可读。** 匿名上传同样不需要登录，文件因此落在本站的对象存储上，并以
   `https://wechat.yoru-and-akari.dev/api/img/…` **公网可读**——拿到链接的人都能看到。本站不做内容审核，
   只有字节头校验、额度封顶和 14 天自动回收。不要上传你不愿意公开、或者你不拥有权利的图片。
 - **禁止借本站图床传播**违法内容、涉及未成年人的性内容、侵犯他人著作权或肖像隐私的内容、恶意程序与诈骗素材，
@@ -132,3 +135,4 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时把 `.env` �
 | [渲染与图片](docs/rendering.md) | AST / Theme 边界、微信 HTML、公式、Mermaid、裁切与图片生命周期 |
 | [稿件与编辑器](docs/documents.md) | 本地 / 云端保存、合并与冲突、草稿箱、素材库、导入导出 |
 | [Agent API](docs/agent-api.md) / [wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) | REST 接口、认证、覆盖语义与 Python 客户端 |
+| [AI 写作与 Remote MCP](docs/remote-mcp.md) | 公共 Skill、单稿件匿名授权、标准接入、同步、并发与撤销 |

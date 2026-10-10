@@ -54,6 +54,18 @@ export const docs = sqliteTable("docs", {
 
 export type DocRow = typeof docs.$inferSelect;
 
+// Lease timestamps use milliseconds; docs retain their existing seconds format.
+// The only anonymous body a bearer can reach is the docId in its own lease.
+export const remoteMcpConnections = sqliteTable("remote_mcp_connections", {
+  id: text("id").primaryKey(),
+  visitor: text("visitor").notNull(),
+  localDocId: text("localDocId").notNull(),
+  docId: text("docId").notNull(),
+  tokenHash: text("tokenHash").notNull(),
+  createdAt: integer("createdAt").notNull(),
+  expiresAt: integer("expiresAt").notNull(),
+});
+
 /**
  * Single-owner deployment: the app authenticates with one access key, so there
  * is no user table. This shape is kept so upload code can keep referring to

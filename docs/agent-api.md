@@ -7,6 +7,9 @@
 [agent-router.test.ts](../api/agent-router.test.ts)。客户端细则见
 [wechat-typesetter/SKILL.md](../skills/wechat-typesetter/SKILL.md)。
 
+普通用户的写作规则与匿名单稿件授权见 [AI 写作与 Remote MCP](remote-mcp.md)。
+`/api/mcp` 使用单篇临时令牌；本页 `/api/agent/*` 仍使用站长配置的 Agent 令牌，两种凭证与授权范围独立。
+
 ## 往返模型与认证
 
 `Agent 推初稿 → 返回 editorUrl → 人在网页精修 → Agent 读回 Markdown`。

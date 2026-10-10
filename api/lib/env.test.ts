@@ -25,6 +25,8 @@ const NUMERIC_KNOBS = [
   'ANON_BURST_PER_MINUTE',
   'ANON_IP_DAILY_IMAGES',
   'AUTH_LOGIN_PER_MINUTE',
+  'REMOTE_MCP_TTL_HOURS',
+  'REMOTE_MCP_TOTAL_BYTES',
   'PORT',
 ]
 
@@ -48,6 +50,8 @@ describe('parseEnv in production', () => {
     expect(env.anonBurstPerMinute).toBe(12)
     expect(env.anonIpDailyImages).toBe(100)
     expect(env.authLoginPerMinute).toBe(10)
+    expect(env.remoteMcpTtlHours).toBe(24)
+    expect(env.remoteMcpTotalBytes).toBe(50 * 1024 * 1024)
     expect(env.port).toBe(3100)
     expect(env.host).toBe('127.0.0.1')
   })
@@ -116,6 +120,12 @@ describe('parseEnv in production', () => {
 
   it('rejects a port outside 1-65535', () => {
     expect(() => parseEnv({ ...production, PORT: '70000' })).toThrow(/PORT must be an integer between 1 and 65535/)
+  })
+
+  it('bounds collaboration lifetime and accepts disabling body capacity', () => {
+    expect(() => parseEnv({ ...production, REMOTE_MCP_TTL_HOURS: '0' })).toThrow(/REMOTE_MCP_TTL_HOURS/)
+    expect(() => parseEnv({ ...production, REMOTE_MCP_TTL_HOURS: '169' })).toThrow(/REMOTE_MCP_TTL_HOURS/)
+    expect(parseEnv({ ...production, REMOTE_MCP_TOTAL_BYTES: '0' }).remoteMcpTotalBytes).toBe(0)
   })
 
   it('keeps ANON_GC_DAYS=0 legal — it is the documented "sweep everything unreferenced now"', () => {

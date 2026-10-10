@@ -37,6 +37,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
 | 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、stale save、三种冲突处理、按需正文与草稿箱 |
+| AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
 | 多图网格 | `node scripts/cdp-verify-gallery.mjs 3221 9353` | 参数、上传前裁切、网格布局、HTML 输出 |
 
@@ -44,6 +45,10 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[diagram](../scripts/cdp-verify-diagram.mjs)、
 [gallery](../scripts/cdp-verify-gallery.mjs)。脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
 `SKIP` 即使退出码为 0，也不能计作已完成该链路验收。
+
+Remote MCP 脚本设置 `MOPAI_OPENCODE_BIN` 为已安装的 OpenCode 原生可执行文件后，会启动真实 OpenCode
+进行 Skill / 读稿 / 改稿三个工具调用；模型响应由本地确定性驱动提供，配置与数据库均在临时目录，
+不读取用户模型账号或修改全局 MCP 配置。未设置时该客户端部分明确 `SKIP`，不能当成客户端验收通过。
 
 ## 测试已启动的本地应用
 

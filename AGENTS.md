@@ -20,6 +20,7 @@
 | Local / cloud documents | [store.ts](src/lib/store.ts) + [body-store.ts](src/lib/body-store.ts)：本机索引与正文；[useDocs.ts](src/hooks/useDocs.ts) + [docs-merge.ts](src/lib/docs-merge.ts)：同步与冲突；[docs-router.ts](api/docs-router.ts)、[schema.ts](db/schema.ts)、[connection.ts](api/queries/connection.ts)：云端保存、表结构与升级 |
 | Import / export | [import-export.ts](src/lib/import-export.ts)：Markdown、整包备份、DOCX；[rich-paste.ts](src/lib/rich-paste.ts)：HTML 转公众号方言；文件与 UI 接线在 `EditorPage.tsx` |
 | Agent API | [agent-router.ts](api/agent-router.ts)、[agent-auth.ts](api/lib/agent-auth.ts)、[contracts/agent.ts](contracts/agent.ts)；[wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) 是 Python 客户端入口 |
+| AI writing / single-document MCP | [wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) 同时是写作事实源；[writing-skill.ts](api/lib/writing-skill.ts) 直接嵌入它；[mcp.ts](api/mcp.ts)、[remote-mcp-router.ts](api/remote-mcp-router.ts)、[remote-mcp.ts](api/lib/remote-mcp.ts)、[useRemoteMcp.ts](src/hooks/useRemoteMcp.ts) 负责临时授权、CAS 与浏览器同步 |
 | Favorites | [favorites.ts](src/lib/favorites.ts) / [useThemeFavorites.ts](src/hooks/useThemeFavorites.ts)：本机收藏，`mopai.theme-favorites.v1`；主题库与编辑器共用 |
 | Verification | [package.json](package.json)、[verify-themes.ts](scripts/verify-themes.ts)、[verify-sources.ts](scripts/verify-sources.ts)、各模块相邻 `*.test.ts`；[验证导航](docs/verification.md) 对应现有浏览器验收脚本 |
 
@@ -33,6 +34,7 @@
 | 微信排版 / renderer | [渲染与图片](docs/rendering.md)、`parse.ts` / `render.ts` / `theme-kit.ts`、相关测试、`scripts/verify-themes.ts`；公式另读 `math-sanitize.ts` |
 | 保存 / 同步 / 导入导出 | [稿件与编辑器](docs/documents.md)、相关 hooks / API / schema 及其测试 |
 | Agent 接入 | [Agent API](docs/agent-api.md)、`contracts/agent.ts`、路由 / 鉴权与客户端实现及验收脚本 |
+| AI 写作 / Remote MCP | [AI 写作与 Remote MCP](docs/remote-mcp.md)、现有 Skill、游客 / docs / hash 实现与相邻测试；ChatGPT OAuth 兼容以 `yoruuuchan/chatgpt-mcp-connect` 的已验证实践为事实基线 |
 | 复制 / 剪贴板 / 预览选区行为 | `selection-copy.ts`、`PreviewPane.tsx`、`selection-copy.test.ts`、`scripts/cdp-verify-selection-copy.mjs`；整篇复制另见 `clipboard.ts` |
 | UI 明暗主题 / shadcn / Tailwind dark variant | `ui-theme.ts`、`ThemeToggle.tsx`、`tailwind.config.js` 的 `darkMode` 与 `src/index.css` 双主题 token、`scripts/cdp-verify-dark-theme.mjs` |
 | 使用规范 / 责任边界 | [Terms.tsx](src/pages/Terms.tsx) 与 README 的「使用规范与责任边界」是派生文档：额度读 `api/lib/anon-quota.ts` 与 `api/lib/burst.ts`、回收读 `api/lib/anon-gc.ts`、正文落在哪里读 `src/lib/store.ts` 与 `body-store.ts`。改这些行为时同步两处措辞，只写实现兑现得了的处置 |

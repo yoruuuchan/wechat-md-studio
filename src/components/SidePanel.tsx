@@ -30,6 +30,8 @@ interface Props {
   /** Change the frame ratio of a whole carousel. */
   onCarouselRatio: (carouselOrdinal: number, ratio: CarouselRatio) => void
   uploadingKey: string | null
+  onOpenRemoteMcp: () => void
+  remoteConnected: boolean
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -285,6 +287,13 @@ export default function SidePanel(p: Props) {
           <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
             缩放按浏览器保存，编辑器、侧栏、预览框一起放大缩小。
           </p>
+          <details className="ya-well mt-4 p-3">
+            <summary className="cursor-pointer text-[12px] font-medium text-ink-2">高级功能</summary>
+            <p className="mt-3 text-[12px] leading-relaxed text-ink-3">授权自己的 AI 通过 Remote MCP 读取和修改当前稿件。</p>
+            <button data-open-remote-mcp onClick={p.onOpenRemoteMcp} className="ya-btn ya-btn-secondary mt-3">
+              {p.remoteConnected ? '管理当前稿件连接' : 'AI 直接编辑当前稿件'}
+            </button>
+          </details>
           <div className="mt-4"><Label>反馈与联系</Label></div>
           <div className="ya-well p-3">
             <p className="text-[12px] leading-relaxed text-ink-2">
@@ -328,7 +337,7 @@ export default function SidePanel(p: Props) {
           </p>
           <div className="mt-4"><Label>使用规范</Label></div>
           <p className="ya-well p-3 text-[12px] leading-relaxed text-ink-2">
-            正文只存在你这台浏览器里，服务器不收；图片上传是公开写入面，传上来的图任何人都能打开。
+            未登录稿件保存在本机；主动开启 AI 协作时，这一篇会有临时服务端副本。上传的图片公网可读。
             <Link
               to="/terms"
               className="ml-1 whitespace-nowrap text-brand underline decoration-brand/40 underline-offset-2"

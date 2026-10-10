@@ -8,8 +8,9 @@ import { THEMES } from '@/lib/themes'
  * Acceptable-use / liability page. Route: /terms
  *
  * Everything asserted here is a property of the current implementation, not a
- * boilerplate promise: anonymous drafts never reach the server (src/lib/store.ts
- * + body-store.ts), anonymous uploads do (api/lib/storage.ts → R2 via mopai-worker),
+ * boilerplate promise: drafts stay local by default (store.ts + body-store.ts),
+ * explicit MCP grants create a temporary copy (api/lib/remote-mcp.ts), uploads
+ * reach the server (api/lib/storage.ts → R2 via mopai-worker),
  * the quota numbers mirror api/lib/anon-quota.ts and api/lib/burst.ts, and the
  * 14-day sweep is api/lib/anon-gc.ts. Change those and change this page.
  *
@@ -140,14 +141,18 @@ export default function Terms() {
           下面把三件事说清楚：你的正文和图片各自存在哪里、什么不能传、以及看到问题时找谁删。
         </p>
 
-        <Section icon={<IconDoc />} title="你的正文不经过本站" eyebrow="未登录时">
+        <Section icon={<IconDoc />} title="正文默认保存在你的浏览器里" eyebrow="本机保存与明确授权">
           <p>
-            不登录就能排版，是因为稿件只存在<strong style={{ color: 'var(--ink-1)' }}>你自己浏览器</strong>的
-            <Code>IndexedDB</Code> / <Code>localStorage</Code> 里。服务器收不到正文，也看不见你写了什么。
-            登录只打开一样东西——云端草稿箱，那是站长自己的账号。
+            不登录就能排版，常规编辑把稿件保存在<strong style={{ color: 'var(--ink-1)' }}>你自己浏览器</strong>的
+            <Code>IndexedDB</Code> / <Code>localStorage</Code> 里。登录会打开站长自己的云端草稿箱。
           </p>
           <p>
-            所以本站不持有任何人的文章内容，也不参与它被发布到公众号之后发生的事情。你排出来的东西写了什么，
+            如果你明确开启「AI 直接编辑当前稿件」，本站会保存这一篇的临时协作副本，只有对应游客与持有该篇连接令牌的客户端可读写。
+            授权默认 24 小时；撤销立即删除副本，到期立即拒绝访问，服务运行时每分钟清理一次过期副本。
+            本机一直保存完整稿件，授权失效后仍可正常编辑。请只把令牌交给你信任的 AI 客户端。
+          </p>
+          <p>
+            本站不参与文章被发布到公众号之后发生的事情。你排出来的东西写了什么，
             责任在执笔和发布的人，不在这个编辑器。
           </p>
           <p style={{ color: 'var(--ink-3)' }}>
@@ -156,9 +161,9 @@ export default function Terms() {
           </p>
         </Section>
 
-        <Section icon={<IconImage />} title="图片是唯一的例外，也是最需要看清的一节" eyebrow="公开写入面">
+        <Section icon={<IconImage />} title="上传的图片公网可读" eyebrow="公开写入面">
           <p>
-            上传图片同样不需要登录，所以这是本站唯一会替你保管内容的地方。它的行为是完全公开的，你要知道确切的边界：
+            上传图片同样不需要登录，文件会保存在本站的对象存储里。它的行为是完全公开的，你要知道确切的边界：
           </p>
           <ul className="space-y-2">
             <Bullet>

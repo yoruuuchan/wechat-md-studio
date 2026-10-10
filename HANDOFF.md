@@ -55,6 +55,7 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 | 语义 AST、Theme、微信 HTML、公式、Mermaid、图片与多图 | [渲染与图片](docs/rendering.md)，规则以 renderer / tests / `verify:themes` 为准 |
 | 本地防丢、云端归档、并发锁、回收站、导入导出 | [稿件与编辑器](docs/documents.md)，事实以 hooks / API / schema / tests 为准 |
 | REST API、令牌、客户端与覆盖语义 | [Agent API](docs/agent-api.md) 与 [wechat-typesetter Skill](skills/wechat-typesetter/SKILL.md) |
+| AI 写作 / 匿名单篇 Remote MCP | [AI 写作与 Remote MCP](docs/remote-mcp.md)：公共 Skill、单篇授权、hash 同步、撤销、自动升级与客户端配置 |
 | 主题来源与许可 | [THEME-SOURCES](THEME-SOURCES.md)，数量由 `THEMES` / `verify:themes` 复算 |
 | 开源致谢与技术取舍 | [References](https://wechat.yoru-and-akari.dev/references)、[credits 数据](src/lib/credits.ts)、[许可核实记录](LICENSES/NOTICE.md) |
 | 来源与生成文档 | [theme-sources.ts](src/lib/theme-sources.ts)、[credits.ts](src/lib/credits.ts)、[sources/report.ts](scripts/sources/report.ts)；`sync:docs` 更新区块，`verify:sources` 复核，完整致谢在 NOTICE |

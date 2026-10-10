@@ -47,6 +47,7 @@ interface Props {
   userName: string
   onLogin: () => void
   onLogout: () => void
+  remoteConnected?: boolean
 }
 
 const THEME_DOT: Record<string, string> = {
@@ -69,6 +70,9 @@ const SYNC_LABEL: Record<Props['syncState'], { text: string; color: string; titl
 }
 
 export default function TopBar(p: Props) {
+  const syncLabel = p.remoteConnected && p.syncState === 'local'
+    ? { text: '本机 + AI', color: 'var(--primary-500)', title: '本机保留稿件，并已授权当前稿件的临时 AI 协作副本；同步状态见编辑器上方' }
+    : SYNC_LABEL[p.syncState]
   const [themeOpen, setThemeOpen] = useState(false)
   const activeTheme = THEMES.find((t) => t.id === p.themeId) || THEMES[0]
   const { favorites } = useThemeFavorites()
@@ -166,10 +170,10 @@ export default function TopBar(p: Props) {
         </div>
         <span
           className="shrink-0 text-[11px] tabular-nums"
-          style={{ color: SYNC_LABEL[p.syncState].color, fontFamily: 'var(--font-mono)' }}
-          title={SYNC_LABEL[p.syncState].title}
+          style={{ color: syncLabel.color, fontFamily: 'var(--font-mono)' }}
+          title={syncLabel.title}
         >
-          {SYNC_LABEL[p.syncState].text}
+          {syncLabel.text}
         </span>
       </div>
 

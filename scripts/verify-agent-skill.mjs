@@ -270,7 +270,7 @@ try {
   const byOwner = await fetch(`${baseUrl}/api/agent/docs/${docId}`, {
     method: 'PUT',
     headers: { authorization: `Bearer ${WRITE_TOKEN}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ content: edited }),
+    body: JSON.stringify({ content: edited, baseHash: serverCopy.hash }),
   })
   check('the owner’s edit went in', byOwner.status === 200, `status ${byOwner.status}`)
 

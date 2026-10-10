@@ -13,9 +13,11 @@
 | IndexedDB 正文 + localStorage 索引 / 设置 | 每次改动本地防丢；只缓存已拿到正文的稿件，不把纯元数据 stub 当空正文保存 |
 | 云端 SQLite | 登录后，已有 `savedAt` 的稿件编辑后约 900ms 防抖同步 |
 | 云端归档 | 点击「保存到草稿箱」设置 `savedAt`；Agent 创建的稿件从一开始就已归档 |
+| 临时 AI 协作副本 | 明确授权当前稿件后，在同一 SQLite 的 `docs`（`ownerId=0`）中建立独立 id 的临时副本，以 `remote_mcp_connections` 绑定游客与本地稿件；不是草稿箱归档 |
 
 `savedAt=null` 是工作稿，不在草稿箱列表中。一篇稿件只占一条记录，保存更新原记录，没有版本历史。
-未登录可编辑、上传、复制与导出，正文仅在本机；口令只解锁站长的云端稿件空间。
+未登录可编辑、上传、复制、导出与使用 AI 写作提示词，正文默认只在本机；口令只解锁站长的云端稿件空间。
+单篇 Remote MCP 是额外的明确授权，临时副本默认 24 小时，撤销或到期不影响本机正文，见 [AI 写作与 Remote MCP](remote-mcp.md)。
 
 旧 `mopai.docs.v1` 会迁入新本地存储，读取与校验成功后才删旧键；失败保留旧数据并重试。
 无 IndexedDB 时降级到 localStorage，迁移 / 写入失败进入 `persistenceStatus()`，
@@ -27,6 +29,8 @@ UI 显示「本地未存」并提示原因。`mopai.*` 是已有存储协议，�
 服务端 compare-and-swap 更新正文与 hash；时间戳只负责展示，不作为并发依据。
 浏览器 stale save 返回冲突与云端当前正文，提供「保留我的 / 用云端的 / 两边都留」。
 Agent 更新的 400 / 409 / `force` 语义见 [Agent API](agent-api.md)。
+单篇 MCP 与浏览器也复用正文 hash / `baseHash` CAS，没有 `force` 写入入口。
+本地记录的 `remoteMcp` 只保存连接 id 与已确认版本，不保存 Bearer；它的 `baseHash` 与站长云端同步的 `baseHash` 独立。
 
 登录合并由 [docs-merge.ts](../src/lib/docs-merge.ts) 定义：
 

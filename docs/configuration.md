@@ -36,9 +36,11 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时**删掉 `.e
 | `SESSION_SECRET` | 生产必填，至少 32 字符，拒绝公开占位值 | 浏览器会话签名 |
 | `IMG_BASE_URL` | 可留空；填写时须为绝对 http(s) URL | 图片 Worker；未配置则上传失败 |
 | `IMG_ADMIN_KEY` | 生产必填，至少 16 字符，拒绝公开占位值 | 与 Worker secret 一致的上传 / 删除凭证 |
-| `PUBLIC_BASE_URL` | 默认取请求 origin | Agent 响应的 `editorUrl` 来源 |
+| `PUBLIC_BASE_URL` | 默认取请求 origin；生产反向代理应设公开 HTTPS origin | Agent `editorUrl`、MCP 接入地址及浏览器 Origin 检查的来源 |
 | `AGENT_TOKENS` | 默认空，Agent API 全部 401 | `名字:令牌[:read]`，逗号分隔；见 [Agent API](agent-api.md) |
 | `STORAGE_QUOTA_BYTES` | `2147483648`（2 GiB） | 登录后素材库显示的用量上限 |
+| `REMOTE_MCP_TTL_HOURS` | `24`，整数 1–168 | 单篇 MCP 授权有效期，创建时固定；重新生成令牌不续期 |
+| `REMOTE_MCP_TOTAL_BYTES` | `52428800`（50 MiB），整数 ≥ 0 | 全部临时协作正文的 UTF-8 字节硬顶，与匿名图片额度独立 |
 
 生产启动会拒绝缺失 / 占位 / 过短的必需密钥、缺失 `DATABASE_URL`、非法 URL，以及非整数或越界的数值配置，
 错误信息点名变量。生产配置应生成真实密钥；`ACCESS_KEY` 可用 `openssl rand -hex 24`，

@@ -87,6 +87,22 @@ function openDatabase(): DatabaseSync {
   }
   db.exec('CREATE INDEX IF NOT EXISTS files_owner_visitor ON files (ownerId, visitor)')
 
+  // Anonymous MCP collaboration reuses docs for bodies/hash, with a separate
+  // visitor-bound lease. These rows never enter the owner's draft box.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS remote_mcp_connections (
+      id TEXT PRIMARY KEY,
+      visitor TEXT NOT NULL,
+      localDocId TEXT NOT NULL,
+      docId TEXT NOT NULL UNIQUE,
+      tokenHash TEXT NOT NULL UNIQUE,
+      createdAt INTEGER NOT NULL,
+      expiresAt INTEGER NOT NULL,
+      UNIQUE (visitor, localDocId)
+    );
+    CREATE INDEX IF NOT EXISTS remote_mcp_expiry ON remote_mcp_connections (expiresAt);
+  `)
+
   // One-off data migrations, recorded so they never run twice.
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -184,10 +200,12 @@ export function runMigrations(db: DatabaseSync, cutoffSeconds = Math.floor(Date.
 }
 
 let instance: ReturnType<typeof drizzle<typeof schema>>
+let sqlite: DatabaseSync
 
 export function getDb() {
   if (!instance) {
     const db = openDatabase()
+    sqlite = db
     instance = drizzle(
       async (sqlText, params, method) => {
         const stmt = db.prepare(sqlText)
@@ -212,4 +230,10 @@ export function getDb() {
     )
   }
   return instance
+}
+
+/** The same connection, for short atomic lease/body transactions. */
+export function getSqlite(): DatabaseSync {
+  getDb()
+  return sqlite
 }

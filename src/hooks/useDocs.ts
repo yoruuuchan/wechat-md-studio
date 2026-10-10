@@ -231,6 +231,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             name: c.name,
             updatedAt: Math.max(p.updatedAt, c.updatedAt),
             baseHash: c.baseHash ?? p.baseHash,
+            remoteMcp: c.remoteMcp,
           }
         })
         const planIds = new Set(shown.map((d) => d.id))

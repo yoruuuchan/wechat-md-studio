@@ -77,6 +77,10 @@ export interface Env {
   anonIpDailyImages: number;
   authLoginPerMinute: number;
 
+  /** Anonymous, explicitly shared article copies; independent of image quotas. */
+  remoteMcpTtlHours: number;
+  remoteMcpTotalBytes: number;
+
   port: number;
   /** Bind address. Loopback by default: the only intended entry point is the
    *  Cloudflare Tunnel, so the host's public IP on this port must not serve the
@@ -217,6 +221,9 @@ export function parseEnv(input: EnvInput): Env {
     anonBurstPerMinute: readInt(ctx, "ANON_BURST_PER_MINUTE", { fallback: 12, min: 0, max: 100_000 }),
     anonIpDailyImages: readInt(ctx, "ANON_IP_DAILY_IMAGES", { fallback: 100, min: 0, max: 1_000_000 }),
     authLoginPerMinute: readInt(ctx, "AUTH_LOGIN_PER_MINUTE", { fallback: 10, min: 0, max: 100_000 }),
+
+    remoteMcpTtlHours: readInt(ctx, "REMOTE_MCP_TTL_HOURS", { fallback: 24, min: 1, max: 168 }),
+    remoteMcpTotalBytes: readInt(ctx, "REMOTE_MCP_TOTAL_BYTES", { fallback: 50 * MIB, min: 0 }),
 
     port: readInt(ctx, "PORT", { fallback: 3100, min: 1, max: 65535 }),
     host: readString(ctx, "HOST", "127.0.0.1"),

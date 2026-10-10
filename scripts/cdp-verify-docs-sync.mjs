@@ -6,7 +6,7 @@
 //   2. a stale browser save is refused with a conflict dialog while the newer
 //      cloud text stays intact, and all three resolution paths behave;
 //   3. bodies are fetched on demand — opening a cloud article loads its text,
-//      and local-only work stays in localStorage throughout.
+//      and local-only work stays in IndexedDB throughout.
 //
 // The second writer is a plain agent-API client (the same door a skill script
 // uses), which is exactly what "another device" looks like to this app.
@@ -183,6 +183,19 @@ try {
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }, sessionId)
   }
   const editorText = () => ev(`window.__mopaiCodemirror ? window.__mopaiCodemirror.state.doc.toString() : ''`)
+  const cachedBody = (name) => ev(`new Promise((resolve, reject) => {
+    const index = JSON.parse(localStorage.getItem('mopai.index.v2') || '{"docs":[]}')
+    const mine = index.docs.find(d => d.name === ${JSON.stringify(name)})
+    if (!mine) { resolve(null); return }
+    const open = indexedDB.open('mopai')
+    open.onsuccess = () => {
+      const db = open.result
+      const read = db.transaction('bodies', 'readonly').objectStore('bodies').get(mine.id)
+      read.onsuccess = () => { resolve(read.result?.content || null); db.close() }
+      read.onerror = () => reject(read.error)
+    }
+    open.onerror = () => reject(open.error)
+  })`)
   const appendToEditor = (text) => ev(`(() => {
     const v = window.__mopaiCodemirror
     if (!v) return false
@@ -219,12 +232,8 @@ try {
   await appendToEditor(LOCAL_TEXT)
   await sleep(1200)
 
-  const cached = await ev(`(() => {
-    const docs = JSON.parse(localStorage.getItem('mopai.docs.v1') || '[]')
-    const mine = docs.find(d => d.name === '本地稿 A')
-    return mine ? mine.content : null
-  })()`)
-  check('the signed-out article is in localStorage', String(cached).includes(LOCAL_TEXT), String(cached).slice(0, 60))
+  const cached = await cachedBody('本地稿 A')
+  check('the signed-out article is in IndexedDB', String(cached).includes(LOCAL_TEXT), String(cached).slice(0, 60))
 
   // ================= sign in with existing cloud data =================
   console.log('\n=== signing in must not drop the local article ===')
@@ -275,12 +284,8 @@ try {
     String(localOnCloud?.json?.content ?? '').slice(0, 60),
   )
 
-  const stillCached = await ev(`(() => {
-    const docs = JSON.parse(localStorage.getItem('mopai.docs.v1') || '[]')
-    const mine = docs.find(d => d.name === '本地稿 A')
-    return mine ? mine.content : null
-  })()`)
-  check('the local copy is still in localStorage after the merge', String(stillCached).includes(LOCAL_TEXT))
+  const stillCached = await cachedBody('本地稿 A')
+  check('the local copy is still in IndexedDB after the merge', String(stillCached).includes(LOCAL_TEXT))
 
   // ================= bodies on demand =================
   console.log('\n=== opening a cloud article fetches its body on demand ===')

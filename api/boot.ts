@@ -10,6 +10,10 @@ import { startAnonGc } from "./lib/anon-gc";
 import { env } from "./lib/env";
 import { securityHeaders } from "./lib/security-headers";
 import { warnAboutWeakTokens } from "./lib/agent-auth";
+import { writingSkill } from "./lib/writing-skill";
+import { remoteMcpRouter } from "./remote-mcp-router";
+import { handleMcpRequest } from "./mcp";
+import { startRemoteMcpCleanup } from "./lib/remote-mcp";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -18,6 +22,16 @@ const app = new Hono<{ Bindings: HttpBindings }>();
 app.use("*", securityHeaders());
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+
+app.get("/skill.md", (c) => {
+  c.header("Content-Type", "text/markdown; charset=utf-8");
+  c.header("Cache-Control", "no-cache");
+  c.header("Access-Control-Allow-Origin", "*");
+  return c.body(writingSkill);
+});
+
+app.route("/api/remote-mcp", remoteMcpRouter);
+app.all("/api/mcp", handleMcpRequest);
 
 // Public image read: stable address, redirects to the R2 worker.
 // Copied WeChat HTML references this stable address, so the key space can never
@@ -75,4 +89,5 @@ if (env.isProduction) {
   // there would delete real objects. Fire and forget: it must never delay
   // serving, and it catches its own errors.
   startAnonGc();
+  startRemoteMcpCleanup();
 }

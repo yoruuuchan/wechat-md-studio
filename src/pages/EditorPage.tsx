@@ -65,6 +65,9 @@ import { cleanHtml, copyPlain, copyRichText, downloadFile, previewPage } from '@
 import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
+import { useRemoteMcp } from '@/hooks/useRemoteMcp'
+import AiWritingDialog from '@/components/AiWritingDialog'
+import RemoteMcpDialog from '@/components/RemoteMcpDialog'
 import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import { blobToBase64, compressForUpload, cropToRatio, fileFromImageUrl, filenameForMime } from '@/lib/image'
@@ -161,6 +164,8 @@ export default function EditorPage() {
   // can be postponed (the pending conflict stays visible as a bar over the
   // editor) — deciding is required before that article syncs again.
   const [conflictOpen, setConflictOpen] = useState(false)
+  const [aiWritingOpen, setAiWritingOpen] = useState(false)
+  const [remoteMcpOpen, setRemoteMcpOpen] = useState(false)
   const importKindRef = useRef<'markdown' | 'docx' | 'bundle'>('markdown')
   const importRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -219,6 +224,12 @@ export default function EditorPage() {
     undoRemove,
     saveCurrentToDrafts,
   } = useDocs({ enabled: isAuthenticated, deepLinkId, onDeepLinkSettled: clearDeepLink })
+
+  const remoteMcp = useRemoteMcp({ docs, activeId, setDocs })
+  const remoteConflictKey = remoteMcp.conflict ? `${activeId}:${remoteMcp.conflict.hash}` : null
+  useEffect(() => {
+    if (remoteConflictKey) setRemoteMcpOpen(true)
+  }, [remoteConflictKey])
 
   const uploadMutation = trpc.storage.upload.useMutation()
 
@@ -1084,6 +1095,7 @@ export default function EditorPage() {
         userName={user?.name || ''}
         onLogin={() => navigate('/login')}
         onLogout={logout}
+        remoteConnected={Boolean(activeDoc?.remoteMcp)}
       />
 
       {/* 窄屏（手机）访客的第一条说明：排版界面是为电脑浏览器设计的 */}
@@ -1118,6 +1130,15 @@ export default function EditorPage() {
               e.preventDefault()
             }}
           >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line-2 px-3 py-1.5">
+              <span className="ya-eyebrow">Markdown</span>
+              <div className="flex items-center gap-2">
+                {activeDoc?.remoteMcp && <button data-mcp-editor-status onClick={() => setRemoteMcpOpen(true)} className="ya-link-btn !text-[11px]">
+                  {remoteMcp.phase === 'conflict' ? 'AI 协作有冲突' : remoteMcp.phase === 'error' ? 'AI 同步待重试' : remoteMcp.phase === 'saving' ? 'AI 同步中…' : 'AI 协作已同步'}
+                </button>}
+                <button data-open-ai-writing onClick={() => setAiWritingOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">AI 帮我写</button>
+              </div>
+            </div>
             <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
             <div className="min-h-0 flex-1">
               {activeLoading || activeError ? (
@@ -1202,11 +1223,16 @@ export default function EditorPage() {
                 onRecrop={(item) => void recropImage(item)}
                 onCarouselRatio={changeCarouselRatio}
                 uploadingKey={uploadingKey}
+                onOpenRemoteMcp={() => setRemoteMcpOpen(true)}
+                remoteConnected={Boolean(activeDoc?.remoteMcp)}
               />
             </ResizablePanel>
           </>
         )}
       </ResizablePanelGroup>
+
+      <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
+      <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />
 
       <RatioPicker
         open={frameTask !== null && manualOpen === false}

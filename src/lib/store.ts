@@ -1,6 +1,7 @@
 import type { SignatureConfig } from './types'
 import { SAMPLE_DOC } from './sample'
 import { createBodyStore, type BodyStore } from './body-store'
+import type { RemoteMcpBinding } from '@contracts/remote-mcp'
 
 export interface DocRecord {
   id: string
@@ -25,6 +26,8 @@ export interface DocRecord {
    * never written to the local cache.
    */
   contentLoaded?: boolean
+  /** Separate collaboration base; never mix it with the owner's cloud baseHash. */
+  remoteMcp?: RemoteMcpBinding | null
 }
 
 /** Everything about a document except its body. Small enough for localStorage. */
@@ -182,6 +185,7 @@ function indexEntryOf(doc: DocRecord): DocIndexEntry {
     deletedAt: doc.deletedAt,
     source: doc.source ?? null,
     baseHash: doc.baseHash ?? null,
+    remoteMcp: doc.remoteMcp ?? null,
     // Stubs are remembered as stubs: on the next load the editor has to fetch
     // the body again instead of trusting the placeholder it was shown.
     contentLoaded: doc.contentLoaded !== false,
