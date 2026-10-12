@@ -335,6 +335,7 @@ export default function TopBar(p: Props) {
         </DropdownMenu>
 
         <button
+          data-onboarding="copy"
           onClick={p.onCopy}
           className="ya-btn ya-btn-primary px-4"
         >

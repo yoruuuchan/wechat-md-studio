@@ -144,6 +144,9 @@ export const zh = {
   'panel.settings.zoom': '整体字体大小',
   'panel.settings.zoomTitle': '整个界面一起缩放，按浏览器保存',
   'panel.settings.zoomNote': '缩放按浏览器保存，编辑器、侧栏、预览框一起放大缩小。',
+  'panel.settings.tour': '使用引导',
+  'panel.settings.tourRestart': '重新查看使用引导',
+  'panel.settings.tourNote': '五步了解编辑、预览、主题、侧栏和复制。',
   'panel.settings.advanced': '高级功能',
   'panel.settings.advancedNote': '授权自己的 AI 通过 Remote MCP 读取和修改当前稿件。',
   'panel.settings.advancedManage': '管理当前稿件连接',
@@ -164,6 +167,26 @@ export const zh = {
   'panel.terms.body':
     '未登录稿件保存在本机；主动开启 AI 协作时，这一篇会有临时服务端副本。上传的图片公网可读。',
   'panel.terms.link': '禁止用途与投诉删除 →',
+
+  // ---- 首次使用引导 ----
+  // {{current}} / {{total}} in the progress template are filled in by driver.js;
+  // calling t() without params returns them untouched.
+  'onboarding.progress': '第 {{current}} 步 · 共 {{total}} 步',
+  'onboarding.prev': '上一步',
+  'onboarding.next': '下一步',
+  'onboarding.done': '完成',
+  'onboarding.skip': '跳过',
+  'onboarding.close': '关闭引导',
+  'onboarding.step.editor.title': 'Markdown 编辑区',
+  'onboarding.step.editor.desc': '在这里写或粘贴文章，也可以把图片直接拖进来。',
+  'onboarding.step.preview.title': '实时预览',
+  'onboarding.step.preview.desc': '看到的就是公众号里的最终排版，复制出去的也是这一份。',
+  'onboarding.step.theme.title': '主题切换',
+  'onboarding.step.theme.desc': '挑一套排版风格换换气质，打开后每套主题都有真实缩略预览。',
+  'onboarding.step.sidebar.title': '右侧侧栏',
+  'onboarding.step.sidebar.desc': '图片素材、标题和署名都在这一栏，设置也在这里。',
+  'onboarding.step.copy.title': '复制到公众号',
+  'onboarding.step.copy.desc': '排版满意后点这里，把带格式的正文直接粘进公众号后台。',
 
   // ---- 工具栏 ----
   'toolbar.label': 'markdown · 语义源',

@@ -68,6 +68,7 @@ import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { useRemoteMcp } from '@/hooks/useRemoteMcp'
 import AiWritingDialog from '@/components/AiWritingDialog'
 import RemoteMcpDialog from '@/components/RemoteMcpDialog'
+import OnboardingTour from '@/components/OnboardingTour'
 import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import { blobToBase64, compressForUpload, cropToRatio, fileFromImageUrl, filenameForMime } from '@/lib/image'
@@ -81,7 +82,9 @@ import {
   toBundle,
   toMarkdownFile,
 } from '@/lib/import-export'
+import { hasSeenOnboarding } from '@/lib/onboarding'
 import { useI18n } from '@/hooks/useI18n'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 function plainTextOf(html: string): string {
   const div = document.createElement('div')
@@ -150,8 +153,17 @@ interface FrameTask {
 
 export default function EditorPage() {
   const { t } = useI18n()
+  const isMobile = useIsMobile()
   const [settings, setSettings] = useState(loadSettings)
   const [panelOpen, setPanelOpen] = useState(true)
+  /**
+   * First-run tour: 0 = not running, a bump starts it. Auto-starts once per
+   * browser (localStorage flag, skipped on narrow screens); the settings tab
+   * can start it again at any time.
+   */
+  const [tourRun, setTourRun] = useState(0)
+  const startTour = useCallback(() => setTourRun((n) => n + 1), [])
+  const endTour = useCallback(() => setTourRun(0), [])
   // Read once at mount: the group is uncontrolled, later drags come back
   // through onLayoutChange.
   const [initialLayout] = useState(loadLayout)
@@ -237,6 +249,14 @@ export default function EditorPage() {
 
   useEffect(() => saveSettings(settings), [settings])
   useEffect(() => applyZoom(settings.zoom), [settings.zoom])
+
+  // First visit only: let the panes settle, then auto-start the tour. Narrow
+  // screens never auto-start; the settings entry can still open it by hand.
+  useEffect(() => {
+    if (isMobile || hasSeenOnboarding()) return
+    const timer = window.setTimeout(() => setTourRun((n) => (n === 0 ? 1 : n)), 700)
+    return () => window.clearTimeout(timer)
+  }, [isMobile])
 
   // The article behind an agent's link only exists on the server, so it needs a
   // session. Hand the id to the login page in the URL and let it come back.
@@ -1121,6 +1141,7 @@ export default function EditorPage() {
         {/* 左：Markdown 编辑（支持拖图上传） */}
         <ResizablePanel id="editor" defaultSize="55%" minSize="320px" className="min-w-0">
           <div
+            data-onboarding="editor"
             className="flex h-full min-w-0 flex-col bg-surface-sunken"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -1227,6 +1248,7 @@ export default function EditorPage() {
                 uploadingKey={uploadingKey}
                 onOpenRemoteMcp={() => setRemoteMcpOpen(true)}
                 remoteConnected={Boolean(activeDoc?.remoteMcp)}
+                onStartOnboarding={startTour}
               />
             </ResizablePanel>
           </>
@@ -1235,6 +1257,7 @@ export default function EditorPage() {
 
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
       <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />
+      <OnboardingTour run={tourRun} onEnd={endTour} />
 
       <RatioPicker
         open={frameTask !== null && manualOpen === false}

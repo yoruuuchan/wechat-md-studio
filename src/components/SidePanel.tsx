@@ -32,6 +32,8 @@ interface Props {
   uploadingKey: string | null
   onOpenRemoteMcp: () => void
   remoteConnected: boolean
+  /** Replay the first-run tour from the settings tab. */
+  onStartOnboarding: () => void
 }
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -137,7 +139,7 @@ export default function SidePanel(p: Props) {
   )
 
   return (
-    <aside className="flex h-full w-full flex-col border-l border-line-2 bg-surface-base">
+    <aside data-onboarding="sidebar" className="flex h-full w-full flex-col border-l border-line-2 bg-surface-base">
       <input
         ref={fileRef}
         type="file"
@@ -290,9 +292,22 @@ export default function SidePanel(p: Props) {
                 ))}
               </select>
             </div>
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
+              <span className="text-[12px] text-ink-1">{t('panel.settings.tour')}</span>
+              <button
+                data-tour-restart
+                onClick={p.onStartOnboarding}
+                className="ya-btn ya-btn-secondary ya-btn-sm"
+              >
+                {t('panel.settings.tourRestart')}
+              </button>
+            </div>
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
             {t('panel.settings.zoomNote')}
+          </p>
+          <p className="mt-3 text-[11px] leading-relaxed text-ink-3">
+            {t('panel.settings.tourNote')}
           </p>
           <details className="ya-well mt-4 p-3">
             <summary className="cursor-pointer text-[12px] font-medium text-ink-2">{t('panel.settings.advanced')}</summary>

@@ -148,7 +148,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   }))
 
   return (
-    <div className="flex h-full flex-col">
+    <div data-onboarding="preview" className="flex h-full flex-col">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-line-1 px-4">
         <span className="ya-eyebrow">{t('preview.label')}</span>
         <div className="flex items-center gap-2">

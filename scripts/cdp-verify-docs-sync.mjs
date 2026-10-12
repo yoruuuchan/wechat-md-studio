@@ -149,6 +149,9 @@ try {
   const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
   await send('Page.enable', {}, sessionId)
+  // A fresh profile would meet the first-run tour on the editor; this suite
+  // drives the app as a returning visitor.
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'try{localStorage.setItem("mopai.onboarding.v1","done")}catch{}' }, sessionId)
   await send('Runtime.enable', {}, sessionId)
   const ev = async (expression) => {
     const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)

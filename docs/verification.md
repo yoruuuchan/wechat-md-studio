@@ -84,11 +84,13 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 草稿箱 / 素材 / 回收站 | [cdp-verify-drafts-materials.mjs](../scripts/cdp-verify-drafts-materials.mjs)、[cdp-verify-trash.mjs](../scripts/cdp-verify-trash.mjs)：先读文件确认当前参数与隔离环境 |
 | 预览区局部复制 | [cdp-verify-selection-copy.mjs](../scripts/cdp-verify-selection-copy.mjs)：`node scripts/cdp-verify-selection-copy.mjs <url> [key] [CDP端口]`；默认 `http://127.0.0.1:3205/` 与 9338 |
 | UI 深色模式 | [cdp-verify-dark-theme.mjs](../scripts/cdp-verify-dark-theme.mjs)：`node scripts/cdp-verify-dark-theme.mjs <url> [key] [CDP端口]`；默认同样 3205，CDP 默认 9339，与公式脚本的固定 9339 相同，勿并发 |
+| 首次使用引导 | [cdp-verify-onboarding.mjs](../scripts/cdp-verify-onboarding.mjs)：`node scripts/cdp-verify-onboarding.mjs <url> [CDP端口]`；默认 `http://127.0.0.1:3100`，CDP 默认 9356；无需登录，新浏览器 profile 即首次访客 |
 
-两个新脚本都自起无头 Chrome，只连接已启动的应用，Chrome 路径同样按 Windows 写定。
+这几个自起无头 Chrome 的脚本只连接已启动的应用，Chrome 路径同样按 Windows 写定。
 `cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；
 折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
 `cdp-verify-dark-theme.mjs` 覆盖 `akari` / `yoru` 两态：`<html>` 上 `data-theme` 与 `.dark` 的同步、shadcn / Tailwind `dark:` 变体生效（侧栏 Tabs 在深色下可读，对比度 ≥ 3:1）并留两主题截图。
+`cdp-verify-onboarding.mjs` 覆盖首次使用引导：新 profile 自动出现并逐步命中五个锚点、进度与完成 / 跳过 / 关闭三条退出路径都写入本机状态、刷新与窄屏不再自动出现、设置内「重新查看使用引导」可重开、中英文文案、明暗两主题对比度 ≥ 3:1，以及引导关掉后编辑器输入仍实时进入预览；截图留在临时目录。
 
 单测与浏览器各有验收层级：逻辑、字符串输出、浏览器交互、微信实际粘贴不能互相替代。
 修改真实交互时运行对应现有脚本；涉及微信粘贴体验时照实记录是否在微信编辑器验证。

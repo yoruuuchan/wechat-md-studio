@@ -467,3 +467,107 @@ body {
   color: #fff !important;
   border-radius: 9px !important;
 }
+
+/* ============================================================
+   First-run tour (driver.js, popoverClass: reed-tour).
+   The popover lives on <body>, but the tokens are defined on
+   :root / [data-theme], so both UI themes apply as usual.
+   driver.css ships a light default theme; everything is overridden.
+   ============================================================ */
+.driver-popover.reed-tour {
+  font-family: var(--font-ui);
+  background: var(--bg-elevated);
+  color: var(--ink-1);
+  border-radius: 16px;
+  box-shadow: var(--shadow-pop);
+  min-width: 260px;
+  max-width: 340px;
+  padding: 16px;
+}
+.reed-tour .driver-popover-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink-1);
+}
+.reed-tour .driver-popover-description {
+  margin-top: 6px;
+  font-size: var(--text-base);
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+.reed-tour .driver-popover-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--ink-4);
+  font-size: 16px;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.reed-tour .driver-popover-close-btn:hover,
+.reed-tour .driver-popover-close-btn:focus {
+  color: var(--ink-1);
+  background: var(--bg-tint);
+}
+.reed-tour .driver-popover-progress-text {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.reed-tour .driver-popover-footer { margin-top: 14px; }
+.reed-tour .driver-popover-footer-btn {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 9px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.reed-tour .driver-popover-prev-btn {
+  background: var(--bg-base);
+  color: var(--ink-1);
+  box-shadow: var(--shadow-raised);
+}
+.reed-tour .driver-popover-prev-btn:hover { background: var(--bg-tint); }
+.reed-tour .driver-popover-next-btn {
+  background: var(--primary-500);
+  color: var(--ink-on-primary);
+  box-shadow: var(--glow-brand);
+}
+.reed-tour .driver-popover-next-btn:hover { background: var(--primary-600); }
+.reed-tour .reed-tour-skip {
+  background: transparent;
+  color: var(--ink-3);
+}
+.reed-tour .reed-tour-skip:hover {
+  color: var(--ink-1);
+  background: var(--bg-tint);
+}
+.reed-tour .driver-popover-footer .driver-popover-btn-disabled {
+  opacity: 0.45;
+}
+/* The arrow must match the popover surface; driver.css hard-codes white. */
+.reed-tour .driver-popover-arrow { border-color: var(--bg-elevated); }
+.reed-tour .driver-popover-arrow-side-left {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+.reed-tour .driver-popover-arrow-side-right {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+.reed-tour .driver-popover-arrow-side-top {
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+.reed-tour .driver-popover-arrow-side-bottom {
+  border-top-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}

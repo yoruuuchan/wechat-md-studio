@@ -146,6 +146,9 @@ export const en: Record<MsgKey, Msg> = {
   'panel.settings.zoom': 'Interface size',
   'panel.settings.zoomTitle': 'Scales the whole interface; remembered per browser',
   'panel.settings.zoomNote': 'The zoom is stored per browser and scales the editor, sidebar and preview together.',
+  'panel.settings.tour': 'Intro tour',
+  'panel.settings.tourRestart': 'Replay the intro tour',
+  'panel.settings.tourNote': 'Five quick steps: write, preview, theme, sidebar and copy.',
   'panel.settings.advanced': 'Advanced',
   'panel.settings.advancedNote': 'Let your own AI read and edit this article through Remote MCP.',
   'panel.settings.advancedManage': 'Manage this article’s connection',
@@ -167,6 +170,26 @@ export const en: Record<MsgKey, Msg> = {
   'panel.terms.body':
     'Signed-out drafts stay in this browser; enabling AI collaboration creates a temporary server-side copy of that one article. Uploaded images are publicly readable.',
   'panel.terms.link': 'Prohibited uses and takedowns →',
+
+  // ---- first-run tour ----
+  // {{current}} / {{total}} in the progress template are filled in by driver.js;
+  // calling t() without params returns them untouched.
+  'onboarding.progress': 'Step {{current}} of {{total}}',
+  'onboarding.prev': 'Back',
+  'onboarding.next': 'Next',
+  'onboarding.done': 'Done',
+  'onboarding.skip': 'Skip',
+  'onboarding.close': 'Close the tour',
+  'onboarding.step.editor.title': 'Markdown editor',
+  'onboarding.step.editor.desc': 'Write or paste your article here, or drop images straight in.',
+  'onboarding.step.preview.title': 'Live preview',
+  'onboarding.step.preview.desc': 'This is exactly the layout that gets copied to WeChat - no surprises.',
+  'onboarding.step.theme.title': 'Theme switcher',
+  'onboarding.step.theme.desc': 'Pick a typesetting style; each theme previews with your real article.',
+  'onboarding.step.sidebar.title': 'Side panel',
+  'onboarding.step.sidebar.desc': 'Images, titles and credits live here, along with the settings.',
+  'onboarding.step.copy.title': 'Copy to WeChat',
+  'onboarding.step.copy.desc': 'When the layout looks right, copy the formatted article into the WeChat editor.',
 
   // ---- toolbar ----
   'toolbar.label': 'markdown · semantic source',
