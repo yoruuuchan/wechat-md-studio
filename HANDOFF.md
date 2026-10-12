@@ -610,11 +610,13 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > （默认中文、切 English 后刷新保持、`/feedback` 无 mailto、未配置时 503 显示明确错误、
 > `/boot.js` 404 服务端 bundle 不对外）；接口实测：4 字内容 400、合法内容 503（未发信）。
 >
-> **待办（需要站长一步）**：反馈真实投递尚未验证——在 cc-tokyo-01 的
-> `/opt/mopai/app/.env` 补 `RESEND_API_KEY=`（Resend 面板新建，Sending 权限即可）、
-> `RESEND_FROM=`（账号已验证发件域，如 `reed@yoru-and-akari.dev`）、`FEEDBACK_TO=`（收件箱），
-> 然后 `sudo systemctl restart mopai`，再从 `/feedback` 发一封真信核对收件；完成前接口保持 503。
-> 提交完成后可删服务器 `/tmp/mopai-f23e601*` 与 `/tmp/install-f23e601.sh`。
+> **已完成（2026-10-12）**：反馈投递已接通并实测——cc-tokyo-01 `/opt/mopai/app/.env` 已补
+> `RESEND_API_KEY`（Resend 面板新建 key「reed-feedback」，Sending access）/ `RESEND_FROM=reed@yoru-and-akari.dev` / `FEEDBACK_TO=<ACCESS_ALLOW_EMAIL>`，
+> `sudo systemctl restart mopai` 后从公网真发：接口 `{"ok":true}`、日志 `[feedback] sent lang=zh ip=…`、
+> Resend Emails 页可见该信（Subject `[芦苇 / Reed 反馈] …`）。发信域 `yoru-and-akari.dev` 已在 Resend
+> （Tokyo 区）验证：`rsend`/`send` CNAME、`resend._domainkey` TXT、`_dmarc` TXT 三条均由 Cloudflare API
+> 写入 zone。收件箱暂用 `<ACCESS_ALLOW_EMAIL>`（换收件箱 = 改 `.env` 后 restart）。仍待站长收件箱确认
+> （新域名首信可能进垃圾箱，标记非垃圾即可）。
 >
 > 公开仓库：本轮增量 `04213ca..ca3a854`（功能 `d3d4615`、脚本修复 `2bf5559`；
 > 普通 push 非 force）。期间公开侧先收到一次 README 重排（`df10283` 等 4 个提交，品牌发布后的
