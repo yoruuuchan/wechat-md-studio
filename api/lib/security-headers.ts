@@ -109,6 +109,17 @@ export function securityHeaders(): MiddlewareHandler {
 
   return async (c, next) => {
     await base(c, next)
+    // secureHeaders writes its headers after next(), so the route cannot set
+    // these itself. `/api/img/*` redirects to the R2 worker and both hops must
+    // stay readable cross-origin: a CORS fetch checks every hop of a redirect
+    // chain, and the app-wide `Cross-Origin-Resource-Policy: same-origin`
+    // (meant for the HTML shell) would otherwise be the one place a
+    // cross-origin image fetch — WeChat re-hosting pasted images, an editor
+    // tool — fails while the worker's own response passes.
+    if (c.req.path.startsWith('/api/img/')) {
+      c.header('Access-Control-Allow-Origin', '*')
+      c.header('Cross-Origin-Resource-Policy', 'cross-origin')
+    }
     if (env.isProduction && isHttpsRequest(c)) {
       c.header('Strict-Transport-Security', HSTS_VALUE)
     }

@@ -42,6 +42,8 @@ app.route("/api/feedback", feedbackRouter);
 // Public image read: stable address, redirects to the R2 worker.
 // Copied WeChat HTML references this stable address, so the key space can never
 // change; WeChat follows the redirect when it re-hosts the image.
+// The cross-origin headers on this route live in securityHeaders() — it writes
+// headers after the handler runs, so the route cannot set them itself.
 app.get("/api/img/:key", async (c) => {
   const key = c.req.param("key");
   try {

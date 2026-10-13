@@ -8,6 +8,7 @@ import path from 'node:path'
 // object the server serves, middleware order and all.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-boot-'))
 process.env.DATABASE_URL = `file:${path.join(dir, 'boot.db')}`
+process.env.IMG_BASE_URL = 'https://img.test.example'
 
 const { default: app } = await import('./boot')
 const { env } = await import('./lib/env')
@@ -84,5 +85,19 @@ describe('the app-wide response headers', () => {
   it('stay off HSTS in development, where there is no certificate to pin', async () => {
     const res = await app.request('/api/nope', { headers: { 'x-forwarded-proto': 'https' } })
     expect(res.headers.get('strict-transport-security')).toBeNull()
+  })
+})
+
+describe('the public image redirect', () => {
+  // A cross-origin image fetch checks every hop of a redirect chain, so the 302
+  // itself has to be readable — and it must not carry the site-wide
+  // same-origin resource policy, or that hop becomes the single place a
+  // cross-origin fetch fails while the worker's own response passes.
+  it('is readable cross-origin on the redirect hop itself', async () => {
+    const res = await app.request('/api/img/some-key', { headers: { origin: 'https://mp.weixin.qq.com' } })
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('https://img.test.example/img/some-key')
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    expect(res.headers.get('cross-origin-resource-policy')).toBe('cross-origin')
   })
 })

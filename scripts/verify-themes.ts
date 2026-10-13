@@ -237,10 +237,26 @@ for (const theme of THEMES) {
     const dims = new RegExp(`width="${f.width}" height="${f.height}"`, 'g')
     const found = (html.match(dims) || []).length
     check(r, 'every image carries the frame width/height attributes', found === 2, `${found}/2`)
-    check(r, 'height:auto keeps the ratio when WeChat shrinks the width', /width:\d+px;height:auto/.test(html))
+    check(r, 'height:auto keeps the ratio when WeChat shrinks the width',
+      /style="display:block;width:100%;height:auto;/.test(html))
+    // 渲染稳定性：轮播条内不允许出现固定像素宽度（窄屏下的溢出隐患）。
+    // 与微信粘贴弹窗无关——2026-10-13 二分实测确认弹窗对任何横向滚动结构都会出现，与 px/％ 无关。
+    const stripStart = html.indexOf('overflow-x:auto;white-space:nowrap;')
+    const bodyStart = html.lastIndexOf('<section', stripStart)
+    const capIdx = html.indexOf('<span leaf="">图1 ', bodyStart)
+    const strip = html.slice(bodyStart, html.lastIndexOf('</section>', capIdx) + '</section>'.length)
+    check(r, 'carousel strip carries no fixed pixel width', !/width\s*:\s*[^;"]*\d+px/i.test(strip) && strip.length > 0,
+      (strip.match(/width\s*:\s*[^;"]*\d+px/i) || [''])[0])
+    check(r, 'slides size in percentages of the strip',
+      (strip.match(/width:88%;/g) || []).length === 2, `${(strip.match(/width:88%;/g) || []).length}/2`)
+    check(r, 'the live-scroll hint without the dead pre-webkit property',
+      /overflow-x:auto;white-space:nowrap;/.test(strip) && !/-webkit-overflow-scrolling/.test(html))
     const ph = renderDoc(parseMarkdown(placeholders(r)), THEMES[0], sig, resolveImg).html
-    const phFrame = new RegExp(`width:${f.width}px;height:${f.height}px`, 'g')
-    check(r, 'placeholder box uses the same frame', (ph.match(phFrame) || []).length === 2)
+    const [rw, rh] = r.split(':').map(Number)
+    const padPct = Number(((rh / rw) * 50).toFixed(3))
+    const phFrame = new RegExp(`padding:${padPct}% 0`, 'g')
+    check(r, 'placeholder box sizes to the same frame, in percentages', (ph.match(phFrame) || []).length === 2,
+      `${(ph.match(phFrame) || []).length}/2`)
     // 宽高比真的对得上
     const implied = f.width / f.height
     const target = Number(r.split(':')[0]) / Number(r.split(':')[1])
@@ -322,6 +338,20 @@ for (const theme of THEMES) {
   }).map((t) => t.id)
   check('all-themes', `every one of ${THEMES.length} themes renders all 4 cells`, swallowed.length === 0,
     swallowed.slice(0, 5).join(','))
+
+  // 轮播条里的固定像素宽度是窄屏溢出隐患，219 套主题一套都不许有（与微信弹窗无关，见上）
+  const carouselSrc = `:::carousel 4:3 轮播\n![A](img:a.png)\n![B](img:b.png)\n:::\n`
+  const withPxWidth = THEMES.filter((t) => {
+    const h = renderDoc(parseMarkdown(carouselSrc), t, sig, resolveImg).html
+    const start = h.indexOf('overflow-x:auto;white-space:nowrap;')
+    if (start < 0) return true
+    const bodyStart = h.lastIndexOf('<section', start)
+    const capIdx = h.indexOf('<span leaf="">图1 ', bodyStart)
+    const strip = h.slice(bodyStart, h.lastIndexOf('</section>', capIdx) + '</section>'.length)
+    return /width\s*:\s*[^;"]*\d+px/i.test(strip)
+  }).map((t) => t.id)
+  check('all-themes', `every one of ${THEMES.length} themes keeps its carousel free of fixed pixel widths`,
+    withPxWidth.length === 0, withPxWidth.slice(0, 5).join(','))
 }
 
 // --- per-image deletion -----------------------------------------------------

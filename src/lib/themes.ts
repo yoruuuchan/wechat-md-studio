@@ -1,7 +1,7 @@
-import type { CarouselRatio, InlineSeg } from './types'
+import type { InlineSeg } from './types'
 import { ORIGINAL_LICENSE, type ThemeMeta, type ThemeOrigin } from './theme-meta'
 import { APP_BYLINE, APP_NAME, REPO_URL } from './brand'
-import { baseTableBlock, carouselFrame, esc, type Theme } from './theme-kit'
+import { baseTableBlock, carouselStrip, esc, type Theme } from './theme-kit'
 import { EXTRA_THEMES } from './themes-extra'
 import { IMPORTED_THEMES } from './themes-imported'
 import { t } from './i18n'
@@ -44,16 +44,12 @@ function goldenSeg(s: InlineSeg): string {
   return inner
 }
 
-function goldenCarouselItem(it: { src: string; alt: string }, last: boolean, ratio: CarouselRatio): string {
-  const f = carouselFrame(ratio)
-  const frame = `width:${f.width}px;height:${f.height}px`
-  const img = it.src
-    ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;border-radius:8px;border:1px solid #E6EDF6;background:#F6FAFF;" />`
-    : `<section style="${frame};box-sizing:border-box;border:1px dashed #B9DAFF;background:#F6FAFF;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#888888;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
-  const cap = it.alt
-    ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(it.alt)}</span></p>`
-    : ''
-  return `<section style="display:inline-block;vertical-align:top;width:${f.width}px;margin-right:${last ? 0 : 10}px;white-space:normal;">${img}${cap}</section>`
+const GOLDEN_CAROUSEL_COLORS = {
+  imgStyle: 'border-radius:8px;border:1px solid #E6EDF6;background:#F6FAFF;',
+  placeholderBorder: '#B9DAFF',
+  placeholderBg: '#F6FAFF',
+  hintColor: '#888888',
+  captionColor: '#888888',
 }
 
 export const goldenTheme: Theme = {
@@ -112,9 +108,7 @@ export const goldenTheme: Theme = {
         ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;text-indent:0;color:#1677FF;font-weight:700;"><span style="border-bottom:2px solid #B9DAFF;"><span leaf="">${esc(title)}</span></span></p>`
         : ''
     }<p style="margin:0 0 14px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#888888;"><span leaf="">← 左右滑动查看图片 →</span></p></section>`
-    const body = `<section style="margin:0;padding:0 0 6px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;">${items
-      .map((it, i) => goldenCarouselItem(it, i === items.length - 1, ratio))
-      .join('')}</section>`
+    const body = carouselStrip(items, ratio, GOLDEN_CAROUSEL_COLORS)
     const cap = `<p style="margin:12px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(caption)}</span></p>`
     return head + body + cap
   },
@@ -200,23 +194,17 @@ export const minimalTheme: Theme = {
       : `<p style="margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(caption)}</span></p>`,
 
   carousel: (title, caption, items, ratio) => {
-    const f = carouselFrame(ratio)
     const head = `<section style="margin:0;">${
       title
         ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;text-indent:0;color:#111111;font-weight:700;"><span leaf="">${esc(title)}</span></p>`
         : ''
     }<p style="margin:0 0 14px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">← 左右滑动查看图片 →</span></p></section>`
-    const body = `<section style="margin:0;padding:0 0 6px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;">${items
-      .map((it, i) => {
-        const img = it.src
-          ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;" />`
-          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed #DDDDDD;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#9A9A9A;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
-        const cap = it.alt
-          ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(it.alt)}</span></p>`
-          : ''
-        return `<section style="display:inline-block;vertical-align:top;width:${f.width}px;margin-right:${i === items.length - 1 ? 0 : 10}px;white-space:normal;">${img}${cap}</section>`
-      })
-      .join('')}</section>`
+    const body = carouselStrip(items, ratio, {
+      placeholderBorder: '#DDDDDD',
+      placeholderBg: 'transparent',
+      hintColor: '#9A9A9A',
+      captionColor: '#9A9A9A',
+    })
     const cap = `<p style="margin:12px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(caption)}</span></p>`
     return head + body + cap
   },
@@ -308,23 +296,18 @@ export const steadyTheme: Theme = {
       : `<p style="margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(caption)}</span></p>`,
 
   carousel: (title, caption, items, ratio) => {
-    const f = carouselFrame(ratio)
     const head = `<section style="margin:0;">${
       title
         ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.8;letter-spacing:2px;text-align:center;text-indent:0;color:#1F4E8C;font-weight:700;"><span leaf="">${esc(title)}</span></p>`
         : ''
     }<p style="margin:0 0 14px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">← 左右滑动查看图片 →</span></p></section>`
-    const body = `<section style="margin:0;padding:0 0 6px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;">${items
-      .map((it, i) => {
-        const img = it.src
-          ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;border:1px solid #E4E9F0;" />`
-          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed #C7D8EC;background:#F7F8FA;display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:#8C9BB3;text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
-        const cap = it.alt
-          ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(it.alt)}</span></p>`
-          : ''
-        return `<section style="display:inline-block;vertical-align:top;width:${f.width}px;margin-right:${i === items.length - 1 ? 0 : 10}px;white-space:normal;">${img}${cap}</section>`
-      })
-      .join('')}</section>`
+    const body = carouselStrip(items, ratio, {
+      imgStyle: 'border:1px solid #E4E9F0;',
+      placeholderBorder: '#C7D8EC',
+      placeholderBg: '#F7F8FA',
+      hintColor: '#8C9BB3',
+      captionColor: '#8C9BB3',
+    })
     const cap = `<p style="margin:12px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(caption)}</span></p>`
     return head + body + cap
   },

@@ -51,8 +51,8 @@ export const BLANK = '<p style="margin:0;"><span leaf="">&nbsp;</span></p>'
 
 // ---------- 轮播画框 ----------
 // 同一轮播里的图片在上传时就被裁成同一比例，所以这里可以直接给出确定宽高。
-// 用 width + height + height:auto：公众号会把 width 压到可用宽度，height:auto
-// 让高度跟着属性里的固有比例走，画框比例在任何宽度下都不变。
+// 用 width + height 属性承载固有比例，height:auto 让高度跟着属性里的比例走。
+// 属性只用于占位和比例提示，正文里不写任何固定像素宽度（见 carouselStrip）。
 const CAROUSEL_MAX_W = 240
 const CAROUSEL_MAX_H = 240
 
@@ -73,6 +73,50 @@ export function carouselFrame(ratio: CarouselRatio): CarouselFrame {
   }
   // 按 3 倍屏取裁切尺寸，缩放后仍然清晰
   return { width, height, cropWidth: width * 3, cropHeight: height * 3 }
+}
+
+/**
+ * 轮播滑动条：横向滚动容器 + 百分比宽度的图片格子。
+ *
+ * 微信编辑器的排版检查（width 一项）会把写死 px 宽度的子节点判成「溢出风险」，
+ * 轮播因此必须在正文里完全不出现固定像素宽度：格子宽度用容器百分比，图片再
+ * `width:100%;height:auto` 吃满格子，比例交给 width/height 属性和真实裁切。
+ * 88% + 2% 的间隙让下一张露出一角，是「左右滑动」的可见线索。
+ */
+const CAROUSEL_SLIDE_W = '88%'
+const CAROUSEL_SLIDE_GAP = '2%'
+
+export interface CarouselStripColors {
+  /** 图片格子上的主题装饰（边框 / 圆角等），照原样追加在图片样式之后 */
+  imgStyle?: string
+  placeholderBorder: string
+  placeholderBg: string
+  hintColor: string
+  captionColor: string
+}
+
+export function carouselStrip(
+  items: { src: string; alt: string }[],
+  ratio: CarouselRatio,
+  opts: CarouselStripColors,
+): string {
+  const f = carouselFrame(ratio)
+  const [rw, rh] = ratio.split(':').map(Number)
+  // 占位条用上下对称的百分比内边距把盒子撑成画框比例（百分比内边距相对宽度），
+  // 这样占位也不依赖任何固定像素尺寸。
+  const placeholderPad = Number(((rh / rw) * 50).toFixed(3))
+  const imgExtra = opts.imgStyle ? `${opts.imgStyle.replace(/;+$/, '')};` : ''
+  return `<section style="margin:0;padding:0 0 6px;overflow-x:auto;white-space:nowrap;">${items
+    .map((it, i) => {
+      const img = it.src
+        ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:100%;height:auto;${imgExtra}" />`
+        : `<p style="margin:0;padding:${placeholderPad}% 0;box-sizing:border-box;border:1px dashed ${opts.placeholderBorder};background:${opts.placeholderBg};font-size:12px;line-height:1.5;letter-spacing:1px;color:${opts.hintColor};text-align:center;text-indent:0;"><span leaf="">${t('theme.pendingImage')}</span></p>`
+      const cap = it.alt
+        ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:${opts.captionColor};"><span leaf="">${esc(it.alt)}</span></p>`
+        : ''
+      return `<section style="display:inline-block;vertical-align:top;width:${CAROUSEL_SLIDE_W};margin-right:${i === items.length - 1 ? 0 : CAROUSEL_SLIDE_GAP};white-space:normal;">${img}${cap}</section>`
+    })
+    .join('')}</section>`
 }
 
 /**
@@ -316,32 +360,17 @@ export interface ImportedThemeSpec {
 // 共享构件
 // ============================================================
 
-interface CarouselColors {
+interface CarouselColors extends CarouselStripColors {
   titleStyle: string
-  hintColor: string
-  captionColor: string
-  placeholderBorder: string
-  placeholderBg: string
 }
 
 /** 轮播骨架（各主题共用结构，换配色）：标题 + 滑动提示 + 横向滚动 + 底部说明。 */
 export function makeCarousel(opts: CarouselColors) {
   return (title: string, caption: string, items: { src: string; alt: string }[], ratio: CarouselRatio): string => {
-    const f = carouselFrame(ratio)
     const head = `<section style="margin:0;">${
       title ? `<p style="margin:0 0 10px;${opts.titleStyle}"><span leaf="">${esc(title)}</span></p>` : ''
     }<p style="margin:0 0 14px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:${opts.hintColor};"><span leaf="">← 左右滑动查看图片 →</span></p></section>`
-    const body = `<section style="margin:0;padding:0 0 6px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;">${items
-      .map((it, i) => {
-        const img = it.src
-          ? `<img src="${esc(it.src)}" width="${f.width}" height="${f.height}" style="display:block;width:${f.width}px;height:auto;" />`
-          : `<section style="width:${f.width}px;height:${f.height}px;box-sizing:border-box;border:1px dashed ${opts.placeholderBorder};background:${opts.placeholderBg};display:flex;align-items:center;justify-content:center;"><p style="margin:0;font-size:12px;letter-spacing:1px;color:${opts.hintColor};text-indent:0;text-align:center;"><span leaf="">${t('theme.pendingImage')}</span></p></section>`
-        const cap = it.alt
-          ? `<p style="margin:8px 0 0;font-size:12px;line-height:1.5;letter-spacing:0.5px;text-align:center;text-indent:0;color:${opts.captionColor};"><span leaf="">${esc(it.alt)}</span></p>`
-          : ''
-        return `<section style="display:inline-block;vertical-align:top;width:${f.width}px;margin-right:${i === items.length - 1 ? 0 : 10}px;white-space:normal;">${img}${cap}</section>`
-      })
-      .join('')}</section>`
+    const body = carouselStrip(items, ratio, opts)
     const cap = `<p style="margin:12px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:${opts.captionColor};"><span leaf="">${esc(caption)}</span></p>`
     return head + body + cap
   }

@@ -651,6 +651,63 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 脱敏表 19 条左值扫 1138 个文件零命中；**发布先于部署**（AGPL 红线）。
 > 新映射基线：伞 `c46277a` ↔ 公开 `ef82dba`。
 
+> 2026-10-13 部署记录（单图上传大小上线）：提交 `e8a30af`（父提交 `15e54fe`；master 用带旧值校验的
+> `git update-ref refs/heads/master e8a30af 15e54fe` 快进，主工作区按纪律 6 `restore --source=HEAD` 同步）。
+> 功能要点：单图上传弹窗新增「上传大小」档位（自动 / 1–5 MB / 原图），确认后按浏览器记住
+> （`AppSettings.uploadSize`），工具栏 / 拖拽粘贴 / 侧栏三个入口共用。自动＝原默认 2048px / 800 KiB
+> 不变；1 MB 沿用 2048px、只放宽字节上限；2–5 MB 长边预算每档 +512px（封顶 4096）并同步放宽字节上限
+> ——只放宽字节的话，2048px 下多数照片到不了 2 MB，大档位会形同虚设。字节目标只作上限：小图不放大、
+> 不补足，GIF / SVG / 已足够小的有损图照旧原样透传；原图＝跳过压缩、字节直传。轮播 / 网格 / 手裁
+> 与 DOCX 导入的图不经过这一档。20 MiB 单图上限收进 `contracts/constants.ts`（客户端 + tRPC 存储路由
+> + Agent API 共用同一常量，worker 自持副本）；超限原图在弹窗里被拦下并提示换档（确认禁用），
+> `prepareForUpload` 留一个具名硬兜底错误，不再让 tRPC 的裸字符串错误当门面。
+> 验证：`check`、1459 测试、`verify:themes`、`build` 全过；新验收脚本 `cdp-verify-upload-size.mjs`
+> 25/25（自动＝2048px、2 MB＝2560px、原图 sha256 逐字节一致、24.3 MB 超限拦截、换 5 MB 后 4.58 MB
+> @4096 上传成功、英文界面）；`gallery` ALL PASS 回归；补齐此前漏掉的 gallery / public-access /
+> recrop 三处引导预置（public-access、recrop 借本地隔离应用 + 内存 mock 图床实跑全过）。
+> 部署：包 `mopai-e8a30af.tar.gz`（33,920,557 bytes，sha256 `66bad11e…`；9×4 MiB 分块首传即过、
+> 逐块 sha256 一致、重组整包一致），`flock` 安装于 2026-10-13 06:35:48 UTC。
+> 三重核对：线上 `boot.js` sha256 `4c988d60…` = 本地；`index.html` 资产 `index-CeeVhGiL.js` /
+> `index-Dd_CfkJE.css` 本地 = 线上 = 公网；重启时间即本次安装；`verify-all.sh` 全过（exit 0）。
+> 公开仓库：增量 `15e54fe..e8a30af` → 公开 `a68dbb2..cce4192`，普通 push；逐 blob 对比只剩已知差异
+> （HANDOFF 路径脱敏、5 个占位脚本、公开根 `LICENSE`）；脱敏表 19 条命中 0；**发布先于部署**（AGPL 红线）。
+> 新映射基线：伞 `e8a30af` ↔ 公开 `cce4192`。
+
+> 2026-10-13 修复记录（轮播复制粘贴）：用户实测「含轮播的文章连续三次
+> 复制到公众号后粘贴，第二次起图片大面积裂图；后台提示多处 Section 存在溢出问题
+> （参考文档 #1.4 width）」。本地取证（新脚本 `scripts/cdp-verify-carousel-copy.mjs`）：
+> 三次整篇复制 payload 逐字节一致（ClipboardItem 路径、DOM 零副作用），排除剪贴板层；
+> 公网图片链路从本机代理、东京服务器（数据中心 IP）、大陆直连三个视角 GET/HEAD/并发全 200。
+> 当晚用已登录会话（独立 Edge + 扫码，CDP 全自动）做了真实实粘，结论如下。
+>
+> **1) 图片「裂图」机制（完整闭环）**：粘贴瞬间编辑器浏览器侧尝试加载原外链（实测 6 图
+> 48 次请求全部 `net::ERR_BLOCKED_BY_ORB`），随后**微信服务端**抓取并转存，src 被改写成
+> `mmbiz.qlogo.cn` 后图片显示——全程约 15 秒（r2/r3 两轮复测同一时序，无永久失败、无逐轮
+> 恶化）。浏览器侧失败的原因在干净 Chrome 里复现并定位：`/api/img` 的 **302 响应带
+> `Cross-Origin-Resource-Policy: same-origin`**（secureHeaders 默认值），Chrome 对 no-cors
+> 子资源的 CORP 检查逐跳执行 → 跨域 img 在第一跳就被拦（错误即 ERR_BLOCKED_BY_ORB）；同一
+> 测试中 Worker 直连（无 CORP、ACAO:*）作为跨域 img 正常加载。因此「裂图几秒」= 转存等待期
+> 内浏览器也无法兜底加载。**修复**：securityHeaders 对 `/api/img/*` 豁免为
+> `Cross-Origin-Resource-Policy: cross-origin` + `Access-Control-Allow-Origin: *`（写在包装里，
+> 路由内设置会被 secureHeaders 在 next() 后覆盖）——部署后粘贴瞬间图片即可直接显示。
+>
+> **2) width 警告的真相（二分实测，推翻「px 宽度触发」的假设）**：该警告是粘贴时的
+> 「内容结构检测」弹窗（列出第 9/11/23 段，点「继续插入」才入正文）。用 5 组微 payload
+> 逐一实粘：纯文字段→无；**单图→无**；单轮播（新 % 结构）→**有**（第 6/8 段）；同一轮播
+> 去掉 `overflow-x:auto`+`nowrap`（不横滑）→**无**；旧 px 结构→**有且行号与新版完全相同**。
+> **结论：触发者是横向滚动结构本身，与 px/％无关**；保留横滑就无法消除该弹窗（微信模板库
+> 也没有内置滑动组件可抄）。正文结构仍改为百分比格子（`carouselStrip()`，三套手写主题与
+> `makeCarousel` 统一收口，图片 `width:100%`、比例走 width/height 属性、占位框百分比内边距、
+> 去掉 `-webkit-overflow-scrolling`）——这消除的是固定像素宽在窄屏的溢出隐患，属渲染稳定性
+> 修复，不是弹窗的解药；`verify:themes` 的 219 主题零 px 宽度断言保留。
+>
+> **3) 验收与清理**：修复版 payload 连续 3 轮实粘（弹窗→继续插入→约 15s 全图 mmbiz 显示），
+> 单图/网格/剪贴板路径无回归；测试草稿两篇已删（草稿箱只剩用户原有的一篇）、控制 Edge 已关、
+> 生产 R2 测试对象（car-1..6.png）已删（404）。**遗留**：zone 上「Challenge high-threat-score」
+> 规则罩 wechat 域名不罩 Worker（本次未观测到它拦微信抓图，但保留为复测项）；修复部署后建议
+> 用真实文章复核粘贴瞬间图片直显。备查脚本在 `app/verify-out/live/`（drive/focus/round/
+> paste-check/locate-probe 等，均为诊断工具，非验收脚本）。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
