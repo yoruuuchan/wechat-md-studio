@@ -7,9 +7,10 @@
  * downscales to a pixel budget first, then walks a quality ladder until a byte
  * budget is met.
  *
- * The sizing and format decisions are pure functions (targetSize / needsMatte /
- * pickMime) so the rules stay testable under Node, where there is no canvas.
- * Only compressImage and drawWithMatte touch the DOM.
+ * The sizing, format and pass-through decisions are pure functions (targetSize /
+ * needsMatte / pickMime / passesThrough / uploadBudget) so the rules stay
+ * testable under Node, where there is no canvas. Only compressImage and
+ * drawWithMatte touch the DOM.
  */
 
 import { t } from './i18n'
@@ -61,6 +62,69 @@ export interface CompressOptions {
   minQuality?: number
   /** Force an output format; without it the orientation rule in pickMime wins. */
   mime?: string
+}
+
+/**
+ * The upload-size choices offered before a loose image goes up.
+ *
+ * 'auto' is the shipped default; '1'–'5' are byte targets in MB; 'original'
+ * explicitly skips compression. Stored as `AppSettings.uploadSize` under these
+ * exact string values, so they are a persistence contract, not just UI labels.
+ */
+export const UPLOAD_SIZE_CHOICES = ['auto', '1', '2', '3', '4', '5', 'original'] as const
+
+export type UploadSizeChoice = (typeof UPLOAD_SIZE_CHOICES)[number]
+
+/** Boundary check for values read back from storage (localStorage, bundles). */
+export function isUploadSize(value: unknown): value is UploadSizeChoice {
+  return typeof value === 'string' && (UPLOAD_SIZE_CHOICES as readonly string[]).includes(value)
+}
+
+/** Pixel + byte budget behind one non-original choice. */
+export interface UploadBudget {
+  maxEdge: number
+  targetBytes: number
+}
+
+/**
+ * Budget per size choice.
+ *
+ * 'auto' is the historical default, untouched. '1 MB' keeps the same 2048px
+ * budget — "3x the 657px WeChat display width" — and only loosens the byte cap,
+ * so it is a mild choice for photos already inside the pixel budget.
+ *
+ * From 2 MB up the pixel budget grows 512px per step instead of staying at
+ * 2048: at 2048px even a quality-1.0 encode of a dense photo rarely reaches
+ * 2 MB, so a byte cap alone would make the larger numbers identical to `auto`
+ * and therefore meaningless. Raising both budgets is what gives every tier a
+ * distinct result; the byte target stays an upper bound (smaller sources are
+ * passed through, never padded up to it).
+ *
+ * 4096 is the cap: a 12MP phone photo (4032px long edge) keeps essentially all
+ * its pixels, while a panorama's 10000px original — which no reader will ever
+ * see at full size — is still refused. `original` remains the explicit way to
+ * upload the file byte-for-byte.
+ */
+const UPLOAD_BUDGETS: Record<Exclude<UploadSizeChoice, 'original'>, UploadBudget> = {
+  auto: { maxEdge: DEFAULT_MAX_EDGE, targetBytes: DEFAULT_TARGET_BYTES },
+  '1': { maxEdge: 2048, targetBytes: 1 * 1024 * 1024 },
+  '2': { maxEdge: 2560, targetBytes: 2 * 1024 * 1024 },
+  '3': { maxEdge: 3072, targetBytes: 3 * 1024 * 1024 },
+  '4': { maxEdge: 3584, targetBytes: 4 * 1024 * 1024 },
+  '5': { maxEdge: 4096, targetBytes: 5 * 1024 * 1024 },
+}
+
+/**
+ * Budget for a size choice. Pure.
+ *
+ * `null` means "skip compression entirely" ('original'). Unknown values fall
+ * back to the auto budget, so a bundle or an edited localStorage entry can
+ * never blow up an upload.
+ */
+export function uploadBudget(size: UploadSizeChoice): UploadBudget | null {
+  if (size === 'original') return null
+  const budgets = UPLOAD_BUDGETS as Record<string, UploadBudget | undefined>
+  return budgets[size] ?? UPLOAD_BUDGETS.auto
 }
 
 export interface CompressedImage {
@@ -136,6 +200,27 @@ export function needsMatte(mime: string): boolean {
 export function pickMime(width: number, height: number, sourceType?: string): string {
   if (sourceType === 'image/gif' || sourceType === 'image/svg+xml') return sourceType
   return height > width ? 'image/jpeg' : 'image/webp'
+}
+
+/**
+ * Whether a source is handed back without a canvas pass. Pure.
+ *
+ * Two reasons, and only two:
+ * - GIF and SVG, which a canvas would flatten to a first frame or rasterise
+ * - a JPEG or WebP that is already inside both the pixel budget and the byte
+ *   budget, where re-encoding would spend quality to save nothing
+ *
+ * Pulled out of compressImage so the pass-through rules stay testable in Node,
+ * which is also what pins the upload-size tiers to them: no tier may push an
+ * animated GIF, a vector, or an already-small lossy image through a canvas.
+ */
+export function passesThrough(
+  sourceType: string,
+  opts: { scaled: boolean; sourceBytes: number; targetBytes: number },
+): boolean {
+  if (sourceType === 'image/gif' || sourceType === 'image/svg+xml') return true
+  const alreadyEncoded = sourceType === 'image/jpeg' || sourceType === 'image/webp'
+  return !opts.scaled && alreadyEncoded && opts.sourceBytes <= opts.targetBytes
 }
 
 /**
@@ -256,14 +341,9 @@ export async function compressImage(
     grew: false,
   })
 
-  // Animation and vectors: canvas only ever paints the first frame, so
-  // compressing these silently destroys them. Hand the original back.
-  if (sourceType === 'image/gif' || sourceType === 'image/svg+xml') return untouched(sourceType)
-
-  // Already a lossy raster, already inside the pixel budget, already inside the
-  // byte budget: re-encoding spends quality to save nothing.
-  const alreadyEncoded = sourceType === 'image/jpeg' || sourceType === 'image/webp'
-  if (!scaled && alreadyEncoded && sourceBytes <= targetBytes) return untouched(sourceType)
+  // Animation, vectors, and lossy rasters already inside both budgets: hand the
+  // original back (see passesThrough for the two reasons).
+  if (passesThrough(sourceType, { scaled, sourceBytes, targetBytes })) return untouched(sourceType)
 
   const mime = opts?.mime ?? pickMime(width, height, sourceType)
 

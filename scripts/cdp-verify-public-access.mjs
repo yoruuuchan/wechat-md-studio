@@ -104,6 +104,14 @@ const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
 const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
 await send('Page.enable', {}, sessionId)
 await send('Runtime.enable', {}, sessionId)
+// The first-run tour auto-starts on a fresh profile and would overlay the
+// anonymous editor this script measures; seed the seen flag before any app
+// script runs.
+await send(
+  'Page.addScriptToEvaluateOnNewDocument',
+  { source: `try { localStorage.setItem('mopai.onboarding.v1', 'done') } catch {}` },
+  sessionId,
+)
 
 const consoleErrors = []
 ws.addEventListener('message', (ev) => {

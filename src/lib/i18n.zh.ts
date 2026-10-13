@@ -386,7 +386,7 @@ export const zh = {
   'ratio.keepOriginal': '保持原图比例，不裁',
   'ratio.recommended': '推荐',
   'ratio.cropTip': '自动居中裁切，尺寸 {w}×{h}。',
-  'ratio.keepTip': '原图按自身尺寸上传，正文里按容器宽度自适应。',
+  'ratio.keepTip': '不裁切：保持图片自身比例，正文里按容器宽度自适应。',
   'ratio.manual': '手动裁切',
   'ratio.manualLocked': '比例锁 {ratio}，自己拖决定留哪一块 →',
   'ratio.manualFree': '自己拖，决定留哪一块 →',
@@ -394,6 +394,16 @@ export const zh = {
   'ratio.uploadOriginal': '原样上传',
   'ratio.processing': '处理中…',
   'ratio.cropTitle': '{r} → 裁成 {w}×{h}',
+
+  // ---- 上传大小 ----
+  'ratio.uploadSize': '上传大小',
+  'ratio.sizeAuto': '自动',
+  'ratio.sizeOriginal': '原图',
+  'ratio.sizeMb': '{n} MB',
+  'ratio.sizeTip':
+    '自动＝按公众号显示优化的默认压缩；1–5 MB 为目标上限，不会把更小的图放大或补足；原图＝跳过压缩，直接上传原文件。',
+  'ratio.originalTooBig':
+    '所选图片最大的一张是 {size}，超过单图 {limit} 上限，原图档会被拒收；换 1–5 MB 中任一档即可。',
 
   // ---- 手动裁切 ----
   'crop.title': '手动裁切',
@@ -794,6 +804,8 @@ export const zh = {
 
   // ---- 图片与图表错误 ----
   'img.decodeFailed': '图片解码失败，换一张试试',
+  'img.originalOverLimit':
+    '原图 {size} 超过单图 {limit} 上限，上传会被拒收；换成 1–5 MB 中任一档即可。',
   'img.cropExportFailed': '导出裁切结果失败',
   'img.noCanvasCrop': '当前浏览器不支持 canvas 裁切',
   'img.cropReadFailed': '读取裁切结果失败',

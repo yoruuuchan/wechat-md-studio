@@ -393,7 +393,7 @@ export const en: Record<MsgKey, Msg> = {
   'ratio.keepOriginal': 'Keep the original, no crop',
   'ratio.recommended': 'Recommended',
   'ratio.cropTip': 'Center-cropped to {w}×{h}.',
-  'ratio.keepTip': 'Uploaded at its own size and scaled to the container width in the article.',
+  'ratio.keepTip': 'No crop: it keeps its own proportions and scales to the container width in the article.',
   'ratio.manual': 'Manual crop',
   'ratio.manualLocked': 'Locked to {ratio}; drag to decide which part stays →',
   'ratio.manualFree': 'Drag to decide which part stays →',
@@ -401,6 +401,16 @@ export const en: Record<MsgKey, Msg> = {
   'ratio.uploadOriginal': 'Upload as-is',
   'ratio.processing': 'Working…',
   'ratio.cropTitle': '{r} → crop to {w}×{h}',
+
+  // ---- upload size ----
+  'ratio.uploadSize': 'Upload size',
+  'ratio.sizeAuto': 'Auto',
+  'ratio.sizeOriginal': 'Original',
+  'ratio.sizeMb': '{n} MB',
+  'ratio.sizeTip':
+    'Auto keeps the WeChat-tuned default. 1–5 MB are upper limits — smaller images are never upscaled or padded up. Original skips compression and uploads the file as it is.',
+  'ratio.originalTooBig':
+    'The largest selected image is {size}, over the {limit} per-image limit, so the original file would be rejected. Pick any 1–5 MB tier instead.',
 
   // ---- manual cropper ----
   'crop.title': 'Manual crop',
@@ -817,6 +827,8 @@ export const en: Record<MsgKey, Msg> = {
 
   // ---- image & diagram errors ----
   'img.decodeFailed': 'The image could not be decoded; try another one',
+  'img.originalOverLimit':
+    'The original file is {size}, over the {limit} per-image limit; the upload would be rejected. Pick any 1–5 MB tier instead.',
   'img.cropExportFailed': 'Exporting the crop failed',
   'img.noCanvasCrop': 'This browser does not support canvas cropping',
   'img.cropReadFailed': 'Reading the crop result failed',

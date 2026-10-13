@@ -13,6 +13,7 @@ import type {
   AgentUpdateDocResult,
   AgentWhoAmI,
 } from "@contracts/agent";
+import { MaxImageBytes } from "@contracts/constants";
 import { OWNER } from "./auth-types";
 import { env } from "./lib/env";
 import { requireAgent } from "./lib/agent-auth";
@@ -46,7 +47,8 @@ import { parseMarkdown } from "@/lib/parse";
  */
 
 const MAX_CONTENT_CHARS = 2_000_000;
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+// 与存储路由、客户端同一个事实源（contracts/constants.ts）
+const MAX_IMAGE_BYTES = MaxImageBytes;
 const OWNER_ID = OWNER.id;
 
 type AgentEnv = { Variables: { agent: AgentIdentity } };

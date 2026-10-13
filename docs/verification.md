@@ -40,10 +40,12 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
 | 多图网格 | `node scripts/cdp-verify-gallery.mjs 3221 9353` | 参数、上传前裁切、网格布局、HTML 输出 |
+| 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[diagram](../scripts/cdp-verify-diagram.mjs)、
-[gallery](../scripts/cdp-verify-gallery.mjs)。脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
+[gallery](../scripts/cdp-verify-gallery.mjs)、[upload-size](../scripts/cdp-verify-upload-size.mjs)。
+脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
 `SKIP` 即使退出码为 0，也不能计作已完成该链路验收。
 
 Remote MCP 脚本设置 `MOPAI_OPENCODE_BIN` 为已安装的 OpenCode 原生可执行文件后，会启动真实 OpenCode

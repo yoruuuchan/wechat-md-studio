@@ -284,6 +284,7 @@ describe('toBundle / bundleFilename', () => {
       sig: { layout: '赵', proof: '钱', review: '孙' },
       syncScroll: false,
       zoom: 110,
+      uploadSize: '3' as const,
     }
     const parsed = JSON.parse(toBundle([doc()], settings)) as { settings: typeof settings }
     expect(parsed.settings).toEqual(settings)
@@ -447,6 +448,7 @@ describe('parseBundle', () => {
         sig: { layout: 'a', proof: 'b', review: 'c' },
         syncScroll: false,
         zoom: 110,
+        uploadSize: '5',
       }),
     )
     expect(good.ok && good.settings).toEqual({
@@ -454,7 +456,22 @@ describe('parseBundle', () => {
       sig: { layout: 'a', proof: 'b', review: 'c' },
       syncScroll: false,
       zoom: 110,
+      uploadSize: '5',
     })
+
+    // A backup exported before the upload-size choice existed gets the shipped
+    // default; an invented value is refused the same way rather than trusted.
+    const legacy = JSON.stringify({
+      version: BUNDLE_VERSION,
+      docs: [doc()],
+      settings: { themeId: 'paper', sig: { layout: 'a', proof: 'b', review: 'c' }, syncScroll: true, zoom: 100 },
+    })
+    const fromLegacy = parseBundle(legacy)
+    expect(fromLegacy.ok && fromLegacy.settings?.uploadSize).toBe('auto')
+    const bogus = JSON.parse(legacy) as { settings: { uploadSize?: unknown } }
+    bogus.settings.uploadSize = 'huge'
+    const fromBogus = parseBundle(JSON.stringify(bogus))
+    expect(fromBogus.ok && fromBogus.settings?.uploadSize).toBe('auto')
 
     // A broken settings block must never cost the owner their articles.
     const bad = parseBundle(JSON.stringify({ version: BUNDLE_VERSION, docs: [doc()], settings: { themeId: 7 } }))

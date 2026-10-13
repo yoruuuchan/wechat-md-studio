@@ -14,6 +14,7 @@
 //    module testable under vitest's `node` environment.
 
 import type { AppSettings, DocRecord } from './store'
+import { isUploadSize } from './image-compress'
 import { t } from './i18n'
 
 /** Bumped whenever the on-disk shape of a backup changes. */
@@ -340,6 +341,9 @@ function readSettings(value: unknown): AppSettings | null {
     sig: { layout, proof, review },
     syncScroll: typeof value.syncScroll === 'boolean' ? value.syncScroll : true,
     zoom: typeof value.zoom === 'number' && value.zoom >= 90 && value.zoom <= 125 ? value.zoom : 100,
+    // Bundles exported before the upload-size choice existed carry no value;
+    // 'auto' is the behavior they were exported under, so they import unchanged.
+    uploadSize: isUploadSize(value.uploadSize) ? value.uploadSize : 'auto',
   }
 }
 

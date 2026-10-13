@@ -67,6 +67,9 @@ const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
 const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
 await send('Page.enable', {}, sessionId)
 await send('Runtime.enable', {}, sessionId)
+// The first-run tour auto-starts on a fresh profile and its dialog would
+// intercept the editor; this script tests re-cropping, not the tour.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: 'try{localStorage.setItem("mopai.onboarding.v1","done")}catch{}' }, sessionId)
 
 const pageErrors = []
 ws.addEventListener('message', (ev) => {

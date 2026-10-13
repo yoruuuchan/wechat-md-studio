@@ -1,4 +1,5 @@
 import type { SignatureConfig } from './types'
+import type { UploadSizeChoice } from './image-compress'
 import { SAMPLE_DOC } from './sample'
 import { createBodyStore, type BodyStore } from './body-store'
 import type { RemoteMcpBinding } from '@contracts/remote-mcp'
@@ -41,6 +42,12 @@ export interface AppSettings {
   syncScroll: boolean
   /** Whole-UI zoom in percent (90/100/110/125); 100 is the design size. */
   zoom: number
+  /**
+   * Target size for loose image uploads (see image-compress.ts). 'auto' is the
+   * shipped WeChat-tuned default; the last confirmed pick is remembered here so
+   * the next upload starts from it.
+   */
+  uploadSize: UploadSizeChoice
 }
 
 /** Bodies used to live here in full; kept as the migration source. */
@@ -519,6 +526,7 @@ export function loadSettings(): AppSettings {
     sig: { layout: 'Yoru', proof: 'Yoru', review: 'Yoru' },
     syncScroll: true,
     zoom: 100,
+    uploadSize: 'auto',
   }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)

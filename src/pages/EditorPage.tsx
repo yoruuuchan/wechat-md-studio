@@ -71,7 +71,16 @@ import RemoteMcpDialog from '@/components/RemoteMcpDialog'
 import OnboardingTour from '@/components/OnboardingTour'
 import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
-import { blobToBase64, compressForUpload, cropToRatio, fileFromImageUrl, filenameForMime } from '@/lib/image'
+import { MaxImageBytes } from '@contracts/constants'
+import {
+  blobToBase64,
+  formatBytes,
+  prepareForUpload,
+  cropToRatio,
+  fileFromImageUrl,
+  filenameForMime,
+} from '@/lib/image'
+import type { UploadSizeChoice } from '@/lib/image-compress'
 import { DEFAULT_CAROUSEL_RATIO, type CarouselRatio } from '@/lib/types'
 import {
   bundleFilename,
@@ -110,13 +119,6 @@ function resolveImg(src: string): string {
   return src
 }
 
-/** Human-readable size, for reporting what compression saved. */
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
-
 /** When the cloud version of a conflicted article was last written. */
 function formatMoment(ts: number, unknownLabel: string): string {
   if (!ts) return unknownLabel
@@ -144,6 +146,11 @@ interface FrameTask {
    * the previous copy is now unreferenced.
    */
   replacedKey?: string
+  /**
+   * Upload-size choice confirmed in the picker. Only the no-crop path consumes
+   * it — a cropped image is re-encoded at its frame's own resolution.
+   */
+  uploadSize?: UploadSizeChoice
   /**
    * Document position a drop landed on, so the image goes where it was dropped
    * rather than wherever the cursor last was. Null for a clipboard paste.
@@ -246,6 +253,16 @@ export default function EditorPage() {
   }, [remoteConflictKey])
 
   const uploadMutation = trpc.storage.upload.useMutation()
+
+  // Loose uploads that the original tier cannot send: the server rejects any
+  // single image over the shared cap, so the framing dialog warns and blocks it
+  // instead of letting the upload fail. Only files that would skip cropping are
+  // considered — a crop re-encodes below the cap either way.
+  const oversizeUpload = useMemo(() => {
+    if (!frameTask || frameTask.mode !== 'loose') return null
+    const over = frameTask.files.filter((f) => f.size > MaxImageBytes)
+    return over.length ? { maxBytes: Math.max(...over.map((f) => f.size)) } : null
+  }, [frameTask])
 
   useEffect(() => saveSettings(settings), [settings])
   useEffect(() => applyZoom(settings.zoom), [settings.zoom])
@@ -519,11 +536,17 @@ export default function EditorPage() {
   }
 
   /** Upload one file, optionally auto-cropping to a carousel frame first. */
-  const uploadOne = async (file: File, ratio?: CarouselRatio): Promise<{ ref: string; saved: string | null }> => {
+  const uploadOne = async (
+    file: File,
+    ratio?: CarouselRatio,
+    size: UploadSizeChoice = 'auto',
+  ): Promise<{ ref: string; saved: string | null }> => {
     const payload = ratio ? await cropToRatio(file, ratio) : null
     // A loose image is the one that needs shrinking: a 12MP phone photo used to go
-    // up at full size for an article that is at most 677px wide.
-    const loose = payload ? null : await compressForUpload(file)
+    // up at full size for an article that is at most 677px wide. The picked size
+    // only drives this path; a cropped image was already re-encoded at its frame's
+    // resolution and must not take a second lossy pass.
+    const loose = payload ? null : await prepareForUpload(file, size)
     const blob = payload ? payload.blob : loose!.blob
     const mime = payload ? payload.mime : loose!.mime
     const contentBase64 = await blobToBase64(blob)
@@ -664,7 +687,7 @@ export default function EditorPage() {
       }
       setUploadingKey(`drop-${file.name}`)
       try {
-        const { ref, saved } = await uploadOne(file, ratio ?? undefined)
+        const { ref, saved } = await uploadOne(file, ratio ?? undefined, task?.uploadSize)
         if (task?.item && task.replacedKey) {
           // Re-crop of a standalone image via the ratio picker: replace in place.
           replaceRecropped(ref, task)
@@ -1266,6 +1289,8 @@ export default function EditorPage() {
         current={frameTask?.locked}
         mode={frameTask?.mode ?? 'loose'}
         fence={frameTask?.item?.kind === '画廊' ? ':::gallery' : ':::carousel'}
+        size={settings.uploadSize}
+        oversize={oversizeUpload}
         busy={uploadingKey !== null}
         onCancel={() => setFrameTask(null)}
         onManual={() => {
@@ -1274,16 +1299,21 @@ export default function EditorPage() {
           setFrameTask({ ...frameTask, ratio: lockedOrCurrent })
           setManualOpen(true)
         }}
-        onConfirm={(ratio) => {
+        onConfirm={(ratio, size) => {
           const task = frameTask
           setFrameTask(null)
           if (!task) return
+          // The confirmed pick becomes the remembered default for the next
+          // upload. Carousel confirmations never change it, so this stays quiet
+          // for the cropping paths where the tiers are not offered.
+          if (size !== settings.uploadSize) setSettings((s) => ({ ...s, uploadSize: size }))
+          const next = { ...task, uploadSize: size }
           if (task.mode === 'carousel' && task.item && ratio) {
-            void uploadToGroup(task.files, task.item, ratio)
+            void uploadToGroup(next.files, task.item, ratio)
           } else {
             // Pass the task so a re-crop replaces the image instead of inserting
             // a second copy at the cursor.
-            void uploadLoose(task.files, ratio, task)
+            void uploadLoose(next.files, ratio, next)
           }
         }}
       />

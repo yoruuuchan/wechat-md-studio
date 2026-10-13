@@ -313,7 +313,13 @@ describe('loading', () => {
 describe('what stays in localStorage', () => {
   it('keeps settings and the active id out of IndexedDB', async () => {
     const { loadSettings, saveSettings, saveActiveId, loadActiveId } = await import('./store')
-    const settings = { themeId: 'steady', sig: { layout: 'a', proof: 'b', review: 'c' }, syncScroll: false, zoom: 110 }
+    const settings = {
+      themeId: 'steady',
+      sig: { layout: 'a', proof: 'b', review: 'c' },
+      syncScroll: false,
+      zoom: 110,
+      uploadSize: '2' as const,
+    }
     saveSettings(settings)
     saveActiveId('doc-9')
     expect(JSON.parse(storage.getItem('mopai.settings.v1') as string)).toEqual(settings)
@@ -321,10 +327,29 @@ describe('what stays in localStorage', () => {
     expect(loadActiveId()).toBe('doc-9')
   })
 
+  it('restores the remembered upload size and defaults it to auto when absent', async () => {
+    const { loadSettings, saveSettings } = await import('./store')
+    const base = { themeId: 'golden', sig: { layout: 'a', proof: 'b', review: 'c' }, syncScroll: true, zoom: 100 }
+
+    // A settings blob written before the size choice existed must come back as
+    // the shipped default, not as undefined.
+    storage.setItem('mopai.settings.v1', JSON.stringify(base))
+    expect(loadSettings().uploadSize).toBe('auto')
+
+    saveSettings({ ...base, uploadSize: 'original' })
+    expect(loadSettings().uploadSize).toBe('original')
+  })
+
   it('reports a settings write that the browser refuses', async () => {
     const { saveSettings } = await import('./store')
     storage.quotaExceeded = true
-    saveSettings({ themeId: 'x', sig: { layout: '', proof: '', review: '' }, syncScroll: true, zoom: 100 })
+    saveSettings({
+      themeId: 'x',
+      sig: { layout: '', proof: '', review: '' },
+      syncScroll: true,
+      zoom: 100,
+      uploadSize: 'auto',
+    })
     expect(persistenceStatus().failure?.kind).toBe('quota')
   })
 

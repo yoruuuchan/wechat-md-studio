@@ -188,6 +188,13 @@ try {
   await send('Page.enable', {}, sessionId)
   await send('Runtime.enable', {}, sessionId)
   await send('DOM.enable', {}, sessionId)
+  // The first-run tour auto-starts on a fresh profile and its dialog would be
+  // the one [role=dialog] finds; this script tests the editor, not the tour.
+  await send(
+    'Page.addScriptToEvaluateOnNewDocument',
+    { source: `try { localStorage.setItem('mopai.onboarding.v1', 'done') } catch {}` },
+    sessionId,
+  )
   const ev = async (expression) => {
     const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId)
     if (r.exceptionDetails) {

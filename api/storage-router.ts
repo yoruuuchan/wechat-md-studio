@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, type SQL } from "drizzle-orm";
+import { MaxImageBytes } from "@contracts/constants";
 import { createRouter, visitorQuery } from "./middleware";
 import { storage, type DeleteResult } from "./lib/storage";
 import { env } from "./lib/env";
@@ -11,8 +12,8 @@ import { denyLog } from "./lib/deny-log";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
 
-// 单图上限 20MB（base64 约 4/3 倍）
-const MAX_BYTES = 20 * 1024 * 1024;
+// 单图上限（客户端与 Agent API 共用 contracts/constants.ts；base64 约 4/3 倍）
+const MAX_BYTES = MaxImageBytes;
 
 /** Rows this caller owns: everything under the owner id, or this browser's anonymous uploads. */
 function ownScope(ctx: { user?: { id: number }; visitor: string }): SQL {
@@ -72,7 +73,10 @@ export const storageRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const bytes = Uint8Array.from(Buffer.from(input.contentBase64, "base64"));
       if (bytes.byteLength > MAX_BYTES)
-        throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "图片超过 20MB 限制" });
+        throw new TRPCError({
+          code: "PAYLOAD_TOO_LARGE",
+          message: `图片超过 ${MAX_BYTES / 1024 / 1024}MB 限制`,
+        });
 
       // Sniffed, not trusted. Whatever we accept is later served from the public
       // image domain, so an HTML or SVG payload renamed to .png would be stored

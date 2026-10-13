@@ -1,7 +1,23 @@
 import { carouselFrame } from './themes'
-import { compressImage, drawWithMatte } from './image-compress'
+import { MaxImageBytes } from '@contracts/constants'
+import {
+  compressImage,
+  drawWithMatte,
+  uploadBudget,
+  type CompressOptions,
+  type UploadSizeChoice,
+} from './image-compress'
 import type { CarouselRatio } from './types'
 import { t } from './i18n'
+
+/** Human-readable size, for upload reports and the over-limit warning. Whole
+ *  megabytes drop the ".0" so the 20 MiB cap reads as "20 MB" beside them. */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  const mb = n / (1024 * 1024)
+  return `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB`
+}
 
 export interface CroppedImage {
   blob: Blob
@@ -194,9 +210,12 @@ export interface UploadReady {
  * A 12MP phone photo used to be uploaded at full size even though the article is
  * at most 677px wide. Carousel slides deliberately skip this: they are already
  * cropped into a fixed frame, so a second lossy pass buys nothing.
+ *
+ * `opts` overrides the default budgets; `prepareForUpload` is the entry point
+ * that resolves a user-facing size choice into them.
  */
-export async function compressForUpload(file: File): Promise<UploadReady> {
-  const out = await compressImage(file)
+export async function compressForUpload(file: File, opts?: CompressOptions): Promise<UploadReady> {
+  const out = await compressImage(file, opts)
   // quality === 1 is compressImage's sentinel for "source handed back untouched".
   const untouched = out.quality === 1
   if (untouched || out.grew) {
@@ -217,6 +236,44 @@ export async function compressForUpload(file: File): Promise<UploadReady> {
     grew: false,
     untouched: false,
   }
+}
+
+/**
+ * Prepare one loose image for upload at the size the user picked.
+ *
+ * 'original' deliberately skips the canvas pass entirely — it is the explicit
+ * "upload my file as it is" choice. Every other choice resolves through
+ * `uploadBudget()` to the `{maxEdge, targetBytes}` budget compressImage already
+ * understands.
+ *
+ * The framing dialog already blocks an over-limit original, so this rejection
+ * is a backstop for other callers: it names the cap in the message instead of
+ * letting the tRPC payload guard answer with a raw string-length error.
+ */
+export async function prepareForUpload(
+  file: File,
+  size: UploadSizeChoice = 'auto',
+): Promise<UploadReady> {
+  const budget = uploadBudget(size)
+  if (!budget) {
+    if (file.size > MaxImageBytes) {
+      throw new Error(
+        t('img.originalOverLimit', {
+          size: formatBytes(file.size),
+          limit: formatBytes(MaxImageBytes),
+        }),
+      )
+    }
+    return {
+      blob: file,
+      mime: file.type,
+      sourceBytes: file.size,
+      bytes: file.size,
+      grew: false,
+      untouched: true,
+    }
+  }
+  return compressForUpload(file, budget)
 }
 
 /**
