@@ -628,6 +628,29 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 另：`cdp-verify-terms` / `cdp-verify-i18n` 补了 `--no-proxy-server`（本机系统代理会让无头
 > Chrome 连公网超时，toolbar 脚本早有同样参数），公网复验即用带该参数的脚本完成。
 
+> 2026-10-13 部署记录（首次使用引导上线）：合并 `feat/onboarding-tour` → master `c46277a`
+> （快进合并，主工作区在 master 且干净；主工作区 `npm ci` 补装新依赖 `driver.js@1.9.0`）。
+> 功能要点：编辑器对首次访问者自动弹出的五步引导（编辑区 / 预览 / 主题切换 / 侧栏 / 复制到
+> 公众号），带进度与上一步 / 下一步 / 跳过 / 完成；完成或任一显式退出（跳过 / ✕ / Esc）写入
+> 本机 `mopai.onboarding.v1`，刷新不再自动出现；设置 → 体验新增「重新查看使用引导」；窄屏
+> （<768px）不自动触发。锚点是各面板上的 data 属性；引导遮罩拦截输入，不会误触复制 / 上传 /
+> 换主题。**验收脚本注意**：11 个以全新 profile 驱动编辑器的脚本（selection-copy / toolbar /
+> terms / dark-theme / i18n / docs-sync / resize / round5 / beauty / remote-mcp /
+> editor-upgrades）已统一预置「老访客」状态（`Page.addScriptToEvaluateOnNewDocument` 写入引导
+> 标记），不改各自流程；新脚本 `cdp-verify-onboarding.mjs` 覆盖引导本身。
+> 验证：`check` / 219 主题 `verify:themes` 全过；测试热跑 1433/1433（冷跑 1 条失败、重跑即过，
+> 与此前记录的冷跑偶发一致）；入口 `index-hJViQPAJ.js`（jsxDEV=0）/ `index-Dd_CfkJE.css`。
+> 部署：包 `mopai-c46277a.tar.gz`（33,918,398 bytes，sha256 `c74f6a4f…`；33×1 MiB 分块、
+> 逐块 sha256 归一化比对全同、重组整包 sha256 一致），`flock` 安装于 2026-10-13 01:40:28 UTC。
+> 三重核对：线上 `boot.js` sha256 `131922f0…` = 本地；`index.html` 资产本地 = 线上 = 公网；
+> 重启时间即本次安装。公网复验全过：`cdp-verify-onboarding` 46/46（五锚点、完成 / 跳过 / ✕ /
+> Esc 四条退出路径落盘、英文、明暗对比度、窄屏不触发、引导关闭后编辑器输入仍实时进预览）、
+> `cdp-verify-terms` 17/17、`cdp-verify-dark-theme` ALL PASSED。
+> 公开仓库：本次增量 `18d79a6..c46277a`（两条记录 + 引导功能）→ 公开 `bf35be0..ef82dba`，
+> 普通 push；逐 blob 对比只剩已知差异（HANDOFF 路径脱敏、5 个占位脚本、公开根 `LICENSE`），
+> 脱敏表 19 条左值扫 1138 个文件零命中；**发布先于部署**（AGPL 红线）。
+> 新映射基线：伞 `c46277a` ↔ 公开 `ef82dba`。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
