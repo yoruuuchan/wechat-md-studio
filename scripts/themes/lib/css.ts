@@ -212,7 +212,7 @@ export function parseCssTheme(cssText: string, root: string): CssParseResult {
       }
       const decls: string[] = []
       rule.walkDecls((d) => {
-        let value = resolveVars(d.value.trim(), vars)
+        const value = resolveVars(d.value.trim(), vars)
         if (/var\(/.test(value)) {
           skipped.unresolvable++
           return

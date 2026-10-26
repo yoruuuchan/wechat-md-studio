@@ -942,7 +942,7 @@ function createService(ctx: ServiceContext): TurndownService {
       const caption = figure ? (figure.querySelector('figcaption')?.textContent || '') : ''
       const rawAlt = node.getAttribute('alt') || node.getAttribute('title') || ''
       const alt = compact(ctx.options.imageAlt?.(image, index) || rawAlt || compact(caption))
-      return `![${alt.replace(/[\[\]]/g, '')}]()`
+      return `![${alt.replace(/[[\]]/g, '')}]()`
     },
   })
 

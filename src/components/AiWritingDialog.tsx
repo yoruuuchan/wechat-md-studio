@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useI18n } from '@/hooks/useI18n'
 import { t as translate } from '@/lib/i18n'
 
+// eslint-disable-next-line react-refresh/only-export-components -- copyAiText is the clipboard helper shared with RemoteMcpDialog; it belongs next to the dialog that owns the AI copy flow.
 export async function copyAiText(text: string, label: string): Promise<void> {
   // `label` is the already-translated name of the thing being copied.
   if (await copyPlain(text)) toast.success(translate('ai.copyDone', { label }))

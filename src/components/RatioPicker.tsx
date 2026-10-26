@@ -63,6 +63,7 @@ export default function RatioPicker({
 
   useEffect(() => {
     if (!open) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the dialog stays mounted while closed, so its state has to be re-seeded from the props on every open (and re-open on a different slot). The alternative — keying the dialog — would remount and lose the open/close transition.
     setRatio(mode === 'loose' ? null : current ?? '4:3')
     setUploadSize(size)
   }, [open, current, mode, size])

@@ -608,6 +608,7 @@ function SidebarMenuSkeleton({
 }) {
   // Random width between 50 to 90%.
   const width = React.useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- the jitter is the point of a skeleton line; useMemo([]) draws it once per mounted row, so re-renders do not reshuffle widths under the user.
     return `${Math.floor(Math.random() * 40) + 50}%`
   }, [])
 

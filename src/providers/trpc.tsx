@@ -5,6 +5,7 @@ import superjson from "superjson";
 import type { AppRouter } from "../../api/router";
 import type { ReactNode } from "react";
 
+// eslint-disable-next-line react-refresh/only-export-components -- the tRPC client is co-located with its provider by design; splitting it out would churn import paths across the app to satisfy a dev-only HMR rule.
 export const trpc = createTRPCReact<AppRouter>();
 
 const queryClient = new QueryClient();

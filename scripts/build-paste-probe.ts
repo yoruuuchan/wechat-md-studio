@@ -57,7 +57,6 @@ probes.push(
         const html = renderDoc(parsed, theme, sig).html
         // Pull just the list out of the theme's full render so all five sit in one
         // copied fragment.
-        const list = html.match(/<(ul|section)[\s\S]*?<\/(ul|section)>/)
         return `<p style="margin:12px 0 4px;font-size:12px;color:#1677FF;text-indent:0;"><span leaf="">主题 ${id}（${theme.name}）</span></p>${html.replace(/^<section[^>]*>/, '').replace(/<\/section>$/, '')}`
       })
       .join('\n'),

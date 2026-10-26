@@ -119,6 +119,7 @@ function AuthLayoutContent({
 
   useEffect(() => {
     if (isCollapsed) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- cancels a drag that the collapse just made meaningless: without it the resize listeners stay armed and keep writing a width the collapsed sidebar is not showing. setState during render would fire on every render while collapsed.
       setIsResizing(false);
     }
   }, [isCollapsed]);

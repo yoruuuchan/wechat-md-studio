@@ -7,6 +7,8 @@
 // 每个来源只做三件事：抽出「主题 → 元素样式字典」、给出授权档案、必要时给色板提示。
 // 归一化、色板反推、分类推导、微信红线消毒全部在 lib/ 里共用，换来源不用重写。
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- 这个 importer 在构建期动态加载上游第三方主题模块（loadModule 返回未类型化的 exports），再把它们的字段桥接成内部规格；给这些运行时形状写完整类型没有收益，any 是有意的边界。 */
+
 import fs from 'node:fs'
 import path from 'node:path'
 import * as esbuild from 'esbuild'

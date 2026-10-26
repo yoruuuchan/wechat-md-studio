@@ -20,7 +20,6 @@ import {
   type Credit,
 } from '../../src/lib/credits'
 import {
-  THEME_SOURCES,
   licenseLabel,
   tallyByColor,
   tallyByComplexity,
@@ -34,7 +33,6 @@ import {
   ORIGINAL_LICENSE,
   STYLE_TAGS,
   complexityLabel,
-  type ThemeLicense,
 } from '../../src/lib/theme-meta'
 import pkg from '../../package.json'
 

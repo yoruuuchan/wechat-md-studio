@@ -35,8 +35,10 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   const scrollerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const onScrollRef = useRef(onScroll)
+  // eslint-disable-next-line react-hooks/refs -- "latest callback" ref: kept fresh during render so a scroll event between the render and the next commit still reaches the newest handler. Assigning in an effect would leave the ref one commit stale.
   onScrollRef.current = onScroll
   const onLayoutRef = useRef(onLayout)
+  // eslint-disable-next-line react-hooks/refs -- same pattern as onScrollRef: the ResizeObserver below reads this off the render cycle.
   onLayoutRef.current = onLayout
 
   // Copying part of the preview is a normal Ctrl/Cmd+C away: the browser's own
@@ -62,6 +64,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
   // image resizing the content (caught by the ResizeObserver below).
   const topsRef = useRef<number[] | null>(null)
   const offsetsRef = useRef(blockOffsets)
+  // eslint-disable-next-line react-hooks/refs -- measure() is called from the imperative scroll handle, i.e. outside render, and must see the offsets of the render it is measuring rather than the previously committed ones.
   offsetsRef.current = blockOffsets
 
   useEffect(() => {
