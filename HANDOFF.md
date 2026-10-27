@@ -708,6 +708,22 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 用真实文章复核粘贴瞬间图片直显。备查脚本在 `app/verify-out/live/`（drive/focus/round/
 > paste-check/locate-probe 等，均为诊断工具，非验收脚本）。
 
+> 2026-10-27 修复记录（用户报「粘贴后编辑，正文莫名往里缩进」）：用户给了一篇真实草稿
+> 的编辑页，用 opencli 绑已登录 Chrome 只读取证（`state` + `eval`，未点击未输入）：
+> 同一份 golden 根样式 `<section style="max-width:677px;…;padding:0 10px;…">` 在该草稿里
+> 存在 **11 份**，最深嵌套 3 层，宽度 578→558→538→518，正文实测 578/558/538/518/498 五档；
+> 还有把根样式合并进 `<p>`（`<p style="max-width:677px;…;padding:0 10px">`）的形态。
+> 结论：微信编辑器在编辑/插入时**复制或合并外层的 `<section>`**，横向 `padding` 会逐层叠加成缩进；
+> 10px 内边距 × 嵌套层数就是用户看到的那条「上宽下窄」的分界线（每层窄 20px）。
+> **修复**：golden / minimal / steady 三套手写主题的根容器改成 `max-width:657px` + 去掉
+> `padding:0 10px`——657 = 原 677 减两侧 10px，桌面端排版宽度分毫不变，窄屏（编辑器、手机）
+> 正文改为铺满微信自带的内容区内边距；`max-width` 是幂等的，被复制多少次都不会再缩。
+> 规则写进 [渲染说明](docs/rendering.md#正文兼容规则)，`selection-copy` 的根样式 fixture 与
+> `cdp-verify-selection-copy.mjs` 的 `ROOT_MARK` 同步改成 657。导入主题的 wrapper 内边距是
+> 卡片设计（边框＋底色＋16–28px 内边距），同样会被复制叠加，但那是卡片本身的双框问题，
+> 不在本次范围。**未做**：该草稿里已经嵌套的 11 份根样式仍然存在，需要在编辑器里改 DOM
+> 或重新粘贴才能消掉（用户要求只读，未动）。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。

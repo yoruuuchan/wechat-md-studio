@@ -27,6 +27,7 @@ parser 只产出语义节点和全稿源位置，不为某套主题做视觉判�
 | 结构 | 唯一顶层 `<section>`，允许嵌套；正文不带 `class` / `id` / `<script>` / `<style>` / `<div>` |
 | 文字 | 正文文字包在 `<span leaf="">`；代码块保留缩进并使用 `white-space:pre-wrap` |
 | 样式 | 全内联；禁 `position:fixed/absolute/sticky`、`float`、`display:grid`、`@media`、`@keyframes`；导入样式由 `sanitizeStyle` 清理 |
+| 根容器 | 只写不改变横向几何的声明：宽度用 `max-width` 表达，不写左右 `padding`、固定宽度或百分比缩进 |
 | 盒式模块 | renderer 插入独立空行 `<p style="margin:0;"><span leaf="">&nbsp;</span></p>`，合并连续空行 |
 | 图片 | 空 `src` 生成普通 `图N 说明` 占位段落；单图、轮播、网格都解析 `img:<key>` |
 | 表格 | 真 `<table>`，单元格保留边框、leaf 文字与逐列对齐 |
@@ -34,6 +35,9 @@ parser 只产出语义节点和全稿源位置，不为某套主题做视觉判�
 | 公式 | SVG 另由 [math-sanitize.ts](../src/lib/math-sanitize.ts) 与 [测试](../src/lib/math-sanitize.test.ts) 检查，不把 MathJax 原始输出直接插进正文 |
 
 完整断言以 `verify:themes` 和相邻测试为准，不在其他文档另建规则副本。
+
+根容器为什么不能用左右内边距：微信编辑器会在编辑时**复制或合并外层的 `<section>`**——2026-10-27 在一篇真实草稿里数到同一份 golden 根样式存在 11 份、最深嵌套 3 层，每多一层正文就窄 20px（578 → 558 → 538 → 518），表现就是「正文往下越过某一段之后莫名往里缩」。`max-width` 这类上限是幂等的（657 套在 657 里仍是 657），像素内边距不是。因此横向留白统一折进 `max-width`（657px 上限＝原 677px 容器减两侧 10px），窄屏时正文自然铺满微信给的内容区。
+
 `html:false` 禁止 Markdown 原样 HTML；[comments.ts](../src/lib/comments.ts) 把编辑备注等长空格化，
 保留行号与字符偏移，围栏代码中的注释仍显示。图片 occurrence 扫描与回填必须对称跳过围栏 / 注释，
 否则重复图注会填错图片。对应 [comments.test.ts](../src/lib/comments.test.ts)、

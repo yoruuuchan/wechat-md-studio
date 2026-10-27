@@ -352,7 +352,10 @@ const validateFragment = (html) =>
     })
   })()`).then(JSON.parse)
 
-const ROOT_MARK = 'max-width:677px'
+// Measured on the article root the preview renders: `max-width` is the only
+// width-bearing declaration left up there (padding moved into the cap so that
+// WeChat copying this wrapper onto a block cannot stack an indent).
+const ROOT_MARK = 'max-width:657px'
 const PARA_ATTR = 'text-align:justify'
 const count = (haystack, needle) => haystack.split(needle).length - 1
 // The renderer's markup carries whitespace text nodes between blocks, and the

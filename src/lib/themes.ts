@@ -64,8 +64,12 @@ export const goldenTheme: Theme = {
     color: '冷色',
   }),
 
+  // The gutter is a max-width cap, never horizontal padding: WeChat's editor
+  // copies or merges this wrapper onto the blocks it edits, so padding here
+  // stacks a few pixels per round and the body visibly drifts inwards.
+  // A cap nests idempotently - 657 inside 657 is still 657.
   root: (inner) =>
-    `<section style="max-width:677px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;padding:0 10px;box-sizing:border-box;">${inner}</section>`,
+    `<section style="max-width:657px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;box-sizing:border-box;">${inner}</section>`,
 
   seg: goldenSeg,
 
@@ -159,7 +163,7 @@ export const minimalTheme: Theme = {
   }),
 
   root: (inner) =>
-    `<section style="max-width:677px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;padding:0 10px;box-sizing:border-box;">${inner}</section>`,
+    `<section style="max-width:657px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;box-sizing:border-box;">${inner}</section>`,
 
   seg: minimalSeg,
 
@@ -257,7 +261,7 @@ export const steadyTheme: Theme = {
   }),
 
   root: (inner) =>
-    `<section style="max-width:677px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;padding:0 10px;box-sizing:border-box;">${inner}</section>`,
+    `<section style="max-width:657px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;box-sizing:border-box;">${inner}</section>`,
 
   seg: steadySeg,
 

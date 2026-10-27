@@ -6,7 +6,7 @@ import { serializeWechatSelection } from './selection-copy'
 // whole point of the serializer is which of these styles survive a copy.
 
 const ROOT_STYLE =
-  'max-width:677px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;padding:0 10px;box-sizing:border-box;'
+  'max-width:657px;margin:0 auto;background:#FFFFFF;color:#333333;line-height:1.75;letter-spacing:1px;overflow-x:hidden;box-sizing:border-box;'
 const PARA_STYLE = 'margin:24px 0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:justify;text-indent:2em;color:#333333;'
 const CARD_STYLE = 'margin:0;padding:16px 18px;background:#F6FAFF;border-left:3px solid #1677FF;'
 
