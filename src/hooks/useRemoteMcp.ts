@@ -63,7 +63,9 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
       const next = prev.map((d) => d.id === id ? { ...d, remoteMcp: null } : d)
       // On disconnect keep any already-observed divergent AI version too. A
       // server-side expiry/revocation never discards the browser's own body.
-      if (remote && remote.content !== local.content) {
+      // An unreadable local body is not a comparison: it must not spawn an
+      // empty "AI version" copy either.
+      if (remote && local.contentLoaded !== false && remote.content !== local.content) {
         next.push({ ...createDoc(), name: `${remote.name.slice(0, 188)}${t('mcp.version.ai')}`, content: remote.content })
       }
       return next
@@ -78,6 +80,9 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
     setDocs((prev) => {
       const local = prev.find((d) => d.id === id)
       if (!local || local.remoteMcp?.id !== snap.connection.id) return prev
+      // Applying the remote body over an unreadable local one would discard the
+      // only copy this browser has; wait for the local read to succeed.
+      if (local.contentLoaded === false) return prev
       // Recheck after every network/hash await: typing must win over a late read.
       if (expected && (local.content !== expected.content || local.name !== expected.name)) return prev
       if (local.content === snap.doc.content && local.name === snap.doc.name && local.remoteMcp.baseHash === snap.doc.hash && local.remoteMcp.name === snap.doc.name) return prev
@@ -88,7 +93,9 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
 
   const tick = useCallback(async (id: string) => {
     const local = docsRef.current.find((d) => d.id === id)
-    if (!local?.remoteMcp || conflictsRef.current.has(id)) return
+    // A body that is not in memory cannot be compared or pushed: sending the
+    // placeholder would overwrite the collaboration copy with an empty article.
+    if (!local?.remoteMcp || local.contentLoaded === false || conflictsRef.current.has(id)) return
     const binding = local.remoteMcp
     try {
       const remote = await request<RemoteMcpSnapshot | null>(pathOf(id))
@@ -198,6 +205,9 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
   const resolve = useCallback((choice: 'local' | 'remote' | 'both') => mutate(async () => {
     const local = docsRef.current.find((d) => d.id === activeId)
     if (!local?.remoteMcp) return
+    // Resolving a conflict needs the local text. With the body unreadable there
+    // is nothing safe to compare or upload; retry the local read first.
+    if (local.contentLoaded === false) return
     const remote = await request<RemoteMcpSnapshot | null>(pathOf(activeId))
     if (!remote || remote.connection.id !== local.remoteMcp.id) { detach(activeId, local.remoteMcp.id); return }
     if (choice === 'local') {

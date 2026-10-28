@@ -37,6 +37,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
 | 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、stale save、三种冲突处理、按需正文与草稿箱 |
+| 本机正文读取失败 | `node scripts/cdp-verify-storage-read-failure.mjs 4102 9702` | 一次 / 持续 `getAll` 失败、IndexedDB 打开失败、真实缺失正文、云端 stub、主动清空、旧版迁移失败；每项都核对 IndexedDB 原件未被空串覆盖 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
 | 多图网格 | `node scripts/cdp-verify-gallery.mjs 3221 9353` | 参数、上传前裁切、网格布局、HTML 输出 |
@@ -44,10 +45,12 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
-[sync](../scripts/cdp-verify-docs-sync.mjs)、[diagram](../scripts/cdp-verify-diagram.mjs)、
+[sync](../scripts/cdp-verify-docs-sync.mjs)、[storage-read-failure](../scripts/cdp-verify-storage-read-failure.mjs)、
+[diagram](../scripts/cdp-verify-diagram.mjs)、
 [gallery](../scripts/cdp-verify-gallery.mjs)、
 [carousel-copy](../scripts/cdp-verify-carousel-copy.mjs)、
 [upload-size](../scripts/cdp-verify-upload-size.mjs)。
+本机正文读取失败脚本的 mock 图床用应用端口 +100（默认 4202），数据库为本工作树的 `data/audit-r02.db`。
 脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
 `SKIP` 即使退出码为 0，也不能计作已完成该链路验收。
 
