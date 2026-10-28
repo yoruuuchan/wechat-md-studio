@@ -567,7 +567,12 @@ const EditorPane = forwardRef<EditorHandle, Props>(function EditorPane(
     const view = viewRef.current
     if (!view) return
     const cur = view.state.doc.toString()
-    if (cur !== value) {
+    // CodeMirror stores every line break as LF, so a CRLF article imported from
+    // a file would look different here and get rewritten to LF on mount. Treat
+    // line endings as equivalent: the article keeps the bytes it was imported
+    // with, which is what the Markdown export is defined to hand back.
+    const sameText = cur === value || cur.replace(/\r\n?/g, '\n') === value.replace(/\r\n?/g, '\n')
+    if (!sameText) {
       view.dispatch({ changes: { from: 0, to: cur.length, insert: value } })
     }
   }, [value])

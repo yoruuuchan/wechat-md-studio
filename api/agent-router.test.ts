@@ -127,6 +127,13 @@ describe('the agent door', () => {
     expect((await push('#  ignored\n\n正文', { name: '显式给的名字' })).name).toBe('显式给的名字')
   })
 
+  it('derives the same title when the file uses CRLF or lone CR', async () => {
+    const crlf = '---\r\ntitles:\r\n  - 行尾推稿\r\ncover: 封面\r\n---\r\n\r\n正文\r\n'
+    const cr = '---\rtitles:\r  - 老式行尾推稿\r---\r\r正文\r'
+    expect((await push(crlf)).name).toBe('行尾推稿')
+    expect((await push(cr)).name).toBe('老式行尾推稿')
+  })
+
   it('does not mistake a heading inside a code fence for the title', async () => {
     const created = await push('```md\n# 代码块里的假标题\n```\n\n## 真正的标题\n\n正文')
     expect(created.name).toBe('真正的标题')

@@ -48,6 +48,22 @@ function parseFrontMatter(src: string): { meta: DocMeta; body: string; offset: n
   return { meta, body: src.slice(m[0].length), offset: m[0].split('\n').length - 1 }
 }
 
+function normalizeNewlines(src: string): string {
+  return src.replace(/\r\n?/g, '\n')
+}
+
+/**
+ * The front matter metadata of a whole file, whatever its line endings.
+ *
+ * The Markdown importer names an article from the same convention as the
+ * parser. It used to carry a second scanner, which saw CRLF but not lone CR
+ * and missed the inline `titles: 标题` form, so a file could import under a
+ * different name than the one the parser (and the agent door) derives.
+ */
+export function readDocMeta(src: string): DocMeta {
+  return parseFrontMatter(normalizeNewlines(src)).meta
+}
+
 // ---------- markdown-it ----------
 
 const md = new MarkdownIt({ html: false, linkify: false, breaks: false })
@@ -199,7 +215,13 @@ function scanImageOccurrences(body: string): { alt: string; occurrence: number }
 }
 
 export function parseMarkdown(src: string): Doc {
-  const { meta, body, offset } = parseFrontMatter(src)
+  // markdown-it folds CRLF and lone CR into LF before tokenising. Do it once
+  // here too, so the front-matter scan and the comment / fence / image scans
+  // read the same text markdown-it does. Without this, a CRLF file's front
+  // matter never matches (it needs a bare `\n`) and its titles and cover notes
+  // are parsed as body prose, showing up in the preview and the copied article.
+  const source = normalizeNewlines(src)
+  const { meta, body, offset } = parseFrontMatter(source)
   // Editor notes are source-only. The blanking is length-preserving, so the
   // token maps below still point at the editor's own lines — what changes is
   // that a `<!-- … -->` never survives into the AST.
@@ -227,7 +249,7 @@ export function parseMarkdown(src: string): Doc {
   // Token maps are relative to `body`; every caller wants a whole-file line so
   // the editor can scroll to it. Blocks whose token carries no map inherit the
   // end of the previous one rather than collapsing onto line 0.
-  const totalLines = src.split('\n').length
+  const totalLines = source.split('\n').length
   let lastEnd = 0
   const span = (open: Token | undefined, close?: Token, extraEnd = 0): SourceSpan => {
     const endMap = close?.map ?? open?.map
