@@ -391,7 +391,7 @@ export function collectMaterials(doc: Doc, resolveDiagram: DiagramResolver = () 
  * Returns null when the index does not exist, so callers can report a failure
  * instead of quietly writing to the wrong image.
  */
-interface ImageSpan {
+export interface ImageSpan {
   start: number
   openEnd: number // index just past the opening `![alt](`
   end: number // index of the closing `)`
@@ -435,6 +435,11 @@ function locate(content: string, alt: string, occurrence: number): ImageSpan | n
   if (!span) return null
   if (span.alt !== alt.trim()) return null
   return span
+}
+
+/** Public form of `locate`, for asynchronous write-backs that must capture a span. */
+export function locateImage(content: string, alt: string, occurrence: number): ImageSpan | null {
+  return locate(content, alt, occurrence)
 }
 
 /**

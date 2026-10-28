@@ -53,11 +53,9 @@ import {
 import {
   renderDoc,
   collectMaterials,
-  fillImageSrc,
   clearImageSrc,
   removeImageLine,
   setCarouselRatio,
-  canLocateImage,
   type MaterialItem,
 } from '@/lib/render'
 import { getTheme } from '@/lib/themes'
@@ -92,6 +90,14 @@ import {
   toMarkdownFile,
 } from '@/lib/import-export'
 import { hasSeenOnboarding } from '@/lib/onboarding'
+import {
+  applyImageWriteTarget,
+  applyInsertWriteTarget,
+  captureImageWriteTarget,
+  captureInsertWriteTarget,
+  mapWriteTarget,
+  type WriteTarget,
+} from '@/lib/upload-writeback'
 import { useI18n } from '@/hooks/useI18n'
 import { useIsMobile } from '@/hooks/use-mobile'
 
@@ -134,6 +140,8 @@ const CONFLICT_PREVIEW_CHARS = 20_000
 interface FrameTask {
   files: File[]
   mode: 'carousel' | 'loose'
+  /** The article that was open when the upload started; write-back must target it. */
+  docId: string
   /** Which sidebar slot was clicked; absent for a plain drag-and-drop. */
   item?: MaterialItem
   /** Ratio already fixed by the carousel, if it has one. */
@@ -412,6 +420,188 @@ export default function EditorPage() {
     setDocs((ds) => ds.map((d) => (d.id === activeId ? { ...d, ...patch, updatedAt: Date.now() } : d)))
   }
 
+  /**
+   * Async uploads finish long after they start. They must not write back the
+   * whole article captured at the start: the author may have typed, renamed or
+   * switched articles in the meantime. Every upload therefore carries the id
+   * of the article that started it and a source span, and the span is folded
+   * through each edit made while the request was in flight. If the article or
+   * the span is gone, the upload refuses to write and tells the author.
+   */
+  const docsRef = useRef(docs)
+  docsRef.current = docs
+  const activeIdRef = useRef(activeId)
+  activeIdRef.current = activeId
+  const pendingWrites = useRef<Map<string, { content: string; targets: Map<number, WriteTarget> }>>(
+    new Map(),
+  )
+  const pendingWriteId = useRef(0)
+
+  const syncPendingWrites = useCallback((docId: string, content: string) => {
+    const rec = pendingWrites.current.get(docId)
+    if (!rec || rec.content === content) return
+    for (const target of rec.targets.values()) mapWriteTarget(target, rec.content, content)
+    rec.content = content
+  }, [])
+
+  // Most edits flow through updateActive, but sync, MCP and merge can replace a
+  // body too. Keeping the pending spans current on every render covers both.
+  useEffect(() => {
+    for (const doc of docs) {
+      if (pendingWrites.current.has(doc.id)) syncPendingWrites(doc.id, doc.content)
+    }
+  }, [docs, syncPendingWrites])
+
+  /** The body as the latest commit has it; the editor reports every change here. */
+  const latestContent = (docId: string): string | null =>
+    docsRef.current.find((d) => d.id === docId)?.content ?? null
+
+  const trackWrite = (
+    docId: string,
+    content: string,
+    target: WriteTarget | null,
+  ): number | null => {
+    if (!target) return null
+    syncPendingWrites(docId, content)
+    let rec = pendingWrites.current.get(docId)
+    if (!rec) {
+      rec = { content, targets: new Map() }
+      pendingWrites.current.set(docId, rec)
+    }
+    const id = ++pendingWriteId.current
+    rec.targets.set(id, target)
+    return id
+  }
+
+  const dropWrite = (docId: string, id: number) => {
+    const rec = pendingWrites.current.get(docId)
+    if (!rec) return
+    rec.targets.delete(id)
+    if (!rec.targets.size) pendingWrites.current.delete(docId)
+  }
+
+  const trackImage = (docId: string, alt: string, occurrence: number): number | null => {
+    const content = latestContent(docId)
+    if (content === null) return null
+    return trackWrite(docId, content, captureImageWriteTarget(content, alt, occurrence))
+  }
+
+  const trackInsert = (docId: string, at: number | null): number | null => {
+    const content = latestContent(docId)
+    if (content === null) return null
+    const pos = at ?? editorRef.current?.getState()?.to ?? content.length
+    return trackWrite(docId, content, captureInsertWriteTarget(content, pos))
+  }
+
+  /** Commit an edit to one article on top of its body as it is right now. */
+  const commitDocContent = (
+    docId: string,
+    stateBase: string,
+    base: string,
+    next: string,
+  ): boolean => {
+    if (next === base) return true
+    if (!docsRef.current.some((d) => d.id === docId)) return false
+    const accepted = (d: DocRecord) =>
+      d.content === stateBase || d.content === base || d.content === next
+    docsRef.current = docsRef.current.map((d) =>
+      d.id === docId && accepted(d) ? { ...d, content: next, updatedAt: Date.now() } : d,
+    )
+    setDocs((ds) =>
+      ds.map((d) =>
+        d.id === docId && accepted(d) ? { ...d, content: next, updatedAt: Date.now() } : d,
+      ),
+    )
+    syncPendingWrites(docId, next)
+    return true
+  }
+
+  /** Write a carousel's frame into the article that started the upload. */
+  const changeTrackedRatio = (docId: string, ordinal: number, ratio: CarouselRatio): boolean => {
+    const doc = docsRef.current.find((d) => d.id === docId)
+    if (!doc) return false
+    const base = latestContent(docId) ?? doc.content
+    syncPendingWrites(docId, base)
+    const next = setCarouselRatio(base, ordinal, ratio)
+    if (next === base) return true
+    return commitDocContent(docId, doc.content, base, next)
+  }
+
+  const writeTrackedImage = (docId: string, id: number, ref: string, label: string): boolean => {
+    const doc = docsRef.current.find((d) => d.id === docId)
+    if (!doc) {
+      dropWrite(docId, id)
+      toast.error(t('editor.toast.docGoneDuringUpload', { name: label }))
+      return false
+    }
+    const base = latestContent(docId) ?? doc.content
+    syncPendingWrites(docId, base)
+    const target = pendingWrites.current.get(docId)?.targets.get(id)
+    if (!target || target.kind !== 'image') return false
+    const result = applyImageWriteTarget(base, target, ref)
+    dropWrite(docId, id)
+    if (!result.ok) {
+      toast.error(t('editor.toast.locateFailed', { no: label }), {
+        description: t('editor.toast.locateFailedDesc'),
+      })
+      return false
+    }
+    return commitDocContent(docId, doc.content, base, result.content)
+  }
+
+  const writeTrackedInsert = (
+    docId: string,
+    id: number,
+    markdown: string,
+    label: string,
+  ): boolean => {
+    const doc = docsRef.current.find((d) => d.id === docId)
+    if (!doc) {
+      dropWrite(docId, id)
+      toast.error(t('editor.toast.docGoneDuringUpload', { name: label }))
+      return false
+    }
+    const base = latestContent(docId) ?? doc.content
+    syncPendingWrites(docId, base)
+    const target = pendingWrites.current.get(docId)?.targets.get(id)
+    if (!target || target.kind !== 'insert') return false
+    const result = applyInsertWriteTarget(base, target, markdown)
+    dropWrite(docId, id)
+    if (!result.ok) {
+      toast.error(t('editor.toast.insertPositionLost', { name: label }))
+      return false
+    }
+    const focused = Boolean(document.activeElement?.closest('.cm-editor'))
+    if (activeIdRef.current === docId && focused && editorRef.current?.getState()?.text === base) {
+      // Keep the editor's own insert command for the open article: cursor and
+      // undo history stay intact. The commit below records the same text if
+      // the change listener has not run yet.
+      editorRef.current.insertAt(target.pos, markdown)
+    }
+    return commitDocContent(docId, doc.content, base, result.content)
+  }
+
+  /** Tell the author when a late upload landed in an article other than the open one. */
+  const placementNote = (docId: string): string | undefined => {
+    if (docId === activeIdRef.current) return undefined
+    const doc = docsRef.current.find((d) => d.id === docId)
+    if (!doc) return undefined
+    return t('editor.toast.filledInOtherDoc', {
+      name: doc.name || t('common.unnamedDoc'),
+    })
+  }
+
+  /** Report why an upload target could not be registered. */
+  const reportMissingTarget = (docId: string, label: string) => {
+    if (!docsRef.current.some((d) => d.id === docId)) {
+      toast.error(t('editor.toast.docGoneDuringUpload', { name: label }))
+    } else {
+      toast.error(t('editor.toast.locateFailed', { no: label }), {
+        description: t('editor.toast.locateFailedDesc'),
+      })
+    }
+  }
+
   const handleCopy = async () => {
     if (diagramPending > 0) {
       toast.info(t('editor.toast.diagramPending'), {
@@ -661,44 +851,59 @@ export default function EditorPage() {
     })
   }
 
-  /**
-   * Put a re-cropped image back into the slot it came from. Distinct from the
-   * insert path: the line already exists, so it must be overwritten rather than
-   * added alongside.
-   */
-  const replaceRecropped = (ref: string, task: FrameTask) => {
-    if (!task.item || !activeDoc) return
-    const next = fillImageSrc(activeDoc.content, task.item.alt, task.item.occurrence, ref)
-    if (next === activeDoc.content) {
-      toast.error(t('editor.toast.locateFailed', { no: task.item.no }), { description: t('editor.toast.locateFailedDesc') })
-      return
-    }
-    updateActive({ content: next })
-    toast.success(t('editor.toast.replaced', { no: task.item.no }))
-    announceReplacedImage()
-  }
-
-  /** Loose images: dropped into the editor at the cursor. Cropping is optional. */
+  /** Loose images: dropped into the editor at the drop point. Cropping is optional. */
   const uploadLoose = async (files: File[], ratio?: CarouselRatio | null, task?: FrameTask | null) => {
-    for (const file of files) {
-      if (!/^image\//.test(file.type)) {
+    const docId = task?.docId ?? activeIdRef.current
+    const recrop = Boolean(task?.item && task.replacedKey)
+    const item = task?.item
+    // Capture every drop point before the first request. Registering the next
+    // one after an earlier image has landed would point at the old offset and
+    // put a multi-file drop in reverse order; pre-captured positions are folded
+    // through each insertion instead.
+    const planned = files.map((file) => {
+      if (!/^image\//.test(file.type)) return { file, image: false, targetId: null }
+      return {
+        file,
+        image: true,
+        targetId:
+          recrop && item
+            ? trackImage(docId, item.alt, item.occurrence)
+            : trackInsert(docId, task?.at ?? null),
+      }
+    })
+    for (const { file, image, targetId } of planned) {
+      if (!image) {
         toast.error(t('editor.toast.notImage', { name: file.name }))
         continue
       }
       setUploadingKey(`drop-${file.name}`)
+      const label = recrop && item ? item.no : file.name
+      if (targetId === null) {
+        reportMissingTarget(docId, label)
+        setUploadingKey(null)
+        continue
+      }
       try {
         const { ref, saved } = await uploadOne(file, ratio ?? undefined, task?.uploadSize)
-        if (task?.item && task.replacedKey) {
+        if (recrop && item) {
           // Re-crop of a standalone image via the ratio picker: replace in place.
-          replaceRecropped(ref, task)
+          if (writeTrackedImage(docId, targetId, ref, item.no)) {
+            toast.success(t('editor.toast.replaced', { no: item.no }))
+            announceReplacedImage()
+          }
           continue
         }
         const alt = file.name.replace(/\.[^.]+$/, '')
-        editorRef.current?.insertAt(task?.at ?? null, `![${alt}](${ref})`)
-        toast.success(files.length > 1 ? t('editor.toast.imageFileInserted', { name: file.name }) : t('editor.toast.imageInserted'), {
-          description: saved ?? undefined,
-        })
+        if (writeTrackedInsert(docId, targetId, `![${alt}](${ref})`, file.name)) {
+          toast.success(
+            files.length > 1
+              ? t('editor.toast.imageFileInserted', { name: file.name })
+              : t('editor.toast.imageInserted'),
+            { description: placementNote(docId) ?? saved ?? undefined },
+          )
+        }
       } catch (e) {
+        dropWrite(docId, targetId)
         toast.error(t('editor.toast.uploadFailed', { name: file.name }), {
           description: e instanceof Error ? e.message : t('editor.toast.uploadRetry'),
         })
@@ -768,6 +973,7 @@ export default function EditorPage() {
       // unused; uploading always mints a new key, so the old object stays behind.
       setFrameTask({
         files: [file],
+        docId: activeId,
         item,
         mode: item.kind === '轮播' ? 'carousel' : 'loose',
         replacedKey: key,
@@ -784,27 +990,46 @@ export default function EditorPage() {
   const uploadCroppedBlob = async (blob: Blob, mime: string, task: FrameTask) => {
     const file = task.files[0]
     if (!file) return
+    const docId = task.docId
     const label = task.item?.no ?? file.name
     const isRecrop = Boolean(task.item && task.replacedKey)
     setUploadingKey(task.item ? `${task.item.no}-${task.item.alt}` : `drop-${file.name}`)
+    // The frame change is part of the same upload: write it first, on top of the
+    // latest body, and then register the slot against that version.
+    if (task.mode === 'carousel' && task.item && task.ratio && task.item.ratio !== task.ratio) {
+      changeTrackedRatio(docId, task.item.carouselOrdinal!, task.ratio)
+    }
+    const targetId =
+      task.item && (task.mode === 'carousel' || isRecrop)
+        ? trackImage(docId, task.item.alt, task.item.occurrence)
+        : trackInsert(docId, task.at ?? null)
+    if (targetId === null) {
+      reportMissingTarget(docId, label)
+      setUploadingKey(null)
+      return
+    }
     try {
       const ref = await uploadBlob(blob, mime, file.name)
-      if (task.mode === 'carousel' && task.item && activeDoc) {
-        let content = activeDoc.content
-        if (task.item.ratio !== task.ratio && task.ratio) {
-          content = setCarouselRatio(content, task.item.carouselOrdinal!, task.ratio)
+      if (task.mode === 'carousel' && task.item) {
+        if (writeTrackedImage(docId, targetId, ref, label)) {
+          toast.success(t('editor.toast.croppedFilled', { label }))
+          if (isRecrop) announceReplacedImage()
         }
-        updateActive({ content: fillImageSrc(content, task.item.alt, task.item.occurrence, ref) })
-        toast.success(t('editor.toast.croppedFilled', { label }))
-        if (isRecrop) announceReplacedImage()
-      } else if (isRecrop) {
-        replaceRecropped(ref, task)
+      } else if (isRecrop && task.item) {
+        if (writeTrackedImage(docId, targetId, ref, task.item.no)) {
+          toast.success(t('editor.toast.replaced', { no: task.item.no }))
+          announceReplacedImage()
+        }
       } else {
         const alt = file.name.replace(/\.[^.]+$/, '')
-        editorRef.current?.insertAt(task.at ?? null, `![${alt}](${ref})`)
-        toast.success(t('editor.toast.croppedInserted'))
+        if (writeTrackedInsert(docId, targetId, `![${alt}](${ref})`, label)) {
+          toast.success(t('editor.toast.croppedInserted'), {
+            description: placementNote(docId),
+          })
+        }
       }
     } catch (e) {
+      dropWrite(docId, targetId)
       toast.error(t('editor.toast.uploadFailedPlain'), { description: e instanceof Error ? e.message : t('editor.toast.uploadRetry') })
     } finally {
       setUploadingKey(null)
@@ -820,49 +1045,61 @@ export default function EditorPage() {
    * its fence line by hand — so only a carousel has an ordinal, and only a
    * carousel needs the source rewritten here.
    */
-  const uploadToGroup = async (files: File[], item: MaterialItem, ratio: CarouselRatio) => {
-    if (!activeDoc) return
-    let content = activeDoc.content
-    if (item.carouselOrdinal && item.ratio !== ratio) {
-      content = setCarouselRatio(content, item.carouselOrdinal, ratio)
+  const uploadToGroup = async (
+    files: File[],
+    item: MaterialItem,
+    ratio: CarouselRatio,
+    docId: string,
+  ) => {
+    const doc = docsRef.current.find((d) => d.id === docId)
+    if (!doc) {
+      toast.error(t('editor.toast.docGoneDuringUpload', { name: item.no }))
+      return
     }
+    if (item.carouselOrdinal && item.ratio !== ratio) {
+      changeTrackedRatio(docId, item.carouselOrdinal, ratio)
+    }
+    const source = latestContent(docId) ?? doc.content
+    const sourceMaterials = collectMaterials(parseMarkdown(source))
     const where = item.kind === '画廊' ? t('editor.toast.slotWhereGallery') : t('editor.toast.slotWhereCarousel')
-    let okCount = 0
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      // A block's images are consecutive `![` slots in the source. Fill from the
-      // clicked slot onward by index, so a multi-file drop lands in order.
-      // (The old code substituted the file name as the caption, which never
-      // matched the placeholder text and made every file after the first fail
-      // silently.)
+    // Capture every slot before the first request. Later edits shift occurrence
+    // numbers and can insert same-caption lookalikes; the captured spans are
+    // folded through those edits one by one instead of being looked up again.
+    const planned = files.map((file, i) => {
       const occurrence = item.occurrence + i
-      // Each slot is addressed by its own caption, not the clicked one:
-      // captions may differ between slots, and checking them all against the
-      // clicked caption refused every file after the first.
-      const slot = materials.find((m) => m.occurrence === occurrence)
+      const slot = sourceMaterials.find((m) => m.occurrence === occurrence)
       const sameGroup =
         slot?.kind === item.kind &&
         (item.carouselOrdinal ? slot.carouselOrdinal === item.carouselOrdinal : slot.line === item.line)
-      if (!slot || !sameGroup || !canLocateImage(content, slot.alt, occurrence)) {
+      if (!slot || !sameGroup) return { file, slot: null, targetId: null }
+      return { file, slot, targetId: trackImage(docId, slot.alt, occurrence) }
+    })
+    let okCount = 0
+    for (const { file, slot, targetId } of planned) {
+      if (!slot) {
         toast.warning(t('editor.toast.slotMissed', { name: file.name }), {
           description: t('editor.toast.slotMissedDesc', { where }),
         })
         continue
       }
+      if (targetId === null) {
+        reportMissingTarget(docId, slot.no)
+        continue
+      }
       setUploadingKey(`${item.no}-${item.alt}`)
       try {
         const { ref } = await uploadOne(file, ratio)
-        content = fillImageSrc(content, slot.alt, occurrence, ref)
-        okCount++
+        if (writeTrackedImage(docId, targetId, ref, slot.no)) okCount++
       } catch (e) {
+        dropWrite(docId, targetId)
         toast.error(t('editor.toast.uploadFailed', { name: file.name }), {
           description: e instanceof Error ? e.message : t('editor.toast.uploadRetry'),
         })
       } finally {
         setUploadingKey(null)
       }
+      if (!docsRef.current.some((d) => d.id === docId)) break
     }
-    updateActive({ content })
     // Only claim success for slides that actually uploaded; every failure has
     // already raised its own error toast, so an all-failed batch stays quiet
     // instead of congratulating itself.
@@ -872,11 +1109,13 @@ export default function EditorPage() {
           okCount === files.length
             ? t('editor.toast.batchCroppedAll', { n: okCount, ratio })
             : t('editor.toast.batchCroppedPart', { ok: okCount, total: files.length, ratio }),
-          { description: t('editor.toast.batchCroppedDesc') },
+          { description: placementNote(docId) ?? t('editor.toast.batchCroppedDesc') },
         )
       }
     } else if (okCount > 0) {
-      toast.success(t('editor.toast.slotCropped', { no: item.no, ratio }))
+      toast.success(t('editor.toast.slotCropped', { no: item.no, ratio }), {
+        description: placementNote(docId),
+      })
     }
   }
 
@@ -892,7 +1131,7 @@ export default function EditorPage() {
       toast.error(t('editor.toast.notImage', { name: bad.name }))
     }
     if (!images.length) return
-    setFrameTask({ files: images, mode: 'loose', at })
+    setFrameTask({ files: images, docId: activeId, mode: 'loose', at })
   }
 
   /**
@@ -932,16 +1171,23 @@ export default function EditorPage() {
       toast.error(t('editor.toast.notImageShort', { name: bad.name }))
       return
     }
+    const docId = activeId
     if (item.kind === '单图') {
       // 单图不强制裁切，但给一个选项，省得想统一高度时还得重传
-      setFrameTask({ files, item, mode: 'loose' })
+      setFrameTask({
+        files,
+        docId,
+        item,
+        mode: 'loose',
+        at: editorRef.current?.getState()?.to ?? null,
+      })
       return
     }
     if (item.kind === '画廊') {
       // A gallery's frame is written in its fence line, so there is nothing to
       // pick here — lock the ratio and leave only how to frame the shot. Without
       // the crop the cells keep their own shapes and the grid rows go ragged.
-      setFrameTask({ files, item, mode: 'carousel', locked: item.ratio })
+      setFrameTask({ files, docId, item, mode: 'carousel', locked: item.ratio })
       return
     }
     // Carousel slides always get the dialog. When the carousel ratio is already
@@ -951,6 +1197,7 @@ export default function EditorPage() {
     const carouselHasImage = materials.some((m) => m.carouselOrdinal === item.carouselOrdinal && m.hasSrc)
     setFrameTask({
       files,
+      docId,
       item,
       mode: 'carousel',
       locked: carouselHasImage ? item.ratio : undefined,
@@ -1309,7 +1556,7 @@ export default function EditorPage() {
           if (size !== settings.uploadSize) setSettings((s) => ({ ...s, uploadSize: size }))
           const next = { ...task, uploadSize: size }
           if (task.mode === 'carousel' && task.item && ratio) {
-            void uploadToGroup(next.files, task.item, ratio)
+            void uploadToGroup(next.files, task.item, ratio, next.docId)
           } else {
             // Pass the task so a re-crop replaces the image instead of inserting
             // a second copy at the cursor.
