@@ -16,6 +16,7 @@
 import type { AppSettings, DocRecord } from './store'
 import { isUploadSize } from './image-compress'
 import { t } from './i18n'
+import { readDocMeta } from './parse'
 
 /** Bumped whenever the on-disk shape of a backup changes. */
 export const BUNDLE_VERSION = 1
@@ -135,10 +136,11 @@ export function parseMarkdownFile(
  *
  * Front matter comes first because `titles` is what this app renders as the
  * headline candidates; an `#` heading in the body is usually a section title.
+ * Reading it through the parser keeps LF, CRLF, lone CR and every supported
+ * `titles:` shape naming an article the same way the agent door does.
  */
 function articleName(content: string, filename: string): string {
-  const frontMatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  const fromTitles = frontMatter?.[1].match(/^[ \t]+-[ \t]+(\S.*)$/m)?.[1]?.trim()
+  const fromTitles = readDocMeta(content).titles.map((title) => title.trim()).find(Boolean)
   const fromHeading = content.match(/^#[ \t]+(\S.*)$/m)?.[1]?.trim()
   const fromFile = sanitizeStem(filename)
   const raw = fromTitles || fromHeading || fromFile || t('io.importFallback')

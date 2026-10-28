@@ -259,6 +259,32 @@ describe('parseMarkdownFile', () => {
     const back = parseMarkdownFile(`# ${'标'.repeat(400)}`, 'x.md')
     expect(Array.from(back.name)).toHaveLength(200)
   })
+
+  it('keeps CRLF bytes and names the article from its front matter', () => {
+    const crlf = '---\r\ntitles:\r\n  - 行尾标题\r\ncover: 封面\r\n---\r\n\r\n正文\r\n'
+    const back = parseMarkdownFile(crlf, 'x.md')
+    expect(back).toEqual({ name: '行尾标题', content: crlf })
+    // The export contract: the body is passed through untouched, line endings included.
+    expect(toMarkdownFile(back.name, back.content).content).toBe(crlf)
+  })
+
+  it('derives the name from front matter delimited by lone CR', () => {
+    const cr = '---\rtitles:\r  - 老式行尾\r---\r\r正文\r'
+    expect(parseMarkdownFile(cr, 'x.md').name).toBe('老式行尾')
+  })
+
+  it('derives the name from an inline titles value, as the parser does', () => {
+    expect(parseMarkdownFile('---\ntitles: 内联标题\n---\n\n# 正文标题\n', 'x.md').name).toBe(
+      '内联标题',
+    )
+  })
+
+  it('strips a BOM in front of CRLF front matter', () => {
+    const crlf = '---\r\ntitles:\r\n  - BOM 标题\r\n---\r\n\r\n正文\r\n'
+    const back = parseMarkdownFile(`\uFEFF${crlf}`, 'x.md')
+    expect(back.name).toBe('BOM 标题')
+    expect(back.content).toBe(crlf)
+  })
 })
 
 // ---------- bundle ----------
