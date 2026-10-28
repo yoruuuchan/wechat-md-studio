@@ -80,6 +80,7 @@ function stubOf(meta: RemoteDocMeta): DocRecord {
     source: meta.source,
     baseHash: meta.hash,
     contentLoaded: false,
+    bodyState: 'stub',
   }
 }
 
@@ -90,6 +91,16 @@ function metaFields(meta: RemoteDocMeta) {
     savedAt: meta.savedAt,
     source: meta.source,
   }
+}
+
+/**
+ * True only when the browser actually holds this article's text. A stub lives
+ * on the server; a failed local read or a missing body is unknown, and treating
+ * its placeholder as content would either archive an empty copy or push an
+ * empty article to the cloud.
+ */
+function holdsBody(doc: DocRecord): boolean {
+  return doc.contentLoaded !== false && doc.bodyState === undefined
 }
 
 export async function planMerge(input: MergeInput): Promise<MergePlan> {
@@ -109,11 +120,19 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
       continue
     }
 
+    if (!holdsBody(cached)) {
+      // Unknown local body: keep the record (and its diagnostic state) as it is.
+      // Adopting the cloud hash or comparing the placeholder would let autosave
+      // overwrite either side. A later reload after a successful read reconciles.
+      remoteDocs.push(cached)
+      continue
+    }
+
     const sameContent = meta.hash !== null && (await contentHash(cached.content)) === meta.hash
     if (sameContent) {
       // Same text on both sides — adopt the cache (no fetch needed) and take
       // the cloud's metadata as truth.
-      remoteDocs.push({ ...cached, ...metaFields(meta), contentLoaded: true, baseHash: meta.hash })
+      remoteDocs.push({ ...cached, ...metaFields(meta), contentLoaded: true, bodyState: undefined, baseHash: meta.hash })
       continue
     }
 
@@ -121,7 +140,7 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
       // The cloud still holds the version this browser last synced with, so
       // the cache is one local (unsaved) edit ahead — not a divergence. Keep
       // the edit; the autosave will push it against this base.
-      remoteDocs.push({ ...cached, ...metaFields(meta), contentLoaded: true, baseHash: meta.hash })
+      remoteDocs.push({ ...cached, ...metaFields(meta), contentLoaded: true, bodyState: undefined, baseHash: meta.hash })
       unsynced.push(meta.id)
       continue
     }
@@ -151,6 +170,13 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
     if (trashed.has(d.id)) {
       // Alive here, in the cloud's bin there: leave the browser's copy exactly
       // as it is — neither resurrected into the live list nor dropped.
+      localOnly.push(d)
+      continue
+    }
+    if (!holdsBody(d)) {
+      // A local-only article we could not read stays local: importing the
+      // placeholder as an empty working copy would overwrite its own text on
+      // the next merge.
       localOnly.push(d)
       continue
     }

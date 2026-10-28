@@ -94,6 +94,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   /** Id of the article whose body is being fetched, if any. */
   const [hydrating, setHydrating] = useState<string | null>(null)
   const [hydrateError, setHydrateError] = useState<{ id: string; message: string } | null>(null)
+  /** A manual retry of the local body store is in flight. */
+  const [retryingLocal, setRetryingLocal] = useState(false)
+  /** Bumped after a successful local retry so a paused cloud merge runs again. */
+  const [localRetryVersion, setLocalRetryVersion] = useState(0)
   /**
    * True once we know where we stand relative to the cloud: after the merge
    * completes, or right away when there is no account to merge with. Autosave
@@ -145,6 +149,45 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     })
     if (!enabled) setSyncState('local')
   }, [enabled])
+
+  // A failed local read leaves the affected articles unloaded, with their
+  // original bodies still on disk. Retrying opens the store again and fills
+  // only the bodies we do not hold; text being edited in another article is
+  // left alone.
+  const retryLocalBodies = useCallback(async () => {
+    if (retryingLocal) return
+    setRetryingLocal(true)
+    try {
+      const loaded = await loadDocs()
+      const byId = new Map(loaded.docs.map((d) => [d.id, d]))
+      setDocs((current) => {
+        const next = current.map((d) => {
+          if (d.contentLoaded !== false || d.bodyState === 'stub') return d
+          const fresh = byId.get(d.id)
+          if (!fresh) return d
+          if (fresh.contentLoaded === false) return { ...d, bodyState: fresh.bodyState }
+          return { ...d, content: fresh.content, contentLoaded: true, bodyState: undefined }
+        })
+        // A body whose index entry is gone is recovered the same way the next
+        // page load would show it.
+        const ids = new Set(next.map((d) => d.id))
+        for (const d of loaded.docs) {
+          if (!ids.has(d.id) && d.contentLoaded !== false && !d.deletedAt) {
+            next.push(d)
+            ids.add(d.id)
+          }
+        }
+        return next
+      })
+      // A merge paused by the read failure may run again now.
+      if (!loaded.bodyReadFailed) setLocalRetryVersion((n) => n + 1)
+    } catch {
+      // loadDocs reports its own failures; a retry that still cannot open the
+      // store leaves the same diagnostic in place.
+    } finally {
+      setRetryingLocal(false)
+    }
+  }, [retryingLocal])
 
   // 本地持久化的健康状况：失败一次提示一次，失败状态本身留在顶部状态位上
   useEffect(
@@ -209,6 +252,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       }
 
       const local = await loadDocs()
+      if (local.bodyReadFailed) {
+        // The local articles are unreadable, so they cannot be compared with
+        // the cloud without risking an empty overwrite. Keep the cloud list out
+        // of the merge and try again after the author's retry succeeds.
+        setSyncState('error')
+        setNotice(t('docs.localReadBlocked'))
+        return
+      }
       const trashedIds = new Set((trashQuery.data ?? []).map((t) => t.id))
       const plan = await planMerge({
         local: local.docs.filter((d) => !d.deletedAt),
@@ -329,7 +380,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       .finally(() => {
         reconcilingRef.current = false
       })
-  }, [enabled, listQuery.isSuccess, listQuery.data, trashQuery.isLoading, trashQuery.data, importMutation, saveToDraftsMutation, utils, t])
+  }, [enabled, listQuery.isSuccess, listQuery.data, trashQuery.isLoading, trashQuery.data, importMutation, saveToDraftsMutation, utils, t, localRetryVersion])
 
   // 3. 本地缓存始终跟着写一份（每次改动都写，纯本地，不碰网络）；
   //    只有真正拿到正文的稿件会进缓存，纯元数据的 stub 不写。
@@ -346,7 +397,11 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const hydrateDoc = useCallback(
     async (id: string) => {
       const doc = docsRef.current.find((d) => d.id === id)
+      // Only a cloud stub may be hydrated here. A failed local read or a
+      // missing local body must never turn into a cloud lookup: the doc might
+      // be local-only, and an empty result would delete it from the list.
       if (!doc || doc.contentLoaded !== false) return
+      if (doc.bodyState === 'read-failed' || doc.bodyState === 'missing') return
       setHydrating(id)
       setHydrateError(null)
       try {
@@ -374,6 +429,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
                   source: row.source ?? null,
                   baseHash: row.hash,
                   contentLoaded: true,
+                  bodyState: undefined,
                 }
               : d,
           ),
@@ -391,6 +447,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     if (!enabled || !settled) return
     const doc = docs.find((d) => d.id === activeId)
     if (!doc || doc.contentLoaded !== false) return
+    // Local read failures and missing bodies have their own retry, not a
+    // cloud fetch.
+    if (doc.bodyState !== undefined && doc.bodyState !== 'stub') return
     if (hydrating === doc.id || hydrateError?.id === doc.id) return
     void hydrateDoc(doc.id)
   }, [enabled, settled, docs, activeId, hydrating, hydrateError, hydrateDoc])
@@ -429,6 +488,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             source: row.source ?? null,
             baseHash: row.hash,
             contentLoaded: true,
+            bodyState: undefined,
           }
           lastSavedRef.current.set(doc.id, doc.content)
           setDocs((ds) => (ds.some((x) => x.id === doc.id) ? ds : [doc, ...ds]))
@@ -561,7 +621,13 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       return { ok: false as const, message: t('docs.saveNeedLogin') }
     }
     if (doc.contentLoaded === false) {
-      return { ok: false as const, message: t('docs.saveLoading') }
+      return {
+        ok: false as const,
+        message:
+          doc.bodyState === 'read-failed' || doc.bodyState === 'missing'
+            ? t('docs.saveBodyUnavailable')
+            : t('docs.saveLoading'),
+      }
     }
     if (conflicts.has(doc.id)) {
       return { ok: false as const, message: t('docs.saveConflictFirst') }
@@ -665,6 +731,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
                     source: row.source ?? null,
                     baseHash: row.hash ?? null,
                     contentLoaded: true,
+                    bodyState: undefined,
                   },
                   ...ds,
                 ],
@@ -768,6 +835,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
                 source: current.source,
                 baseHash: current.hash,
                 contentLoaded: true,
+                bodyState: undefined,
               }
             : x,
         ),
@@ -824,6 +892,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
                   source: current.source,
                   baseHash: current.hash,
                   contentLoaded: true,
+                  bodyState: undefined,
                 }
               : x,
           )
@@ -853,8 +922,13 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const hydrateAllForExport = useCallback(async (): Promise<
     { ok: true; docs: DocRecord[] } | { ok: false; message: string }
   > => {
-    if (!enabled) return { ok: true, docs: docsRef.current }
     const current = docsRef.current
+    // A backup must never turn an unknown body into an empty article. Only
+    // cloud stubs can be fetched; anything else already went wrong locally.
+    if (current.some((d) => d.contentLoaded === false && d.bodyState !== 'stub')) {
+      return { ok: false, message: t('docs.exportLocalUnreadable') }
+    }
+    if (!enabled) return { ok: true, docs: current }
     const missing = current.filter((d) => d.contentLoaded === false)
     if (!missing.length) return { ok: true, docs: current }
 
@@ -887,6 +961,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         source: row.source ?? null,
         baseHash: row.hash,
         contentLoaded: true,
+        bodyState: undefined,
       }
     })
     for (const [id, row] of fetched) lastSavedRef.current.set(id, row.content)
@@ -903,6 +978,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           source: row.source ?? null,
           baseHash: row.hash,
           contentLoaded: true,
+          bodyState: undefined,
         }
       }),
     )
@@ -941,6 +1017,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const hasUnsavedChanges = Boolean(activeDoc && dirtyIds.has(activeDoc.id))
   const neverSaved = Boolean(activeDoc && activeDoc.savedAt === null)
   const activeConflict = activeDoc ? conflicts.get(activeDoc.id) ?? null : null
+  // A body that failed to read, or is really absent, must not be edited as if
+  // it were an empty article: the editor shows this instead of the text.
+  const activeBodyError =
+    activeDoc &&
+    activeDoc.contentLoaded === false &&
+    (activeDoc.bodyState === 'read-failed' || activeDoc.bodyState === 'missing')
+      ? t(activeDoc.bodyState === 'read-failed' ? 'docs.bodyReadFailed' : 'docs.bodyMissing')
+      : null
 
   return {
     docs,
@@ -953,6 +1037,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       activeDoc && hydrateError?.id === activeDoc.id && activeDoc.contentLoaded === false
         ? hydrateError.message
         : null,
+    activeBodyError,
+    retryLocalBodies,
+    retryingLocal,
     retryHydrate,
     activeConflict,
     resolveConflictKeepLocal,

@@ -360,3 +360,206 @@ describe('what stays in localStorage', () => {
     expect(blank.deletedAt).toBeNull()
   })
 })
+
+describe('unavailable bodies', () => {
+  async function storedBody(id: string): Promise<string | null> {
+    const { createBodyStore } = await import('./body-store')
+    const store = await createBodyStore()
+    try {
+      return (await store.readAll()).find((r) => r.id === id)?.content ?? null
+    } finally {
+      store.close()
+    }
+  }
+
+  it('keeps the original when the first body read fails, then recovers it on retry', async () => {
+    await saveDocs([doc('a', 'ORIGINAL_BODY_MUST_SURVIVE')], 'a')
+    __resetLocalStoreForTests()
+
+    const spy = vi.spyOn(IDBObjectStore.prototype, 'getAll').mockImplementationOnce(() => {
+      throw new Error('Simulated transient read failure')
+    })
+    try {
+      const loaded = await loadDocs()
+      const a = loaded.docs.find((d) => d.id === 'a')!
+      expect(loaded.bodyReadFailed).toBe(true)
+      expect(a.content).toBe('')
+      expect(a.contentLoaded).toBe(false)
+      expect(a.bodyState).toBe('read-failed')
+      expect(persistenceStatus().failure?.kind).toBe('read-failed')
+
+      // This is what the editor's autosave effect runs with. It must write the
+      // index, not an empty body.
+      expect(await saveDocs(loaded.docs, loaded.activeId)).toBe(true)
+      // A successful write does not repair a failed read.
+      expect(persistenceStatus().failure?.kind).toBe('read-failed')
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(await storedBody('a')).toBe('ORIGINAL_BODY_MUST_SURVIVE')
+
+    __resetLocalStoreForTests()
+    const again = await loadDocs()
+    const a = again.docs.find((d) => d.id === 'a')!
+    expect(a.content).toBe('ORIGINAL_BODY_MUST_SURVIVE')
+    expect(a.contentLoaded).toBe(true)
+    expect(a.bodyState).toBeUndefined()
+    expect(persistenceStatus().healthy).toBe(true)
+  })
+
+  it('distinguishes an emptied article from a missing body', async () => {
+    await saveDocs([doc('empty', '')], 'empty')
+    __resetLocalStoreForTests()
+
+    const emptied = (await loadDocs()).docs.find((d) => d.id === 'empty')!
+    expect(emptied.content).toBe('')
+    expect(emptied.contentLoaded).toBe(true)
+    expect(emptied.bodyState).toBeUndefined()
+    expect(persistenceStatus().failure).toBeNull()
+
+    // The index remembers an id the body store does not have: unknown, not empty.
+    storage.setItem(
+      INDEX_KEY,
+      JSON.stringify({
+        docs: [
+          {
+            id: 'gone',
+            name: 'Missing',
+            updatedAt: 2,
+            savedAt: null,
+            deletedAt: null,
+            source: null,
+            baseHash: null,
+            contentLoaded: true,
+          },
+        ],
+        removed: [],
+      }),
+    )
+    __resetLocalStoreForTests()
+    const missing = await loadDocs()
+    expect(missing.docs[0].contentLoaded).toBe(false)
+    expect(missing.docs[0].bodyState).toBe('missing')
+    expect(persistenceStatus().failure?.kind).toBe('read-failed')
+
+    await saveDocs(missing.docs, missing.activeId)
+    expect(await storedBody('gone')).toBeNull()
+    __resetLocalStoreForTests()
+    expect((await loadDocs()).docs[0].bodyState).toBe('missing')
+  })
+
+  it('indexes a cloud stub without writing an empty body', async () => {
+    storage.setItem(
+      INDEX_KEY,
+      JSON.stringify({
+        docs: [
+          {
+            id: 'stub',
+            name: 'Cloud stub',
+            updatedAt: 2,
+            savedAt: 3,
+            deletedAt: null,
+            source: null,
+            baseHash: '0123456789abcdef',
+            contentLoaded: false,
+          },
+        ],
+        removed: [],
+      }),
+    )
+    __resetLocalStoreForTests()
+
+    const loaded = await loadDocs()
+    expect(loaded.docs[0].contentLoaded).toBe(false)
+    expect(loaded.docs[0].bodyState).toBe('stub')
+    await saveDocs(loaded.docs, loaded.activeId)
+    expect(await storedBody('stub')).toBeNull()
+
+    __resetLocalStoreForTests()
+    expect((await loadDocs()).docs[0].bodyState).toBe('stub')
+  })
+
+  it('does not fall back to an empty store when IndexedDB cannot open', async () => {
+    await saveDocs([doc('a', 'ORIGINAL')], 'a')
+    __resetLocalStoreForTests()
+
+    const spy = vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+      throw new Error('Simulated IndexedDB open failure')
+    })
+    try {
+      const loaded = await loadDocs()
+      expect(loaded.bodyReadFailed).toBe(true)
+      expect(loaded.docs[0].bodyState).toBe('read-failed')
+      await saveDocs(loaded.docs, loaded.activeId)
+    } finally {
+      spy.mockRestore()
+    }
+
+    __resetLocalStoreForTests()
+    const after = await loadDocs()
+    expect(after.docs[0].content).toBe('ORIGINAL')
+  })
+
+  it('does not migrate or delete the legacy copy while bodies cannot be read', async () => {
+    await saveDocs([doc('a', 'INDEXED_BODY')], 'a')
+    storage.setItem(LEGACY_KEY, JSON.stringify([doc('legacy', 'LEGACY_BODY')]))
+    storage.removeItem(MIGRATED_KEY)
+    __resetLocalStoreForTests()
+
+    const spy = vi.spyOn(IDBObjectStore.prototype, 'getAll').mockImplementationOnce(() => {
+      throw new Error('Simulated transient read failure')
+    })
+    try {
+      const loaded = await loadDocs()
+      expect(loaded.bodyReadFailed).toBe(true)
+      expect(storage.getItem(LEGACY_KEY)).not.toBeNull()
+      expect(storage.getItem(MIGRATED_KEY)).toBeNull()
+      expect(loaded.docs.find((d) => d.id === 'legacy')?.content).toBe('LEGACY_BODY')
+      expect(loaded.docs.find((d) => d.id === 'a')?.bodyState).toBe('read-failed')
+      await saveDocs(loaded.docs, loaded.activeId)
+    } finally {
+      spy.mockRestore()
+    }
+
+    expect(await storedBody('a')).toBe('INDEXED_BODY')
+
+    __resetLocalStoreForTests()
+    const again = await loadDocs()
+    expect(again.docs.find((d) => d.id === 'a')?.content).toBe('INDEXED_BODY')
+    expect(again.docs.find((d) => d.id === 'legacy')?.content).toBe('LEGACY_BODY')
+    expect(storage.getItem(LEGACY_KEY)).toBeNull()
+    expect(storage.getItem(MIGRATED_KEY)).toBe('1')
+  })
+
+  it('does not migrate a cloud stub as an empty body', async () => {
+    storage.setItem(LEGACY_KEY, JSON.stringify([doc('legacy', 'LEGACY_BODY')]))
+    storage.setItem(
+      INDEX_KEY,
+      JSON.stringify({
+        docs: [
+          {
+            id: 'stub',
+            name: 'Cloud stub',
+            updatedAt: 2,
+            savedAt: 3,
+            deletedAt: null,
+            source: null,
+            baseHash: '0123456789abcdef',
+            contentLoaded: false,
+            bodyState: 'stub',
+          },
+        ],
+        removed: [],
+      }),
+    )
+    __resetLocalStoreForTests()
+
+    const loaded = await loadDocs()
+    expect(loaded.docs.find((d) => d.id === 'stub')?.bodyState).toBe('stub')
+    // The legacy copy moved, but the stub must not have gained a '' body.
+    expect(await storedBody('stub')).toBeNull()
+    expect(await storedBody('legacy')).toBe('LEGACY_BODY')
+    expect(storage.getItem(MIGRATED_KEY)).toBe('1')
+  })
+})

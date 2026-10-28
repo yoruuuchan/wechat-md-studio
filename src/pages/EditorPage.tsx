@@ -228,6 +228,9 @@ export default function EditorPage() {
     activeDoc,
     activeLoading,
     activeError,
+    activeBodyError,
+    retryLocalBodies,
+    retryingLocal,
     retryHydrate,
     activeConflict,
     resolveConflictKeepLocal,
@@ -235,6 +238,7 @@ export default function EditorPage() {
     resolveConflictKeepBoth,
     hydrateAllForExport,
     syncState,
+    localFault,
     notice,
     clearNotice,
     hasUnsavedChanges,
@@ -413,6 +417,10 @@ export default function EditorPage() {
   }
 
   const handleCopy = async () => {
+    if (activeBodyError) {
+      toast.error(activeBodyError)
+      return
+    }
     if (diagramPending > 0) {
       toast.info(t('editor.toast.diagramPending'), {
         description: t('editor.toast.diagramPendingDesc'),
@@ -433,6 +441,12 @@ export default function EditorPage() {
 
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
     const name = activeDoc?.name || t('io.fallbackArticle')
+    // Copying or exporting the placeholder would hand the author an empty
+    // article. The bundle path has its own check in hydrateAllForExport.
+    if (kind !== 'bundle' && activeBodyError) {
+      toast.error(activeBodyError)
+      return
+    }
     if (kind === 'markdown') {
       const f = toMarkdownFile(name, activeDoc?.content || '')
       downloadFile(f.filename, f.content, f.mime)
@@ -1143,6 +1157,28 @@ export default function EditorPage() {
         remoteConnected={Boolean(activeDoc?.remoteMcp)}
       />
 
+      {/* 本机存储失败不是一次性提示：原因留在页面上，读不出来时可以重试 */}
+      {!localFault.healthy &&
+        (localFault.failure?.kind === 'read-failed' ||
+          localFault.failure?.kind === 'migration-failed' ||
+          localFault.failure?.kind === 'write-failed') && (
+          <div
+            data-local-storage-banner
+            role="status"
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-line-2 bg-surface-sunken px-4 py-1.5 text-[12px] leading-relaxed text-ink-2"
+          >
+            <span className="min-w-0">{localFault.failure?.message}</span>
+            <button
+              data-local-retry
+              onClick={() => void retryLocalBodies()}
+              disabled={retryingLocal}
+              className="ya-btn ya-btn-secondary ya-btn-sm shrink-0"
+            >
+              {t('common.retry')}
+            </button>
+          </div>
+        )}
+
       {/* 窄屏（手机）访客的第一条说明：排版界面是为电脑浏览器设计的 */}
       <div className="flex items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3 md:hidden">
         {t('editor.narrowNote')}
@@ -1187,7 +1223,22 @@ export default function EditorPage() {
             </div>
             <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
             <div className="min-h-0 flex-1">
-              {activeLoading || activeError ? (
+              {activeBodyError ? (
+                <div
+                  data-local-body-error
+                  className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
+                >
+                  <p className="text-[13px] text-ink-2">{activeBodyError}</p>
+                  <button
+                    data-local-retry
+                    onClick={() => void retryLocalBodies()}
+                    disabled={retryingLocal}
+                    className="ya-btn ya-btn-secondary"
+                  >
+                    {t('common.retry')}
+                  </button>
+                </div>
+              ) : activeLoading || activeError ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   {activeLoading ? (
                     <p className="text-[13px] text-ink-3">{t('editor.loadingDoc')}</p>

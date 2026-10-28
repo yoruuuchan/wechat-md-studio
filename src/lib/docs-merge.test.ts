@@ -173,4 +173,27 @@ describe('the login merge', () => {
     expect(plan.toArchive).toHaveLength(1)
     expect(plan.toArchive[0].content).toBe('本机正文')
   })
+
+  it('never merges, uploads or archives with an unknown local body', async () => {
+    const unreadable = localDoc({
+      id: 'unknown',
+      name: '读不出来的稿',
+      content: '',
+      savedAt: NOW,
+      contentLoaded: false,
+      bodyState: 'read-failed',
+    })
+    const remote = await remoteDoc({ id: 'unknown', content: '云端正文' })
+
+    for (const remoteRows of [[], [remote]]) {
+      const plan = await planMerge({ local: [unreadable], remote: remoteRows })
+      expect(plan.toImport).toEqual([])
+      expect(plan.toArchive).toEqual([])
+      expect(plan.unsynced).toEqual([])
+      const kept = plan.docs.find((d) => d.id === 'unknown')!
+      expect(kept.contentLoaded).toBe(false)
+      expect(kept.bodyState).toBe('read-failed')
+      expect(kept.baseHash).toBeNull()
+    }
+  })
 })

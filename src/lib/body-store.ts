@@ -18,7 +18,9 @@
  * Not every environment has IndexedDB (some in-app webviews, some private
  * modes, `file://` in a few browsers). The fallback keeps the bodies in
  * localStorage - the old behavior - and says so through the failure channel, so
- * a quota error there is visible instead of silent.
+ * a quota error there is visible instead of silent. An IndexedDB that exists
+ * but cannot be opened is a different case: it rejects instead of pretending
+ * the browser has no bodies, so a transient failure never reads as "empty".
  */
 
 export interface BodyRecord {
@@ -146,12 +148,17 @@ function createFallbackStore(): BodyStore {
   }
 }
 
-/** A fresh store, opened for real. Callers that only need one keep their own. */
+/**
+ * A fresh store, opened for real. Callers that only need one keep their own.
+ *
+ * A browser without the IndexedDB API keeps the old localStorage behavior. An
+ * IndexedDB that exists but fails to open is *not* the same thing: falling back
+ * to an empty localStorage store would make every article look empty and let
+ * the next autosave write those empties over the real ones. The rejection goes
+ * to the read/write failure channel instead, so the original bodies stay put
+ * and the UI can offer a retry.
+ */
 export async function createBodyStore(): Promise<BodyStore> {
   if (!indexedDbAvailable()) return createFallbackStore()
-  try {
-    return createIndexedDbStore(await openDatabase())
-  } catch {
-    return createFallbackStore()
-  }
+  return createIndexedDbStore(await openDatabase())
 }
