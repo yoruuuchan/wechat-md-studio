@@ -27,6 +27,10 @@ function openDatabase(): DatabaseSync {
   const file = resolveDbPath()
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const db = new DatabaseSync(file)
+  // Uploads reserve their quota with `BEGIN IMMEDIATE`, which is also how two
+  // service processes sharing this file stay honest with each other. Wait for
+  // the other writer instead of turning a normal burst into SQLITE_BUSY / 500.
+  db.exec('PRAGMA busy_timeout = 5000')
   // Tables, created on first use — no migration tooling needed at this size.
   db.exec(`
     CREATE TABLE IF NOT EXISTS files (
@@ -101,6 +105,25 @@ function openDatabase(): DatabaseSync {
       UNIQUE (visitor, localDocId)
     );
     CREATE INDEX IF NOT EXISTS remote_mcp_expiry ON remote_mcp_connections (expiresAt);
+  `)
+
+  // In-flight anonymous uploads. `CREATE TABLE IF NOT EXISTS` is the whole
+  // migration: an existing database picks the table up on the next boot and no
+  // row from before this feature exists, because reservations are ephemeral.
+  // `files` is untouched, so its declared column order (and the positional
+  // mapping HANDOFF pitfall 9 warns about) stays as it was.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS anon_upload_reservations (
+      token TEXT PRIMARY KEY,
+      visitor TEXT NOT NULL,
+      objectKey TEXT NOT NULL,
+      bytes INTEGER NOT NULL,
+      state TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      expiresAt INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS anon_upload_reservations_sweep
+      ON anon_upload_reservations (state, expiresAt);
   `)
 
   // One-off data migrations, recorded so they never run twice.

@@ -58,6 +58,25 @@ function safeName(name: string): string {
 }
 
 /**
+ * A key can be minted before the upload starts. Anonymous uploads claim one
+ * first, so a request that dies without an answer still leaves the key behind
+ * for the reservation sweep to delete the object it may have stored.
+ */
+export function uploadKey(fileName: string): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${safeName(fileName)}`
+}
+
+/**
+ * A worker request must not hang forever: the caller holds an anonymous quota
+ * reservation while it waits. This has to stay well below the reservation lease
+ * (RESERVATION_TTL_MS), otherwise a slow upload could be swept mid-flight.
+ */
+const UPLOAD_TIMEOUT_MS = 30_000
+
+/** Deletes are small; a hung one must not block a sweep or an upload retry. */
+const DELETE_TIMEOUT_MS = 10_000
+
+/**
  * `deleteFile` never throws and never guesses. Every caller has to decide what
  * "not confirmed" means for its own ledger, and the one thing they must not do
  * is treat it as done.
@@ -82,10 +101,14 @@ export const storage = {
     fileContent: Uint8Array
     fileName: string
     contentType?: string
+    /** Pre-minted key (anonymous uploads claim one before the request). */
+    key?: string
+    /** Aborts when the caller hangs up; the worker timeout below applies either way. */
+    signal?: AbortSignal
   }): Promise<UploadedFile> {
-    const key = `${Date.now().toString(36)}-${Math.random()
-      .toString(36)
-      .slice(2, 10)}-${safeName(opts.fileName)}`
+    const key = opts.key ?? uploadKey(opts.fileName)
+    const timeout = AbortSignal.timeout(UPLOAD_TIMEOUT_MS)
+    const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout
 
     const resp = await fetch(endpoint(`/api/upload?key=${encodeURIComponent(key)}`), {
       method: 'PUT',
@@ -95,6 +118,7 @@ export const storage = {
       body: new Blob([new Uint8Array(opts.fileContent)], {
         type: opts.contentType || 'application/octet-stream',
       }),
+      signal,
     })
 
     if (!resp.ok) {
@@ -127,6 +151,7 @@ export const storage = {
       resp = await fetch(endpoint(`/api/upload?key=${encodeURIComponent(key)}`), {
         method: 'DELETE',
         headers: adminHeaders(),
+        signal: AbortSignal.timeout(DELETE_TIMEOUT_MS),
       })
     } catch (e) {
       const err = e as { code?: string; message?: string }

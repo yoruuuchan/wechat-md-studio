@@ -32,7 +32,7 @@ legacy.close()
 
 process.env.DATABASE_URL = `file:${dbFile}`
 
-const { getDb } = await import('./connection')
+const { getDb, getSqlite } = await import('./connection')
 const { files } = await import('../../db/schema')
 
 afterAll(() => {
@@ -76,5 +76,26 @@ describe('upgrading a pre-anonymous database', () => {
 
     const theirs = await db.select({ key: files.key }).from(files).where(scope('visitor-b'))
     expect(theirs).toEqual([])
+  })
+
+  it('creates the anonymous upload reservation table without touching files', () => {
+    const columns = (
+      getSqlite().prepare('PRAGMA table_info(anon_upload_reservations)').all() as { name: string }[]
+    ).map((c) => c.name)
+    expect(columns).toEqual([
+      'token',
+      'visitor',
+      'objectKey',
+      'bytes',
+      'state',
+      'createdAt',
+      'expiresAt',
+    ])
+    // The upgrade is additive: `files` keeps its established column order,
+    // which the positional sqlite-proxy driver depends on.
+    const fileColumns = (getSqlite().prepare('PRAGMA table_info(files)').all() as { name: string }[]).map(
+      (c) => c.name,
+    )
+    expect(fileColumns).toEqual(['key', 'ownerId', 'name', 'size', 'createdAt', 'visitor'])
   })
 })

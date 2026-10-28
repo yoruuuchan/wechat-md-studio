@@ -67,6 +67,36 @@ export const remoteMcpConnections = sqliteTable("remote_mcp_connections", {
 });
 
 /**
+ * Budget claim held between the anonymous quota check and the ledger insert.
+ *
+ * The check and the upload are separated by a network await, so checking the
+ * `files` ledger alone lets every concurrent request pass before the first one
+ * lands. These rows are the atomic part: created inside one `BEGIN IMMEDIATE`
+ * transaction (api/lib/anon-upload.ts), counted by the next request's check,
+ * and removed when the upload settles.
+ *
+ * `state` is `pending` while an upload may be in flight and `cleanup` once the
+ * quota has been released but the object (if any) still has to be deleted.
+ * Only `pending` rows count against a ceiling. `objectKey` is minted *before*
+ * the upload, so even a process that dies mid-request leaves the key behind for
+ * the startup sweep to delete. Rows are ephemeral; the table is created with
+ * `CREATE TABLE IF NOT EXISTS` at boot, so no data migration is needed.
+ */
+export const anonUploadReservations = sqliteTable("anon_upload_reservations", {
+  token: text("token").primaryKey(),
+  visitor: text("visitor").notNull(),
+  objectKey: text("objectKey").notNull(),
+  bytes: integer("bytes").notNull(),
+  /** 'pending' | 'cleanup'. */
+  state: text("state").notNull(),
+  /** Milliseconds, like the Remote MCP leases. */
+  createdAt: integer("createdAt").notNull(),
+  expiresAt: integer("expiresAt").notNull(),
+});
+
+export type AnonUploadReservation = typeof anonUploadReservations.$inferSelect;
+
+/**
  * Single-owner deployment: the app authenticates with one access key, so there
  * is no user table. This shape is kept so upload code can keep referring to
  * `ctx.user` exactly as it did before.

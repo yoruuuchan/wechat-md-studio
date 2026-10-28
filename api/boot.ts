@@ -7,6 +7,7 @@ import { agentRouter } from "./agent-router";
 import { createContext } from "./context";
 import { storage } from "./lib/storage";
 import { startAnonGc } from "./lib/anon-gc";
+import { startAnonUploadRecovery } from "./lib/anon-upload";
 import { env } from "./lib/env";
 import { securityHeaders } from "./lib/security-headers";
 import { warnAboutWeakTokens } from "./lib/agent-auth";
@@ -98,4 +99,11 @@ if (env.isProduction) {
   // serving, and it catches its own errors.
   startAnonGc();
   startRemoteMcpCleanup();
+
+  // A process killed between claiming anonymous quota and recording the upload
+  // leaves a reservation behind. Reclaim those (and retry pending object
+  // deletes) immediately at boot, then every minute: the row names the object,
+  // so none is left unaccounted and no quota stays held for good. Only rows in
+  // this database are touched, which keeps it safe in any environment.
+  startAnonUploadRecovery();
 }

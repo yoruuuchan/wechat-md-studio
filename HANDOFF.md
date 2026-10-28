@@ -104,8 +104,10 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 | 应用 | 每 IP 每分钟 10 次登录尝试（内存计数）。站点公开之后，`auth.login` 是全站唯一能被人坐在那儿一直试的门；超了答 429，口令比较本身仍是常数时间 | 同上，`AUTH_LOGIN_PER_MINUTE`；`api/auth-router.ts` |
 | 应用 | 配置错了不启动：生产环境缺 `ACCESS_KEY` / `SESSION_SECRET`，或用了仓库里公开的占位值，或任何数值旋钮写了非整数 / 越界值，启动时直接报错并点名变量——**不再有「静默拿开发默认值上线」这条路** | `api/lib/env.ts` |
 | 应用 | 安全响应头由代码统一设置（HTML / 静态资源 / API 一致）：CSP、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`，以及只在 HTTPS 请求上发的 HSTS | `api/lib/security-headers.ts` |
-| 应用 | 每访客滚动 24 小时 30 张 / 100 MiB | `api/lib/anon-quota.ts` |
-| 应用 | 全部匿名上传合计 1.5 GiB 封顶 | 同上，`ANON_TOTAL_BYTES` |
+| 应用 | 每访客滚动 24 小时 30 张 / 100 MiB；额度检查与占用写在同一条 SQLite 事务里（`BEGIN IMMEDIATE`），并发上传最多只放到上限 | `api/lib/anon-quota.ts`、`api/lib/anon-upload.ts` |
+| 应用 | 全部匿名上传合计 1.5 GiB 封顶；与访客额度共用同一份原子预留，失败 / 取消 / 超时立即释放 | 同上，`ANON_TOTAL_BYTES` |
+| 应用 | 预留结算：对象 key 先于上传生成并随预留落库；上传失败 / 记账失败转入 `cleanup` 并立即释放额度，宽限期后由清理确认对象已删再删记录；进程中断留下的 `pending` 在 90 秒租约到期后由启动 / 定期清理释放额度。两个服务进程共用一个数据库时同样生效；`anon_upload_reservations` 表随启动自动创建，旧库无需手工迁移 | `api/lib/anon-upload.ts`、`api/queries/connection.ts` |
+| 运维 | 预留清理在启动时跑一次、之后每 60 秒一次：`[anon-upload] sweep requeued=N dropped=N failed=N`；删不掉的另写 `[anon-upload] sweep-failed key=… reason=…` | `api/lib/anon-upload.ts` |
 | 应用 | 匿名图回收（GC）：`ownerId=0`、超过 `ANON_GC_DAYS`（默认 14 天）、且没有任何云端稿件引用（正文里搜不到 `img:<key>`）的图删掉——上面那个 1.5 GiB 池子因此是循环的，不会填满一次就永久拒客。启动 1 分钟后跑一次，之后每 24 小时一次；先让 Worker 确认对象已删，再删账本行，Worker 失败就留着下次重试 | `api/lib/anon-gc.ts` |
 | 应用 | 只认字节头是 jpeg / png / gif / webp 的图；**对外提供的 Content-Type 由字节决定，不信请求头** | `api/lib/image-type.ts` |
 | 应用 | 匿名图片按访客 Cookie 的哈希归属，别人列不出也删不掉 | `api/lib/visitor.ts` |
