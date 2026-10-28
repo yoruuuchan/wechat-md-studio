@@ -3,10 +3,11 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, type SQL } from "drizzle-orm";
 import { MaxImageBytes } from "@contracts/constants";
 import { createRouter, visitorQuery } from "./middleware";
-import { storage, type DeleteResult } from "./lib/storage";
+import { storage, uploadKey, type DeleteResult } from "./lib/storage";
 import { env } from "./lib/env";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
-import { ANON_OWNER_ID, checkAnonQuota, readAnonUsage } from "./lib/anon-quota";
+import { ANON_OWNER_ID } from "./lib/anon-quota";
+import { releaseAnonUpload, reserveAnonUpload, settleAnonUpload } from "./lib/anon-upload";
 import { checkBurst, checkIpDaily, clientIp } from "./lib/burst";
 import { denyLog } from "./lib/deny-log";
 import { getDb } from "./queries/connection";
@@ -23,9 +24,23 @@ function ownScope(ctx: { user?: { id: number }; visitor: string }): SQL {
 }
 
 function toTrpcError(e: unknown): never {
-  const err = e as { code?: string; message?: string; cause?: { code?: string } };
+  const err = e as {
+    name?: string;
+    code?: string;
+    message?: string;
+    cause?: { code?: string; name?: string };
+  };
   const code = err?.code || "";
   const message = err?.message || "";
+  // The two ways a worker request ends without an HTTP answer. Both release the
+  // anonymous claim before this mapping runs; the message just has to say which
+  // one happened instead of surfacing a bare DOMException.
+  const errorName = err?.name || err?.cause?.name || "";
+
+  if (errorName === "TimeoutError")
+    throw new TRPCError({ code: "TIMEOUT", message: "图床上传超时了，稍后再试" });
+  if (errorName === "AbortError")
+    throw new TRPCError({ code: "CLIENT_CLOSED_REQUEST", message: "上传已取消" });
 
   if (code === "STORAGE_FILE_TOO_LARGE")
     throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "图片超过大小限制" });
@@ -87,7 +102,17 @@ export const storageRouter = createRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: `只认 ${ACCEPTED_IMAGE_LABEL} 这几种图片` });
       }
 
-      if (!ctx.user) {
+      const owner = ctx.user;
+      const folder = owner ? `mopai/${owner.id}` : `mopai/v/${ctx.visitor.slice(0, 8)}`;
+      const fileName = `${folder}/${input.name}`;
+
+      /**
+       * Claimed before the worker request and released on every failure path.
+       * Owner uploads do not take one: their budget semantics are unchanged.
+       */
+      let reservation: { token: string; objectKey: string } | undefined;
+
+      if (!owner) {
         // Cheapest check first: the in-memory limits cost nothing, the quota
         // reads the database, and neither should be reached by a flood.
         const ip = clientIp(ctx.req.headers);
@@ -103,29 +128,55 @@ export const storageRouter = createRouter({
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: daily.message ?? "今日上传额度用完了" });
         }
 
-        const verdict = checkAnonQuota(await readAnonUsage(ctx.visitor), bytes.byteLength);
-        if (!verdict.ok) {
-          denyLog("quota", { ip, visitor: ctx.visitor.slice(0, 8), detail: verdict.message });
-          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: verdict.message ?? "上传额度用完了" });
+        // The ceiling check and the claim are one SQLite transaction, so eight
+        // simultaneous requests can no longer all read the same empty ledger
+        // and then all write. The key is minted first: a process that dies
+        // mid-request still leaves the object's name behind for the sweep.
+        const objectKey = uploadKey(fileName);
+        const claimed = await reserveAnonUpload(ctx.visitor, bytes.byteLength, objectKey);
+        if (!claimed.ok) {
+          denyLog("quota", { ip, visitor: ctx.visitor.slice(0, 8), detail: claimed.message });
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: claimed.message });
         }
+        reservation = { token: claimed.token, objectKey };
       }
 
       try {
-        const folder = ctx.user ? `mopai/${ctx.user.id}` : `mopai/v/${ctx.visitor.slice(0, 8)}`;
         const saved = await storage.uploadFile({
+          key: reservation?.objectKey,
           fileContent: bytes,
-          fileName: `${folder}/${input.name}`,
+          fileName,
           contentType: mime,
+          // Abort upstream when the caller goes away; the worker timeout in
+          // storage.ts bounds the wait either way.
+          signal: ctx.req.signal,
         });
-        await getDb().insert(files).values({
-          key: saved.key,
-          ownerId: ctx.user ? ctx.user.id : ANON_OWNER_ID,
-          visitor: ctx.user ? null : ctx.visitor,
-          name: saved.fileName,
-          size: saved.size,
-        });
+        if (reservation) {
+          // Ledger row in, claim out — one transaction, so a crash cannot leave
+          // a recorded image without budget or budget without a recorded image.
+          settleAnonUpload(reservation.token, ctx.visitor, saved);
+        } else if (owner) {
+          await getDb().insert(files).values({
+            key: saved.key,
+            ownerId: owner.id,
+            visitor: null,
+            name: saved.fileName,
+            size: saved.size,
+          });
+        }
         return { key: saved.key, size: saved.size };
       } catch (e) {
+        if (reservation) {
+          const err = e as { code?: string };
+          // A failure before the request leaves this process (worker not
+          // configured) cannot have created an object. Everything else might
+          // have, so keep the pre-minted key on the reservation for the sweep.
+          await releaseAnonUpload({
+            token: reservation.token,
+            objectKey: reservation.objectKey,
+            objectMayExist: err?.code !== "STORAGE_NOT_CONFIGURED",
+          });
+        }
         toTrpcError(e);
       }
     }),

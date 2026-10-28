@@ -88,4 +88,21 @@ describe('storage.uploadFile', () => {
       code: 'STORAGE_UNAUTHORIZED',
     })
   })
+
+  it('uses the pre-minted key an anonymous reservation claimed, and always bounds the request', async () => {
+    const spy = mockFetch(
+      () => new Response('{"key":"claimed-key","size":3}', { status: 200 }),
+    )
+    const saved = await storage.uploadFile({
+      fileContent: new Uint8Array([1, 2, 3]),
+      fileName: 'mopai/v/visitor/a.png',
+      key: 'claimed-key',
+    })
+
+    expect(saved).toEqual({ key: 'claimed-key', fileName: 'mopai/v/visitor/a.png', size: 3 })
+    const [url, init] = spy.mock.calls[0]
+    expect(new URL(String(url)).searchParams.get('key')).toBe('claimed-key')
+    // A hung worker must not hold an anonymous quota claim forever.
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
+  })
 })

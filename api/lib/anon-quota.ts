@@ -1,6 +1,3 @@
-import { and, eq, gte, sql } from 'drizzle-orm'
-import { files } from '../../db/schema'
-import { getDb } from '../queries/connection'
 import { env } from './env'
 
 /**
@@ -10,40 +7,28 @@ import { env } from './env'
  * the one place where a stranger can spend the owner's money and disk. Two
  * ceilings: a rolling 24 h allowance per visitor, and a hard total for every
  * anonymous upload ever kept. The owner's own session is not limited by either.
+ *
+ * This module only decides *whether* a request fits. Reading the usage and then
+ * acting on it is not atomic, so the router never calls the check directly:
+ * api/lib/anon-upload.ts repeats it inside the same SQLite transaction that
+ * writes the reservation, which is what makes concurrent uploads stop at the
+ * ceiling.
  */
 export const ANON_OWNER_ID = 0
 
-const WINDOW_MS = 24 * 60 * 60 * 1000
+export const ANON_WINDOW_MS = 24 * 60 * 60 * 1000
 
 export interface AnonUsage {
-  /** Uploads by this visitor in the last 24 h. */
+  /** Uploads by this visitor in the last 24 h, including reserved but unfinished ones. */
   windowCount: number
   windowBytes: number
-  /** Every anonymous upload still on record, all visitors. */
+  /** Every anonymous upload still on record, all visitors, plus live reservations. */
   totalBytes: number
 }
 
 export interface AnonQuotaVerdict {
   ok: boolean
   message?: string
-}
-
-export async function readAnonUsage(visitor: string): Promise<AnonUsage> {
-  const db = getDb()
-  const since = new Date(Date.now() - WINDOW_MS)
-  const mine = await db
-    .select({ n: sql<number>`count(*)`, b: sql<number>`coalesce(sum(${files.size}), 0)` })
-    .from(files)
-    .where(and(eq(files.ownerId, ANON_OWNER_ID), eq(files.visitor, visitor), gte(files.createdAt, since)))
-  const total = await db
-    .select({ b: sql<number>`coalesce(sum(${files.size}), 0)` })
-    .from(files)
-    .where(eq(files.ownerId, ANON_OWNER_ID))
-  return {
-    windowCount: Number(mine.at(0)?.n ?? 0),
-    windowBytes: Number(mine.at(0)?.b ?? 0),
-    totalBytes: Number(total.at(0)?.b ?? 0),
-  }
 }
 
 export function mb(bytes: number): string {
