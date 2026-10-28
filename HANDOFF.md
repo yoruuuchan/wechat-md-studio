@@ -724,6 +724,15 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 不在本次范围。**未做**：该草稿里已经嵌套的 11 份根样式仍然存在，需要在编辑器里改 DOM
 > 或重新粘贴才能消掉（用户要求只读，未动）。
 
+> 2026-10-28 部署记录（根容器留白修复上线）：`fix/root-gutter-stacking` 快进合并到
+> master（`3c7f773..83a881a`），由主工作区构建——entry `assets/index-BltrsVkN.js`、
+> `dist/boot.js` 3,329,456 B / sha256 `18a74a37…`。整包 32.34 MB，按 4 MB 分 9 块 scp
+> （本次线路全绿，9 块一次过），服务器逐块 sha256 与重组整包 sha256（`ed3a12c2…`）都和
+> 本机一致；`flock` 安装于 **2026-10-28 01:52:07 UTC**（`ExecMainStartTimestamp` 核对一致），
+> `mopai.service` active，本地 `/`、`/login`、`auth.me` 与公网 `https://wechat.yoru-and-akari.dev/`
+> 全 200。线上产物复核：新根样式 `max-width:657px` 在，golden 旧根
+> `padding:0 10px` 已消失。公开仓库随本次普通推送同步（历史未重写）。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
