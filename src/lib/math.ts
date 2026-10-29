@@ -37,13 +37,34 @@
 import mathjaxPkg from 'mathjax-full/package.json'
 import { sanitizeMathSvg } from './math-sanitize'
 import { mathFailure } from './theme-fallbacks'
+import type { Block } from './types'
 
 export interface MathEngine {
   convert(tex: string, display: boolean): string
 }
 
+export type MathEngineLoader = () => Promise<MathEngine>
+
 let engine: MathEngine | null = null
 let loading: Promise<MathEngine> | null = null
+
+/**
+ * The shared engine for the page.
+ *
+ * A rejected load must not stick: the usual cause is a chunk that never arrived,
+ * and the next attempt deserves a fresh request rather than the same rejection
+ * replayed for the rest of the session.
+ */
+async function loadSharedEngine(): Promise<MathEngine> {
+  if (engine) return engine
+  try {
+    engine = await (loading ??= loadEngine())
+    return engine
+  } catch (err) {
+    loading = null
+    throw err
+  }
+}
 
 /**
  * The TeX packages a formula here may use, paired with the module that registers
@@ -158,12 +179,47 @@ async function loadEngine(): Promise<MathEngine> {
   return engine
 }
 
+/**
+ * Whether one formula has its SVG yet.
+ *
+ * `get` alone cannot answer this: it returns markup for a rendered formula and
+ * for a failed one, and null for both "not started" and "in flight". The copy
+ * and HTML-export paths need that distinction to tell a wait from an error.
+ */
+export type MathStatus = 'pending' | 'rendered' | 'failed'
+
 export interface MathSnapshot {
   /**
    * Inner HTML for a formula: its SVG, or a failure box once the TeX is known
    * not to compile. Null only while the formula is still pending.
    */
   get(tex: string, display: boolean): string | null
+  /** Where one formula stands right now. */
+  status(tex: string, display: boolean): MathStatus
+  /**
+   * The MathJax bundles themselves did not load. Waiting will not help until a
+   * later attempt succeeds, so callers should say so instead of showing a
+   * "still rendering" hint.
+   */
+  engineUnavailable(): boolean
+}
+
+/** One formula as the article carries it. */
+export interface MathFormula {
+  tex: string
+  display: boolean
+}
+
+/** What the current article's formulas still need before its HTML is complete. */
+export interface MathReadiness {
+  /** Distinct formulas in the article. */
+  total: number
+  /** Still waiting on MathJax. */
+  pending: number
+  /** TeX that does not compile, in reading order. */
+  failed: string[]
+  /** MathJax is not loaded at all, so `pending` cannot drain on its own. */
+  engineUnavailable: boolean
 }
 
 export interface MathRenderer {
@@ -179,19 +235,73 @@ export interface MathRenderer {
 
 const keyOf = (tex: string, display: boolean) => (display ? 'd' : 'i') + '\u0000' + tex
 
-const EMPTY: MathSnapshot = { get: () => null }
+const EMPTY: MathSnapshot = {
+  get: () => null,
+  status: () => 'pending',
+  engineUnavailable: () => false,
+}
+
+/**
+ * The formulas an article carries, in reading order.
+ *
+ * A repeated formula collapses to one entry: the cache renders it once, and a
+ * hint that said "3 formulas still rendering" for one equation pasted three
+ * times would only confuse the author.
+ */
+export function documentFormulas(blocks: readonly Block[]): MathFormula[] {
+  const seen = new Set<string>()
+  const out: MathFormula[] = []
+  for (const b of blocks) {
+    if (b.type !== 'math') continue
+    const key = keyOf(b.tex, b.display)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ tex: b.tex, display: b.display })
+  }
+  return out
+}
+
+/**
+ * How far the article's formulas are from a complete HTML output.
+ *
+ * Copy and both HTML exports read this one function, so "may I hand this out?"
+ * has a single answer instead of each path checking a different counter.
+ */
+export function mathReadiness(
+  formulas: readonly MathFormula[],
+  snapshot: MathSnapshot,
+): MathReadiness {
+  let pending = 0
+  const failed: string[] = []
+  for (const f of formulas) {
+    const state = snapshot.status(f.tex, f.display)
+    if (state === 'pending') pending++
+    else if (state === 'failed') failed.push(f.tex)
+  }
+  return { total: formulas.length, pending, failed, engineUnavailable: snapshot.engineUnavailable() }
+}
 
 /**
  * One renderer per session. The cache is what makes typing tolerable: re-parsing
  * the document on every keystroke must not re-run MathJax over every formula.
+ *
+ * `load` is injectable so a test can drive the load-failure path without
+ * reaching for the real 38 MB engine; the page uses the shared one.
  */
-export function createMathRenderer(): MathRenderer {
+export function createMathRenderer(load: MathEngineLoader = loadSharedEngine): MathRenderer {
   const cache = new Map<string, string>()
   const failures = new Set<string>()
   const inflight = new Map<string, Promise<boolean>>()
   const listeners = new Set<() => void>()
+  let attempt: Promise<MathEngine> | null = null
+  let engineBroken = false
   let view: MathSnapshot = EMPTY
 
+  const status = (tex: string, display: boolean): MathStatus => {
+    const key = keyOf(tex, display)
+    if (cache.has(key)) return 'rendered'
+    return failures.has(key) ? 'failed' : 'pending'
+  }
   const lookup = (tex: string, display: boolean): string | null => {
     const key = keyOf(tex, display)
     return cache.get(key) ?? (failures.has(key) ? mathFailure(tex) : null)
@@ -199,14 +309,27 @@ export function createMathRenderer(): MathRenderer {
   const publish = () => {
     // A fresh object every time: its identity is the only signal a React caller
     // has that the cache moved.
-    view = { get: lookup }
+    view = { get: lookup, status, engineUnavailable: () => engineBroken }
     listeners.forEach((fn) => fn())
   }
 
   async function run(key: string, tex: string, display: boolean): Promise<boolean> {
+    let e: MathEngine
     try {
-      const e = engine ?? (await (loading ??= loadEngine()))
+      e = await (attempt ??= load())
+    } catch (err) {
+      // The bundles, not the formula. Staying out of `failures` is what keeps a
+      // chunk that never arrived from being reported as broken TeX to the
+      // author. Clearing the attempt is what lets the next ask try again.
+      attempt = null
+      engineBroken = true
+      console.error('[math] engine load failed', err)
+      publish()
+      return false
+    }
+    try {
       cache.set(key, e.convert(tex, display))
+      engineBroken = false
       publish()
       return true
     } catch (e) {
