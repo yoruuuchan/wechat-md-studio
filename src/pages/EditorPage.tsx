@@ -62,6 +62,7 @@ import { getTheme } from '@/lib/themes'
 import { cleanHtml, copyPlain, copyRichText, downloadFile, previewPage } from '@/lib/clipboard'
 import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
+import PaneSwitcher, { type EditorPaneId } from '@/components/PaneSwitcher'
 import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { useRemoteMcp } from '@/hooks/useRemoteMcp'
 import AiWritingDialog from '@/components/AiWritingDialog'
@@ -101,7 +102,7 @@ import {
   type WriteTarget,
 } from '@/lib/upload-writeback'
 import { useI18n } from '@/hooks/useI18n'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { useIsNarrowEditor } from '@/hooks/use-mobile'
 
 function plainTextOf(html: string): string {
   const div = document.createElement('div')
@@ -177,7 +178,9 @@ interface FrameTask {
 
 export default function EditorPage() {
   const { t } = useI18n()
-  const isMobile = useIsMobile()
+  /** Below this the three columns would squeeze, so one pane is shown at a time. */
+  const narrow = useIsNarrowEditor()
+  const [pane, setPane] = useState<EditorPaneId>('editor')
   const [settings, setSettings] = useState(loadSettings)
   const [panelOpen, setPanelOpen] = useState(true)
   /**
@@ -290,13 +293,15 @@ export default function EditorPage() {
   useEffect(() => saveSettings(settings), [settings])
   useEffect(() => applyZoom(settings.zoom), [settings.zoom])
 
-  // First visit only: let the panes settle, then auto-start the tour. Narrow
-  // screens never auto-start; the settings entry can still open it by hand.
+  // First visit only: let the panes settle, then auto-start the tour. The tour
+  // points at the three-column furniture (the side panel in particular), so it
+  // never auto-starts while the single-pane layout is up; the settings entry
+  // can still open it by hand.
   useEffect(() => {
-    if (isMobile || hasSeenOnboarding()) return
+    if (narrow || hasSeenOnboarding()) return
     const timer = window.setTimeout(() => setTourRun((n) => (n === 0 ? 1 : n)), 700)
     return () => window.clearTimeout(timer)
-  }, [isMobile])
+  }, [narrow])
 
   // The article behind an agent's link only exists on the server, so it needs a
   // session. Hand the id to the login page in the URL and let it come back.
@@ -1485,10 +1490,140 @@ export default function EditorPage() {
     }
   }
 
+  // The three panes are built once and then placed either into the desktop
+  // three-column group or into the narrow single-pane switcher. Building the
+  // same elements in both branches is what lets a hidden pane stay mounted:
+  // switching panels, or crossing the breakpoint, does not rebuild the
+  // CodeMirror view, so the caret, the scroll offset and any in-flight upload
+  // survive.
+  const editorPaneBody = (
+    <div
+      data-onboarding="editor"
+      className="flex h-full min-w-0 flex-col bg-surface-sunken"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        // CodeMirror claims drops inside the editor and preventDefaults
+        // them; handling those here too would open a second picker. This
+        // only stops the browser navigating away from a file dropped on the
+        // surrounding chrome.
+        if (e.defaultPrevented) return
+        e.preventDefault()
+      }}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line-2 px-3 py-1.5">
+        <span className="ya-eyebrow">Markdown</span>
+        <div className="flex items-center gap-2">
+          {activeDoc?.remoteMcp && <button data-mcp-editor-status onClick={() => setRemoteMcpOpen(true)} className="ya-link-btn !text-[11px]">
+            {remoteMcp.phase === 'conflict' ? t('editor.mcp.conflict') : remoteMcp.phase === 'error' ? t('editor.mcp.error') : remoteMcp.phase === 'saving' ? t('editor.mcp.saving') : t('editor.mcp.synced')}
+          </button>}
+          <button data-open-ai-writing onClick={() => setAiWritingOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('editor.aiWriting')}</button>
+        </div>
+      </div>
+      <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
+      <div className="min-h-0 flex-1">
+        {activeBodyError ? (
+          <div
+            data-local-body-error
+            className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
+          >
+            <p className="text-[13px] text-ink-2">{activeBodyError}</p>
+            <button
+              data-local-retry
+              onClick={() => void retryLocalBodies()}
+              disabled={retryingLocal}
+              className="ya-btn ya-btn-secondary"
+            >
+              {t('common.retry')}
+            </button>
+          </div>
+        ) : activeLoading || activeError ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+            {activeLoading ? (
+              <p className="text-[13px] text-ink-3">{t('editor.loadingDoc')}</p>
+            ) : (
+              <>
+                <p className="text-[13px] text-ink-2">{activeError}</p>
+                <button onClick={retryHydrate} className="ya-btn ya-btn-secondary">
+                  {t('common.retry')}
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <EditorPane
+            ref={editorRef}
+            value={activeDoc?.content || ''}
+            docKey={activeId}
+            onChange={(content) => updateActive({ content })}
+            onScroll={onEditorScroll}
+            onLayout={onEditorLayout}
+            onFiles={handleEditorFiles}
+            onHtml={handleHtml}
+            onViewState={setViewState}
+            onPaint={brush !== 'off' ? handlePaint : undefined}
+          />
+        )}
+      </div>
+      {activeConflict && !conflictOpen && (
+        <button
+          onClick={() => setConflictOpen(true)}
+          className="flex shrink-0 items-center gap-2 border-t border-warn/40 bg-warn/10 px-4 py-2 text-left text-[12px] text-warn-700 transition-colors hover:bg-warn/20"
+        >
+          <span className="ya-unsaved-dot" />
+          {t('editor.conflictBar')}
+        </button>
+      )}
+    </div>
+  )
+
+  const previewPaneBody = (
+    <PreviewPane
+      ref={previewRef}
+      html={rendered.html}
+      stats={rendered.stats}
+      blockOffsets={rendered.blockOffsets}
+      width={previewWidth}
+      onWidthChange={setPreviewWidth}
+      onScroll={onPreviewScroll}
+      onLayout={onPreviewLayout}
+    />
+  )
+
+  const sidebarPaneBody = (
+    <SidePanel
+      materials={materials}
+      titles={parsed.meta.titles}
+      cover={parsed.meta.cover}
+      sig={settings.sig}
+      onSig={(sig) => setSettings((s) => ({ ...s, sig }))}
+      syncScroll={settings.syncScroll}
+      onSyncScrollChange={(v) => setSettings((s) => ({ ...s, syncScroll: v }))}
+      zoom={settings.zoom}
+      onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
+      onJump={(line) => editorRef.current?.jumpToLine(line)}
+      onCopyTitle={(title) => {
+        void copyPlain(title).then((ok) => {
+          if (ok) toast.success(t('editor.toast.titleCopied'))
+          else toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedDesc') })
+        })
+      }}
+      onUpload={(files, item) => startUpload(files, item)}
+      onClear={clearImage}
+      onRemove={removeImage}
+      onRecrop={(item) => void recropImage(item)}
+      onCarouselRatio={changeCarouselRatio}
+      uploadingKey={uploadingKey}
+      onOpenRemoteMcp={() => setRemoteMcpOpen(true)}
+      remoteConnected={Boolean(activeDoc?.remoteMcp)}
+      onStartOnboarding={startTour}
+    />
+  )
+
   return (
-    <div className="ya-page flex h-screen flex-col overflow-hidden">
+    <div className="ya-page ya-viewport ya-safe-x ya-safe-b flex flex-col overflow-hidden">
       <TopBar
         docs={docs}
+        narrow={narrow}
         activeId={activeId}
         docName={activeDoc?.name || ''}
         onRename={(name) => updateActive({ name })}
@@ -1569,11 +1704,25 @@ export default function EditorPage() {
           </div>
         )}
 
-      {/* 窄屏（手机）访客的第一条说明：排版界面是为电脑浏览器设计的 */}
-      <div className="flex items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3 md:hidden">
-        {t('editor.narrowNote')}
-      </div>
+      {/* 窄屏访客的第二条说明：单面板切换怎么用、想要三栏去哪 */}
+      {narrow && (
+        <div data-narrow-note className="flex shrink-0 items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3">
+          {t('editor.narrowNote')}
+        </div>
+      )}
 
+      {narrow ? (
+        <PaneSwitcher pane={pane} onPaneChange={setPane}>
+          {/* All three panes stay mounted and laid out; the inactive ones are
+              only invisible, so the editor keeps its caret and scroll offset
+              and an in-flight upload keeps running while another pane is up. */}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div role="tabpanel" id="pane-editor" aria-labelledby="pane-tab-editor" data-pane="editor" className={`absolute inset-0 min-h-0 ${pane === 'editor' ? '' : 'invisible pointer-events-none'}`}>{editorPaneBody}</div>
+            <div role="tabpanel" id="pane-preview" aria-labelledby="pane-tab-preview" data-pane="preview" className={`absolute inset-0 min-h-0 ${pane === 'preview' ? '' : 'invisible pointer-events-none'}`}>{previewPaneBody}</div>
+            <div role="tabpanel" id="pane-side" aria-labelledby="pane-tab-side" data-pane="side" className={`absolute inset-0 min-h-0 ${pane === 'side' ? '' : 'invisible pointer-events-none'}`}>{sidebarPaneBody}</div>
+          </div>
+        </PaneSwitcher>
+      ) : (
       <ResizablePanelGroup
         orientation="horizontal"
         className="min-h-0 flex-1"
@@ -1589,99 +1738,14 @@ export default function EditorPage() {
       >
         {/* 左：Markdown 编辑（支持拖图上传） */}
         <ResizablePanel id="editor" defaultSize="55%" minSize="320px" className="min-w-0">
-          <div
-            data-onboarding="editor"
-            className="flex h-full min-w-0 flex-col bg-surface-sunken"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              // CodeMirror claims drops inside the editor and preventDefaults
-              // them; handling those here too would open a second picker. This
-              // only stops the browser navigating away from a file dropped on the
-              // surrounding chrome.
-              if (e.defaultPrevented) return
-              e.preventDefault()
-            }}
-          >
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line-2 px-3 py-1.5">
-              <span className="ya-eyebrow">Markdown</span>
-              <div className="flex items-center gap-2">
-                {activeDoc?.remoteMcp && <button data-mcp-editor-status onClick={() => setRemoteMcpOpen(true)} className="ya-link-btn !text-[11px]">
-                  {remoteMcp.phase === 'conflict' ? t('editor.mcp.conflict') : remoteMcp.phase === 'error' ? t('editor.mcp.error') : remoteMcp.phase === 'saving' ? t('editor.mcp.saving') : t('editor.mcp.synced')}
-                </button>}
-                <button data-open-ai-writing onClick={() => setAiWritingOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('editor.aiWriting')}</button>
-              </div>
-            </div>
-            <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
-            <div className="min-h-0 flex-1">
-              {activeBodyError ? (
-                <div
-                  data-local-body-error
-                  className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
-                >
-                  <p className="text-[13px] text-ink-2">{activeBodyError}</p>
-                  <button
-                    data-local-retry
-                    onClick={() => void retryLocalBodies()}
-                    disabled={retryingLocal}
-                    className="ya-btn ya-btn-secondary"
-                  >
-                    {t('common.retry')}
-                  </button>
-                </div>
-              ) : activeLoading || activeError ? (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                  {activeLoading ? (
-                    <p className="text-[13px] text-ink-3">{t('editor.loadingDoc')}</p>
-                  ) : (
-                    <>
-                      <p className="text-[13px] text-ink-2">{activeError}</p>
-                      <button onClick={retryHydrate} className="ya-btn ya-btn-secondary">
-                        {t('common.retry')}
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <EditorPane
-                  ref={editorRef}
-                  value={activeDoc?.content || ''}
-                  docKey={activeId}
-                  onChange={(content) => updateActive({ content })}
-                  onScroll={onEditorScroll}
-                  onLayout={onEditorLayout}
-                  onFiles={handleEditorFiles}
-                  onHtml={handleHtml}
-                  onViewState={setViewState}
-                  onPaint={brush !== 'off' ? handlePaint : undefined}
-                />
-              )}
-            </div>
-            {activeConflict && !conflictOpen && (
-              <button
-                onClick={() => setConflictOpen(true)}
-                className="flex shrink-0 items-center gap-2 border-t border-warn/40 bg-warn/10 px-4 py-2 text-left text-[12px] text-warn-700 transition-colors hover:bg-warn/20"
-              >
-                <span className="ya-unsaved-dot" />
-                {t('editor.conflictBar')}
-              </button>
-            )}
-          </div>
+          {editorPaneBody}
         </ResizablePanel>
 
         <ResizableHandle withHandle />
 
         {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖） */}
         <ResizablePanel id="preview" defaultSize="500px" minSize="380px" maxSize="820px" className="min-w-0 border-l border-line-2">
-          <PreviewPane
-            ref={previewRef}
-            html={rendered.html}
-            stats={rendered.stats}
-            blockOffsets={rendered.blockOffsets}
-            width={previewWidth}
-            onWidthChange={setPreviewWidth}
-            onScroll={onPreviewScroll}
-            onLayout={onPreviewLayout}
-          />
+          {previewPaneBody}
         </ResizablePanel>
 
         {/* 右：折叠侧栏 */}
@@ -1689,37 +1753,12 @@ export default function EditorPage() {
           <>
             <ResizableHandle withHandle />
             <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" maxSize="520px" className="min-w-0">
-              <SidePanel
-                materials={materials}
-                titles={parsed.meta.titles}
-                cover={parsed.meta.cover}
-                sig={settings.sig}
-                onSig={(sig) => setSettings((s) => ({ ...s, sig }))}
-                syncScroll={settings.syncScroll}
-                onSyncScrollChange={(v) => setSettings((s) => ({ ...s, syncScroll: v }))}
-                zoom={settings.zoom}
-                onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
-                onJump={(line) => editorRef.current?.jumpToLine(line)}
-                onCopyTitle={(title) => {
-                  void copyPlain(title).then((ok) => {
-                    if (ok) toast.success(t('editor.toast.titleCopied'))
-                    else toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedDesc') })
-                  })
-                }}
-                onUpload={(files, item) => startUpload(files, item)}
-                onClear={clearImage}
-                onRemove={removeImage}
-                onRecrop={(item) => void recropImage(item)}
-                onCarouselRatio={changeCarouselRatio}
-                uploadingKey={uploadingKey}
-                onOpenRemoteMcp={() => setRemoteMcpOpen(true)}
-                remoteConnected={Boolean(activeDoc?.remoteMcp)}
-                onStartOnboarding={startTour}
-              />
+              {sidebarPaneBody}
             </ResizablePanel>
           </>
         )}
       </ResizablePanelGroup>
+      )}
 
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
       <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />

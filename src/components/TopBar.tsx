@@ -20,6 +20,8 @@ import type { ArticleSaveStatus } from '@/lib/save-status'
 
 interface Props {
   docs: DocRecord[]
+  /** Narrow layout: the bar keeps only the article name and the primary actions. */
+  narrow: boolean
   activeId: string
   docName: string
   onRename: (name: string) => void
@@ -106,24 +108,48 @@ export default function TopBar(p: Props) {
     </button>
   )
 
+  // The one action that must stay reachable in every layout: copying the
+  // finished article into the WeChat editor.
+  const copyButton = (
+    <button
+      data-onboarding="copy"
+      onClick={p.onCopy}
+      className={`ya-btn ya-btn-primary whitespace-nowrap ${p.narrow ? '!px-2.5 !text-[12px]' : 'px-4'}`}
+    >
+      {p.copying ? (
+        <>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {t('common.copied')}
+        </>
+      ) : (
+        t('topbar.copy')
+      )}
+    </button>
+  )
+
   return (
-    <header className="ya-glass flex h-14 shrink-0 items-center gap-3 px-4">
+    <header
+      data-topbar
+      className={`ya-glass flex h-14 shrink-0 items-center ${p.narrow ? 'gap-2 px-2' : 'gap-3 px-4'}`}
+    >
       {/* 左：标识 + 稿件 */}
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex items-center gap-2.5">
           <YoruMark height={17} />
           <div className="flex items-baseline gap-2">
             <span className="whitespace-nowrap text-[14px] font-bold tracking-wide text-ink-1">{t('app.name')}</span>
-            <span className="ya-eyebrow hidden whitespace-nowrap lg:inline">{APP_BYLINE}</span>
+            <span className="ya-eyebrow hidden whitespace-nowrap xl:inline">{APP_BYLINE}</span>
           </div>
         </div>
-        <span className="h-4 w-px bg-line-2" />
-        <div className="flex items-center rounded-lg transition-colors hover:bg-line-1">
+        <span className={`h-4 w-px bg-line-2 ${p.narrow ? 'hidden' : ''}`} />
+        <div className={`flex items-center rounded-lg transition-colors hover:bg-line-1 ${p.narrow ? 'min-w-0 flex-1' : ''}`}>
           <input
             value={p.docName}
             onChange={(e) => p.onRename(e.target.value)}
             placeholder={t('common.unnamedDoc')}
-            className="w-36 bg-transparent px-1.5 py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4"
+            className={`${p.narrow ? 'w-full min-w-0' : 'w-36'} bg-transparent px-1.5 py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4`}
             title={t('topbar.docNameTitle')}
           />
           <DropdownMenu>
@@ -163,21 +189,27 @@ export default function TopBar(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <SaveStatus
-          status={p.saveStatus}
-          docName={p.docName}
-          readable={p.readable}
-          retryingLocal={p.retryingLocal}
-          onRetryLocal={p.onRetryLocal}
-          onRetryCloud={p.onRetryCloud}
-          onOpenConflict={p.onOpenConflict}
-          onSaveDraft={p.onSaveDraft}
-          onLogin={p.onLogin}
-          onExport={(kind) => p.onExport(kind)}
-          remoteConnected={p.remoteConnected}
-        />
+<div className={p.narrow ? 'min-w-0 max-w-[76px] shrink-0' : 'min-w-0'}>
+          <SaveStatus
+            status={p.saveStatus}
+            docName={p.docName}
+            readable={p.readable}
+            retryingLocal={p.retryingLocal}
+            onRetryLocal={p.onRetryLocal}
+            onRetryCloud={p.onRetryCloud}
+            onOpenConflict={p.onOpenConflict}
+            onSaveDraft={p.onSaveDraft}
+            onLogin={p.onLogin}
+            onExport={(kind) => p.onExport(kind)}
+            remoteConnected={p.remoteConnected}
+          />
+        </div>
       </div>
 
+      {/* 宽屏：主题快切 + 全部动作。窄屏只留稿件名、保存状态和复制，
+          其余收进「更多」，这样没有按钮会被挤出屏幕。 */}
+      {!p.narrow && (
+        <>
       <div className="flex-1" />
 
       {/* 中：主题切换（实时缩略预览） */}
@@ -332,22 +364,7 @@ export default function TopBar(p: Props) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <button
-          data-onboarding="copy"
-          onClick={p.onCopy}
-          className="ya-btn ya-btn-primary px-4"
-        >
-          {p.copying ? (
-            <>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {t('common.copied')}
-            </>
-          ) : (
-            t('topbar.copy')
-          )}
-        </button>
+        {copyButton}
 
         <button
           onClick={p.onTogglePanel}
@@ -370,7 +387,7 @@ export default function TopBar(p: Props) {
             target="_blank"
             rel="noreferrer"
             title={t('topbar.github')}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-1 transition-colors hover:bg-line-1"
+            className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-1 transition-colors hover:bg-line-1 xl:flex"
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.66.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .31.21.67.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/>
@@ -397,13 +414,96 @@ export default function TopBar(p: Props) {
         ) : (
           <button
             onClick={p.onLogin}
-            className="ya-link-btn whitespace-nowrap !px-2.5 !py-1.5 !text-[12px]"
+            className="ya-link-btn whitespace-nowrap !px-2 !py-1.5 !text-[12px]"
             title={t('topbar.loginTitle')}
           >
             {t('topbar.login')}
           </button>
         )}
       </div>
+        </>
+      )}
+
+      {p.narrow && (
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {copyButton}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                data-topbar-more
+                className="ya-btn ya-btn-secondary whitespace-nowrap !px-2.5 !text-[12px]"
+                title={t('topbar.moreTitle')}
+              >
+                {t('topbar.more')}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="ya-pop w-64 border-none">
+              <DropdownMenuItem onSelect={p.onSaveDraft} disabled={p.saving} className="rounded-lg">
+                {t('topbar.save')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={p.onOpenDrafts} className="rounded-lg">
+                {t('topbar.drafts')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={p.onOpenMaterials} className="rounded-lg">
+                {t('topbar.materials')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={p.onOpenThemes} className="rounded-lg">
+                {t('topbar.themes.viewAll', { n: THEMES.length })}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <p className="ya-eyebrow px-2 pb-1 pt-1.5">{t('topbar.import')}</p>
+              <DropdownMenuItem data-import="markdown" onSelect={() => p.onImport('markdown')} className="rounded-lg">
+                {t('topbar.import.markdown')}
+              </DropdownMenuItem>
+              <DropdownMenuItem data-import="docx" onSelect={() => p.onImport('docx')} className="rounded-lg">
+                {t('topbar.import.docx')}
+              </DropdownMenuItem>
+              <DropdownMenuItem data-import="bundle" onSelect={() => p.onImport('bundle')} className="rounded-lg">
+                {t('topbar.import.bundle')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <p className="ya-eyebrow px-2 pb-1 pt-1.5">{t('topbar.export')}</p>
+              <DropdownMenuItem data-export="markdown" onSelect={() => p.onExport('markdown')} className="rounded-lg">
+                {t('topbar.export.markdown')}
+              </DropdownMenuItem>
+              <DropdownMenuItem data-export="clean" onSelect={() => p.onExport('clean')} className="rounded-lg">
+                {t('topbar.export.clean')}
+              </DropdownMenuItem>
+              <DropdownMenuItem data-export="page" onSelect={() => p.onExport('page')} className="rounded-lg">
+                {t('topbar.export.page')}
+              </DropdownMenuItem>
+              <DropdownMenuItem data-export="bundle" onSelect={() => p.onExport('bundle')} className="rounded-lg">
+                {t('topbar.export.bundle')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <p className="ya-eyebrow px-2 pb-1 pt-1.5">{t('topbar.moreLook')}</p>
+              <div className="flex items-center justify-between gap-2 px-2 pb-1.5">
+                <LanguageToggle />
+                <ThemeToggle />
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={p.onOpenReferences} className="rounded-lg">
+                {t('topbar.references')}
+              </DropdownMenuItem>
+              {REPO_URL && (
+                <DropdownMenuItem asChild className="rounded-lg">
+                  <a href={REPO_URL} target="_blank" rel="noreferrer">{t('topbar.github')}</a>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              {p.userName ? (
+                <DropdownMenuItem onSelect={p.onLogout} className="rounded-lg">
+                  {t('topbar.logout')}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onSelect={p.onLogin} className="rounded-lg">
+                  {t('topbar.login')}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </header>
   )
 }

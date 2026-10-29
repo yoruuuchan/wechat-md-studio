@@ -14,7 +14,7 @@
 
 [主题库](https://wechat.yoru-and-akari.dev/themes) · [写作 Skill](https://wechat.yoru-and-akari.dev/skill.md) · [开源致谢](https://wechat.yoru-and-akari.dev/references)
 
-by Yoru。一个自己持续使用、慢慢完善的个人项目。界面支持「中文 / English」切换（默认中文，选择记在本机），主要为电脑浏览器设计；觉得好用，欢迎在 [GitHub](https://github.com/yoruuuchan/wechat-md-studio) 留个 Star。
+by Yoru。一个自己持续使用、慢慢完善的个人项目。界面支持「中文 / English」切换（默认中文，选择记在本机）；电脑浏览器上是可拖拽的三栏，窄屏则换成「编辑 / 预览 / 图片与设置」的单面板切换。觉得好用，欢迎在 [GitHub](https://github.com/yoruuuchan/wechat-md-studio) 留个 Star。
 
 | akari（亮） | yoru（暗） |
 |:--:|:--:|
