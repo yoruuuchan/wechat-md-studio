@@ -255,7 +255,8 @@ export default function EditorPage() {
     resolveConflictUseRemote,
     resolveConflictKeepBoth,
     hydrateAllForExport,
-    syncState,
+    saveStatus,
+    retryCloudSave,
     localFault,
     notice,
     clearNotice,
@@ -1419,14 +1420,19 @@ export default function EditorPage() {
             },
           })
         }}
-        syncState={syncState}
+        saveStatus={saveStatus}
+        readable={Boolean(activeDoc && activeDoc.contentLoaded !== false)}
+        retryingLocal={retryingLocal}
+        onRetryLocal={() => void retryLocalBodies()}
+        onRetryCloud={() => void retryCloudSave()}
+        onOpenConflict={() => setConflictOpen(true)}
         onSaveDraft={() => {
           void saveCurrentToDrafts().then((res) => {
             if (res.ok) toast.success(t('editor.toast.savedDraft'))
             else toast.error(res.message)
           })
         }}
-        saving={syncState === 'saving'}
+        saving={saveStatus?.cloud === 'saving'}
         unsaved={hasUnsavedChanges || neverSaved}
         onOpenDrafts={() => navigate('/drafts')}
         onOpenMaterials={() => navigate('/materials')}
@@ -1458,24 +1464,17 @@ export default function EditorPage() {
       />
 
       {/* 本机存储失败不是一次性提示：原因留在页面上，读不出来时可以重试 */}
-      {!localFault.healthy &&
-        (localFault.failure?.kind === 'read-failed' ||
-          localFault.failure?.kind === 'migration-failed' ||
-          localFault.failure?.kind === 'write-failed') && (
+      {!localFault.healthy && (
           <div
             data-local-storage-banner
             role="status"
             className="flex shrink-0 items-center justify-between gap-3 border-b border-line-2 bg-surface-sunken px-4 py-1.5 text-[12px] leading-relaxed text-ink-2"
           >
             <span className="min-w-0">{localFault.failure?.message}</span>
-            <button
-              data-local-retry
-              onClick={() => void retryLocalBodies()}
-              disabled={retryingLocal}
-              className="ya-btn ya-btn-secondary ya-btn-sm shrink-0"
-            >
-              {t('common.retry')}
-            </button>
+            <div className="flex shrink-0 gap-2">
+              <button data-local-retry onClick={() => void retryLocalBodies()} disabled={retryingLocal} className="ya-btn ya-btn-secondary ya-btn-sm">{t('common.retry')}</button>
+              <button data-local-export onClick={() => void handleExport('markdown')} disabled={!activeDoc || activeDoc.contentLoaded === false} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.export')}</button>
+            </div>
           </div>
         )}
 

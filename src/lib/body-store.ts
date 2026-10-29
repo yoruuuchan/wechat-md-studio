@@ -28,6 +28,8 @@
 export interface BodyRecord {
   id: string
   content: string
+  /** Time this record was written; callers expose it only after commit succeeds. */
+  storedAt?: number
   /** Persisted with the body, so another tab can compare its editing base. */
   revision?: number
   /** The document index entry; committed atomically with the corresponding body. */

@@ -15,6 +15,8 @@ import { YoruMark } from '@/components/YoruMark'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageToggle } from '@/components/LanguageToggle'
 import { useI18n } from '@/hooks/useI18n'
+import { SaveStatus } from '@/components/SaveStatus'
+import type { ArticleSaveStatus } from '@/lib/save-status'
 
 interface Props {
   docs: DocRecord[]
@@ -26,7 +28,12 @@ interface Props {
   /** Open a fresh copy of the syntax-showcase article. */
   onCreateSample: () => void
   onDeleteDoc: (id: string) => void
-  syncState: 'loading' | 'synced' | 'saving' | 'local' | 'error' | 'local-error'
+  saveStatus: ArticleSaveStatus | null
+  readable: boolean
+  retryingLocal: boolean
+  onRetryLocal: () => void
+  onRetryCloud: () => void
+  onOpenConflict: () => void
   /** Put the open article into the drafts box. Nothing else does that. */
   onSaveDraft: () => void
   saving: boolean
@@ -60,21 +67,6 @@ const THEME_DOT: Record<string, string> = {
 
 export default function TopBar(p: Props) {
   const { t } = useI18n()
-  const syncLabel =
-    p.remoteConnected && p.syncState === 'local'
-      ? { text: t('topbar.sync.localMcp'), color: 'var(--primary-500)', title: t('topbar.sync.localMcpTitle') }
-      : {
-          loading: { text: t('topbar.sync.loading'), color: 'var(--ink-3)', title: t('topbar.sync.loadingTitle') },
-          saving: { text: t('topbar.sync.saving'), color: 'var(--primary-500)', title: t('topbar.sync.savingTitle') },
-          synced: { text: t('topbar.sync.synced'), color: 'var(--success-500)', title: t('topbar.sync.syncedTitle') },
-          local: { text: t('topbar.sync.local'), color: 'var(--warning-700)', title: t('topbar.sync.localTitle') },
-          error: { text: t('topbar.sync.error'), color: 'var(--error-500)', title: t('topbar.sync.errorTitle') },
-          'local-error': {
-            text: t('topbar.sync.localError'),
-            color: 'var(--error-500)',
-            title: t('topbar.sync.localErrorTitle'),
-          },
-        }[p.syncState]
   const [themeOpen, setThemeOpen] = useState(false)
   const activeTheme = THEMES.find((th) => th.id === p.themeId) || THEMES[0]
   const { favorites } = useThemeFavorites()
@@ -171,13 +163,19 @@ export default function TopBar(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <span
-          className="shrink-0 text-[11px] tabular-nums"
-          style={{ color: syncLabel.color, fontFamily: 'var(--font-mono)' }}
-          title={syncLabel.title}
-        >
-          {syncLabel.text}
-        </span>
+        <SaveStatus
+          status={p.saveStatus}
+          docName={p.docName}
+          readable={p.readable}
+          retryingLocal={p.retryingLocal}
+          onRetryLocal={p.onRetryLocal}
+          onRetryCloud={p.onRetryCloud}
+          onOpenConflict={p.onOpenConflict}
+          onSaveDraft={p.onSaveDraft}
+          onLogin={p.onLogin}
+          onExport={() => p.onExport('markdown')}
+          remoteConnected={p.remoteConnected}
+        />
       </div>
 
       <div className="flex-1" />
