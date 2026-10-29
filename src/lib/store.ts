@@ -1,7 +1,17 @@
 import type { SignatureConfig } from './types'
 import type { UploadSizeChoice } from './image-compress'
 import { SAMPLE_DOC } from './sample'
-import { createBodyStore, type BodyStore } from './body-store'
+import { createBodyStore, type BodyRecord, type BodyStore } from './body-store'
+import {
+  bodyFromDocument,
+  documentFromBody,
+  mergeLocalCommit,
+  planLocalCommit,
+  sameLocalDoc,
+  type LocalCommit,
+  type LocalDocChange,
+  type LocalDocRecord,
+} from './local-docs'
 import type { RemoteMcpBinding } from '@contracts/remote-mcp'
 import { t } from './i18n'
 
@@ -39,6 +49,8 @@ export interface DocRecord {
   bodyState?: BodyState
   /** Separate collaboration base; never mix it with the owner's cloud baseHash. */
   remoteMcp?: RemoteMcpBinding | null
+  /** Local IndexedDB revision; it protects tabs, not cloud writes. */
+  localRevision?: number
 }
 
 /** Why a record has no trustworthy body in memory. See `DocRecord.bodyState`. */
@@ -55,7 +67,7 @@ export function hasCloudCopy(doc: Pick<DocRecord, 'savedAt' | 'baseHash'>): bool
 }
 
 /** Everything about a document except its body. Small enough for localStorage. */
-type DocIndexEntry = Omit<DocRecord, 'content'>
+type DocIndexEntry = Omit<DocRecord, 'content' | 'localRevision'>
 
 export interface AppSettings {
   themeId: string
@@ -92,6 +104,56 @@ interface DocIndex {
   removed: string[]
 }
 
+const LOCAL_CHANGE_KEY = 'mopai.local-change.v1'
+const LOCAL_CHANNEL = 'mopai.local-docs.v1'
+const LOCAL_TAB_ID = uid()
+let localChannel: BroadcastChannel | null = null
+const localChangeListeners = new Set<() => void>()
+
+function dispatchLocalChange(): void {
+  for (const listener of localChangeListeners) listener()
+}
+
+function handleRemoteLocalChange(source: unknown): void {
+  if (typeof source === 'string' && source !== LOCAL_TAB_ID) dispatchLocalChange()
+}
+
+function onLocalChangeStorage(event: StorageEvent): void {
+  if (event.key !== LOCAL_CHANGE_KEY || !event.newValue) return
+  try {
+    const value = JSON.parse(event.newValue) as { source?: unknown }
+    handleRemoteLocalChange(value.source)
+  } catch {
+    // Another tab wrote an incompatible notification. A delayed save still
+    // protects the data through the IndexedDB revision check.
+  }
+}
+
+/**
+ * Wake other tabs after a local commit. The notification is only an accelerator:
+ * every write independently verifies the persisted revision in its transaction.
+ */
+export function subscribeLocalDocChanges(listener: () => void): () => void {
+  localChangeListeners.add(listener)
+  if (!localChannel && typeof BroadcastChannel !== 'undefined') {
+    localChannel = new BroadcastChannel(LOCAL_CHANNEL)
+    localChannel.onmessage = (event) => {
+      const source = (event.data as { source?: unknown } | null)?.source
+      handleRemoteLocalChange(source)
+    }
+  }
+  if (typeof window !== 'undefined') window.addEventListener('storage', onLocalChangeStorage)
+  return () => {
+    localChangeListeners.delete(listener)
+    if (typeof window !== 'undefined') window.removeEventListener('storage', onLocalChangeStorage)
+  }
+}
+
+function notifyLocalDocChange(): void {
+  localChannel?.postMessage({ source: LOCAL_TAB_ID })
+  safeSet(LOCAL_CHANGE_KEY, JSON.stringify({ source: LOCAL_TAB_ID, at: Date.now() }))
+}
+
 export type PersistenceFailureKind =
   | 'unsupported'
   | 'quota'
@@ -120,6 +182,15 @@ const listeners = new Set<(s: PersistenceStatus) => void>()
  * Cleared only by a successful `readBodies`.
  */
 let bodiesReadFailed = false
+
+/**
+ * The last local version this page knew was committed. Saves compare against
+ * this, while the IndexedDB transaction compares again against the persisted
+ * revision so a missed BroadcastChannel event cannot turn into an overwrite.
+ */
+let confirmed = new Map<string, LocalDocRecord>()
+const conflictIds = new Map<string, { baseRevision: number; id: string }>()
+let saveQueue: Promise<void> = Promise.resolve()
 
 export function persistenceStatus(): PersistenceStatus {
   return status
@@ -166,16 +237,19 @@ export function __resetLocalStoreForTests(): void {
   openStore?.close()
   openStore = null
   storePromise = null
-  written.clear()
+  confirmed = new Map()
+  conflictIds.clear()
+  saveQueue = Promise.resolve()
   bodiesReadFailed = false
   status = HEALTHY
   listeners.clear()
+  localChannel?.close()
+  localChannel = null
+  localChangeListeners.clear()
 }
 
 let storePromise: Promise<BodyStore> | null = null
 let openStore: BodyStore | null = null
-/** What is already in the body store, so a keystroke does not rewrite the article twice. */
-const written = new Map<string, string>()
 
 function bodyStore(): Promise<BodyStore> {
   if (!storePromise) {
@@ -307,16 +381,14 @@ function readLegacyDocs(): DocRecord[] | null {
 }
 
 interface BodiesRead {
-  bodies: Map<string, string>
+  bodies: Map<string, BodyRecord>
   failed: boolean
 }
 
 async function readBodies(): Promise<BodiesRead> {
   try {
     const rows = await (await bodyStore()).readAll()
-    const map = new Map(rows.map((r) => [r.id, r.content]))
-    written.clear()
-    for (const [id, content] of map) written.set(id, content)
+    const map = new Map(rows.map((row) => [row.id, row]))
     bodiesReadFailed = false
     return { bodies: map, failed: false }
   } catch (e) {
@@ -347,21 +419,36 @@ export interface Loaded {
  *    entry *present* with `content: ''` is an article the author really emptied,
  *    and loads as loaded.
  */
-function hydrate(entries: DocIndexEntry[], bodies: Map<string, string>, bodiesFailed: boolean): DocRecord[] {
-  return entries.map((entry) => {
+function hydrate(entries: DocIndexEntry[], bodies: Map<string, BodyRecord>, bodiesFailed: boolean): DocRecord[] {
+  const out: DocRecord[] = []
+  for (const entry of entries) {
+    const body = bodies.get(entry.id)
+    // A durable tombstone wins over every stale index row.
+    if (body?.removed) continue
     const declared = entry.bodyState
     // A stub is not a missing local body: it is a body that lives on the server.
     if (entry.contentLoaded === false && (declared === 'stub' || declared === undefined)) {
-      return { ...entry, content: '', contentLoaded: false, bodyState: 'stub' }
+      out.push({ ...entry, content: '', contentLoaded: false, bodyState: 'stub' })
+      continue
     }
     if (bodiesFailed) {
-      return { ...entry, content: '', contentLoaded: false, bodyState: 'read-failed' }
+      out.push({ ...entry, content: '', contentLoaded: false, bodyState: 'read-failed' })
+      continue
     }
-    if (!bodies.has(entry.id)) {
-      return { ...entry, content: '', contentLoaded: false, bodyState: 'missing' }
+    if (!body) {
+      out.push({ ...entry, content: '', contentLoaded: false, bodyState: 'missing' })
+      continue
     }
-    return { ...entry, content: bodies.get(entry.id) as string, contentLoaded: true, bodyState: undefined }
-  })
+    const stored = documentFromBody(body, entry as LocalDocRecord)
+    out.push(stored ?? {
+      ...entry,
+      content: body.content,
+      contentLoaded: true,
+      bodyState: undefined,
+      localRevision: body.revision ?? 0,
+    })
+  }
+  return out
 }
 
 function bodyMissingReport(docs: DocRecord[]): void {
@@ -376,7 +463,8 @@ function bodyMissingReport(docs: DocRecord[]): void {
  * from IndexedDB, and - on the first run after this upgrade - a migration of the
  * old localStorage documents.
  */
-export async function loadDocs(): Promise<Loaded> {
+export async function loadDocs(options: { trackBase?: boolean } = {}): Promise<Loaded> {
+  const trackBase = options.trackBase !== false
   const legacy = readLegacyDocs()
   const index = readIndex()
   const { bodies, failed: bodiesFailed } = await readBodies()
@@ -397,15 +485,22 @@ export async function loadDocs(): Promise<Loaded> {
     if (bodiesFailed || !(await migrate(docs, removed))) {
       // Keep working on the legacy data in memory, keep the legacy key on disk,
       // and try again next load. Nothing is lost; the user is told.
+      if (trackBase) rememberLocalDocs(docs)
       return { docs, activeId: pickActive(docs, safeGet(ACTIVE_KEY)), bodyReadFailed: bodiesFailed }
     }
   } else if (index) {
     docs = hydrate(index.docs, bodies, bodiesFailed)
     removed = index.removed
+  } else if (!bodiesFailed && bodies.size) {
+    // The localStorage index is only a cache. A committed body row still carries
+    // its metadata, so it can come back even when that cache failed to write.
+    docs = []
+    removed = []
   } else {
     // Nothing on this browser yet: the sample article is the front page.
     const first = createSampleDoc()
     safeSet(SAMPLE_SEEDED_KEY, '1')
+    if (trackBase) rememberLocalDocs([first])
     return { docs: [first], activeId: first.id, bodyReadFailed: bodiesFailed }
   }
 
@@ -416,21 +511,28 @@ export async function loadDocs(): Promise<Loaded> {
   // A body whose index entry is gone is an article that would otherwise become
   // invisible - the crash-or-quota case. Show it again unless the user deleted it.
   const known = new Set(docs.map((d) => d.id))
-  const tombstones = new Set(removed)
-  for (const [id, content] of bodies) {
+  const tombstones = new Set([
+    ...removed,
+    ...[...bodies.values()].filter((row) => row.removed).map((row) => row.id),
+  ])
+  for (const [id, row] of bodies) {
     if (known.has(id) || tombstones.has(id)) continue
-    docs.push({
+    const stored = documentFromBody(row)
+    docs.push(stored ?? {
       id,
       name: t('store.recoveredName'),
-      content,
+      content: row.content,
       updatedAt: Date.now(),
       savedAt: null,
       deletedAt: null,
       contentLoaded: true,
+      localRevision: row.revision ?? 0,
     })
   }
 
+  if (trackBase) rememberLocalDocs(docs)
   const seeded = await applySampleSeed(docs, pickActive(docs, safeGet(ACTIVE_KEY)))
+  if (trackBase) rememberLocalDocs(seeded.docs)
   return { ...seeded, bodyReadFailed: bodiesFailed }
 }
 
@@ -473,16 +575,21 @@ function pickActive(docs: DocRecord[], stored: string | null): string {
   return live.some((d) => d.id === stored) ? (stored as string) : live[0].id
 }
 
+function rememberLocalDocs(docs: DocRecord[]): void {
+  confirmed = new Map(docs.map((doc) => [doc.id, doc as LocalDocRecord]))
+}
+
 /** Legacy documents win on content, the index wins on order. */
 function mergeLegacy(
   legacy: DocRecord[],
   index: DocIndex | null,
-  bodies: Map<string, string>,
+  bodies: Map<string, BodyRecord>,
   bodiesFailed: boolean,
 ): DocRecord[] {
   const byId = new Map<string, DocRecord>()
   for (const entry of index?.docs ?? []) {
-    byId.set(entry.id, hydrate([entry], bodies, bodiesFailed)[0])
+    const stored = hydrate([entry], bodies, bodiesFailed)[0]
+    if (stored) byId.set(entry.id, stored)
   }
   for (const doc of legacy) {
     const existing = byId.get(doc.id)
@@ -509,7 +616,7 @@ async function migrate(docs: DocRecord[], removed: string[]): Promise<boolean> {
   // unreadable body would be "verified" as an empty article.
   const cacheable = docs.filter((d) => d.contentLoaded !== false && d.bodyState === undefined)
   try {
-    await store.write(cacheable.map((d) => ({ id: d.id, content: d.content })))
+    await store.write(cacheable.map((d) => bodyFromDocument({ ...d, localRevision: 1 }, 1)))
     if (!writeIndex({ docs: docs.map(indexEntryOf), removed })) return false
     const back = await store.readAll()
     const read = new Map(back.map((r) => [r.id, r.content]))
@@ -523,7 +630,10 @@ async function migrate(docs: DocRecord[], removed: string[]): Promise<boolean> {
     reportFailure('migration-failed', t('store.migrationFailedError', { err: describe(e) }))
     return false
   }
-  for (const doc of cacheable) written.set(doc.id, doc.content)
+  const migratedIds = new Set(cacheable.map((doc) => doc.id))
+  rememberLocalDocs(docs.map((doc) =>
+    migratedIds.has(doc.id) ? { ...doc, localRevision: 1 } : doc,
+  ))
   safeSet(MIGRATED_KEY, '1')
   // Verified: the legacy copy can go, and with it the quota it was holding.
   safeRemove(LEGACY_DOCS_KEY)
@@ -547,41 +657,115 @@ function safeRemove(key: string): void {
   }
 }
 
-/**
- * Persist the whole set. Bodies go first: a body with no index entry is
- * recoverable (it comes back as 本地恢复 above), an index entry with no body is a
- * blank article - so a partial write must fail in the first direction.
- *
- * Failures never throw; they land in `persistenceStatus()` and wake subscribers.
- * Resolves true when everything landed.
- */
-export async function saveDocs(docs: DocRecord[], activeId: string): Promise<boolean> {
+export interface LocalSaveResult {
+  ok: boolean
+  request: LocalDocRecord[]
+  commit: LocalCommit
+}
+
+const EMPTY_COMMIT: LocalCommit = {
+  docs: [],
+  removed: [],
+  copies: [],
+  conflicted: false,
+  changedIds: [],
+}
+
+function localConflictCopyName(name: string): string {
+  const suffix = t('mcp.version.local')
+  return t('merge.copyName', {
+    name: (name || t('common.unnamedDoc')).slice(0, 200 - suffix.length),
+  })
+}
+
+function conflictIdFor(id: string, before?: LocalDocRecord): string {
+  const baseRevision = before?.localRevision ?? -1
+  const existing = conflictIds.get(id)
+  if (existing?.baseRevision === baseRevision) return existing.id
+  const next = { baseRevision, id: uid() }
+  conflictIds.set(id, next)
+  return next.id
+}
+
+function uniqueDocs(docs: DocRecord[]): LocalDocRecord[] {
+  const byId = new Map<string, LocalDocRecord>()
+  for (const doc of docs) byId.set(doc.id, doc as LocalDocRecord)
+  return [...byId.values()]
+}
+
+function plannedChanges(
+  request: LocalDocRecord[],
+  pageBase: LocalDocRecord[],
+): LocalDocChange[] {
+  const next = new Map(request.map((doc) => [doc.id, doc]))
+  const page = new Map(pageBase.map((doc) => [doc.id, doc]))
+  const changes: LocalDocChange[] = []
+
+  for (const doc of request) {
+    const before = confirmed.get(doc.id) ?? page.get(doc.id)
+    if (before && sameLocalDoc(before, doc)) continue
+    changes.push({
+      id: doc.id,
+      before,
+      after: doc,
+      conflictId: conflictIdFor(doc.id, before),
+    })
+  }
+
+  // Only documents this page previously knew can be intentional removals. A
+  // conflict copy created by an earlier queued save is not in this page base,
+  // so another snapshot cannot purge it merely because it has not reached React
+  // state yet.
+  for (const id of page.keys()) {
+    if (next.has(id)) continue
+    const before = confirmed.get(id) ?? page.get(id)
+    if (!before) continue
+    changes.push({
+      id,
+      before,
+      after: undefined,
+      conflictId: conflictIdFor(id, before),
+    })
+  }
+  return changes
+}
+
+async function performLocalSave(
+  docs: DocRecord[],
+  activeId: string,
+  pageBase: DocRecord[],
+): Promise<LocalSaveResult> {
+  const request = uniqueDocs(docs)
+  const changes = plannedChanges(request, uniqueDocs(pageBase))
   let store: BodyStore
   try {
     store = await bodyStore()
   } catch (e) {
     reportFailure('write-failed', t('store.writeOpenFailed', { err: describe(e) }))
-    return false
+    return { ok: false, request, commit: EMPTY_COMMIT }
   }
 
-  const ids = new Set(docs.map((d) => d.id))
-  // A stub, a failed read and a missing body all carry a placeholder in
-  // `content`. Writing that as the article would make the next session open an
-  // empty document and believe it, so only bodies we actually hold reach the
-  // body store - the rest go to the index with their state preserved.
-  const cacheable = docs.filter((d) => d.contentLoaded !== false && d.bodyState === undefined)
-  const changed = cacheable.filter((d) => written.get(d.id) !== d.content)
-  const stale = [...written.keys()].filter((id) => !ids.has(id))
-  let ok = true
-
-  if (changed.length) {
+  let commit = EMPTY_COMMIT
+  if (changes.length) {
+    const ids = new Set<string>()
+    for (const change of changes) {
+      ids.add(change.id)
+      ids.add(change.conflictId)
+    }
     try {
-      await store.write(changed.map((d) => ({ id: d.id, content: d.content })))
-      for (const doc of changed) written.set(doc.id, doc.content)
+      commit = await store.transact(
+        (rows) => planLocalCommit(rows, changes, localConflictCopyName),
+        [...ids],
+      )
+      for (const doc of commit.docs) confirmed.set(doc.id, doc)
+      for (const id of commit.removed) {
+        if (!commit.docs.some((doc) => doc.id === id)) confirmed.delete(id)
+      }
+      for (const change of changes) {
+        if (!commit.conflicted) conflictIds.delete(change.id)
+      }
+      notifyLocalDocChange()
     } catch (e) {
-      // While the legacy key is still present, a failed write is a failed
-      // migration retry: say that, not just "quota", so the original-copy
-      // promise stays visible.
       const migrating = safeGet(LEGACY_DOCS_KEY) !== null && safeGet(MIGRATED_KEY) !== '1'
       reportFailure(
         migrating ? 'migration-failed' : 'quota',
@@ -589,36 +773,105 @@ export async function saveDocs(docs: DocRecord[], activeId: string): Promise<boo
           ? t('store.migrationFailedError', { err: describe(e) })
           : t('store.quotaWrite', { err: describe(e) }),
       )
-      ok = false
+      return { ok: false, request, commit: EMPTY_COMMIT }
     }
   }
 
-  const removed = new Set<string>()
-  if (stale.length) {
-    try {
-      await store.remove(stale)
-      for (const id of stale) written.delete(id)
-    } catch (e) {
-      // The body is still there; the tombstone in the index keeps it from
-      // coming back as a 本地恢复 article.
-      reportFailure('write-failed', t('store.writeRemoveFailed', { err: describe(e) }))
-      ok = false
-    }
-  }
-  for (const id of stale) removed.add(id)
-
+  const canonical = changes.length
+    ? mergeLocalCommit(request, request, commit)
+    : request
+  let ok = true
   const previous = readIndex()
-  const tombstones = [...new Set([...(previous?.removed ?? []), ...removed])].slice(-TOMBSTONE_LIMIT)
-  if (!writeIndex({ docs: docs.map(indexEntryOf), removed: tombstones })) ok = false
+  const tombstones = [
+    ...new Set([...(previous?.removed ?? []), ...commit.removed]),
+  ].slice(-TOMBSTONE_LIMIT)
+  if (!writeIndex({ docs: canonical.map(indexEntryOf), removed: tombstones })) ok = false
   if (!safeSetBool(ACTIVE_KEY, activeId)) ok = false
 
-  // The legacy key only still exists while a migration was failing; a later
-  // successful save is what finally frees the space it was holding.
+  // The body transaction is already durable when the compatibility index fails;
+  // keep that warning visible, but never rewrite a good body with an empty one.
   if (ok) {
-    if (safeGet(LEGACY_DOCS_KEY) !== null && safeGet(MIGRATED_KEY) === '1') safeRemove(LEGACY_DOCS_KEY)
     reportHealthy(store.kind)
+    if (safeGet(LEGACY_DOCS_KEY) !== null && safeGet(MIGRATED_KEY) === '1') {
+      safeRemove(LEGACY_DOCS_KEY)
+    }
   }
-  return ok
+  return { ok, request, commit }
+}
+
+/**
+ * Persist one page snapshot. Calls are serialized so two keystrokes from this
+ * tab advance the same revision instead of mistaking each other for a conflict.
+ */
+export function saveLocalDocs(
+  docs: DocRecord[],
+  activeId: string,
+  pageBase: DocRecord[] = [...confirmed.values()],
+): Promise<LocalSaveResult> {
+  const request = docs.map((doc) => ({ ...doc }))
+  const base = pageBase.map((doc) => ({ ...doc }))
+  const pending = saveQueue.then(() => performLocalSave(request, activeId, base))
+  saveQueue = pending.then(() => undefined, () => undefined)
+  return pending
+}
+
+/**
+ * Compatibility wrapper for callers that only need success/failure. Failures
+ * never throw; they land in `persistenceStatus()` and wake subscribers.
+ */
+export async function saveDocs(docs: DocRecord[], activeId: string): Promise<boolean> {
+  return (await saveLocalDocs(docs, activeId)).ok
+}
+
+/**
+ * Merge a local notification into page state without rolling back text this tab
+ * is still editing. Documents that still match their confirmed base adopt the
+ * new persisted copy; newer local edits stay in memory and will create a
+ * recoverable conflict copy if another tab also changed them.
+ */
+export function reconcileObservedLocalDocs(
+  currentDocs: DocRecord[],
+  observedDocs: DocRecord[],
+): { docs: LocalDocRecord[]; base: LocalDocRecord[]; changed: boolean } {
+  const current = new Map(uniqueDocs(currentDocs).map((doc) => [doc.id, doc]))
+  const observed = new Map(uniqueDocs(observedDocs).map((doc) => [doc.id, doc]))
+  const nextBase = new Map(confirmed)
+  const out: LocalDocRecord[] = []
+  const included = new Set<string>()
+  let changed = false
+
+  for (const doc of current.values()) {
+    const base = confirmed.get(doc.id)
+    const seen = observed.get(doc.id)
+    if (!base || !sameLocalDoc(doc, base)) {
+      out.push(doc)
+      included.add(doc.id)
+      continue
+    }
+    if (seen) {
+      out.push(seen)
+      included.add(doc.id)
+      if (!sameLocalDoc(doc, seen)) changed = true
+      nextBase.set(doc.id, seen)
+    } else {
+      changed = true
+      nextBase.delete(doc.id)
+    }
+  }
+
+  for (const doc of observed.values()) {
+    if (included.has(doc.id) || confirmed.has(doc.id)) continue
+    out.push(doc)
+    included.add(doc.id)
+    nextBase.set(doc.id, doc)
+    changed = true
+  }
+
+  // An observed tombstone with a page copy still at its old base is removed
+  // above. A locally pending deletion has no current copy and keeps its old
+  // base until its own transaction commits.
+  confirmed = nextBase
+  return { docs: out, base: [...nextBase.values()], changed }
 }
 
 function safeSetBool(key: string, value: string): boolean {

@@ -7,14 +7,17 @@ import {
   loadActiveId,
   loadDocs,
   persistenceStatus,
+  reconcileObservedLocalDocs,
   saveActiveId,
-  saveDocs,
+  saveLocalDocs,
+  subscribeLocalDocChanges,
   subscribePersistence,
   uid,
   type DocRecord,
   type PersistenceStatus,
 } from '@/lib/store'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
+import { mergeLocalCommit, type LocalDocRecord } from '@/lib/local-docs'
 import { useI18n } from '@/hooks/useI18n'
 
 export type SyncState = 'loading' | 'synced' | 'saving' | 'local' | 'error'
@@ -121,6 +124,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const lastSavedRef = useRef<Map<string, string>>(new Map())
   const docsRef = useRef<DocRecord[]>([])
   docsRef.current = docs
+  /** The local versions this page last knew were committed. */
+  const localBaseRef = useRef<Map<string, LocalDocRecord>>(new Map())
+  const localRefreshRef = useRef<{ running: boolean; again: boolean }>({ running: false, again: false })
   /** The trash as of now, for callbacks a toast captured before the delete. */
   const localTrashRef = useRef<DocRecord[]>([])
   localTrashRef.current = localTrash
@@ -152,6 +158,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     // development, and dropping the result of the first run - the only one that
     // loads - would leave the editor empty.
     void loadDocs().then((local) => {
+      localBaseRef.current = new Map(local.docs.map((d) => [d.id, d as LocalDocRecord]))
       setLocalTrash(local.docs.filter((d) => d.deletedAt))
       const live = local.docs.filter((d) => !d.deletedAt)
       const shown = live.length ? live : [createDoc()]
@@ -170,6 +177,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     setRetryingLocal(true)
     try {
       const loaded = await loadDocs()
+      localBaseRef.current = new Map(loaded.docs.map((d) => [d.id, d as LocalDocRecord]))
       const byId = new Map(loaded.docs.map((d) => [d.id, d]))
       setDocs((current) => {
         const next = current.map((d) => {
@@ -199,6 +207,44 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       setRetryingLocal(false)
     }
   }, [retryingLocal])
+
+  const refreshLocalDocs = useCallback(async () => {
+    if (localRefreshRef.current.running) {
+      localRefreshRef.current.again = true
+      return
+    }
+    localRefreshRef.current.running = true
+    try {
+      do {
+        localRefreshRef.current.again = false
+        const observed = await loadDocs({ trackBase: false })
+        const current = [...docsRef.current, ...localTrashRef.current]
+        const merged = reconcileObservedLocalDocs(current, observed.docs)
+        const live = merged.docs.filter((d) => !d.deletedAt)
+        const trash = merged.docs.filter((d) => Boolean(d.deletedAt))
+        const shown = live.length ? live : [createDoc()]
+        docsRef.current = shown
+        localTrashRef.current = trash
+        localBaseRef.current = new Map(merged.base.map((d) => [d.id, d]))
+        setDocs(shown)
+        setLocalTrash(trash)
+        if (!live.some((d) => d.id === activeIdRef.current)) setActiveId(shown[0].id)
+        if (merged.changed) setNotice(t('docs.localTabChanged'))
+      } while (localRefreshRef.current.again)
+    } catch {
+      setNotice(t('docs.localRefreshFailed'))
+    } finally {
+      localRefreshRef.current.running = false
+    }
+  }, [t])
+
+  useEffect(
+    () =>
+      subscribeLocalDocChanges(() => {
+        void refreshLocalDocs()
+      }),
+    [refreshLocalDocs],
+  )
 
   // 本地持久化的健康状况：失败一次提示一次，失败状态本身留在顶部状态位上
   useEffect(
@@ -263,6 +309,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       }
 
       const local = await loadDocs()
+      localBaseRef.current = new Map(local.docs.map((d) => [d.id, d as LocalDocRecord]))
       if (local.bodyReadFailed) {
         // The local articles are unreadable, so they cannot be compared with
         // the cloud without risking an empty overwrite. Keep the cloud list out
@@ -397,8 +444,39 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   //    只有真正拿到正文的稿件会进缓存，纯元数据的 stub 不写。
   useEffect(() => {
     if (!docs.length && !localTrash.length) return
-    void saveDocs([...docs, ...localTrash], activeId)
-  }, [docs, localTrash, activeId])
+    const requested = [...docs, ...localTrash]
+    const requestedTrash = requested.filter((d) => d.deletedAt)
+    const pageBase = [...localBaseRef.current.values()]
+    void saveLocalDocs(requested, activeId, pageBase).then((result) => {
+      const { commit } = result
+      if (!commit.changedIds.length && !commit.removed.length && !commit.copies.length) return
+
+      const nextBase = new Map(localBaseRef.current)
+      for (const doc of commit.docs) nextBase.set(doc.id, doc)
+      for (const id of commit.removed) {
+        if (!commit.docs.some((doc) => doc.id === id)) nextBase.delete(id)
+      }
+      localBaseRef.current = nextBase
+
+      setDocs((current) =>
+        mergeLocalCommit(current, requested.filter((d) => !d.deletedAt), commit)
+          .filter((d) => !d.deletedAt),
+      )
+      setLocalTrash((current) =>
+        mergeLocalCommit(current, requestedTrash, commit)
+          .filter((d) => Boolean(d.deletedAt)),
+      )
+
+      const activeCopy = commit.copies.find((copy) => copy.originalId === activeIdRef.current)
+      if (activeCopy) setActiveId(activeCopy.copyId)
+      if (commit.conflicted) {
+        const copyName =
+          commit.docs.find((doc) => doc.id === (activeCopy?.copyId ?? commit.copies[0]?.copyId))?.name ??
+          t('docs.localConflictCopy')
+        setNotice(t('docs.localConflict', { name: copyName }))
+      }
+    })
+  }, [docs, localTrash, activeId, t])
 
   useEffect(() => {
     if (activeId) saveActiveId(activeId)

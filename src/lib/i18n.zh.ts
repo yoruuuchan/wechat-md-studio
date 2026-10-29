@@ -871,6 +871,10 @@ export const zh = {
   'docs.switchedToCloud': '已换成云端的版本',
   'docs.copySavedAs': '本机那一版已经另存为「{name}」，云端版本保持原样',
   'docs.copySaveFailed': '另存失败，本机这一版还在编辑器和本地缓存里，稍后再试一次',
+  'docs.localConflictCopy': '本机冲突版本',
+  'docs.localConflict': '另一个标签页同时改了这篇稿件，双方内容都已保留；已自动切到「{name}」。',
+  'docs.localTabChanged': '另一个标签页更新了本机稿件，已加载最新内容',
+  'docs.localRefreshFailed': '另一个标签页更新了本机稿件，但本页暂时没读下来；继续编辑不会覆盖它，稍后会自动重试',
 
   // ---- 登录合并 ----
   'merge.copyName': '{name}（本机版本）',
