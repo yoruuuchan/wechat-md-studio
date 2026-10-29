@@ -1001,7 +1001,11 @@ export default function EditorPage() {
         files: [file],
         docId: activeId,
         item,
-        mode: item.kind === '轮播' ? 'carousel' : 'loose',
+        // Both multi-image kinds have one frame contract for every image. A
+        // standalone image remains free-form.
+        mode: item.kind === '单图' ? 'loose' : 'carousel',
+        locked: item.kind === '单图' ? undefined : item.ratio,
+        ratio: item.kind === '单图' ? undefined : item.ratio,
         replacedKey: key,
       })
       setManualOpen(true)
