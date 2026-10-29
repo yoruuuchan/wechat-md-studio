@@ -908,6 +908,7 @@ export const zh = {
   'io.reason.noVersion': '文件里没有版本号（version），应该不是本工具导出的备份包。',
   'io.reason.version': '这个备份文件是 v{n} 版本，当前只支持 v{m}。',
   'io.reason.noDocs': '备份包里没有 docs 数组，文件可能不完整。',
+  'io.reason.tooLarge': '备份包超过 {mb} MiB 的导入上限，请拆成几个小文件。',
   'io.reason.tooMany': '备份包里有 {n} 篇稿件，超过单次导入上限 {max} 篇，请拆成几个备份文件。',
   'io.entryLabel': '第 {n} 篇稿件',
   'io.reason.entryNotObject': '{label}不是一个对象。',

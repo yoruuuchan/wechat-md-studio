@@ -17,6 +17,7 @@ import {
   type PersistenceStatus,
 } from '@/lib/store'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
+import { BUNDLE_IMPORT_BATCH_SIZE } from '@/lib/import-export'
 import { mergeLocalCommit, type LocalDocRecord } from '@/lib/local-docs'
 import { useI18n } from '@/hooks/useI18n'
 
@@ -383,8 +384,8 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       if (plan.toImport.length) {
         try {
           let imported = 0
-          for (let i = 0; i < plan.toImport.length; i += 100) {
-            const chunk = plan.toImport.slice(i, i + 100)
+          for (let i = 0; i < plan.toImport.length; i += BUNDLE_IMPORT_BATCH_SIZE) {
+            const chunk = plan.toImport.slice(i, i + BUNDLE_IMPORT_BATCH_SIZE)
             const res = await importMutation.mutateAsync({
               docs: chunk.map((d) => ({
                 id: d.id,

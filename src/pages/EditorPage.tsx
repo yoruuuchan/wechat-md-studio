@@ -81,8 +81,10 @@ import {
 import type { UploadSizeChoice } from '@/lib/image-compress'
 import { DEFAULT_CAROUSEL_RATIO, type CarouselRatio } from '@/lib/types'
 import {
+  MAX_BUNDLE_BYTES,
   bundleFilename,
   docxToDocxImport,
+  mergeBundleDocs,
   parseBundle,
   parseMarkdownFile,
   safeFilename,
@@ -713,6 +715,15 @@ export default function EditorPage() {
         await importDocx(file)
         return
       }
+      if (kind === 'bundle' && file.size > MAX_BUNDLE_BYTES) {
+        toast.error(t('editor.toast.bundleUnreadable'), {
+          description: t('io.reason.tooLarge', {
+            mb: Math.floor(MAX_BUNDLE_BYTES / 1024 / 1024),
+          }),
+          duration: 9000,
+        })
+        return
+      }
       const text = await file.text()
       if (kind === 'markdown') {
         const parsedFile = parseMarkdownFile(text, file.name)
@@ -729,16 +740,15 @@ export default function EditorPage() {
         toast.error(t('editor.toast.bundleUnreadable'), { description: result.reason, duration: 9000 })
         return
       }
-      // Ids are kept as they are: the server's own importLocal already resolves a
-      // collision by keeping the stored copy, and inventing new ids here would
-      // silently duplicate every article instead.
-      const known = new Set(docs.map((d) => d.id))
-      const incoming = result.docs.filter((d) => !known.has(d.id))
-      const skipped = result.docs.length - incoming.length
-      setDocs((ds) => [...incoming, ...ds])
+      // Ids are kept as they are: an existing article always wins, and the
+      // cloud import uses insert-only batches after the local library settles.
+      const merged = mergeBundleDocs(docs, result.docs)
+      setDocs(merged.docs)
       if (result.settings) setSettings((s) => ({ ...s, ...result.settings! }))
-      toast.success(t('editor.toast.importedCount', { n: incoming.length }), {
-        description: skipped ? t('editor.toast.importedSkipped', { n: skipped }) : undefined,
+      toast.success(t('editor.toast.importedCount', { n: merged.added }), {
+        description: merged.skipped
+          ? t('editor.toast.importedSkipped', { n: merged.skipped })
+          : undefined,
       })
     } catch (e) {
       toast.error(t('editor.toast.importFailed'), { description: e instanceof Error ? e.message : t('editor.toast.importUnknown') })
