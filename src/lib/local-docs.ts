@@ -46,6 +46,19 @@ export function sameLocalDoc(a: LocalDocRecord, b: LocalDocRecord): boolean {
   return JSON.stringify(localDocValue(a)) === JSON.stringify(localDocValue(b))
 }
 
+/**
+ * True when two records describe the same article text.
+ *
+ * Saved timestamps, cloud base hashes and recovery markers are bookkeeping: a
+ * cloud save updates them in page state a moment before the local body row is
+ * rewritten. Treating that window as a "another tab edited it" conflict made a
+ * plain delete-after-save produce a `（本机版本）` copy and hand undo the copy
+ * instead of the article. Only a different name or body is a competing version.
+ */
+export function sameArticleText(a: LocalDocRecord, b: LocalDocRecord): boolean {
+  return a.name === b.name && a.content === b.content
+}
+
 /** Rebase only this page's later changes onto a completed earlier save. */
 export function applyLocalDelta(base: LocalDocRecord, next: LocalDocRecord, committed: LocalDocRecord): LocalDocRecord {
   const from = localDocValue(base)
@@ -183,9 +196,10 @@ export function planLocalCommit(
     if (!after) {
       if (!row || row.removed) {
         result.removed.push(change.id)
-      } else if (!before || !current || !sameLocalDoc(current, before) ||
-        (row.revision ?? 0) !== (change.before?.localRevision ?? 0)) {
-        // A purge from an old list must not erase an article another tab edited.
+      } else if (!before || !current || !sameArticleText(current, before)) {
+        // A purge from an old list must not erase article text another tab
+        // edited. Bookkeeping-only differences (savedAt/baseHash/recovery) are
+        // not another version, so a delete-after-save does not make a copy.
         preserveConflict(change, current)
       } else {
         puts.set(change.id, { id: change.id, content: '', revision: (row.revision ?? 0) + 1, removed: true })
@@ -201,6 +215,12 @@ export function planLocalCommit(
       continue
     }
     if (row?.removed || (!row && before && (change.before?.localRevision ?? 0) > 0)) {
+      // A user-initiated restore (undo / bin) or an account-archived row may revive
+      // a tombstoned id; a stale live view with no archive still gets a copy.
+      if (after.recovery?.kind === 'restored' || after.savedAt !== null) {
+        put(after, row)
+        continue
+      }
       preserveConflict(change)
       continue
     }
@@ -225,6 +245,14 @@ export function planLocalCommit(
     if (current.deletedAt !== null && before.deletedAt === null &&
       (after.content !== before.content || after.name !== before.name)) {
       preserveConflict(change, current)
+      continue
+    }
+
+    // Deleting text this page already knows is not a competing version just
+    // because a cloud save moved bookkeeping in the same tick. Without this,
+    // delete-after-save produced a （本机版本） copy and handed undo the copy.
+    if (after.deletedAt !== null && sameArticleText(current, before)) {
+      put({ ...after, updatedAt: Math.max(current.updatedAt, after.updatedAt) }, row)
       continue
     }
 

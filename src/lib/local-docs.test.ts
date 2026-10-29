@@ -112,6 +112,52 @@ describe('local document version planning', () => {
     expect(plan.result.removed).toEqual(['a'])
   })
 
+  it('revives a tombstoned id for a user-initiated restore', () => {
+    const base = doc('a', 'BODY', { savedAt: 100, baseHash: 'hash' })
+    const tombstone: BodyRecord = { id: 'a', content: '', revision: 2, removed: true }
+    const restored = { ...base, updatedAt: 120, recovery: { kind: 'restored' as const, at: 5 } }
+    const plan = planLocalCommit([tombstone], [change(base, restored)], copyName)
+    expect(plan.result.copies).toEqual([])
+    expect(plan.result.removed).toEqual([])
+    expect(plan.put?.find((r) => r.id === 'a')).toMatchObject({ content: 'BODY' })
+  })
+
+  it('revives a tombstoned id when the account still archives the article', () => {
+    const base = doc('a', 'BODY')
+    const tombstone: BodyRecord = { id: 'a', content: '', revision: 2, removed: true }
+    const archived = { ...base, savedAt: 100, baseHash: 'hash', updatedAt: 120 }
+    const plan = planLocalCommit([tombstone], [change(base, archived)], copyName)
+    expect(plan.result.copies).toEqual([])
+    expect(plan.put?.find((r) => r.id === 'a')).toMatchObject({ content: 'BODY', metadata: { savedAt: 100 } })
+  })
+
+  it('deletes after a cloud save without making a (local version) copy', () => {
+    // Page state already carries the cloud response; the body row is still the
+    // previous save, so only the bookkeeping fields differ.
+    const before = doc('a', 'BODY', { savedAt: 200, baseHash: 'newhash', localRevision: 1 })
+    const stored = row({ ...before, savedAt: 100, baseHash: 'oldhash' }, 1)
+    const trashed = { ...before, deletedAt: 150, updatedAt: 150 }
+    const plan = planLocalCommit([stored], [change(before, trashed)], copyName)
+    expect(plan.result.copies).toEqual([])
+    expect(plan.result.conflicted).toBe(false)
+    expect(plan.put?.find((r) => r.id === 'a')).toMatchObject({
+      content: 'BODY',
+      metadata: { deletedAt: 150, savedAt: 200, baseHash: 'newhash' },
+    })
+  })
+
+  it('keeps another tab edit when a stale view deletes the article', () => {
+    const before = doc('a', 'BODY')
+    const stored = row({ ...before, content: 'ANOTHER TAB EDIT' }, 2)
+    const plan = planLocalCommit([stored], [change(before, { ...before, deletedAt: 150 })], copyName)
+    expect(plan.result.copies).toEqual([])
+    // The delete moves the newer text to the bin; it is not silently replaced.
+    expect(plan.put?.find((r) => r.id === 'a')).toMatchObject({
+      content: 'ANOTHER TAB EDIT',
+      metadata: { deletedAt: 150 },
+    })
+  })
+
   it('moves the latest body to trash when an older unchanged body requests soft deletion', () => {
     const base = doc('a', 'BASE')
     const current = row({ ...base, content: 'LATEST', updatedAt: 110 }, 2)
