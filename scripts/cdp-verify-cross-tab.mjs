@@ -291,7 +291,9 @@ try {
     await a.edit('INTERRUPTED_EDIT')
     await sleep(500)
     check('aborted persistence leaves the original committed version intact', (await a.rows()).find((row) => row.id === 'shared')?.content === 'BASE_shared')
-    check('aborted persistence keeps the unsaved text and a visible failure', await a.editor() === 'INTERRUPTED_EDIT' && await a.ev(`/本地未存|本地.*失败|local.*fail/i.test(document.body.innerText)`))
+    // U01 replaced the old sync chip ("本地未存") with SaveStatus, whose local
+    // failure label is "本机保存异常"; accept either wording.
+    check('aborted persistence keeps the unsaved text and a visible failure', await a.editor() === 'INTERRUPTED_EDIT' && await a.ev(`/本地未存|本地.*失败|本机保存异常|local.*fail/i.test(document.body.innerText)`), JSON.stringify({ editor: await a.editor(), page: (await a.ev('document.body.innerText')).slice(0, 160) }))
     await a.open()
     await a.until(`window.__mopaiCodemirror?.state.doc.toString() === 'BASE_shared'`, 'committed body after reload')
     check('refresh after interruption recovers the last committed body', await a.editor() === 'BASE_shared')
