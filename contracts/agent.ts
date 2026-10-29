@@ -43,8 +43,8 @@ export interface AgentDoc extends AgentDocSummary {
   content: string;
   createdAt: number;
   /**
-   * sha256 of `content`, first 16 hex chars. Send it back as `baseHash` to
-   * update without clobbering anyone.
+   * sha256 of the article name and `content`, first 16 hex chars. Send it back
+   * as `baseHash` to update without clobbering anyone.
    *
    * The lock is a hash and not `updatedAt` on purpose: that column is stored at
    * second granularity and holds the *client's* clock, so two writes inside the

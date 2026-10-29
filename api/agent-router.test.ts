@@ -300,6 +300,32 @@ describe('the agent door', () => {
     expect(after.content).toBe('在代理版本上接着改')
   })
 
+  it('versions name-only edits across the agent and browser doors', async () => {
+    const created = await push('标题并发测试')
+    const read = await json<{ hash: string }>(await call('GET', `/docs/${created.id}`, { headers: READ }))
+    const renamed = await call('PUT', `/docs/${created.id}`, {
+      headers: WRITE,
+      body: { name: 'Agent 改的标题', content: '标题并发测试', baseHash: read.hash },
+    })
+    expect(renamed.status).toBe(200)
+    const renamedBody = await json<{ hash: string }>(renamed)
+    expect(renamedBody.hash).not.toBe(read.hash)
+
+    const staleBrowser = await browser.save({
+      id: created.id,
+      name: '浏览器改的标题',
+      content: '标题并发测试',
+      updatedAt: Date.now(),
+      baseHash: read.hash,
+    })
+    expect(staleBrowser.ok).toBe(false)
+    if (staleBrowser.ok) throw new Error('unreachable')
+    expect(staleBrowser.current).toMatchObject({
+      name: 'Agent 改的标题',
+      content: '标题并发测试',
+    })
+  })
+
   it('hands back the owner’s own edits, which is the whole point of the round trip', async () => {
     const created = await push('Agent 推的初稿')
     // The owner polishes it in the browser; the auto-save path writes it back

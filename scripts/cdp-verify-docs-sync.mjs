@@ -207,8 +207,19 @@ try {
     return true
   })()`)
   const openSwitcher = async () => {
-    await clickElement(`document.querySelector('[title="切换稿件"]')`, 'the article switcher')
-    await waitFor(`document.querySelector('[role="menu"]') !== null`, 5000, 'the switcher menu')
+    await sleep(600)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await ev(`document.querySelector('[title="切换稿件"]')?.focus()`)
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter' }, sessionId)
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter' }, sessionId)
+      try {
+        await waitFor(`document.querySelector('[role="menu"]') !== null`, 1800, 'the switcher menu')
+        return
+      } catch {
+        await sleep(300)
+      }
+    }
+    throw new Error('the switcher menu never happened')
   }
 
   console.log('\n=== signed out: a fresh article is written locally ===')
@@ -304,6 +315,49 @@ try {
   check('the body was fetched and rendered', cloudShown.includes(CLOUD_TEXT))
   const nameNow = await ev(`document.querySelector('input[placeholder="未命名稿件"]').value`)
   check('the right article is open', nameNow === '云端稿 B', String(nameNow))
+
+  // ================= a rename is an edit, even when the body is unchanged =================
+  console.log('\n=== renaming an archived article is synced, not lost ===')
+  await ev(`(() => {
+    const input = document.querySelector('input[placeholder="未命名稿件"]')
+    const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    set.call(input, '云端稿 B 改名')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  let renamed = null
+  for (let i = 0; i < 30; i++) {
+    await sleep(500)
+    renamed = await api('GET', `/api/agent/docs/${cloudDocId}`)
+    if (renamed.json?.name === '云端稿 B 改名') break
+  }
+  check('a name-only edit reaches the account', renamed?.json?.name === '云端稿 B 改名', String(renamed?.json?.name))
+  check('the body is unchanged by the rename', String(renamed?.json?.content ?? '').includes(CLOUD_TEXT))
+
+  await send('Page.reload', {}, sessionId)
+  await waitFor(`window.__mopaiCodemirror !== undefined`, 20000, 'the editor after the rename reload')
+  const renamedAfterReload = await waitFor(`(() => {
+    const input = document.querySelector('input[placeholder="未命名稿件"]')
+    return input?.value === '云端稿 B 改名' ? input.value : null
+  })()`, 20000, 'the renamed title after reload')
+  check('reloading does not roll the name back', renamedAfterReload === '云端稿 B 改名')
+  await waitFor(`(() => {
+    const text = window.__mopaiCodemirror?.state.doc.toString() || ''
+    return text.includes(${JSON.stringify(CLOUD_TEXT)}) ? text : null
+  })()`, 20000, 'the cloud body after the rename reload')
+  await ev(`(() => {
+    const input = document.querySelector('input[placeholder="未命名稿件"]')
+    const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    set.call(input, '云端稿 B')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  for (let i = 0; i < 30; i++) {
+    await sleep(500)
+    renamed = await api('GET', `/api/agent/docs/${cloudDocId}`)
+    if (renamed.json?.name === '云端稿 B') break
+  }
+  check('the restored title also syncs', renamed?.json?.name === '云端稿 B', String(renamed?.json?.name))
 
   // ================= conflict #1: the agent moves first, resolve by keeping mine =================
   console.log('\n=== a stale save is refused, the newer cloud text stays intact ===')

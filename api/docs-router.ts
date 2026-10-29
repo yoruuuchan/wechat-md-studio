@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { contentHash } from "./lib/doc-hash";
+import { documentHash } from "./lib/doc-hash";
 import { docs } from "../db/schema";
 import type { DocRow } from "../db/schema";
 
@@ -10,7 +10,7 @@ import type { DocRow } from "../db/schema";
  * The browser's document door.
  *
  * Concurrency: every write that targets an existing row is a compare-and-swap
- * on `docs.hash` (the content hash from ./lib/doc-hash, the same token the
+ * on `docs.hash` (the name+content hash from ./lib/doc-hash, the same token the
  * agent door calls `baseHash`). `updatedAt` is a display timestamp — it carries
  * the *client's* clock at second granularity and must never be used as a lock.
  *
@@ -183,12 +183,12 @@ export const docsRouter = createRouter({
       return { ok: true as const, savedAt: null, missing: true as const, hash: null };
     }
 
-    const currentHash = existing.hash ?? contentHash(existing.content);
-    const nextHash = contentHash(input.content);
-    // Identical content is an idempotent re-save — no lock to check, and it
-    // lets a client that lost its `baseHash` re-establish one by saving what is
-    // already there. Anything else needs the base this edit was built on.
-    if (nextHash !== currentHash && input.baseHash !== currentHash) {
+    const currentHash = existing.hash ?? documentHash(existing.name, existing.content);
+    const nextHash = documentHash(input.name, input.content);
+    const sameDocument = existing.name === input.name && existing.content === input.content;
+    // Identical document data is an idempotent re-save — no lock to check, and
+    // it upgrades a legacy content-only hash. Any actual edit needs its base.
+    if (!sameDocument && input.baseHash !== currentHash) {
       return { ok: false as const, conflict: true as const, current: conflictPayload(existing, currentHash) };
     }
 
@@ -220,7 +220,7 @@ export const docsRouter = createRouter({
   saveToDrafts: authedQuery.input(DocInput).mutation(async ({ ctx, input }) => {
     const now = new Date(input.updatedAt || Date.now());
     const existing = await findOwnedDoc(ctx.user.id, input.id);
-    const nextHash = contentHash(input.content);
+    const nextHash = documentHash(input.name, input.content);
 
     if (!existing) {
       await getDb().insert(docs).values({
@@ -236,8 +236,9 @@ export const docsRouter = createRouter({
       return { ok: true as const, savedAt: now.getTime(), conflict: false as const, hash: nextHash, missing: false as const };
     }
 
-    const currentHash = existing.hash ?? contentHash(existing.content);
-    if (nextHash !== currentHash && input.baseHash !== currentHash) {
+    const currentHash = existing.hash ?? documentHash(existing.name, existing.content);
+    const sameDocument = existing.name === input.name && existing.content === input.content;
+    if (!sameDocument && input.baseHash !== currentHash) {
       return { ok: false as const, conflict: true as const, current: conflictPayload(existing, currentHash) };
     }
 
@@ -293,7 +294,7 @@ export const docsRouter = createRouter({
               content: d.content,
               createdAt: new Date(d.updatedAt || Date.now()),
               updatedAt: new Date(d.updatedAt || Date.now()),
-              hash: contentHash(d.content),
+              hash: documentHash(d.name, d.content),
               // Imported work is not archived until the user saves it; savedAt
               // is left out so it defaults to NULL.
             })),
@@ -505,8 +506,17 @@ async function applyCheckedEdit(
 
   const fresh = await findOwnedDoc(ownerId, id);
   if (!fresh) return { kind: "missing" };
-  const freshHash = fresh.hash ?? contentHash(fresh.content);
-  // The racer wrote exactly the text this edit wanted: nothing to do.
-  if (freshHash === nextHash) return { kind: "ok" };
+  const freshHash = fresh.hash ?? documentHash(fresh.name, fresh.content);
+  // The racer wrote exactly what this edit wanted. If the stored token is a
+  // legacy content hash, upgrade it once so both doors share the new version.
+  if (
+    fresh.name === patch.name &&
+    fresh.content === patch.content
+  ) {
+    if (freshHash !== nextHash) {
+      await swapOwnedDoc(ownerId, id, freshHash, { hash: nextHash });
+    }
+    return { kind: "ok" };
+  }
   return { kind: "conflict", current: conflictPayload(fresh, freshHash) };
 }

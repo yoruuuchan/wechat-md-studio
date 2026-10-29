@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { contentHash } from './content-hash'
+import { documentHash } from './content-hash'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from './docs-merge'
 import { createSampleDoc, type DocRecord } from './store'
-import { contentHash as serverContentHash } from '../../api/lib/doc-hash'
+import { documentHash as serverDocumentHash } from '../../api/lib/doc-hash'
 
 const NOW = 1_700_000_000_000
 
@@ -20,21 +20,28 @@ function localDoc(over: Partial<DocRecord> & { id: string; content: string }): D
 
 async function remoteDoc(over: { id: string; content: string } & Partial<RemoteDocMeta>): Promise<RemoteDocMeta> {
   const { id, content, ...rest } = over
+  const name = over.name ?? id
   return {
     id,
-    name: over.name ?? id,
+    name,
     updatedAt: NOW,
     savedAt: NOW,
     source: null,
-    hash: await contentHash(content),
+    hash: await documentHash(name, content),
     ...rest,
   }
 }
 
-describe('contentHash parity with the server', () => {
-  it('produces the same token as api/lib/doc-hash for the same text', async () => {
-    for (const text of ['', '正文内容', '---\ntitles:\n  - 标题\n---\n', 'a'.repeat(1000), '中文😀混合 English 123']) {
-      expect(await contentHash(text)).toBe(serverContentHash(text))
+describe('document hash parity with the server', () => {
+  it('produces the same name+content token as api/lib/doc-hash', async () => {
+    for (const [name, text] of [
+      ['稿件', ''],
+      ['文章 A', '正文内容'],
+      ['标题', '---\ntitles:\n  - 标题\n---\n'],
+      ['长文', 'a'.repeat(1000)],
+      ['Emoji', '中文😀混合 English 123'],
+    ]) {
+      expect(await documentHash(name, text)).toBe(serverDocumentHash(name, text))
     }
   })
 })
@@ -128,6 +135,21 @@ describe('the login merge', () => {
     expect(plan.unsynced).toEqual(['ahead'])
     expect(plan.docs[0].content).toBe('云端这一版 + 本机又写了一段')
     expect(plan.docs[0].baseHash).toBe(remote.hash)
+  })
+
+  it('does not discard a local rename when the cloud content is unchanged', async () => {
+    const remote = await remoteDoc({ id: 'renamed', name: '云端标题', content: '同一份正文' })
+    const local = localDoc({
+      id: 'renamed',
+      name: '本机标题',
+      content: '同一份正文',
+      savedAt: NOW,
+      baseHash: remote.hash!,
+    })
+    const plan = await planMerge({ local: [local], remote: [remote] })
+    expect(plan.toArchive).toEqual([])
+    expect(plan.unsynced).toEqual(['renamed'])
+    expect(plan.docs[0]).toMatchObject({ name: '本机标题', content: '同一份正文', baseHash: remote.hash })
   })
 
   it('does not ship the pristine sample into the account', async () => {
