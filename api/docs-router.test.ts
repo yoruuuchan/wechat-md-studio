@@ -42,12 +42,21 @@ describe('the recycle bin', () => {
     await save('a', '正文甲')
     expect((await caller.list()).items.map((d) => d.id)).toContain('a')
 
-    await caller.remove({ id: 'a' })
+    const removed = await caller.remove({ id: 'a' })
+    expect(removed).toEqual({ ok: true, removed: true })
     expect((await caller.list()).items.map((d) => d.id)).not.toContain('a')
     expect((await caller.drafts()).items.map((d) => d.id)).not.toContain('a')
     const trash = await caller.trash()
     expect(trash.map((d) => d.id)).toEqual(['a'])
     expect(trash[0].deletedAt).not.toBeNull()
+  })
+
+  it('reports when the account had no row to trash', async () => {
+    // A local-only draft reaches this door too; the client must keep its own
+    // copy when the account never held the article.
+    const res = await caller.remove({ id: 'never-pushed' })
+    expect(res).toEqual({ ok: true, removed: false })
+    expect((await caller.trash()).map((d) => d.id)).not.toContain('never-pushed')
   })
 
   it('restores the content, not just the row', async () => {
