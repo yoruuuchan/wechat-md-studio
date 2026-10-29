@@ -220,8 +220,9 @@ function reportHealthy(backend: BodyStore['kind']): void {
   }
   // A failed migration is not repaired by a later index write either. Until a
   // load has migrated and verified the old documents, the legacy copy is the
-  // only proven store, so its warning must stay. Only migrate() clears it.
-  if (status.failure?.kind === 'migration-failed' &&
+  // only proven store, so its warning must stay. Only migrate() clears it. The
+  // same holds for a legacy value that could not be parsed at all.
+  if ((status.failure?.kind === 'migration-failed' || status.failure?.kind === 'parse-failed') &&
     safeGet(LEGACY_DOCS_KEY) !== null && safeGet(MIGRATED_KEY) !== '1') {
     status = { ...status, backend }
     return
@@ -505,10 +506,17 @@ export async function loadDocs(options: { trackBase?: boolean } = {}): Promise<L
     docs = []
     removed = []
   } else {
-    // Nothing on this browser yet: the sample article is the front page.
+    // Nothing on this browser yet: the sample article is the front page. It is
+    // written out here, before the editor can autosave an unchanged snapshot:
+    // the first save of a doc that only exists in memory has nothing to compare
+    // against, so leaving it unwritten would strand an index entry without a
+    // body and the next load would report a missing article.
     const first = createSampleDoc()
     safeSet(SAMPLE_SEEDED_KEY, '1')
-    if (trackBase) rememberLocalDocs([first])
+    // When the body store cannot be read, writing now would replace the read
+    // failure in the status bar with a write failure and still leave nothing
+    // durable; keep the diagnostic and let the next load try again.
+    if (!bodiesFailed) await saveDocs([first], first.id)
     return { docs: [first], activeId: first.id, bodyReadFailed: bodiesFailed }
   }
 

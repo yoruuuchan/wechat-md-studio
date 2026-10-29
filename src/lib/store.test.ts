@@ -6,6 +6,7 @@ import {
   loadDocs,
   persistenceStatus,
   saveDocs,
+  saveLocalDocs,
   subscribePersistence,
   type DocRecord,
 } from './store'
@@ -299,6 +300,23 @@ describe('loading', () => {
     expect(loaded.docs[0].content).toBe(SAMPLE_DOC)
     expect(loaded.activeId).toBe(loaded.docs[0].id)
     expect(storage.getItem('mopai.sample.v1')).toBe('1')
+  })
+
+  it('keeps the sample body after a reload, even when the first autosave has nothing to change', async () => {
+    const first = await loadDocs()
+    expect(first.docs[0].content).toBe(SAMPLE_DOC)
+
+    // The editor saves the snapshot it was handed as the page base on mount.
+    // That snapshot is identical to what it loaded, so the save has no diff to
+    // write - the body must already be durable at this point.
+    await saveLocalDocs(first.docs, first.activeId, first.docs)
+
+    __resetLocalStoreForTests()
+    const second = await loadDocs()
+    expect(second.docs).toHaveLength(1)
+    expect(second.docs[0].bodyState).toBeUndefined()
+    expect(second.docs[0].contentLoaded).not.toBe(false)
+    expect(second.docs[0].content).toBe(SAMPLE_DOC)
   })
 
   it('seeds the sample into a browser that predates it, once', async () => {
