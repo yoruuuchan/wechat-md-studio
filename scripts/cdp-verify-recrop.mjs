@@ -84,31 +84,64 @@ const evaluate = async (expression) => {
 }
 
 // ---- stub the upload + image-read endpoints --------------------------------
-// Hijack fetch inside the page: uploads answer a synthetic key, image reads a
-// 1×1 PNG. Everything else flows through. All logic stays in one place (the
-// page), avoiding the CDP Fetch.requestPaused handshake entirely.
-const PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
-let uploadSeq = 0
+// Hijack fetch inside the page: uploads answer a synthetic key and record the
+// real pixel dimensions of the blob, while image reads return a controlled
+// 1200×900 source. Everything else flows through the shipped code.
 const stubSrc = `(() => {
-  const PNG = '${PNG_BASE64}'
   const rawFetch = window.fetch
   window.__uploadedKeys = []
+  window.__uploadedSizes = []
   let seq = 0
   window.fetch = function (input, init) {
     const url = typeof input === 'string' ? input : input.url
     if (/storage\\.upload/.test(url)) {
-      const key = 'stubkey' + (++seq)
-      window.__uploadedKeys.push(key)
-      return Promise.resolve(new Response(JSON.stringify({ result: { data: { json: { key, size: 1234 } } } }), {
-        status: 200, headers: { 'Content-Type': 'application/json' },
-      }))
+      return (async () => {
+        const key = 'stubkey' + (++seq)
+        window.__uploadedKeys.push(key)
+        try {
+          const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null
+          const findBase64 = (value) => {
+            if (!value || typeof value !== 'object') return null
+            if (typeof value.contentBase64 === 'string') return value.contentBase64
+            for (const child of Object.values(value)) {
+              const found = findBase64(child)
+              if (found) return found
+            }
+            return null
+          }
+          const base64 = findBase64(body)
+          if (base64) {
+            const blob = new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))])
+            const bitmap = await createImageBitmap(blob)
+            window.__uploadedSizes.push({ key, width: bitmap.width, height: bitmap.height })
+            bitmap.close()
+          }
+        } catch (error) {
+          window.__uploadedSizes.push({ key, error: String(error) })
+        }
+        return new Response(JSON.stringify({ result: { data: { json: { key, size: 1234 } } } }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        })
+      })()
     }
     if (/\\/api\\/img\\//.test(url)) {
-      const bin = Uint8Array.from(atob(PNG), (c) => c.charCodeAt(0))
-      return Promise.resolve(new Response(new Blob([bin], { type: 'image/png' }), {
-        status: 200, headers: { 'Content-Type': 'image/png' },
-      }))
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 1200
+        canvas.height = 900
+        const context = canvas.getContext('2d')
+        const gradient = context.createLinearGradient(0, 0, 1200, 900)
+        gradient.addColorStop(0, '#16365c')
+        gradient.addColorStop(1, '#e5a54b')
+        context.fillStyle = gradient
+        context.fillRect(0, 0, 1200, 900)
+        context.fillStyle = 'rgba(255,255,255,.8)'
+        for (let x = 0; x < 1200; x += 100) context.fillRect(x, 0, 2, 900)
+        for (let y = 0; y < 900; y += 100) context.fillRect(0, y, 1200, 2)
+        canvas.toBlob((blob) => resolve(new Response(blob, {
+          status: 200, headers: { 'Content-Type': 'image/png' },
+        })), 'image/png')
+      })
     }
     return rawFetch.apply(this, arguments)
   }
@@ -125,6 +158,7 @@ if (ACCESS_KEY) {
 await send('Page.addScriptToEvaluateOnNewDocument', { source: stubSrc }, sessionId)
 await evaluate(stubSrc)
 const uploadedKeys = () => evaluate(`window.__uploadedKeys || []`)
+const uploadedSizes = () => evaluate(`window.__uploadedSizes || []`)
 
 const setDoc = async (markdown) => {
   await evaluate(`(() => { const v = window.__mopaiCodemirror
@@ -207,6 +241,13 @@ check('recrop', 'the image line was replaced, not duplicated',
   (afterLoose.match(/!\[要重裁的图\]/g) || []).length === 1)
 check('recrop', 'the new key is written in place', /!\[要重裁的图\]\(img:stubkey\d+\)/.test(afterLoose))
 check('recrop', 'the old key is gone from the markdown', !/ORIGKEY/.test(afterLoose))
+const looseSize = (await uploadedSizes()).at(-1)
+check(
+  'ratio',
+  'standalone free crop keeps the source 4:3 shape',
+  Math.abs((looseSize?.width ?? 0) / (looseSize?.height ?? 1) - 4 / 3) < 0.01,
+  JSON.stringify(looseSize),
+)
 console.log('  toasts:', JSON.stringify(await toastTexts()))
 
 // ---- 2. re-crop a carousel slide ------------------------------------------
@@ -231,9 +272,65 @@ console.log('  markdown after re-crop:\n' + afterCar.split('\n').map((l) => '   
 check('recrop', 'slide 1 is untouched', /!\[甲\]\(img:AKEY\)/.test(afterCar))
 check('recrop', 'slide 2 got the new key', /!\[乙\]\(img:stubkey\d+\)/.test(afterCar))
 check('recrop', 'the old slide key is gone', !/BKEY/.test(afterCar))
+const carouselSize = (await uploadedSizes()).at(-1)
+check('ratio', '4:3 carousel output is 720×540', carouselSize?.width === 720 && carouselSize?.height === 540, JSON.stringify(carouselSize))
 console.log('  toasts:', JSON.stringify(await toastTexts()))
 
-// ---- 3. the owner is told about the orphaned upload ------------------------
+// ---- 3. every group ratio survives carousel and gallery re-cropping --------
+console.log('\n=== group ratios are inherited by the manual cropper ===')
+const RATIOS = [
+  ['9:16', 405, 720],
+  ['3:4', 540, 720],
+  ['1:1', 720, 720],
+]
+
+async function recropSingle(fence, ratio, kind) {
+  const expected = RATIOS.find(([value]) => value === ratio)
+  if (!expected) throw new Error(`missing expected size for ${ratio}`)
+  const markdown = kind === 'carousel'
+    ? `## ${ratio} 轮播\n\n:::carousel ${ratio} 测试组\n![图](img:${ratio.replace(':', 'x')}KEY)\n:::\n`
+    : `## ${ratio} 网格\n\n:::gallery 2 ${ratio} 测试组\n![图](img:${ratio.replace(':', 'x')}KEY)\n:::\n`
+  await setDoc(markdown)
+  await sleep(800)
+  const clicked = await clickRow('图1-1', '重裁')
+  check('ratio', `${ratio} ${kind} re-crop control exists`, clicked === 'clicked', clicked)
+  await sleep(1500)
+  const dialog = await dialogText()
+  check('ratio', `${ratio} ${kind} cropper is locked to the group frame`, dialog.includes(ratio), dialog.slice(0, 140))
+  const applied = await confirmManualCrop()
+  check('ratio', `${ratio} ${kind} cropper confirmed`, applied === 'clicked', applied)
+  await sleep(2800)
+  const size = (await uploadedSizes()).at(-1)
+  check(
+    'ratio',
+    `${ratio} ${kind} uploads ${expected[1]}×${expected[2]} pixels`,
+    size?.width === expected[1] && size?.height === expected[2],
+    JSON.stringify(size),
+  )
+  const source = await readDoc()
+  check('ratio', `${ratio} ${kind} fence and image stay in place`, source.includes(`:::${fence} 2 ${ratio}`) || source.includes(`:::${fence} ${ratio}`))
+}
+
+for (const ratioCase of RATIOS) {
+  await recropSingle('carousel', ratioCase[0], 'carousel')
+  await recropSingle('gallery', ratioCase[0], 'gallery')
+}
+
+// ---- 4. cancelling a free crop changes neither source nor storage ----------
+console.log('\n=== cancelling a standalone re-crop is a no-op ===')
+const CANCEL = `## 取消重裁\n\n![不要改](img:CANCELKEY)\n`
+await setDoc(CANCEL)
+const uploadsBeforeCancel = (await uploadedKeys()).length
+const cancelOpen = await clickRow('图1', '重裁')
+check('cancel', 'standalone re-crop opened', cancelOpen === 'clicked', cancelOpen)
+await sleep(1400)
+const cancelled = await clickDialogButton('取消')
+check('cancel', 'cropper cancelled', cancelled === 'clicked', cancelled)
+await sleep(600)
+check('cancel', 'source still points at the original object', (await readDoc()) === CANCEL)
+check('cancel', 'cancel did not mint another upload', (await uploadedKeys()).length === uploadsBeforeCancel)
+
+// ---- 5. the owner is told about the orphaned upload ------------------------
 console.log('\n=== the replaced upload is announced ===')
 const texts = (await toastTexts()).join(' || ')
 console.log('  visible toasts:', texts)
