@@ -76,6 +76,57 @@ const md = new MarkdownIt({ html: false, linkify: false, breaks: false })
   .use(markdownItContainer, 'carousel')
   .use(markdownItContainer, 'gallery')
 
+/**
+ * Index of the `)` that closes an inline image whose opening `(` ends at
+ * `openEnd`, or null when markdown-it would not accept the construct.
+ *
+ * The image span used to end at the first `)`, which tore
+ * `![photo](https://example.com/a(b).png)` apart: a replacement kept the tail
+ * (`.png)`) and a clear left it behind. Walking markdown-it's own destination /
+ * title helpers keeps the locator on the grammar the parser actually accepted —
+ * balanced parentheses, backslash escapes, `<…>` destinations and the three
+ * title forms — instead of adding a second scanner that could drift from it.
+ *
+ * `limit` is the end of the enclosing inline run: a paragraph is tokenised on
+ * its own, so a destination or title can never cross a blank line, fence or
+ * comment. Bounding the lookup keeps a malformed image from swallowing the
+ * following article.
+ */
+export function inlineImageEnd(source: string, openEnd: number, limit = source.length): number | null {
+  const max = Math.min(limit, source.length)
+  let pos = openEnd
+  // markdown-it's image rule skips tab / space / line feed before the
+  // destination and again before and after the optional title. A lone CR is
+  // included because this runs on the editor's text, which may still use CRLF
+  // where the parser itself works on normalised line endings.
+  const skipSpace = () => {
+    while (pos < max) {
+      const code = source.charCodeAt(pos)
+      if (code !== 9 && code !== 10 && code !== 13 && code !== 32) break
+      pos++
+    }
+  }
+
+  skipSpace()
+  if (pos >= max) return null
+
+  const dest = md.helpers.parseLinkDestination(source, pos, max)
+  if (dest.ok) {
+    const href = md.normalizeLink(dest.str)
+    if (md.validateLink(href)) pos = dest.pos
+  }
+
+  const beforeTitle = pos
+  skipSpace()
+  const title = md.helpers.parseLinkTitle(source, pos, max)
+  if (pos < max && beforeTitle !== pos && title.ok) {
+    pos = title.pos
+    skipSpace()
+  }
+
+  return pos < max && source.charCodeAt(pos) === 41 ? pos : null
+}
+
 // ---------- inline ----------
 
 interface Flags {
