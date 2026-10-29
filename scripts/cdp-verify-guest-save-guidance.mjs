@@ -314,7 +314,10 @@ try {
   })()`)
   check('the save-details popover does not overflow at 390px', narrow.popoverOverflowX <= 0, `popoverOverflowX=${narrow.popoverOverflowX}`)
   check('the page does not scroll sideways at 390px', narrow.bodyOverflowX <= 0, `bodyOverflowX=${narrow.bodyOverflowX}`)
-  check('renaming the sign-in entry adds no material width to the narrow header', narrow.renameDelta !== null && narrow.renameDelta <= 40, JSON.stringify({ renameDelta: narrow.renameDelta, headerRequired: narrow.headerRequired, headerClient: narrow.headerClient }))
+  // U03 moved account actions into the narrow "more" menu, so the owner label is
+  // no longer a direct header child. The width question then reduces to whether
+  // the header still fits; when it is in the header, keep the rename delta guard.
+  check('renaming the sign-in entry adds no material width to the narrow header', narrow.headerRequired <= narrow.headerClient + 1 && (narrow.renameDelta === null || narrow.renameDelta <= 40), JSON.stringify({ renameDelta: narrow.renameDelta, headerRequired: narrow.headerRequired, headerClient: narrow.headerClient }))
   check('the guest warning is fully visible on a narrow screen', narrow.text.includes('换浏览器') && narrow.text.includes('下载 Markdown'), narrow.text.slice(0, 160))
   await screenshot('guest-save-details-zh-mobile.png')
   await closeDetails()
