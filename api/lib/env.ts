@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { DEFAULT_TRUSTED_PROXY_CIDRS, parseTrustedProxyCidrs } from "./client-ip";
+import { validateAgentTokenConfig } from "./agent-auth";
 
 /**
  * Every environment knob the server reads, parsed once at import time.
@@ -271,6 +272,14 @@ export function parseEnv(input: EnvInput): Env {
   };
 
   for (const warning of ctx.warnings) console.warn(`[env] ${warning}`);
+  if (ctx.isProduction) {
+    // AGENT_TOKENS is read per request by agent-auth.ts, but a malformed or
+    // weak entry is a production configuration bug: refuse to boot instead of
+    // running a door whose permissions nobody can predict.
+    for (const problem of validateAgentTokenConfig(ctx.input.AGENT_TOKENS ?? "")) {
+      ctx.problems.push(`AGENT_TOKENS entry "${problem.name}" ${problem.message}`);
+    }
+  }
   if (ctx.problems.length > 0) {
     throw new Error(
       `[env] refusing to start with ${ctx.problems.length} configuration problem(s):\n` +
