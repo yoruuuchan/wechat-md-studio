@@ -39,7 +39,7 @@ const chrome = spawn(
     `--user-data-dir=${profile}`,
     '--no-first-run',
     '--disable-gpu',
-    '--window-size=1440,900',
+    '--window-size=1600,1000',
     '--no-proxy-server',
     '--proxy-bypass-list=<-loopback>',
     'about:blank',
@@ -200,7 +200,8 @@ check('the sample renders a real table', previewShape.tables >= 1 && previewShap
 check('text is wrapped in leaf spans', previewShape.leafSpans > 50, `leaf=${previewShape.leafSpans}`)
 check('an empty image src becomes a 图1 placeholder', previewShape.placeholder === true)
 
-const loginButton = await evaluate(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === '登录')`)
+// U04 renamed the entry to 站长登录; accept both while keeping the intent.
+const loginButton = await evaluate(`[...document.querySelectorAll('button')].some(b => ['登录','站长登录'].includes(b.textContent.trim()))`)
 check('the top bar still offers the owner a way in', loginButton === true)
 await shot('public-editor.png')
 
@@ -290,7 +291,8 @@ check('the theme library is public too', cardsReady === true && cardCount >= 200
 
 await goto(`${APP}/drafts`, 2000)
 const draftsText = await bodyText()
-check('cloud drafts stay owner-only', draftsText.includes('草稿箱需要登录'), draftsText.slice(0, 80))
+// U04 states the same rule as 云端草稿箱是站长的私人空间，不开放注册.
+check('cloud drafts stay owner-only', /草稿箱需要登录|不开放注册|站长的私人空间/.test(draftsText), draftsText.slice(0, 80))
 
 // ------------------------------------------------------- console hygiene
 const knownNoise = /Line decoration ranges must be zero-length/
