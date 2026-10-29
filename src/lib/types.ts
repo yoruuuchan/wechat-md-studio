@@ -25,6 +25,31 @@ export interface SourceSpan {
   lineEnd: number
 }
 
+/** One paragraph or nested list inside a list item, in source order. */
+export type ListItemPart =
+  | { type: 'paragraph'; segs: InlineSeg[] }
+  | { type: 'list'; list: ListBlock }
+
+/**
+ * A stable path id such as `1.2.1` identifies an item without flattening its
+ * depth. The path is also useful to tests and future editing tools.
+ */
+export interface ListItem {
+  id: string
+  parts: ListItemPart[]
+}
+
+/**
+ * A recursive list independent of theme styling. Rendering a flat list keeps
+ * the existing Theme.listBlock path; nested lists use the shared tree renderer.
+ */
+export interface ListBlock {
+  ordered: boolean
+  /** First marker number for ordered lists (`3.` in Markdown starts at 3). */
+  start: number
+  items: ListItem[]
+}
+
 export type Block =
   | ({ type: 'paragraph'; segs: InlineSeg[] } & SourceSpan)
   | ({ type: 'heading'; kicker: string; title: string; numbered: boolean } & SourceSpan) // ## KICKER | 标题
@@ -36,7 +61,7 @@ export type Block =
   | ({ type: 'carousel'; title: string; ratio: CarouselRatio; items: CarouselItem[]; occurrence: number } & SourceSpan) // :::carousel [比例] 标题
   | ({ type: 'gallery'; title: string; ratio: CarouselRatio; cols: number; items: CarouselItem[]; occurrence: number } & SourceSpan) // :::gallery [列数] [比例] 标题
   | ({ type: 'signature' } & SourceSpan) // @signature
-  | ({ type: 'list'; ordered: boolean; items: InlineSeg[][] } & SourceSpan)
+  | ({ type: 'list' } & ListBlock & SourceSpan)
   | ({ type: 'table'; align: CellAlign[]; head: InlineSeg[][]; rows: InlineSeg[][][] } & SourceSpan) // GFM 表格
   | ({ type: 'code'; lang: string; code: string } & SourceSpan)
   | ({ type: 'math'; tex: string; display: boolean } & SourceSpan) // $$…$$ on its own lines
