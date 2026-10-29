@@ -1,4 +1,4 @@
-import { contentHash } from './content-hash'
+import { documentHash } from './content-hash'
 import { SAMPLE_DOC } from './sample'
 import { uid, type DocRecord } from './store'
 import { t } from './i18n'
@@ -13,7 +13,7 @@ import { t } from './i18n'
  *
  *   - a local-only article is kept and queued for upload (working copy);
  *   - a cloud-only article is kept as a metadata stub, fetched when opened;
- *   - same id, same content merges silently;
+ *   - same id and identical name/body version merges silently;
  *   - same id, different content is a divergence: the cloud version keeps the
  *     id and the local version is re-homed under a new id and archived, so
  *     neither side is ever dropped without trace;
@@ -128,8 +128,8 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
       continue
     }
 
-    const sameContent = meta.hash !== null && (await contentHash(cached.content)) === meta.hash
-    if (sameContent) {
+    const sameDocument = meta.hash !== null && (await documentHash(cached.name, cached.content)) === meta.hash
+    if (sameDocument) {
       // Same text on both sides — adopt the cache (no fetch needed) and take
       // the cloud's metadata as truth.
       remoteDocs.push({ ...cached, ...metaFields(meta), contentLoaded: true, bodyState: undefined, baseHash: meta.hash })
@@ -140,7 +140,15 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
       // The cloud still holds the version this browser last synced with, so
       // the cache is one local (unsaved) edit ahead — not a divergence. Keep
       // the edit; the autosave will push it against this base.
-      remoteDocs.push({ ...cached, ...metaFields(meta), contentLoaded: true, bodyState: undefined, baseHash: meta.hash })
+      remoteDocs.push({
+        ...metaFields(meta),
+        ...cached,
+        savedAt: meta.savedAt ?? cached.savedAt,
+        source: meta.source ?? cached.source,
+        contentLoaded: true,
+        bodyState: undefined,
+        baseHash: meta.hash,
+      })
       unsynced.push(meta.id)
       continue
     }

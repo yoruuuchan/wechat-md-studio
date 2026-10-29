@@ -33,6 +33,11 @@ export const UNDO_DELETE_MS = 10_000
  */
 const PAGE_SIZE = 200
 
+type SyncedDocument = Pick<DocRecord, 'name' | 'content'>
+const sameSyncedDocument = (saved: SyncedDocument | undefined, doc: SyncedDocument): boolean =>
+  saved?.name === doc.name && saved.content === doc.content
+const syncedSnapshot = (doc: SyncedDocument): SyncedDocument => ({ name: doc.name, content: doc.content })
+
 /** The cloud's copy of an article this browser disagreed with. */
 export interface ConflictCurrent {
   id: string
@@ -66,7 +71,7 @@ interface Options {
  *   - 云端：只在该稿件已经被保存过（savedAt 有值）时随改动更新；
  *     没保存过的稿件要等用户点「保存到草稿箱」才会出现在云端和草稿箱里
  *
- * 并发靠内容 hash：每篇稿子带着最后一次同步的 baseHash，保存时服务端比对，
+ * 并发靠稿件 hash：每篇稿子带着最后一次同步的 baseHash，保存时服务端比对，
  * 对不上就回一个 conflict（不会被覆盖），由这里弹窗让用户决定保留哪边。
  *
  * 正文按需加载：列表只给元数据，打开哪篇才拉哪篇的正文（contentLoaded=false
@@ -121,7 +126,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const saveTimer = useRef<number | null>(null)
   const pendingRef = useRef<Set<string>>(new Set())
   // 最近一次已落库的内容，用来判断是否真的需要再写一次
-  const lastSavedRef = useRef<Map<string, string>>(new Map())
+  const lastSavedRef = useRef<Map<string, SyncedDocument>>(new Map())
   const docsRef = useRef<DocRecord[]>([])
   docsRef.current = docs
   /** The local versions this page last knew were committed. */
@@ -370,7 +375,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       for (const d of shown) {
         if (d.contentLoaded === false) continue
         if (unsynced.has(d.id)) continue
-        lastSavedRef.current.set(d.id, d.content)
+        lastSavedRef.current.set(d.id, syncedSnapshot(d))
       }
 
       const notices: string[] = [...plan.notices]
@@ -505,7 +510,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           return
         }
         const row = res.doc
-        lastSavedRef.current.set(id, row.content)
+        lastSavedRef.current.set(id, syncedSnapshot(row))
         setDocs((ds) =>
           ds.map((d) =>
             d.id === id && d.contentLoaded === false
@@ -579,7 +584,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             contentLoaded: true,
             bodyState: undefined,
           }
-          lastSavedRef.current.set(doc.id, doc.content)
+          lastSavedRef.current.set(doc.id, syncedSnapshot(doc))
           setDocs((ds) => (ds.some((x) => x.id === doc.id) ? ds : [doc, ...ds]))
           setActiveId(doc.id)
           onDeepLinkSettled?.(true)
@@ -626,7 +631,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           } else if (!res.ok) {
             found.push([d.id, { ...res.current }])
           } else {
-            lastSavedRef.current.set(d.id, d.content)
+            lastSavedRef.current.set(d.id, syncedSnapshot(d))
             setDocs((ds) =>
               ds.map((x) => (x.id === d.id ? { ...x, baseHash: res.hash, savedAt: res.savedAt ?? x.savedAt } : x)),
             )
@@ -642,7 +647,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         } else {
           setDirtyIds((prev) => {
             const next = new Set(prev)
-            for (const d of targets) if (lastSavedRef.current.get(d.id) === d.content) next.delete(d.id)
+            for (const d of targets) if (sameSyncedDocument(lastSavedRef.current.get(d.id), d)) next.delete(d.id)
             return next
           })
           setSyncState('synced')
@@ -662,7 +667,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       (d) =>
         d.contentLoaded !== false &&
         !conflicts.has(d.id) &&
-        lastSavedRef.current.get(d.id) !== d.content,
+        !sameSyncedDocument(lastSavedRef.current.get(d.id), d),
     )
     setDirtyIds((prev) => {
       const next = new Set<string>()
@@ -738,7 +743,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           message: t('docs.saveConflictToast'),
         }
       }
-      lastSavedRef.current.set(doc.id, doc.content)
+      lastSavedRef.current.set(doc.id, syncedSnapshot(doc))
       setDirtyIds((prev) => {
         const next = new Set(prev)
         next.delete(doc.id)
@@ -860,18 +865,19 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           // not: a mismatched base turns the next save into a conflict instead
           // of a silent overwrite.
           const content = local?.content ?? row.content
-          const sameContent = content === row.content
-          const baseHash = sameContent
+          const name = local?.name ?? row.name
+          const sameDocument = content === row.content && name === row.name
+          const baseHash = sameDocument
             ? row.hash ?? local?.baseHash ?? null
             : local?.baseHash && local.baseHash === row.hash
               ? row.hash
               : null
-          lastSavedRef.current.set(row.id, content)
+          lastSavedRef.current.set(row.id, { name: local?.name ?? row.name, content })
           setDocs((ds) => {
             if (ds.some((d) => d.id === row.id)) return ds
             const restored: DocRecord = {
               id: row.id,
-              name: local?.name ?? row.name,
+              name,
               content,
               updatedAt: Math.max(row.updatedAt.getTime(), local?.updatedAt ?? 0),
               savedAt: row.savedAt ? row.savedAt.getTime() : null,
@@ -964,7 +970,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           setSyncState('error')
           return
         }
-        lastSavedRef.current.set(id, doc.content)
+        lastSavedRef.current.set(id, syncedSnapshot(doc))
         setDocs((ds) =>
           ds.map((x) => (x.id === id ? { ...x, baseHash: res.hash, savedAt: res.savedAt ?? x.savedAt } : x)),
         )
@@ -984,7 +990,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     (id: string) => {
       const current = conflicts.get(id)
       if (!current) return
-      lastSavedRef.current.set(id, current.content)
+      lastSavedRef.current.set(id, syncedSnapshot(current))
       setDocs((ds) =>
         ds.map((x) =>
           x.id === id
@@ -1041,7 +1047,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           return
         }
         const saved: DocRecord = { ...copy, savedAt: res.savedAt, baseHash: res.hash ?? null }
-        lastSavedRef.current.set(id, current.content)
+        lastSavedRef.current.set(id, syncedSnapshot(current))
         setDocs((ds) => {
           const next = ds.map((x) =>
             x.id === id
@@ -1126,7 +1132,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         bodyState: undefined,
       }
     })
-    for (const [id, row] of fetched) lastSavedRef.current.set(id, row.content)
+    for (const [id, row] of fetched) lastSavedRef.current.set(id, syncedSnapshot(row))
     setDocs((ds) =>
       ds.map((d) => {
         const row = fetched.get(d.id)

@@ -107,7 +107,7 @@ ChatGPT 自定义连接可能额外要求 OAuth。核心 MCP 保持独立；若�
 工具没有稿件 id 选择器、列表、删除、上传图片、通用 workspace 或 `force` 入口。
 需加图片时在网页上传，再让 AI 保留正文里的 `img:<key>` 短引用。
 
-正文 hash 与已有 Agent API 相同：sha256 前 16 位。更新以读到的 `doc.hash` 作为 `baseHash`，
+稿件 hash 与已有 Agent API 相同：名称与正文共同计算的 sha256 前 16 位，只改名称也会推进版本。更新以读到的 `doc.hash` 作为 `baseHash`，
 SQLite 在同一事务里检查版本和授权、执行 CAS 写入。MCP 冲突返回 `isError: true` 与
 `{ok:false, error:"conflict", current}`；浏览器 PUT 冲突返回 HTTP 409。
 AI 必须重新读稿与合并后再决定，不能拿新 hash 盲目覆盖人工修改。

@@ -20,7 +20,7 @@ import { requireAgent } from "./lib/agent-auth";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
 import { denyLog } from "./lib/deny-log";
 import { storage, StorageError } from "./lib/storage";
-import { contentHash } from "./lib/doc-hash";
+import { documentHash } from "./lib/doc-hash";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
 import { THEMES } from "@/lib/themes";
@@ -199,6 +199,7 @@ agentRouter.post("/docs", requireAgent("write"), async (c) => {
   const id = nanoid(12);
   const name = parsed.data.name?.trim() || deriveDocName(content);
   const source = parsed.data.source?.trim() || `agent:${agent.name}`;
+  const hash = documentHash(name, content);
 
   await getDb().insert(docs).values({
     id,
@@ -210,7 +211,7 @@ agentRouter.post("/docs", requireAgent("write"), async (c) => {
     // Saved from birth — see the invariant at the top of this file.
     savedAt: now,
     source,
-    hash: contentHash(content),
+    hash,
   });
 
   const body: AgentCreateDocResult = {
@@ -218,7 +219,7 @@ agentRouter.post("/docs", requireAgent("write"), async (c) => {
     name,
     savedAt: now.getTime(),
     source,
-    hash: contentHash(content),
+    hash,
     editorUrl: `${baseUrl(c)}/?doc=${encodeURIComponent(id)}`,
   };
   return c.json(body, 201);
@@ -233,7 +234,7 @@ agentRouter.get("/docs/:id", requireAgent("read"), async (c) => {
     ...toSummary({ ...row, chars: row.content.length }),
     content: row.content,
     createdAt: row.createdAt.getTime(),
-    hash: contentHash(row.content),
+    hash: row.hash ?? documentHash(row.name, row.content),
   };
   return c.json(body);
 });
@@ -282,7 +283,7 @@ agentRouter.put("/docs/:id", requireAgent("write"), async (c) => {
   const row = await findLiveDoc(id);
   if (!row) return c.json({ error: "稿件不存在，或已在回收站里" }, 404);
 
-  const currentHash = row.hash ?? contentHash(row.content);
+  const currentHash = row.hash ?? documentHash(row.name, row.content);
   if (!force && baseHash !== currentHash) {
     // Someone (usually the owner, in the browser) changed it since the agent
     // read it. Handing back the current text and its hash is what makes this
@@ -303,7 +304,7 @@ agentRouter.put("/docs/:id", requireAgent("write"), async (c) => {
 
   const now = new Date();
   const name = parsed.data.name?.trim() || row.name;
-  const nextHash = contentHash(content);
+  const nextHash = documentHash(name, content);
   // Compare-and-swap even for `force`: an unconditional write still names the
   // hash it produced, so the browser door's next save (which carries the
   // pre-force hash) comes back as a conflict instead of clobbering this text.
@@ -318,7 +319,7 @@ agentRouter.put("/docs/:id", requireAgent("write"), async (c) => {
     // Lost the race between the read and the write (or the row vanished).
     const fresh = await findLiveDoc(id);
     if (!fresh) return c.json({ error: "稿件不存在，或已在回收站里" }, 404);
-    const freshHash = fresh.hash ?? contentHash(fresh.content);
+    const freshHash = fresh.hash ?? documentHash(fresh.name, fresh.content);
     const body: AgentUpdateDocResult = {
       ok: false,
       error: "conflict",

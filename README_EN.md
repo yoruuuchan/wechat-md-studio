@@ -49,7 +49,7 @@ The website, public endpoint and MCP tool all expose [the same repository Skill]
 
 Open **设置 → 高级功能 → AI 直接编辑当前稿件** (“Settings → Advanced → Let AI edit this document”) and create a **Remote MCP** connection. Guests can use it too. Reed provides a Streamable HTTP endpoint and Bearer authorization header; configure them in a compatible MCP client and the agent can read the writing Skill, read this document and update its Markdown directly.
 
-Authorization is scoped to one visitor and one document. AI edits appear automatically in the open browser, while browser edits sync back to the temporary collaboration copy. Every write carries the hash of the version it read. Stale writes are rejected; if both sides have unsynced changes, the browser pauses synchronization and lets you keep both versions, keep the local version or use the AI version. Revoking access or letting the connection expire leaves the complete local draft intact.
+Authorization is scoped to one visitor and one document. AI edits appear automatically in the open browser, while browser edits sync back to the temporary collaboration copy. Every write carries the hash of the version it read; the article name and body are both part of that version. Stale writes are rejected; if both sides have unsynced changes, the browser pauses synchronization and lets you keep both versions, keep the local version or use the AI version. Revoking access or letting the connection expire leaves the complete local draft intact.
 
 ```mermaid
 flowchart LR

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import type { RemoteMcpDoc, RemoteMcpSnapshot, RemoteMcpWriteResult } from '@contracts/remote-mcp'
 import { getSqlite } from '../queries/connection'
-import { contentHash } from './doc-hash'
+import { documentHash } from './doc-hash'
 import { env } from './env'
 
 const MAX_VISITOR_CONNECTIONS = 5
@@ -49,9 +49,13 @@ function transaction<T>(action: () => T): T {
 function readDoc(lease: Lease): RemoteMcpDoc {
   const row = getSqlite().prepare(
     'SELECT name, content, hash, updatedAt FROM docs WHERE id = ? AND ownerId = 0',
-  ).get(lease.docId) as { name: string; content: string; hash: string; updatedAt: number } | undefined
+  ).get(lease.docId) as { name: string; content: string; hash: string | null; updatedAt: number } | undefined
   if (!row) throw new RemoteMcpError(410, '连接已失效，本地稿件仍可正常编辑')
-  return { ...row, updatedAt: row.updatedAt * 1000 }
+  return {
+    ...row,
+    hash: row.hash ?? documentHash(row.name, row.content),
+    updatedAt: row.updatedAt * 1000,
+  }
 }
 
 function snapshot(lease: Lease): RemoteMcpSnapshot {
@@ -123,7 +127,7 @@ export function createVisitorConnection(
     getSqlite().prepare(`
       INSERT INTO docs (id, ownerId, name, content, createdAt, updatedAt, savedAt, deletedAt, source, hash)
       VALUES (?, 0, ?, ?, ?, ?, NULL, NULL, 'mcp', ?)
-    `).run(lease.docId, input.name, input.content, Math.floor(now / 1000), Math.floor(now / 1000), contentHash(input.content))
+    `).run(lease.docId, input.name, input.content, Math.floor(now / 1000), Math.floor(now / 1000), documentHash(input.name, input.content))
     getSqlite().prepare(`
       INSERT INTO remote_mcp_connections (id, visitor, localDocId, docId, tokenHash, createdAt, expiresAt)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -147,7 +151,7 @@ function writeLease(lease: Lease, input: { name?: string; content: string; baseH
     if (input.baseHash !== current.hash) return { ok: false, error: 'conflict', current }
     checkBodyQuota(input.content, lease.docId)
     const name = input.name?.trim() || current.name
-    const hash = contentHash(input.content)
+    const hash = documentHash(name, input.content)
     const updatedAt = Math.floor(Date.now() / 1000)
     const result = getSqlite().prepare(`
       UPDATE docs SET name = ?, content = ?, hash = ?, updatedAt = ?

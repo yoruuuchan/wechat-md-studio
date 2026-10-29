@@ -10,7 +10,10 @@ process.env.DATABASE_URL = `file:${path.join(dir, 'docs.db')}`
 
 const { docsRouter } = await import('./docs-router')
 const { createVisitorResolver } = await import('./lib/visitor')
-const { contentHash } = await import('./lib/doc-hash')
+const { contentHash, documentHash } = await import('./lib/doc-hash')
+const { getDb } = await import('./queries/connection')
+const { docs } = await import('../db/schema')
+const { eq } = await import('drizzle-orm')
 
 const user = {
   id: 1,
@@ -190,6 +193,60 @@ describe('compare-and-swap saves', () => {
     expect(res).toMatchObject({ ok: true, missing: false })
   })
 
+  it('versions a name-only edit and protects concurrent renames', async () => {
+    const created = await save('cas-name', '名称并发测试')
+    const deviceA = client()
+    const deviceB = client()
+    const seenByA = (await deviceA.get({ id: 'cas-name' })).doc!
+    const seenByB = (await deviceB.get({ id: 'cas-name' })).doc!
+    expect(seenByA.hash).toBe(created.hash)
+    expect(seenByB.hash).toBe(created.hash)
+
+    const first = await deviceA.save({
+      id: 'cas-name',
+      name: 'A 改的名字',
+      content: '名称并发测试',
+      updatedAt: Date.now(),
+      baseHash: seenByA.hash,
+    })
+    expect(first.ok).toBe(true)
+    if (!first.ok) throw new Error('unreachable')
+
+    const stale = await deviceB.save({
+      id: 'cas-name',
+      name: 'B 改的名字',
+      content: '名称并发测试',
+      updatedAt: Date.now(),
+      baseHash: seenByB.hash,
+    })
+    expect(stale.ok).toBe(false)
+    if (stale.ok) throw new Error('unreachable')
+    expect(stale.current).toMatchObject({ name: 'A 改的名字', content: '名称并发测试' })
+    expect(stale.current.hash).toBe(first.hash)
+  })
+
+  it('accepts a legacy content hash once and upgrades it with the first edit', async () => {
+    await save('cas-legacy', '旧版正文')
+    const legacy = contentHash('旧版正文')
+    await getDb().update(docs).set({ hash: legacy }).where(eq(docs.id, 'cas-legacy'))
+
+    const res = await caller.save({
+      id: 'cas-legacy',
+      name: '旧版改名',
+      content: '旧版正文',
+      updatedAt: Date.now(),
+      baseHash: legacy,
+    })
+    expect(res.ok).toBe(true)
+    if (!res.ok) throw new Error('unreachable')
+    expect(res.hash).toBe(documentHash('旧版改名', '旧版正文'))
+    expect((await caller.get({ id: 'cas-legacy' })).doc).toMatchObject({
+      name: '旧版改名',
+      content: '旧版正文',
+      hash: res.hash,
+    })
+  })
+
   it('reports missing instead of resurrecting a purged article', async () => {
     await save('cas-3', '要被彻底删掉的')
     await caller.remove({ id: 'cas-3' })
@@ -249,7 +306,7 @@ describe('importLocal', () => {
       ],
     })
     expect(first.imported).toBe(1)
-    expect(first.hashes['imp-1']).toBe(contentHash('浏览器里的正文'))
+    expect(first.hashes['imp-1']).toBe(documentHash('本地稿', '浏览器里的正文'))
 
     // A replay with different content must not clobber what is stored — the
     // merge that produces the local copy has its own place to put conflicts.
@@ -259,7 +316,7 @@ describe('importLocal', () => {
       ],
     })
     expect(replay.imported).toBe(0)
-    expect(replay.hashes['imp-1']).toBe(contentHash('浏览器里的正文'))
+    expect(replay.hashes['imp-1']).toBe(documentHash('本地稿', '浏览器里的正文'))
     expect((await caller.get({ id: 'imp-1' })).doc?.content).toBe('浏览器里的正文')
 
     // Imported work is a working copy, not an archived draft.
@@ -282,7 +339,7 @@ describe('the metadata list', () => {
     const row = listed.items.find((d) => d.id === 'meta-1')!
     expect(row).toBeDefined()
     expect(row.hash).toBe(res.hash)
-    expect(row.hash).toBe(contentHash(`正文 ${marker}`))
+    expect(row.hash).toBe(documentHash('元数据测试', `正文 ${marker}`))
     expect(JSON.stringify(listed)).not.toContain(marker)
     expect(row).not.toHaveProperty('content')
   })
@@ -362,7 +419,7 @@ describe('the metadata list', () => {
     const res = await caller.getMany({ ids: ['many-1', 'many-2', 'missing-id'] })
     expect(res.docs.map((d) => d.id)).toEqual(['many-1'])
     expect(res.docs[0].content).toBe('批量正文一')
-    expect(res.docs[0].hash).toBe(contentHash('批量正文一'))
+    expect(res.docs[0].hash).toBe(documentHash('批量一', '批量正文一'))
   })
 })
 
