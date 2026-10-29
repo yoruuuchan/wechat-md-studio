@@ -541,7 +541,7 @@ export const oliveTheme: Theme = {
   meta: gzh('olive-journal', { styles: ['杂志', '文艺复古'], complexity: 3, color: '暖色' }, GZH_ADAPTED),
 
   root: (inner) =>
-    `<section style="max-width:677px;margin:0 auto;padding:8px;box-sizing:border-box;background:#FDFDF8;color:#4D4F46;line-height:1.75;overflow-x:hidden;">${inner}</section>`,
+    `<section style="max-width:661px;margin:0 auto;padding:8px 0;box-sizing:border-box;background:#FDFDF8;color:#4D4F46;line-height:1.75;overflow-x:hidden;">${inner}</section>`,
 
   seg: oliveSeg,
 
