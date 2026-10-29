@@ -279,8 +279,9 @@ export async function prepareForUpload(
 /**
  * Pull an already-uploaded image back so it can be re-cropped.
  *
- * Uploaded images are served from our own origin, so this is a same-origin read
- * and the canvas stays untainted.
+ * The stable same-origin URL redirects to the configured image worker. Both
+ * CSP connect-src and that worker's CORS response must permit the read; the
+ * resulting blob can then be cropped locally without tainting the canvas.
  */
 export async function fileFromImageUrl(url: string, name: string): Promise<File> {
   const resp = await fetch(url, { cache: 'force-cache' })

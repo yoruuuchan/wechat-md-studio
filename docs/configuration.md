@@ -24,6 +24,27 @@ PowerShell 复制配置用 `Copy-Item .env.example .env`。开发时**删掉 `.e
 图片服务未配置或不可达时，上传会明确报错，仍可编辑、预览、复制与导出。
 本地上传验收优先使用已有脚本自带的 mock 图床，见 [验证导航](verification.md)。
 
+## 生产图片来源与重裁
+
+生产内容安全策略允许正文展示本站图片、公开 HTTPS 外链图片，以及裁切 / 图表生成使用的
+`data:` / `blob:` 图片。普通 HTTP 外链图片不在支持范围；显式配置的 HTTP `IMG_BASE_URL`
+供本地生产验收使用，HTTPS 站点应配置 HTTPS 图床，避免浏览器阻止混合内容。
+
+「重裁」会先请求本站 `/api/img/<key>`，再跟随 302 到 `IMG_BASE_URL` 的图片地址。
+因此 `connect-src` 同时允许本站和**该配置的 origin**（协议、主机及端口），不会因为支持
+HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_URL` 后重启服务，策略随之更新。
+脚本、对象和第三方嵌入仍保留各自的限制；本站不提供任意图片 URL 的服务端代理。
+
+跨域取图的每个重定向响应和最终图床都必须满足 CORS。本站图片跳转和自带 Worker 允许公开读取；
+替换 Worker 或增加 CDN 时，保留相应的 `Access-Control-Allow-Origin` 响应头，并让最终取图
+地址停留在已配置的 origin。图片能在预览中显示，不代表它一定可以由 `fetch` 取回重裁。
+未配置、图片不存在、图床离线、CSP 或 CORS 拒绝时，重裁会显示「取回原图失败」；HTTP 错误附带
+状态码，网络错误结合浏览器控制台的 CSP / CORS 信息和图床可达性排查，原正文保留。
+
+真实生产浏览器回归见 [cdp-verify-image-policy.mjs](../scripts/cdp-verify-image-policy.mjs)：
+先构建，再运行 `node scripts/cdp-verify-image-policy.mjs 4108 9708 <输出目录>`。
+它使用独立数据库、模拟图床和浏览器配置；模拟图床端口是应用端口加 100，输出目录应放在仓库外。
+
 ## 基础配置
 
 | 变量 | 当前默认 / 要求 | 用途 |
