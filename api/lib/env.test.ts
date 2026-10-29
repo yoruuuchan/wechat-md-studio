@@ -27,6 +27,8 @@ const NUMERIC_KNOBS = [
   'AUTH_LOGIN_PER_MINUTE',
   'REMOTE_MCP_TTL_HOURS',
   'REMOTE_MCP_TOTAL_BYTES',
+  'REMOTE_MCP_MAX_ACTIVE_PER_SOURCE',
+  'REMOTE_MCP_CREATES_PER_SOURCE_PER_DAY',
   'PORT',
 ]
 
@@ -52,6 +54,8 @@ describe('parseEnv in production', () => {
     expect(env.authLoginPerMinute).toBe(10)
     expect(env.remoteMcpTtlHours).toBe(24)
     expect(env.remoteMcpTotalBytes).toBe(50 * 1024 * 1024)
+    expect(env.remoteMcpMaxActivePerSource).toBe(20)
+    expect(env.remoteMcpCreatesPerSourcePerDay).toBe(40)
     expect(env.port).toBe(3100)
     expect(env.host).toBe('127.0.0.1')
     expect(env.trustedProxyCidrs).toEqual(['127.0.0.1/32', '::1/128'])

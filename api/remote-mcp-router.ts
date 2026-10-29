@@ -8,7 +8,7 @@ import { clientIp } from './lib/client-ip'
 import { readVisitorId, newVisitorId, visitorKey, visitorCookie } from './lib/visitor'
 import {
   createVisitorConnection, readVisitorConnection, rotateVisitorToken,
-  writeVisitorDoc, revokeVisitorConnection, RemoteMcpError,
+  writeVisitorDoc, revokeVisitorConnection, RemoteMcpError, mcpSourceKey,
 } from './lib/remote-mcp'
 
 const createHits = new Map<string, number[]>()
@@ -62,9 +62,11 @@ router.post('/connections', async (c) => {
     return c.json({ error: '创建太频繁，请一分钟后再试' }, 429)
   }
   const owner = visitor(c, true)!
-  const result = createVisitorConnection(owner, {
-    ...parsed.data, name: parsed.data.name.trim() || '未命名稿件',
-  })
+  const result = createVisitorConnection(
+    owner,
+    { ...parsed.data, name: parsed.data.name.trim() || '未命名稿件' },
+    mcpSourceKey(ip),
+  )
   return c.json({ ...result.snapshot, token: result.token, endpoint: `${publicOrigin(c)}/api/mcp` }, result.token ? 201 : 200)
 })
 

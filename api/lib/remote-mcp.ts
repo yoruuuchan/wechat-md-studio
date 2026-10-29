@@ -11,6 +11,7 @@ const MAX_CONNECTIONS = 200
 interface Lease {
   id: string
   visitor: string
+  source: string | null
   localDocId: string
   docId: string
   tokenHash: string
@@ -27,6 +28,11 @@ export class RemoteMcpError extends Error {
 /** Hash only: the raw bearer is returned once and never stored on the server. */
 export function mcpTokenHash(token: string): string {
   return createHash('sha256').update(`mopai-mcp:${token}`).digest('hex')
+}
+
+/** Keep source addresses out of lease rows while preserving a stable budget key. */
+export function mcpSourceKey(ip: string): string {
+  return createHash('sha256').update(`mopai-mcp-source:${ip}`).digest('hex').slice(0, 32)
 }
 
 function mintToken(): string {
@@ -104,23 +110,46 @@ function checkBodyQuota(content: string, replacingDocId = ''): void {
 export function createVisitorConnection(
   visitor: string,
   input: { localDocId: string; name: string; content: string },
+  source: string,
+  now = Date.now(),
 ): { snapshot: RemoteMcpSnapshot; token: string | null } {
   cleanupExpiredConnections()
   return transaction(() => {
     // A retry or second tab must never replace a copy the AI has already edited.
     const existing = findVisitorLease(visitor, input.localDocId)
     if (existing) return { snapshot: snapshot(existing), token: null }
-    const { total, own } = getSqlite().prepare(`
-      SELECT count(*) AS total, coalesce(sum(visitor = ?), 0) AS own FROM remote_mcp_connections
-    `).get(visitor) as { total: number; own: number }
+    const { total, own, sourceActive } = getSqlite().prepare(`
+      SELECT
+        count(*) AS total,
+        coalesce(sum(visitor = ?), 0) AS own,
+        coalesce(sum(source = ?), 0) AS sourceActive
+      FROM remote_mcp_connections
+      WHERE expiresAt > ?
+    `).get(visitor, source, now) as { total: number; own: number; sourceActive: number }
     if (own >= MAX_VISITOR_CONNECTIONS || total >= MAX_CONNECTIONS) {
       throw new RemoteMcpError(429, '连接数量已达上限，请先撤销不用的连接')
     }
+    if (sourceActive >= env.remoteMcpMaxActivePerSource) {
+      console.warn(`[remote-mcp-deny] reason=source-active source=${source.slice(0, 12)}`)
+      throw new RemoteMcpError(
+        429,
+        '这个网络创建的临时协作连接太多，请先撤销不用的连接或稍后再试',
+      )
+    }
+
+    const day = new Date(now).toISOString().slice(0, 10)
+    const used = getSqlite().prepare(
+      'SELECT count FROM remote_mcp_source_budget WHERE source = ? AND day = ?',
+    ).get(source, day) as { count: number } | undefined
+    if ((used?.count ?? 0) >= env.remoteMcpCreatesPerSourcePerDay) {
+      console.warn(`[remote-mcp-deny] reason=source-daily source=${source.slice(0, 12)}`)
+      throw new RemoteMcpError(429, '这个网络今天创建的临时协作连接较多，请稍后再试')
+    }
+
     checkBodyQuota(input.content)
     const token = mintToken()
-    const now = Date.now()
     const lease: Lease = {
-      id: nanoid(), visitor, localDocId: input.localDocId, docId: nanoid(),
+      id: nanoid(), visitor, source, localDocId: input.localDocId, docId: nanoid(),
       tokenHash: mcpTokenHash(token), createdAt: now,
       expiresAt: now + env.remoteMcpTtlHours * 3600_000,
     }
@@ -129,9 +158,23 @@ export function createVisitorConnection(
       VALUES (?, 0, ?, ?, ?, ?, NULL, NULL, 'mcp', ?)
     `).run(lease.docId, input.name, input.content, Math.floor(now / 1000), Math.floor(now / 1000), documentHash(input.name, input.content))
     getSqlite().prepare(`
-      INSERT INTO remote_mcp_connections (id, visitor, localDocId, docId, tokenHash, createdAt, expiresAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(lease.id, lease.visitor, lease.localDocId, lease.docId, lease.tokenHash, lease.createdAt, lease.expiresAt)
+      INSERT INTO remote_mcp_connections
+        (id, visitor, localDocId, docId, tokenHash, createdAt, expiresAt, source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      lease.id,
+      lease.visitor,
+      lease.localDocId,
+      lease.docId,
+      lease.tokenHash,
+      lease.createdAt,
+      lease.expiresAt,
+      lease.source,
+    )
+    getSqlite().prepare(`
+      INSERT INTO remote_mcp_source_budget (source, day, count) VALUES (?, ?, 1)
+      ON CONFLICT(source, day) DO UPDATE SET count = count + 1
+    `).run(source, day)
     return { snapshot: snapshot(lease), token }
   })
 }
@@ -196,7 +239,12 @@ export function cleanupExpiredConnections(now = Date.now()): number {
     getSqlite().prepare(`DELETE FROM docs WHERE ownerId = 0 AND id IN (
       SELECT docId FROM remote_mcp_connections WHERE expiresAt <= ?
     )`).run(now)
-    return Number(getSqlite().prepare('DELETE FROM remote_mcp_connections WHERE expiresAt <= ?').run(now).changes)
+    const removed = Number(
+      getSqlite().prepare('DELETE FROM remote_mcp_connections WHERE expiresAt <= ?').run(now).changes,
+    )
+    const day = new Date(now).toISOString().slice(0, 10)
+    getSqlite().prepare('DELETE FROM remote_mcp_source_budget WHERE day < ?').run(day)
+    return removed
   })
 }
 

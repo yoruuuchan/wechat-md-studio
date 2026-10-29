@@ -10,6 +10,16 @@ const legacy = new DatabaseSync(file)
 legacy.exec(`
   CREATE TABLE files (key TEXT PRIMARY KEY, ownerId INTEGER NOT NULL, name TEXT, size INTEGER NOT NULL, createdAt INTEGER NOT NULL);
   CREATE TABLE docs (id TEXT PRIMARY KEY, ownerId INTEGER NOT NULL, name TEXT NOT NULL, content TEXT NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL);
+  CREATE TABLE remote_mcp_connections (
+    id TEXT PRIMARY KEY,
+    visitor TEXT NOT NULL,
+    localDocId TEXT NOT NULL,
+    docId TEXT NOT NULL UNIQUE,
+    tokenHash TEXT NOT NULL UNIQUE,
+    createdAt INTEGER NOT NULL,
+    expiresAt INTEGER NOT NULL,
+    UNIQUE (visitor, localDocId)
+  );
   INSERT INTO docs VALUES ('owner-article', 1, '旧稿件', '不能丢失的旧正文', 100, 101);
 `)
 legacy.close()
@@ -26,6 +36,13 @@ describe('MCP upgrade of an existing SQLite database', () => {
     expect(doc.ownerId).toBe(1)
     expect(doc.hash).toMatch(/^[0-9a-f]{16}$/)
     expect(getSqlite().prepare('SELECT count(*) AS n FROM remote_mcp_connections').get()!.n).toBe(0)
+    const columns = getSqlite().prepare('PRAGMA table_info(remote_mcp_connections)').all() as {
+      name: string
+    }[]
+    expect(columns.map((c) => c.name)).toContain('source')
+    expect(
+      getSqlite().prepare('SELECT count(*) AS n FROM remote_mcp_source_budget').get()!.n,
+    ).toBe(0)
   })
   it('does not clean up owner articles or unleased bodies', () => {
     expect(cleanupExpiredConnections(Date.now() + 1000_000_000)).toBe(0)
