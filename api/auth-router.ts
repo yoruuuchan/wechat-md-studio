@@ -3,7 +3,7 @@ import * as cookie from 'cookie'
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { Session } from '@contracts/constants'
-import { checkLoginAttempt, clientIp } from './lib/burst'
+import { checkLoginAttempt } from './lib/burst'
 import { getSessionCookieOptions } from './lib/cookies'
 import { authDenyLog } from './lib/deny-log'
 import { env } from './lib/env'
@@ -27,7 +27,7 @@ export const authRouter = createRouter({
       // The site is public and this is the one door a stranger can sit at and
       // knock on, so the per-IP ceiling is checked before the key comparison —
       // a flood never reaches it, and neither does a guessing loop.
-      const ip = clientIp(ctx.req.headers)
+      const ip = ctx.clientIp
       const attempt = checkLoginAttempt(ip)
       if (!attempt.ok) {
         authDenyLog('login-burst', { ip })

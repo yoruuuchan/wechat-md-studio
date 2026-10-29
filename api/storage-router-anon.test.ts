@@ -55,6 +55,7 @@ function caller(tag: string, options: { signal?: AbortSignal; owner?: boolean } 
   return storageRouter.createCaller({
     req,
     resHeaders,
+    clientIp: '203.0.113.10',
     visitorIdentity: createVisitorResolver(req.headers, resHeaders),
     ...(options.owner ? { user } : {}),
   })

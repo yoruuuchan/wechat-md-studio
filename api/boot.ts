@@ -9,6 +9,7 @@ import { storage } from "./lib/storage";
 import { startAnonGc } from "./lib/anon-gc";
 import { startAnonUploadRecovery } from "./lib/anon-upload";
 import { env } from "./lib/env";
+import { clientIp } from "./lib/client-ip";
 import { securityHeaders } from "./lib/security-headers";
 import { warnAboutWeakTokens } from "./lib/agent-auth";
 import { writingSkill } from "./lib/writing-skill";
@@ -62,11 +63,16 @@ app.get("/api/img/:key", async (c) => {
 app.route("/api/agent", agentRouter);
 
 app.use("/api/trpc/*", async (c) => {
+  const ip = clientIp(
+    c.req.raw.headers,
+    c.env?.incoming?.socket?.remoteAddress,
+    env.trustedProxyCidrs,
+  );
   return fetchRequestHandler({
     endpoint: "/api/trpc",
     req: c.req.raw,
     router: appRouter,
-    createContext,
+    createContext: (opts) => createContext(opts, ip),
   });
 });
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));

@@ -6,6 +6,8 @@ import { authenticateRequest } from "./session";
 export type TrpcContext = {
   req: Request;
   resHeaders: Headers;
+  /** Trusted-proxy-normalized source address, shared by every procedure in a batch. */
+  clientIp: string;
   user?: User;
   /**
    * Request-scoped, shared by every procedure in a tRPC batch. One request gets
@@ -16,10 +18,12 @@ export type TrpcContext = {
 
 export async function createContext(
   opts: FetchCreateContextFnOptions,
+  clientIp = "unattributed",
 ): Promise<TrpcContext> {
   const ctx: TrpcContext = {
     req: opts.req,
     resHeaders: opts.resHeaders,
+    clientIp,
     visitorIdentity: createVisitorResolver(opts.req.headers, opts.resHeaders),
   };
   try {

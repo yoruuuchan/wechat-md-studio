@@ -51,6 +51,7 @@ HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_
 |---|---|---|
 | `NODE_ENV` | 示例文件默认 `production`；**开发时整行删掉，不要写成 `development`** | `production` 开启生产校验与 GC 排程；写进 `.env` 会同时改变前端构建产物 |
 | `HOST` | `127.0.0.1` | 服务端监听地址 |
+| `TRUSTED_PROXY_CIDRS` | `127.0.0.1/32,::1/128`；显式留空表示直连 | 允许提供 `CF-Connecting-IP` / `X-Real-IP` / `X-Forwarded-For` 的反向代理地址或 CIDR；其他对端的这些头一律忽略 |
 | `PORT` | `3100` | 生产服务端端口；Vite 开发端口由 `vite.config.ts` 定义 |
 | `DATABASE_URL` | 生产必填；示例为 `file:./data/mopai.db` | SQLite；相对路径按进程工作目录解析 |
 | `ACCESS_KEY` | 生产必填，至少 16 字符，拒绝公开占位值 | 站长云端草稿箱口令；匿名排版与图片上传不需要它 |
@@ -69,6 +70,28 @@ HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_
 生产启动会拒绝缺失 / 占位 / 过短的必需密钥、缺失 `DATABASE_URL`、非法 URL，以及非整数或越界的数值配置，
 错误信息点名变量。生产配置应生成真实密钥；`ACCESS_KEY` 可用 `openssl rand -hex 24`，
 `SESSION_SECRET` / `IMG_ADMIN_KEY` 可用 `openssl rand -hex 32`。真实 `.env` 不提交。
+
+## 反向代理与客户端 IP
+
+登录、匿名上传、反馈和 Remote MCP 创建限流都使用同一份“客户端 IP”。服务端先读取 TCP
+连接的真实对端，只有对端落在 `TRUSTED_PROXY_CIDRS` 内时才采信转发头。优先级依次是
+`CF-Connecting-IP`、`X-Real-IP`、`X-Forwarded-For`；`X-Forwarded-For` 从最靠近服务端的地址
+向左查找，并跳过同一信任列表中的代理。空值、非法 IP 和多值冲突会退回真实对端，不会退到
+更宽松的转发头。转发链中任一地址非法时整条链不采信。
+
+三种部署按下面配置：
+
+- **Cloudflare Tunnel（当前部署）**：保持 `HOST=127.0.0.1`，默认只信任
+  `127.0.0.1/32,::1/128`。Tunnel 从本机连接，Cloudflare 写入的 `CF-Connecting-IP`
+  代表真实访客；不要扩大到整个内网或公网。
+- **普通反向代理**：只填写代理实际连接服务端所用的地址或最小 CIDR，例如
+  `TRUSTED_PROXY_CIDRS=10.0.0.5/32`。代理必须覆盖而不是拼接客户端自带的转发头；
+  多级代理要把每一级都对端加入列表，并设置 `PUBLIC_BASE_URL`。
+- **直接对外监听**：设置 `TRUSTED_PROXY_CIDRS=`，让服务端忽略所有转发头，直接按 TCP
+  对端地址限流。若前面有多台未知代理，不应把它们整体加入信任列表。
+
+没有真实对端元数据时（例如不经过 Node 服务的本地函数测试），身份统一是
+`unattributed`，转发头也不会改变这个桶。生产启动会拒绝无法解析的地址或 CIDR。
 
 ## 匿名额度与回收
 

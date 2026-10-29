@@ -54,6 +54,7 @@ describe('parseEnv in production', () => {
     expect(env.remoteMcpTotalBytes).toBe(50 * 1024 * 1024)
     expect(env.port).toBe(3100)
     expect(env.host).toBe('127.0.0.1')
+    expect(env.trustedProxyCidrs).toEqual(['127.0.0.1/32', '::1/128'])
   })
 
   it('takes numeric overrides, including an explicit zero ceiling', () => {
@@ -157,6 +158,19 @@ describe('parseEnv in production', () => {
     expect(() => parseEnv({ ...production, IMG_BASE_URL: 'not a url' })).toThrow(/IMG_BASE_URL must be an absolute/)
     expect(() => parseEnv({ ...production, PUBLIC_BASE_URL: 'ftp://files.example.test' })).toThrow(
       /PUBLIC_BASE_URL must be an absolute/,
+    )
+  })
+
+  it('validates and canonicalizes the trusted proxy boundary', () => {
+    expect(
+      parseEnv({
+        ...production,
+        TRUSTED_PROXY_CIDRS: '127.0.0.1, 10.0.0.0/8, 2001:0db8::/32',
+      }).trustedProxyCidrs,
+    ).toEqual(['127.0.0.1/32', '10.0.0.0/8', '2001:db8::/32'])
+    expect(parseEnv({ ...production, TRUSTED_PROXY_CIDRS: '' }).trustedProxyCidrs).toEqual([])
+    expect(() => parseEnv({ ...production, TRUSTED_PROXY_CIDRS: '10.0.0.0/99' })).toThrow(
+      /TRUSTED_PROXY_CIDRS must be/,
     )
   })
 

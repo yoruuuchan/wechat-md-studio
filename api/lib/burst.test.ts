@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowBurst, allowIpDaily, checkLoginAttempt, clientIp } from './burst'
+import { allowBurst, allowIpDaily, checkLoginAttempt } from './burst'
 import { env } from './env'
 
 const NOW = 1_800_000_000_000
@@ -94,22 +94,5 @@ describe('allowIpDaily', () => {
     for (let i = 0; i < 100; i++) allowIpDaily(store, 'ip-a', '2026-10-08', 100)
     expect(allowIpDaily(store, 'ip-a', '2026-10-08', 100)).toBe(false)
     expect(allowIpDaily(store, 'ip-b', '2026-10-08', 100)).toBe(true)
-  })
-})
-
-describe('clientIp', () => {
-  it('trusts the address the Cloudflare edge reports', () => {
-    const h = new Headers({ 'cf-connecting-ip': '203.0.113.9', 'x-forwarded-for': '198.51.100.1, 10.0.0.1' })
-    expect(clientIp(h)).toBe('203.0.113.9')
-  })
-
-  it('falls back to x-forwarded-for off Cloudflare, taking the first hop', () => {
-    expect(clientIp(new Headers({ 'x-forwarded-for': '198.51.100.7, 10.0.0.1' }))).toBe('198.51.100.7')
-  })
-
-  it('buckets unattributable requests together rather than letting them through', () => {
-    // The server's own acceptance scripts land here, and they share the bucket —
-    // the login ceiling applies to them exactly as it does to a stranger.
-    expect(clientIp(new Headers())).toBe('unattributed')
   })
 })

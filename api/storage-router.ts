@@ -8,7 +8,7 @@ import { env } from "./lib/env";
 import { ACCEPTED_IMAGE_LABEL, sniffImageMime } from "./lib/image-type";
 import { ANON_OWNER_ID } from "./lib/anon-quota";
 import { releaseAnonUpload, reserveAnonUpload, settleAnonUpload } from "./lib/anon-upload";
-import { checkBurst, checkIpDaily, clientIp } from "./lib/burst";
+import { checkBurst, checkIpDaily } from "./lib/burst";
 import { denyLog } from "./lib/deny-log";
 import { getDb } from "./queries/connection";
 import { docs, files } from "../db/schema";
@@ -115,7 +115,7 @@ export const storageRouter = createRouter({
       if (!owner) {
         // Cheapest check first: the in-memory limits cost nothing, the quota
         // reads the database, and neither should be reached by a flood.
-        const ip = clientIp(ctx.req.headers);
+        const ip = ctx.clientIp;
         const burst = checkBurst(ip);
         if (!burst.ok) {
           denyLog("burst", { ip });

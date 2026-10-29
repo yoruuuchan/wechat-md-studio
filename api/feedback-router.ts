@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
-import { allowBurst, allowIpDaily, clientIp } from './lib/burst'
+import type { HttpBindings } from '@hono/node-server'
+import { allowBurst, allowIpDaily } from './lib/burst'
+import { clientIp } from './lib/client-ip'
 import { env } from './lib/env'
 import {
   buildFeedbackEmail,
@@ -32,7 +34,7 @@ export interface FeedbackRouterDeps {
 }
 
 export function createFeedbackRouter(deps: FeedbackRouterDeps = {}) {
-  const router = new Hono()
+  const router = new Hono<{ Bindings: HttpBindings }>()
   const minuteHits = new Map<string, number[]>()
   const dayHits = new Map<string, { day: string; count: number }>()
 
@@ -62,7 +64,11 @@ export function createFeedbackRouter(deps: FeedbackRouterDeps = {}) {
       return c.json({ error: 'unavailable' }, 503)
     }
 
-    const ip = clientIp(c.req.raw.headers)
+    const ip = clientIp(
+      c.req.raw.headers,
+      c.env?.incoming?.socket?.remoteAddress,
+      env.trustedProxyCidrs,
+    )
     if (!allowBurst(minuteHits, ip, Date.now(), env.feedbackPerMinute)) {
       console.warn(`[feedback-deny] minute ip=${ip}`)
       return c.json({ error: 'rate_limited' }, 429)

@@ -138,8 +138,11 @@ bash scripts/cf-open-public.sh           # 执行
 
 要重新关回门禁：`bash scripts/cf-create-access.sh`（会重建 Access 应用与 `/api/img/*` 的 bypass）。
 
-补充运维记录：请求没有可识别来源头时会落入同一个 `ip=unattributed` 限流桶。服务器验收套件后立刻再次登录，
-可能由自家请求触发 429；先检查 `[auth-deny] login-burst ip=unattributed` 与时间窗口，再判断是否受攻击。
+补充运维记录：应用现在先读取 TCP 对端，只有对端落在 `TRUSTED_PROXY_CIDRS` 内才采信
+`CF-Connecting-IP` / `X-Real-IP` / `X-Forwarded-For`。当前 Cloudflare Tunnel 部署保持默认的
+本机回环信任边界，继续按真实访客 IP 限流；直连和普通反代的配置见
+[配置说明](docs/configuration.md#反向代理与客户端-ip)。只有运行时拿不到对端元数据时才使用
+`ip=unattributed`；排查 429 时先核对对端、代理配置与时间窗口，再判断是否受攻击。
 
 
 ### 运维脚本导航
