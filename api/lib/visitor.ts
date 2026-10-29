@@ -37,3 +37,39 @@ export function visitorCookie(id: string, headers: Headers): string {
     maxAge: VISITOR_MAX_AGE_S,
   })
 }
+
+/** The raw visitor id for one HTTP request, and whether this request minted it. */
+export interface VisitorIdentity {
+  id: string
+  minted: boolean
+}
+
+/** Resolves the request's visitor identity, minting it at most once. */
+export type VisitorResolver = () => Promise<VisitorIdentity>
+
+/**
+ * One visitor identity per HTTP request.
+ *
+ * tRPC resolves every procedure of a `?batch=1` call with the same context, and
+ * the batch is one HTTP request carrying one cookie. Reading the request headers
+ * inside each procedure (the old behaviour) made every first-contact upload in
+ * a batch mint its own id and append its own `Set-Cookie`; the browser keeps
+ * only the last cookie, so the other uploads belonged to identities nobody
+ * held. Resolving lazily here, behind a memo, means the whole batch awaits the
+ * same mint and the response carries one `Set-Cookie` that names all of it.
+ * A request that already has a cookie is not touched: no Set-Cookie, same id.
+ */
+export function createVisitorResolver(headers: Headers, resHeaders: Headers): VisitorResolver {
+  let resolved: Promise<VisitorIdentity> | undefined
+  return () => {
+    resolved ??= (async () => {
+      const existing = readVisitorId(headers)
+      if (existing) return { id: existing, minted: false }
+
+      const id = newVisitorId()
+      resHeaders.append('set-cookie', visitorCookie(id, headers))
+      return { id, minted: true }
+    })()
+    return resolved
+  }
+}

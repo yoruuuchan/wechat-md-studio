@@ -9,6 +9,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-docs-'))
 process.env.DATABASE_URL = `file:${path.join(dir, 'docs.db')}`
 
 const { docsRouter } = await import('./docs-router')
+const { createVisitorResolver } = await import('./lib/visitor')
 const { contentHash } = await import('./lib/doc-hash')
 
 const user = {
@@ -28,6 +29,7 @@ function client(id = 1) {
   return docsRouter.createCaller({
     req: new Request('http://test/'),
     resHeaders: new Headers(),
+    visitorIdentity: createVisitorResolver(new Headers(), new Headers()),
     user: { ...user, id },
   })
 }

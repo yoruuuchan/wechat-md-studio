@@ -2,7 +2,7 @@ import { ErrorMessages } from "@contracts/constants";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
-import { newVisitorId, readVisitorId, visitorCookie, visitorKey } from "./lib/visitor";
+import { visitorKey } from "./lib/visitor";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -18,11 +18,9 @@ export const publicQuery = t.procedure;
  * hash of a first-party cookie, minted on first contact.
  */
 const withVisitor = t.middleware(async ({ ctx, next }) => {
-  const existing = readVisitorId(ctx.req.headers);
-  if (existing) return next({ ctx: { ...ctx, visitor: visitorKey(existing) } });
-
-  const id = newVisitorId();
-  ctx.resHeaders.append("set-cookie", visitorCookie(id, ctx.req.headers));
+  // The resolver is memoised per HTTP request, so every procedure in a batch
+  // sees the same id and the response carries at most one Set-Cookie.
+  const { id } = await ctx.visitorIdentity();
   return next({ ctx: { ...ctx, visitor: visitorKey(id) } });
 });
 
