@@ -20,16 +20,16 @@ import { env } from './env'
 const HSTS_VALUE = 'max-age=31536000'
 
 /**
- * Extra image origins. `/api/img/<key>` answers with a 302 to the R2 worker and
- * a redirect target is re-checked against the policy, so the worker's origin
- * must be named here — and it differs per deployment, hence IMG_BASE_URL.
+ * Articles can display public HTTPS pictures as well as uploaded images.
+ * Keep an explicitly configured HTTP worker for local production acceptance;
+ * it does not grant access to arbitrary HTTP origins.
  *
  * `data:` and `blob:` are not decoration: the mermaid rasterizer loads an SVG
  * through a data: URL, and every crop / compress preview and paste fallback is
  * a blob: URL.
  */
 function imageOrigins(): string[] {
-  const origins = ["'self'", 'data:', 'blob:']
+  const origins = ["'self'", 'https:', 'data:', 'blob:']
   if (env.imgBaseUrl) origins.push(new URL(env.imgBaseUrl).origin)
   return origins
 }
@@ -57,8 +57,10 @@ export function contentSecurityPolicy() {
     // preview's inline styles cannot declare one — so this is not a hole a
     // crafted document can climb through.
     fontSrc: ["'self'", 'data:'],
-    // The browser talks only to this origin (tRPC, /api/img redirects, assets).
-    connectSrc: ["'self'"],
+    // Re-cropping fetches /api/img/<key>, which redirects to the configured
+    // worker. CSP checks the redirect target too: img-src only permits display,
+    // not this fetch. Trust that worker's origin, not every HTTPS image host.
+    connectSrc: env.imgBaseUrl ? ["'self'", new URL(env.imgBaseUrl).origin] : ["'self'"],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],
     formAction: ["'self'"],

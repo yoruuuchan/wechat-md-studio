@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 
 // securityHeaders() freezes the policy in when it is called and env.ts is
@@ -14,6 +14,10 @@ process.env.IMG_ADMIN_KEY = 'security-headers-test-admin-key'
 
 const { contentSecurityPolicy, securityHeaders } = await import('./security-headers')
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 function testApp() {
   const app = new Hono()
   app.use('*', securityHeaders())
@@ -25,6 +29,36 @@ function testApp() {
 describe('contentSecurityPolicy', () => {
   it("names the image worker's origin, taken from IMG_BASE_URL", () => {
     expect(contentSecurityPolicy().imgSrc).toContain('https://img.example.test')
+  })
+
+  it('allows public HTTPS pictures without allowing arbitrary network connections', () => {
+    const policy = contentSecurityPolicy()
+    expect(policy.imgSrc).toContain('https:')
+    expect(policy.connectSrc).toEqual(["'self'", 'https://img.example.test'])
+    expect(policy.scriptSrc).toEqual(["'self'"])
+    expect(policy.defaultSrc).toEqual(["'self'"])
+    expect(policy.objectSrc).toEqual(["'none'"])
+    expect(policy.frameAncestors).toEqual(["'none'"])
+    for (const source of ['http:', 'javascript:', 'file:', '*']) {
+      expect(policy.imgSrc).not.toContain(source)
+      expect(policy.connectSrc).not.toContain(source)
+    }
+  })
+
+  it.each([
+    ['https://other-images.example.test/path/to/worker', 'https://other-images.example.test'],
+    ['http://127.0.0.1:4208/local', 'http://127.0.0.1:4208'],
+    ['', null],
+  ])('takes the crop fetch origin from IMG_BASE_URL=%s', async (baseUrl, origin) => {
+    vi.stubEnv('IMG_BASE_URL', baseUrl)
+    vi.resetModules()
+    const { contentSecurityPolicy: configuredPolicy } = await import('./security-headers')
+    const policy = configuredPolicy()
+    expect(policy.connectSrc).toEqual(origin ? ["'self'", origin] : ["'self'"])
+    expect(policy.connectSrc).not.toContain('https:')
+    expect(policy.imgSrc).toContain('https:')
+    if (origin) expect(policy.imgSrc).toContain(origin)
+    expect(JSON.stringify(policy)).not.toContain('img.example.test')
   })
 
   it('allows the data:/blob: images the rasterizer and croppers create', () => {
