@@ -4,6 +4,7 @@ import {
   clearImageSrc,
   collectMaterials,
   fillImageSrc,
+  locateImage,
   removeImageLine,
   setCarouselRatio,
 } from './render'
@@ -135,6 +136,160 @@ describe('a commented-out image is not an occurrence', () => {
     const out = fillImageSrc(PARKED, '第二张真图', 2, 'img:new')
     expect(out).toContain('![第二张真图](img:new)')
     expect(out).toContain('![暂存的图](img:parked)')
+  })
+})
+
+describe('image sources are consumed with the parser grammar', () => {
+  // `findImageSpan` used to end at the first `)`. For a source that contains
+  // parentheses or a title, that left the tail (`.png)`) in the article and the
+  // replacement or clear silently corrupted the source. The span now walks the
+  // same destination / title grammar markdown-it accepted in the first place.
+  const destinations = [
+    ['balanced parentheses', 'https://example.com/a(b).png'],
+    ['nested parentheses', 'https://example.com/a(b(c)d).png'],
+    ['escaped parentheses', 'https://example.com/a\\(b\\).png'],
+    ['angle-bracket form', '<https://example.com/a(b).png>'],
+  ] as const
+
+  for (const [name, src] of destinations) {
+    it(`replaces, clears and deletes ${name} without leftovers`, () => {
+      const doc = `前文\n\n![photo](${src})\n\n后文\n`
+      expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe('前文\n\n![photo](img:NEW)\n\n后文\n')
+      expect(clearImageSrc(doc, 'photo', 1)).toBe('前文\n\n![photo]()\n\n后文\n')
+      expect(removeImageLine(doc, 'photo', 1)).toBe('前文\n\n后文\n')
+    })
+  }
+
+  it('drops all three title forms together with the source', () => {
+    for (const title of ['"说明"', "'说明'", '(说明)']) {
+      const doc = `![photo](https://example.com/a(b).png ${title})`
+      expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe('![photo](img:NEW)')
+      expect(clearImageSrc(doc, 'photo', 1)).toBe('![photo]()')
+      expect(removeImageLine(doc, 'photo', 1)).toBe('')
+    }
+  })
+
+  it('accepts a title that wraps onto the next line of the paragraph', () => {
+    const doc = '![photo](https://example.com/a(b).png "第一行\n第二行")'
+    expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe('![photo](img:NEW)')
+  })
+
+  it('does not stop at a `)` inside a quoted title', () => {
+    const doc = '![photo](https://example.com/a(b).png "图注（草稿)")'
+    expect(locateImage(doc, 'photo', 1)?.end).toBe(doc.length - 1)
+    expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe('![photo](img:NEW)')
+  })
+
+  it('applies all three operations to empty, plain and img:key sources', () => {
+    for (const src of ['', 'https://example.com/plain.png', 'img:old']) {
+      const doc = `前文\n\n![photo](${src})\n\n后文\n`
+      expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe('前文\n\n![photo](img:NEW)\n\n后文\n')
+      expect(clearImageSrc(doc, 'photo', 1)).toBe('前文\n\n![photo]()\n\n后文\n')
+      expect(removeImageLine(doc, 'photo', 1)).toBe('前文\n\n后文\n')
+    }
+  })
+
+  it('targets the right image when an earlier one has parentheses in its source', () => {
+    const doc = [
+      '![同图注](https://example.com/a(b).png)',
+      '',
+      '正文里夹着 ![行内图](https://example.com/x(y).png) 一张图。',
+      '',
+      '![同图注](img:second)',
+      '',
+    ].join('\n')
+    const mats = collectMaterials(parseMarkdown(doc))
+    expect(mats.map((m) => m.occurrence)).toEqual([1, 3])
+    const out = fillImageSrc(doc, '同图注', 3, 'img:NEW')
+    expect(out).toContain('![同图注](https://example.com/a(b).png)')
+    expect(out).toContain('![同图注](img:NEW)')
+    expect(out).not.toContain('img:second')
+  })
+
+  it('keeps the rest of the line when the image shares it with text', () => {
+    const doc = '正文前 ![photo](https://example.com/a(b).png) 正文后'
+    expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe('正文前 ![photo](img:NEW) 正文后')
+    expect(removeImageLine(doc, 'photo', 1)).toBe('正文前  正文后')
+  })
+
+  it('leaves fenced and commented examples with parentheses untouched', () => {
+    const doc = [
+      '```md',
+      '![photo](https://example.com/a(b).png)',
+      '```',
+      '',
+      '<!-- ![photo](https://example.com/c(d).png) -->',
+      '',
+      '![photo](https://example.com/real(e).png)',
+      '',
+    ].join('\n')
+    const out = fillImageSrc(doc, 'photo', 1, 'img:NEW')
+    expect(out).toContain('```md\n![photo](https://example.com/a(b).png)\n```')
+    expect(out).toContain('<!-- ![photo](https://example.com/c(d).png) -->')
+    expect(out).toContain('![photo](img:NEW)')
+    expect(out).not.toContain('real(e).png')
+  })
+
+  it('refuses a destination the parser cannot close, instead of editing the tail', () => {
+    const doc = '![photo](https://example.com/a(b.png)'
+    expect(collectMaterials(parseMarkdown(doc))).toHaveLength(0)
+    expect(locateImage(doc, 'photo', 1)).toBeNull()
+    expect(canLocateImage(doc, 'photo', 1)).toBe(false)
+    expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe(doc)
+    expect(clearImageSrc(doc, 'photo', 1)).toBe(doc)
+    expect(removeImageLine(doc, 'photo', 1)).toBe(doc)
+  })
+
+  it('does not reach across a blank line to close an unclosed title', () => {
+    const doc = [
+      '![photo](https://example.com/a(b).png "unclosed',
+      '',
+      '正文 "t")',
+      '',
+    ].join('\n')
+    expect(collectMaterials(parseMarkdown(doc))).toHaveLength(0)
+    expect(locateImage(doc, 'photo', 1)).toBeNull()
+    expect(fillImageSrc(doc, 'photo', 1, 'img:NEW')).toBe(doc)
+  })
+})
+
+describe('carousel and gallery slides with parentheses in their sources', () => {
+  const CAROUSEL = [
+    ':::carousel 4:3 括号图',
+    '![同图注](https://example.com/a(b).png)',
+    '![同图注](https://example.com/c(d).png)',
+    ':::',
+    '',
+  ].join('\n')
+
+  it('clears only the addressed slide and keeps the other one intact', () => {
+    const out = clearImageSrc(CAROUSEL, '同图注', 2)
+    expect(out).toContain('![同图注](https://example.com/a(b).png)')
+    expect(out).toContain('![同图注]()')
+    expect(out).not.toContain('c(d)')
+    expect(out).toContain(':::carousel 4:3 括号图')
+  })
+
+  it('removes only the addressed slide line', () => {
+    const out = removeImageLine(CAROUSEL, '同图注', 1)
+    expect(out).not.toContain('a(b)')
+    expect(out).toContain('![同图注](https://example.com/c(d).png)')
+    expect(out).toContain(':::')
+  })
+
+  const GALLERY = [
+    ':::gallery 2 4:3 括号网格',
+    '![网格](https://example.com/g(1).png)',
+    '![网格](https://example.com/g(2).png)',
+    ':::',
+    '',
+  ].join('\n')
+
+  it('fills only the addressed gallery cell', () => {
+    const out = fillImageSrc(GALLERY, '网格', 2, 'img:NEW')
+    expect(out).toContain('![网格](https://example.com/g(1).png)')
+    expect(out).toContain('![网格](img:NEW)')
+    expect(out).not.toContain('g(2)')
   })
 })
 

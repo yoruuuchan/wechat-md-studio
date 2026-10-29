@@ -2,8 +2,9 @@ import type { Block, CarouselRatio, Doc, InlineSeg, RenderStats, SignatureConfig
 import { baseTableBlock, BLANK, esc, type Theme } from './themes'
 import { ext, type FootnoteItem } from './theme-fallbacks'
 import { diagramOf } from './diagram'
-import { fencedRanges, isInFence } from './fences'
+import { fencedRanges, isInFence, type Range } from './fences'
 import { commentRanges, isInComment } from './comments'
+import { inlineImageEnd } from './parse'
 import { t } from './i18n'
 
 // 盒式模块的前后空行由 pushBlock(boxed=true) 统一插入
@@ -398,6 +399,25 @@ export interface ImageSpan {
   alt: string // caption as it appears in the source
 }
 
+/**
+ * Where the inline run holding the image ends.
+ *
+ * A paragraph is tokenised on its own, so an image destination or title can
+ * never cross a blank line, a fence or an editor note. Bounding the lookup that
+ * way keeps a malformed image (an unclosed title, say) from matching a `)`
+ * several blocks later and swallowing the rest of the article.
+ */
+function inlineImageLimit(content: string, from: number, fences: Range[], comments: Range[]): number {
+  let max = content.length
+  const blank = /\n[ \t]*\n/g
+  blank.lastIndex = from
+  const hit = blank.exec(content)
+  if (hit) max = hit.index
+  for (const [start] of fences) if (start >= from && start < max) max = start
+  for (const [start] of comments) if (start >= from && start < max) max = start
+  return max
+}
+
 function findImageSpan(content: string, occurrence: number): ImageSpan | null {
   if (occurrence < 1) return null
   const fences = fencedRanges(content)
@@ -416,8 +436,11 @@ function findImageSpan(content: string, occurrence: number): ImageSpan | null {
     if (seen !== occurrence) continue
     const start = m.index
     const openEnd = m.index + m[0].length
-    const end = content.indexOf(')', openEnd)
-    if (end < 0) return null
+    // The destination may hold balanced parentheses or escapes, and may be
+    // followed by a title; the parser's own grammar decides where the image
+    // ends. Stopping at the first `)` left the tail of `a(b).png` behind.
+    const end = inlineImageEnd(content, openEnd, inlineImageLimit(content, m.index, fences, comments))
+    if (end === null) return null
     return { start, openEnd, end, alt: m[1].trim() }
   }
   return null
