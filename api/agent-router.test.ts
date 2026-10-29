@@ -110,6 +110,55 @@ describe('the agent door', () => {
     expect((await call('GET', '/docs', { headers: READ })).status).toBe(200)
   })
 
+  it('keeps a read-only token out of every write endpoint, not just POST /docs', async () => {
+    const created = await push('只读令牌的写端点回归')
+    const updated = await call('PUT', `/docs/${created.id}`, {
+      headers: READ,
+      body: { content: '只读不该改到这里', force: true },
+    })
+    expect(updated.status).toBe(403)
+
+    const form = new FormData()
+    form.append('file', new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'x.png', { type: 'image/png' }))
+    const image = await agentRouter.request('/images', { method: 'POST', headers: READ, body: form })
+    expect(image.status).toBe(403)
+
+    // The refusal is enforced before the handler, so nothing was written.
+    const after = await json<{ content: string }>(await call('GET', `/docs/${created.id}`, { headers: READ }))
+    expect(after.content).toBe('只读令牌的写端点回归')
+  })
+
+  it('revoking a token closes the door for that token alone', async () => {
+    const previous = process.env.AGENT_TOKENS
+    try {
+      // Deleting the line is the documented revocation procedure.
+      process.env.AGENT_TOKENS = `reviewer:${'mopai_read_tok'}:read`
+      const revoked = await call('GET', '/whoami', { headers: WRITE })
+      expect(revoked.status).toBe(401)
+      expect((await json<{ error: string }>(revoked)).error).toContain('无效')
+      // The other token is untouched by the same edit.
+      expect((await call('GET', '/whoami', { headers: READ })).status).toBe(200)
+      expect((await call('POST', '/docs', { headers: READ, body: { content: '# x' } })).status).toBe(403)
+    } finally {
+      process.env.AGENT_TOKENS = previous
+    }
+  })
+
+  it('refuses the browser access key as an Agent credential', async () => {
+    const { env } = await import('./lib/env')
+    // ACCESS_KEY is the human login. It must never authenticate the agent door,
+    // even when it happens to look like a token an agent would send.
+    for (const key of [env.accessKey, `mopai_${env.accessKey}`, `Bearer ${env.accessKey}`]) {
+      const asBearer = await call('GET', '/whoami', { headers: { authorization: `Bearer ${key}` } })
+      expect(asBearer.status).toBe(401)
+    }
+    // A bare session cookie is not a credential either: only Bearer counts.
+    const asCookie = await call('GET', '/whoami', {
+      headers: { cookie: `mopai_sid=${encodeURIComponent(env.accessKey)}` },
+    })
+    expect(asCookie.status).toBe(401)
+  })
+
   it('creates an article that is saved from birth, so browser edits sync back', async () => {
     const created = await push('---\ntitles:\n  - 深秋的排期\n---\n\n正文一段。')
     expect(created.name).toBe('深秋的排期')

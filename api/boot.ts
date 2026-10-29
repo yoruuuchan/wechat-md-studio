@@ -11,7 +11,7 @@ import { startAnonUploadRecovery } from "./lib/anon-upload";
 import { env } from "./lib/env";
 import { clientIp } from "./lib/client-ip";
 import { securityHeaders } from "./lib/security-headers";
-import { warnAboutWeakTokens } from "./lib/agent-auth";
+import { warnAboutTokenConfig, warnAboutWeakTokens } from "./lib/agent-auth";
 import { writingSkill } from "./lib/writing-skill";
 import { remoteMcpRouter } from "./remote-mcp-router";
 import { feedbackRouter } from "./feedback-router";
@@ -79,15 +79,18 @@ app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
 
+// The agent door is validated by env.ts, which refuses to boot in production.
+// In development the same problems are only warnings: an entry that cannot be
+// parsed is ignored per request (fail closed), and one weak enough to guess is
+// still worth saying out loud once. Both calls are silent when the list is clean
+// or empty, and neither ever prints a token.
+warnAboutTokenConfig();
+warnAboutWeakTokens();
+
 if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);
-
-  // The agent door stays closed while AGENT_TOKENS is empty; when it is open,
-  // say once at boot if a token is too weak to be worth having. (The door reads
-  // the raw env per request by design, so boot is the one eager reader.)
-  warnAboutWeakTokens();
 
   // Port and bind address come from lib/env.ts, which validates them (an
   // unparsable PORT used to become NaN and hand the failure to the OS).

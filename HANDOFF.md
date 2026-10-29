@@ -104,6 +104,7 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 | 应用 | 每 IP 每分钟 10 次登录尝试（内存计数）。站点公开之后，`auth.login` 是全站唯一能被人坐在那儿一直试的门；超了答 429，口令比较本身仍是常数时间 | 同上，`AUTH_LOGIN_PER_MINUTE`；`api/auth-router.ts` |
 | 应用 | 匿名 Remote MCP 除每游客 5 条、全站 200 条外，再按真实来源哈希限制 20 条活跃连接和每 UTC 日 40 次实际新建；Cookie 轮换不能绕过，撤销 / 到期会释放活跃槽，日预算与连接记录持久化到 SQLite | `api/lib/remote-mcp.ts`、`api/queries/connection.ts`；`REMOTE_MCP_MAX_ACTIVE_PER_SOURCE` / `REMOTE_MCP_CREATES_PER_SOURCE_PER_DAY` |
 | 应用 | 配置错了不启动：生产环境缺 `ACCESS_KEY` / `SESSION_SECRET`，或用了仓库里公开的占位值，或任何数值旋钮写了非整数 / 越界值，启动时直接报错并点名变量——**不再有「静默拿开发默认值上线」这条路** | `api/lib/env.ts` |
+| 应用 | Agent 令牌配置错了也不启动：生产环境里 `AGENT_TOKENS` 的未知 scope（如 `:raed`）、多余字段、同名或同令牌重复、短于 16 字符、仓库公开占位值，都在启动时报错并只点名条目——未知 scope 不再被当成读写权限 | `api/lib/env.ts`、`api/lib/agent-auth.ts` |
 | 应用 | 安全响应头由代码统一设置（HTML / 静态资源 / API 一致）：CSP、`X-Content-Type-Options`、`Referrer-Policy`、`Permissions-Policy`，以及只在 HTTPS 请求上发的 HSTS | `api/lib/security-headers.ts` |
 | 应用 | 每访客滚动 24 小时 30 张 / 100 MiB；额度检查与占用写在同一条 SQLite 事务里（`BEGIN IMMEDIATE`），并发上传最多只放到上限 | `api/lib/anon-quota.ts`、`api/lib/anon-upload.ts` |
 | 应用 | 全部匿名上传合计 1.5 GiB 封顶；与访客额度共用同一份原子预留，失败 / 取消 / 超时立即释放 | 同上，`ANON_TOTAL_BYTES` |

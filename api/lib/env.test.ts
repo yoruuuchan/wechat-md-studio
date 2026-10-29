@@ -209,3 +209,81 @@ describe('parseEnv in development', () => {
     )
   })
 })
+
+describe('parseEnv and AGENT_TOKENS', () => {
+  const strong = (seed: string) => `mopai_${seed.repeat(43).slice(0, 43)}`
+
+  it('accepts an unset or empty list: that is the closed door', () => {
+    expect(() => parseEnv(production)).not.toThrow()
+    expect(() => parseEnv({ ...production, AGENT_TOKENS: '' })).not.toThrow()
+  })
+
+  it('accepts valid default, read-only and mixed lists', () => {
+    expect(() => parseEnv({ ...production, AGENT_TOKENS: `claude-code:${strong('a')}` })).not.toThrow()
+    expect(() => parseEnv({ ...production, AGENT_TOKENS: `reviewer:${strong('b')}:read` })).not.toThrow()
+    expect(() =>
+      parseEnv({ ...production, AGENT_TOKENS: `writer:${strong('c')},reviewer:${strong('d')}:read` }),
+    ).not.toThrow()
+  })
+
+  it('refuses to boot on a weak or placeholder token, naming the entry only', () => {
+    const weak = 'short-password'
+    let error: Error | undefined
+    try {
+      parseEnv({ ...production, AGENT_TOKENS: `claude-code:${weak}` })
+    } catch (caught) {
+      error = caught as Error
+    }
+    expect(error?.message).toMatch(/AGENT_TOKENS/)
+    expect(error?.message).toContain('claude-code')
+    expect(error?.message).toContain(`${weak.length} characters`)
+    // The gate must not become the leak it exists to prevent.
+    expect(error?.message).not.toContain(weak)
+  })
+
+  it('refuses to boot on an unknown scope instead of granting write', () => {
+    expect(() =>
+      parseEnv({ ...production, AGENT_TOKENS: `claude-code:${strong('e')}:raed` }),
+    ).toThrow(/AGENT_TOKENS entry "claude-code" scope must be/)
+  })
+
+  it('refuses to boot on extra fields and duplicate entries', () => {
+    expect(() =>
+      parseEnv({ ...production, AGENT_TOKENS: `claude-code:${strong('f')}:read:extra` }),
+    ).toThrow(/scope must be/)
+    expect(() =>
+      parseEnv({ ...production, AGENT_TOKENS: `claude-code:${strong('g')},same:${strong('g')}` }),
+    ).toThrow(/reuses a token/)
+    expect(() =>
+      parseEnv({ ...production, AGENT_TOKENS: `same:${strong('h')},same:${strong('i')}` }),
+    ).toThrow(/more than once/)
+  })
+
+  it('reports every token problem alongside the other configuration problems', () => {
+    let error: Error | undefined
+    try {
+      parseEnv({
+        ...production,
+        PORT: 'nope',
+        AGENT_TOKENS: `weak:pass,typo:${strong('j')}:raed`,
+      })
+    } catch (caught) {
+      error = caught as Error
+    }
+    expect(error?.message).toMatch(/PORT/)
+    expect(error?.message).toMatch(/AGENT_TOKENS entry "weak"/)
+    expect(error?.message).toMatch(/AGENT_TOKENS entry "typo"/)
+    expect(error?.message).toMatch(/3 configuration problem/)
+  })
+
+  it('keeps development fixtures usable: the short token is only refused in production', () => {
+    const development: EnvInput = { NODE_ENV: 'development', DATABASE_URL: 'file:./data/mopai.db' }
+    expect(() =>
+      parseEnv({ ...development, AGENT_TOKENS: 'claude-code:short-fixture' }),
+    ).not.toThrow()
+    expect(() => parseEnv({ ...development, AGENT_TOKENS: 'typo:mopai_x:raed' })).not.toThrow()
+    // Production refuses the same values; the parser itself stays lenient so
+    // request handling can fail closed per entry instead of crashing the door.
+    expect(() => parseEnv({ ...production, AGENT_TOKENS: 'claude-code:short-fixture' })).toThrow()
+  })
+})

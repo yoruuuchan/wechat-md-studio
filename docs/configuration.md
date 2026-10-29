@@ -59,7 +59,7 @@ HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_
 | `IMG_BASE_URL` | 可留空；填写时须为绝对 http(s) URL | 图片 Worker；未配置则上传失败 |
 | `IMG_ADMIN_KEY` | 生产必填，至少 16 字符，拒绝公开占位值 | 与 Worker secret 一致的上传 / 删除凭证 |
 | `PUBLIC_BASE_URL` | 默认取请求 origin；生产反向代理应设公开 HTTPS origin | Agent `editorUrl`、MCP 接入地址及浏览器 Origin 检查的来源 |
-| `AGENT_TOKENS` | 默认空，Agent API 全部 401 | `名字:令牌[:read]`，逗号分隔；见 [Agent API](agent-api.md) |
+| `AGENT_TOKENS` | 默认空，Agent API 全部 401 | `名字:令牌[:read]`，逗号分隔；scope 只认小写 `read`，未知 scope / 多余字段 / 同名或同令牌重复 / 弱令牌 / 公开占位值在生产拒绝启动；见 [Agent API](agent-api.md) |
 | `STORAGE_QUOTA_BYTES` | `2147483648`（2 GiB） | 登录后素材库显示的用量上限 |
 | `REMOTE_MCP_TTL_HOURS` | `24`，整数 1–168 | 单篇 MCP 授权有效期，创建时固定；重新生成令牌不续期 |
 | `REMOTE_MCP_TOTAL_BYTES` | `52428800`（50 MiB），整数 ≥ 0 | 全部临时协作正文的 UTF-8 字节硬顶，与匿名图片额度独立 |
