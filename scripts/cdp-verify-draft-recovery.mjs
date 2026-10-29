@@ -432,6 +432,15 @@ const bodyInDb = (id) =>
     return row ? row.content : null
   })()`)
 
+/** Purge/removal is written by the queued local save, so give it a moment. */
+async function bodyGone(id) {
+  for (let i = 0; i < 24; i++) {
+    if ((await bodyInDb(id)) === null) return true
+    await sleep(250)
+  }
+  return false
+}
+
 /** Look for the article in the account by exact name (agent/draft door). */
 async function accountDoc(name) {
   for (let i = 0; i < 12; i++) {
@@ -581,7 +590,7 @@ try {
   check('purge asks first', String(await evaluate(`window.__r01Confirmed`)).includes('彻底删除'))
   const outPurgedEntry = await indexEntryById(signedOutId)
   check('the purged article is gone from the local index', outPurgedEntry === null, JSON.stringify(outPurgedEntry))
-  check('the purged article has no body left', (await bodyInDb(signedOutId)) === null)
+  check('the purged article has no body left', await bodyGone(signedOutId))
   await goDrafts()
   check('a reload does not bring the purged article back to the bin', !(await evaluate(`document.body.innerText.includes(${JSON.stringify(SIGNED_OUT_NAME)})`)))
 
@@ -680,7 +689,7 @@ try {
   await goDrafts()
   check('purge was clicked', await purgeFromBin(SIGNED_IN_PURGE_NAME))
   check('the purged local-only article left the index', (await indexEntryById(purgeId)) === null)
-  check('the purged local-only article left the body store', (await bodyInDb(purgeId)) === null)
+  check('the purged local-only article left the body store', await bodyGone(purgeId))
 
   // ================= C. an article that lives in the account =================
   section('cloud article: delete, undo, and the bin')
