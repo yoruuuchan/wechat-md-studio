@@ -42,6 +42,13 @@ interface Props {
   onLogin: () => void
   onExport: (kind: 'markdown' | 'bundle') => void
   remoteConnected?: boolean
+  /**
+   * Narrow layout: the trigger shares a crowded bar, so it takes the width its
+   * container hands it instead of its own intrinsic width. Without this the
+   * button keeps its full label width inside a shrunken wrapper and pushes the
+   * right edge of the bar past the viewport.
+   */
+  compact?: boolean
 }
 
 /** Existing top-bar styling, with independently proven local and cloud states. */
@@ -90,7 +97,7 @@ export function SaveStatus(p: Props) {
           data-local-state={status.local}
           data-cloud-state={status.cloud}
           data-save-doc={status.id}
-          className="min-w-0 max-w-[170px] rounded-lg px-1.5 py-1 text-left text-[10px] leading-4 transition-colors hover:bg-line-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          className={`min-w-0 rounded-lg px-1.5 py-1 text-left text-[10px] leading-4 transition-colors hover:bg-line-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${p.compact ? 'w-full max-w-full' : 'max-w-[170px]'}`}
           title={t('saveStatus.details')}
           aria-label={`${t('saveStatus.open', { name: p.docName, local: localLabel, cloud: cloudLabel })}${status.recovery ? ` · ${recoveryLabel}` : ''}`}
         >

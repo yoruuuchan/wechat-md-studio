@@ -135,9 +135,12 @@ export default function TopBar(p: Props) {
       className={`ya-glass flex h-14 shrink-0 items-center ${p.narrow ? 'gap-2 px-2' : 'gap-3 px-4'}`}
     >
       {/* 左：标识 + 稿件 */}
-      <div className="flex min-w-0 items-center gap-3">
+      <div className={`flex min-w-0 items-center ${p.narrow ? 'flex-1 gap-2' : 'gap-3'}`}>
         <div className="flex items-center gap-2.5">
-          <YoruMark height={17} />
+          {/* The moon-phase row is 92px of decoration; on a phone the article
+              name and the copy button are what need the room, so the mark
+              gives way and the wordmark stays. */}
+          {!p.narrow && <YoruMark height={17} />}
           <div className="flex items-baseline gap-2">
             <span className="whitespace-nowrap text-[14px] font-bold tracking-wide text-ink-1">{t('app.name')}</span>
             <span className="ya-eyebrow hidden whitespace-nowrap xl:inline">{APP_BYLINE}</span>
@@ -189,7 +192,7 @@ export default function TopBar(p: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-<div className={p.narrow ? 'min-w-0 max-w-[76px] shrink-0' : 'min-w-0'}>
+<div className={p.narrow ? 'w-[64px] shrink-0' : 'min-w-0'}>
           <SaveStatus
             status={p.saveStatus}
             docName={p.docName}
@@ -202,6 +205,7 @@ export default function TopBar(p: Props) {
             onLogin={p.onLogin}
             onExport={(kind) => p.onExport(kind)}
             remoteConnected={p.remoteConnected}
+            compact={p.narrow}
           />
         </div>
       </div>

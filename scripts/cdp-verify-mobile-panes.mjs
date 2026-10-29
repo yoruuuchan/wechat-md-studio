@@ -257,7 +257,10 @@ try {
     throw new Error(`${label} timed out; last=${JSON.stringify(result)}`)
   }
   const click = async (expression) => {
-    const position = await evaluate(`(() => { const el=${expression}; if(!el) return null; el.scrollIntoView({block:'center',inline:'center'}); const r=el.getBoundingClientRect(); return r.width&&r.height?{x:r.x+r.width/2,y:r.y+r.height/2}:null })()`)
+    // `inline:'nearest'`, never `center`: the editor page is an overflow-hidden
+    // column, and scrollIntoView will happily scroll such a container sideways,
+    // which then reports buttons as clipped on the left edge.
+    const position = await evaluate(`(() => { const el=${expression}; if(!el) return null; el.scrollIntoView({block:'center',inline:'nearest'}); const r=el.getBoundingClientRect(); return r.width&&r.height?{x:r.x+r.width/2,y:r.y+r.height/2}:null })()`)
     if (!position) throw new Error(`No visible click target: ${expression}`)
     await call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...position })
     await call('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...position })
