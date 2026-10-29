@@ -40,6 +40,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 未入云稿件删除 / 撤销 / 回收站 | `node scripts/cdp-verify-draft-recovery.mjs 4101 9701` | 登录前后新稿的删除、立即撤销、撤销期结束后回收站恢复与刷新持久化、彻底删除；云端稿件的撤销 / 回收站；remove / restore 故障注入 |
 | 本机正文读取失败 | `node scripts/cdp-verify-storage-read-failure.mjs 4102 9702` | 一次 / 持续 `getAll` 失败、IndexedDB 打开失败、真实缺失正文、云端 stub、主动清空、旧版迁移失败；每项都核对 IndexedDB 原件未被空串覆盖 |
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；事务中断回滚和可见失败 |
+| 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；中英文文案 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
 | 多图网格 | `node scripts/cdp-verify-gallery.mjs 3221 9353` | 参数、上传前裁切、网格布局、HTML 输出 |
@@ -50,6 +51,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[draft-recovery](../scripts/cdp-verify-draft-recovery.mjs)、
 [storage-read-failure](../scripts/cdp-verify-storage-read-failure.mjs)、
+[materials-states](../scripts/cdp-verify-materials-states.mjs)、
 [diagram](../scripts/cdp-verify-diagram.mjs)、
 [gallery](../scripts/cdp-verify-gallery.mjs)、
 [carousel-copy](../scripts/cdp-verify-carousel-copy.mjs)、
@@ -60,6 +62,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 双标签页脚本使用 `data/audit-r04-<时间>.db`，每次运行创建独立数据库，结果与截图默认写入临时目录。
 侧栏单图回填脚本的 mock 图床同样用应用端口 +100（默认 4206），数据库为本工作树的 `data/audit-r06.db`。
 结果与截图写入 `verify-out/single-slot-upload/`；粘贴 / 拖入使用浏览器合成文件事件，覆盖应用处理与写回，不代表原生操作系统交互已验收。
+素材接口失败脚本同样把 mock 图床放在应用端口 +100（默认 4220），数据库为 `data/audit-r20.db`。
 脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
 `SKIP` 即使退出码为 0，也不能计作已完成该链路验收。
 
