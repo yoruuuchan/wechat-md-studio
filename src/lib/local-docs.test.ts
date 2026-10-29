@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyLocalDelta, bodyFromDocument, mergeLocalCommit, planLocalCommit, type LocalDocRecord } from './local-docs'
+import { applyLocalDelta, bodyFromDocument, documentFromBody, mergeLocalCommit, planLocalCommit, type LocalDocRecord } from './local-docs'
 import type { BodyRecord } from './body-store'
 
 const copyName = (name: string) => `${name} (conflict)`
@@ -151,6 +151,30 @@ describe('local document version planning', () => {
     })], copyName)
     expect(plan.put).toHaveLength(0)
     expect(plan.result.docs[0]).toMatchObject({ content: 'ORIGINAL', baseHash: 'original-hash', contentLoaded: true })
+  })
+})
+
+describe('reading a stored body', () => {
+  it('returns a readable body as loaded even when the fallback entry remembers a failed read', () => {
+    const fallback = doc('a', '', { contentLoaded: false, bodyState: 'read-failed' })
+    const stored = documentFromBody({ id: 'a', content: 'ORIGINAL_BODY_MUST_SURVIVE' }, fallback)
+    expect(stored).toMatchObject({
+      id: 'a',
+      content: 'ORIGINAL_BODY_MUST_SURVIVE',
+      contentLoaded: true,
+      bodyState: undefined,
+    })
+  })
+
+  it('keeps metadata written with the body authoritative over the fallback', () => {
+    const fallback = doc('a', '', { name: 'stale name', contentLoaded: false, bodyState: 'read-failed' })
+    const stored = documentFromBody({
+      id: 'a',
+      content: 'BODY',
+      revision: 3,
+      metadata: { name: 'persisted name', updatedAt: 200, savedAt: null, deletedAt: null },
+    }, fallback)
+    expect(stored).toMatchObject({ name: 'persisted name', content: 'BODY', localRevision: 3, contentLoaded: true })
   })
 })
 

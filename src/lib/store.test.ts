@@ -155,6 +155,38 @@ describe('migrating the old localStorage documents', () => {
     }
   })
 
+  it('keeps reporting a failed migration when a later save only rewrites the index', async () => {
+    storage.setItem(LEGACY_KEY, JSON.stringify([doc('a', 'A')]))
+    const spy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => {
+      throw new Error('Simulated migration write failure')
+    })
+    try {
+      const loaded = await loadDocs()
+      expect(loaded.docs[0].content).toBe('A')
+      expect(persistenceStatus().failure?.kind).toBe('migration-failed')
+      expect(storage.getItem(LEGACY_KEY)).not.toBeNull()
+      expect(storage.getItem(MIGRATED_KEY)).toBeNull()
+
+      // The autosave that follows a load with no edits writes only the index.
+      // That is not a migration: the old copy is still the only proven store,
+      // so the warning must not disappear until a later load migrates it.
+      expect(await saveDocs(loaded.docs, loaded.activeId)).toBe(true)
+      expect(persistenceStatus().healthy).toBe(false)
+      expect(persistenceStatus().failure?.kind).toBe('migration-failed')
+      expect(storage.getItem(LEGACY_KEY)).not.toBeNull()
+    } finally {
+      spy.mockRestore()
+    }
+
+    // The next load retries the migration and only that repairs the status.
+    __resetLocalStoreForTests()
+    const retried = await loadDocs()
+    expect(retried.docs[0].content).toBe('A')
+    expect(storage.getItem(LEGACY_KEY)).toBeNull()
+    expect(storage.getItem(MIGRATED_KEY)).toBe('1')
+    expect(persistenceStatus().healthy).toBe(true)
+  })
+
   it('leaves an unreadable legacy value alone and says so', async () => {
     storage.setItem(LEGACY_KEY, '{not json')
 
@@ -487,6 +519,43 @@ describe('unavailable bodies', () => {
 
     __resetLocalStoreForTests()
     expect((await loadDocs()).docs[0].bodyState).toBe('stub')
+  })
+
+  it('loads a readable body even when the index still says the last read failed', async () => {
+    // Regression from the local-document refactor: a body row without metadata
+    // used the index entry as its fallback, and the entry's remembered
+    // read-failed placeholder then hid content that had just been read.
+    storage.setItem(
+      INDEX_KEY,
+      JSON.stringify({
+        docs: [
+          {
+            id: 'a',
+            name: '稿件 a',
+            updatedAt: 1000,
+            savedAt: null,
+            deletedAt: null,
+            source: null,
+            baseHash: null,
+            contentLoaded: false,
+            bodyState: 'read-failed',
+          },
+        ],
+        removed: [],
+      }),
+    )
+    const { createBodyStore } = await import('./body-store')
+    const store = await createBodyStore()
+    await store.write([{ id: 'a', content: 'ORIGINAL_BODY_MUST_SURVIVE' }])
+    store.close()
+    __resetLocalStoreForTests()
+
+    const loaded = await loadDocs()
+    const a = loaded.docs.find((d) => d.id === 'a')!
+    expect(loaded.bodyReadFailed).toBe(false)
+    expect(a.content).toBe('ORIGINAL_BODY_MUST_SURVIVE')
+    expect(a.contentLoaded).toBe(true)
+    expect(a.bodyState).toBeUndefined()
   })
 
   it('does not fall back to an empty store when IndexedDB cannot open', async () => {

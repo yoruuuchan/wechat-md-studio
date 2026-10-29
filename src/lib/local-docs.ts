@@ -102,6 +102,11 @@ export function documentFromBody(row: BodyRecord, fallback?: LocalDocRecord): Lo
       content: row.content,
       savedAt: metadata.savedAt ?? null,
       deletedAt: metadata.deletedAt ?? null,
+      // The row itself is the proof that the body was read: a fallback index
+      // entry may still carry a placeholder state from the load that failed
+      // before this row was read, and it must not hide the readable content.
+      contentLoaded: true,
+      bodyState: undefined,
     } as DocRecord),
     localRevision: row.revision ?? 0,
   }

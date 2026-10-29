@@ -218,6 +218,14 @@ function reportHealthy(backend: BodyStore['kind']): void {
     status = { ...status, backend }
     return
   }
+  // A failed migration is not repaired by a later index write either. Until a
+  // load has migrated and verified the old documents, the legacy copy is the
+  // only proven store, so its warning must stay. Only migrate() clears it.
+  if (status.failure?.kind === 'migration-failed' &&
+    safeGet(LEGACY_DOCS_KEY) !== null && safeGet(MIGRATED_KEY) !== '1') {
+    status = { ...status, backend }
+    return
+  }
   // `unsupported` describes the browser, not the write: with the bodies in
   // localStorage a successful save is still a save into the store that will run
   // out of room first, and the author should keep hearing about it.
