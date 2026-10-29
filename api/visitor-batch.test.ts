@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HttpBindings } from '@hono/node-server'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -33,11 +34,16 @@ const { getSqlite } = await import('./queries/connection')
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const PNG_BYTES = Buffer.from(PNG_BASE64, 'base64').byteLength
+const NODE_ENV = {
+  incoming: { socket: { remoteAddress: '127.0.0.1' } },
+} as unknown as HttpBindings
 
 const DEFAULTS = {
   anonDailyImages: 10,
   anonDailyBytes: 104857600,
   anonTotalBytes: 104857600,
+  anonBurstPerMinute: 1000,
+  anonIpDailyImages: 1000,
 }
 
 const VISITOR_COOKIE = /mopai_vid=([0-9a-f]{32})/
@@ -58,7 +64,7 @@ function batchedUpload(count: number, cookie?: string) {
       ...(cookie ? { cookie } : {}),
     },
     body: JSON.stringify(body),
-  })
+  }, NODE_ENV)
 }
 
 function list(cookie?: string) {
@@ -68,7 +74,7 @@ function list(cookie?: string) {
       host: '127.0.0.1:4107',
       ...(cookie ? { cookie } : {}),
     },
-  })
+  }, NODE_ENV)
 }
 
 async function listKeys(cookie?: string): Promise<string[]> {
@@ -206,9 +212,30 @@ describe('first-contact visitor identity across a tRPC batch', () => {
         cookie: intruderCookie,
       },
       body: JSON.stringify({ json: { key } }),
-    })
+    }, NODE_ENV)
     expect(removed.status).toBe(403)
     expect(await listKeys(intruderCookie)).toHaveLength(1)
     expect(await listKeys(ownerCookie)).toHaveLength(1)
+  })
+
+  it('does not let forged forwarding headers split a direct upload bucket', async () => {
+    Object.assign(env, { anonBurstPerMinute: 1 })
+    const body = {
+      json: { name: 'direct.png', contentBase64: PNG_BASE64, contentType: 'image/png' },
+    }
+    const request = (ip: string) => app.request('/api/trpc/storage.upload', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'cf-connecting-ip': ip,
+        host: '127.0.0.1:4107',
+      },
+      body: JSON.stringify(body),
+    }, {
+      incoming: { socket: { remoteAddress: '198.51.100.201' } },
+    } as unknown as HttpBindings)
+
+    expect((await request('203.0.113.41')).status).toBe(200)
+    expect((await request('203.0.113.42')).status).toBe(429)
   })
 })

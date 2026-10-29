@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { DEFAULT_TRUSTED_PROXY_CIDRS, parseTrustedProxyCidrs } from "./client-ip";
 
 /**
  * Every environment knob the server reads, parsed once at import time.
@@ -92,6 +93,9 @@ export interface Env {
    *  Cloudflare Tunnel, so the host's public IP on this port must not serve the
    *  site directly. */
   host: string;
+  /** Socket peers allowed to supply CF-Connecting-IP / X-Real-IP / X-Forwarded-For.
+   *  The loopback default matches the local Cloudflare Tunnel. Empty means direct. */
+  trustedProxyCidrs: string[];
 
   /** Absolute origin for links handed to agents (`editorUrl`). Optional: when
    *  unset the agent API derives it from the incoming request. Set it only if
@@ -150,6 +154,18 @@ function readRequiredString(ctx: ParseContext, name: string): string {
 
 function readString(ctx: ParseContext, name: string, fallback: string): string {
   return (ctx.input[name] ?? "").trim() || fallback;
+}
+
+function readTrustedProxyCidrs(ctx: ParseContext): string[] {
+  const raw = ctx.input.TRUSTED_PROXY_CIDRS;
+  const parsed = parseTrustedProxyCidrs(raw ?? DEFAULT_TRUSTED_PROXY_CIDRS.join(","));
+  if (!parsed) {
+    ctx.problems.push(
+      'TRUSTED_PROXY_CIDRS must be a comma-separated list of IPv4/IPv6 addresses or CIDR ranges',
+    );
+    return [...DEFAULT_TRUSTED_PROXY_CIDRS];
+  }
+  return parsed;
 }
 
 /** Finite integers only: a non-integer or out-of-range value is a config bug,
@@ -236,6 +252,7 @@ export function parseEnv(input: EnvInput): Env {
 
     port: readInt(ctx, "PORT", { fallback: 3100, min: 1, max: 65535 }),
     host: readString(ctx, "HOST", "127.0.0.1"),
+    trustedProxyCidrs: readTrustedProxyCidrs(ctx),
 
     publicBaseUrl: readOptionalUrl(ctx, "PUBLIC_BASE_URL"),
   };

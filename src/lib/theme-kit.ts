@@ -269,6 +269,81 @@ function s(css: string | undefined, fallback = ''): string {
   return out || fallback
 }
 
+function cssPx(value: string): number | null {
+  const match = value.trim().match(/^(-?\d+(?:\.\d+)?)(px|rem|em)$/i)
+  if (!match) return null
+  const n = Number(match[1])
+  return match[2].toLowerCase() === 'px' ? n : n * 16
+}
+
+/**
+ * The article root is copied and nested by WeChat. Horizontal padding repeats
+ * on every nesting level, so it must become a one-time max-width subtraction.
+ * Vertical padding and all visual declarations stay on the root.
+ */
+export function normalizeRootStyle(css: string, baseWidth = 677): { style: string; maxWidth: number } {
+  const parts = sanitizeStyle(css).split(';').map((part) => part.trim()).filter(Boolean)
+  let top = '0'
+  let right = '0'
+  let bottom = '0'
+  let left = '0'
+  const kept: string[] = []
+  const horizontalPx = (value: string) => cssPx(value) ?? 0
+
+  for (const part of parts) {
+    const sep = part.indexOf(':')
+    if (sep < 0) continue
+    const prop = part.slice(0, sep).trim().toLowerCase()
+    const value = part.slice(sep + 1).trim()
+    if (prop === 'padding') {
+      const v = value.split(/\s+/)
+      if (v.length === 1) {
+        top = bottom = v[0]
+        left = right = v[0]
+      } else if (v.length === 2) {
+        top = bottom = v[0]
+        left = right = v[1]
+      } else if (v.length === 3) {
+        top = v[0]
+        left = right = v[1]
+        bottom = v[2]
+      } else {
+        top = v[0]
+        right = v[1]
+        bottom = v[2]
+        left = v[3]
+      }
+      continue
+    }
+    if (prop === 'padding-left') {
+      left = value
+      continue
+    }
+    if (prop === 'padding-right') {
+      right = value
+      continue
+    }
+    if (prop === 'border') {
+      const match = value.match(/^(\d+(?:\.\d+)?(?:px|rem|em))\s+(?:solid|dashed|dotted|double)\s+(.+)$/i)
+      if (match) {
+        kept.push(`outline:${value}`, `outline-offset:-${match[1]}`)
+        continue
+      }
+    }
+    if (prop === 'max-width') continue
+    kept.push(part)
+  }
+
+  if (top !== '0' || bottom !== '0') {
+    kept.push(top === bottom ? `padding:${top} 0` : `padding:${top} 0 ${bottom}`)
+  }
+  const horizontal = Math.max(0, horizontalPx(left) + horizontalPx(right))
+  return {
+    style: kept.join(';'),
+    maxWidth: Math.max(240, Math.round(baseWidth - horizontal)),
+  }
+}
+
 // ============================================================
 // 规格：语义节点 → 内联 CSS
 // ============================================================
@@ -503,6 +578,7 @@ function derive(spec: ImportedThemeSpec) {
 export function buildTheme(spec: ImportedThemeSpec): Theme {
   const p = spec.palette
   const d = derive(spec)
+  const rootStyle = normalizeRootStyle(d.rootStyle)
   const { top: h2Top, rest: h2Style } = liftMarginTop(d.h2Raw)
   const headingGap = h2Top || '36px'
 
@@ -529,7 +605,7 @@ export function buildTheme(spec: ImportedThemeSpec): Theme {
     ui: { accent: p.accent, soft: p.soft, ink: p.heading },
 
     root: (inner) =>
-      `<section style="${/font-family/i.test(d.rootStyle) ? '' : d.bodyFont}background:${p.background};color:${p.text};line-height:1.75;${d.rootStyle};max-width:677px;margin:0 auto;overflow-x:hidden;box-sizing:border-box;">${inner}</section>`,
+      `<section style="${/font-family/i.test(rootStyle.style) ? '' : d.bodyFont}background:${p.background};color:${p.text};line-height:1.75;${rootStyle.style};max-width:${rootStyle.maxWidth}px;margin:0 auto;overflow-x:hidden;box-sizing:border-box;">${inner}</section>`,
 
     seg,
 

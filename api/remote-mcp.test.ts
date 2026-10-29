@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { HttpBindings } from '@hono/node-server'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -26,14 +27,18 @@ type RpcResult = {
 const rpcJson = async (response: Response) => await response.json() as RpcResult
 
 let id = 0
+let ipSerial = 0
+const testNodeEnv = {
+  incoming: { socket: { remoteAddress: '127.0.0.1' } },
+} as unknown as HttpBindings
 async function browser(url: string, method = 'GET', body?: object, cookie?: string, origin?: string) {
   return app.request(`http://localhost${url}`, {
     method, headers: {
       ...(body ? { 'content-type': 'application/json' } : {}),
       ...(cookie ? { cookie } : {}), ...(origin ? { origin } : {}),
-      'cf-connecting-ip': `test-${++id}`,
+      'cf-connecting-ip': `198.51.100.${(++ipSerial % 200) + 1}`,
     }, body: body ? JSON.stringify(body) : undefined,
-  })
+  }, testNodeEnv)
 }
 async function create(localDocId = `doc-${++id}`, content = '原稿', cookie?: string) {
   const response = await browser('/api/remote-mcp/connections', 'POST', { localDocId, name: '稿件', content }, cookie)
@@ -200,6 +205,18 @@ describe('anonymous single-document MCP', () => {
     expect(await status.json()).toBeNull()
     cleanupExpiredConnections()
     expect(getSqlite().prepare('SELECT id FROM docs WHERE id = ?').get(docId)).toBeUndefined()
+  })
+  it('does not let forged forwarding headers split Remote MCP creation limits', async () => {
+    const request = (i: number) => app.request('http://localhost/api/remote-mcp/connections', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'cf-connecting-ip': `203.0.113.${i + 100}` },
+      body: JSON.stringify({ localDocId: `direct-burst-${i}`, name: '限流', content: '正文' }),
+    }, {
+      incoming: { socket: { remoteAddress: '192.0.2.203' } },
+    } as unknown as HttpBindings)
+
+    for (let i = 0; i < 10; i++) expect((await request(i)).status).toBe(201)
+    expect((await request(10)).status).toBe(429)
   })
   it('rejects missing bases, oversized requests and untrusted Origins', async () => {
     const c = await create()

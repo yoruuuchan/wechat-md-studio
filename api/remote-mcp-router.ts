@@ -1,8 +1,10 @@
 import { Hono, type Context } from 'hono'
+import type { HttpBindings } from '@hono/node-server'
 import { z } from 'zod'
 import { REMOTE_MCP_MAX_CHARS } from '@contracts/remote-mcp'
 import { env } from './lib/env'
-import { allowBurst, clientIp } from './lib/burst'
+import { allowBurst } from './lib/burst'
+import { clientIp } from './lib/client-ip'
 import { readVisitorId, newVisitorId, visitorKey, visitorCookie } from './lib/visitor'
 import {
   createVisitorConnection, readVisitorConnection, rotateVisitorToken,
@@ -35,7 +37,7 @@ function visitor(c: Context, create = false): string | null {
   return id ? visitorKey(id) : null
 }
 
-const router = new Hono()
+const router = new Hono<{ Bindings: HttpBindings }>()
 router.use('*', async (c, next) => {
   c.header('Cache-Control', 'no-store')
   if (!hasAllowedOrigin(c)) return c.json({ error: '不接受跨站授权请求' }, 403)
@@ -51,7 +53,12 @@ router.post('/connections', async (c) => {
   const parsed = z.object({ localDocId: localId, name, content: body }).strict()
     .safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return c.json({ error: '稿件参数不正确，正文最多 200 万字符' }, 400)
-  if (!allowBurst(createHits, clientIp(c.req.raw.headers), Date.now(), 10)) {
+  const ip = clientIp(
+    c.req.raw.headers,
+    c.env?.incoming?.socket?.remoteAddress,
+    env.trustedProxyCidrs,
+  )
+  if (!allowBurst(createHits, ip, Date.now(), 10)) {
     return c.json({ error: '创建太频繁，请一分钟后再试' }, 429)
   }
   const owner = visitor(c, true)!
@@ -85,7 +92,12 @@ router.post('/connections/:localDocId/rotate', async (c) => {
   if (!parsed.success || !id.success) return c.json({ error: '连接参数不正确' }, 400)
   const owner = visitor(c)
   if (!owner) return c.json({ error: '游客身份已失效' }, 410)
-  if (!allowBurst(createHits, clientIp(c.req.raw.headers), Date.now(), 10)) {
+  const ip = clientIp(
+    c.req.raw.headers,
+    c.env?.incoming?.socket?.remoteAddress,
+    env.trustedProxyCidrs,
+  )
+  if (!allowBurst(createHits, ip, Date.now(), 10)) {
     return c.json({ error: '操作太频繁，请一分钟后再试' }, 429)
   }
   return c.json({ ...rotateVisitorToken(owner, id.data, parsed.data.connectionId), endpoint: `${publicOrigin(c)}/api/mcp` })

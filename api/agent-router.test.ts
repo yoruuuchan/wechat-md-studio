@@ -49,6 +49,7 @@ const READ = { authorization: 'Bearer mopai_read_tok' }
 const browser = docsRouter.createCaller({
   req: new Request('http://test/'),
   resHeaders: new Headers(),
+  clientIp: '203.0.113.10',
   visitorIdentity: createVisitorResolver(new Headers(), new Headers()),
   user: OWNER,
 })

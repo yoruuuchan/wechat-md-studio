@@ -110,6 +110,13 @@ function plainTextOf(html: string): string {
 // 三栏各自的拖拽宽度，跨刷新记住。布局以 panel id 为键；侧栏折叠时它的记录
 // 留着，下次打开先按 defaultSize 恢复。
 const LAYOUT_KEY = 'mopai.layout.v1'
+type ImportKind = 'markdown' | 'docx' | 'bundle'
+const IMPORT_ACCEPT: Record<ImportKind, string> = {
+  markdown: '.md,.markdown,.txt',
+  docx: '.docx',
+  bundle: '.json',
+}
+
 function loadLayout(): Record<string, number> | undefined {
   try {
     const raw = localStorage.getItem(LAYOUT_KEY)
@@ -195,7 +202,8 @@ export default function EditorPage() {
   const [conflictOpen, setConflictOpen] = useState(false)
   const [aiWritingOpen, setAiWritingOpen] = useState(false)
   const [remoteMcpOpen, setRemoteMcpOpen] = useState(false)
-  const importKindRef = useRef<'markdown' | 'docx' | 'bundle'>('markdown')
+  const [importKind, setImportKind] = useState<ImportKind>('markdown')
+  const importKindRef = useRef<ImportKind>('markdown')
   const importRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<EditorHandle>(null)
@@ -1421,7 +1429,13 @@ export default function EditorPage() {
         onExport={handleExport}
         onImport={(kind) => {
           importKindRef.current = kind
-          importRef.current?.click()
+          setImportKind(kind)
+          // The chooser must see the new type immediately; React may not commit
+          // the JSX attribute before input.click() opens it.
+          const input = importRef.current
+          if (!input) return
+          input.accept = IMPORT_ACCEPT[kind]
+          input.click()
         }}
         importing={importing}
         onOpenReferences={() => navigate('/references')}
@@ -1732,7 +1746,7 @@ export default function EditorPage() {
         ref={importRef}
         type="file"
         className="hidden"
-        accept={importKindRef.current === 'docx' ? '.docx' : importKindRef.current === 'bundle' ? '.json' : '.md,.markdown,.txt'}
+        accept={IMPORT_ACCEPT[importKind]}
         onChange={(e) => {
           const f = e.target.files?.[0]
           if (f) void handleImportFile(f, importKindRef.current)
