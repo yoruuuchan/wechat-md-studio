@@ -255,6 +255,13 @@ async function rename(name) {
 
 const docName = () => evaluate(`document.querySelector('input[placeholder="未命名稿件"]')?.value ?? null`)
 
+/** What the editor currently shows, for failure details. */
+const editorSnapshot = () =>
+  evaluate(`(() => {
+    const view = window.__mopaiCodemirror
+    return { name: document.querySelector('input[placeholder="未命名稿件"]')?.value ?? null, len: view ? view.state.doc.length : -1, text: view ? view.state.doc.toString().slice(0, 80) : null }
+  })()`)
+
 async function openSwitcher() {
   // A previous step may have left the menu open (the delete button stops the
   // click from selecting the row); close it before opening again.
@@ -722,7 +729,7 @@ try {
   await deleteArticle(CLOUD_NAME)
   check('the delete toast is shown', await hasToast('已移入回收站'))
   check('undo was clicked', await clickUndo())
-  check('the cloud article is back in the editor', await editorShows(CLOUD_NAME, CLOUD_TEXT))
+  check('the cloud article is back in the editor', await editorShows(CLOUD_NAME, CLOUD_TEXT), JSON.stringify(await editorSnapshot()))
   const cloudBack = await accountDoc(CLOUD_NAME)
   check('the account row is live again after undo', Boolean(cloudBack), JSON.stringify(cloudBack))
 
@@ -734,7 +741,7 @@ try {
   check('the account row is live again', Boolean(await accountDoc(CLOUD_NAME)))
   await goEditor({ signedIn: true })
   await openArticle(CLOUD_NAME)
-  check('the restored cloud article has its body', await editorShows(CLOUD_NAME, CLOUD_TEXT))
+  check('the restored cloud article has its body', await editorShows(CLOUD_NAME, CLOUD_TEXT), JSON.stringify(await editorSnapshot()))
 
   section('cloud article: a failed remove keeps a recoverable copy')
   await blockProcedure('docs.remove')
@@ -747,7 +754,7 @@ try {
   check('the local recovery copy restores', await restoreFromBin(CLOUD_NAME))
   await goEditor({ signedIn: true })
   await openArticle(CLOUD_NAME)
-  check('the body survived the failed remove', await editorShows(CLOUD_NAME, CLOUD_TEXT))
+  check('the body survived the failed remove', await editorShows(CLOUD_NAME, CLOUD_TEXT), JSON.stringify(await editorSnapshot()))
 
   section('cloud article: a failed restore is not reported as success')
   // Make sure the article is in the account bin first.
@@ -759,12 +766,12 @@ try {
   check('undo was clicked against the failing restore', restoreUndo)
   await sleep(1800)
   check('no success toast claims the article is restored', !(await hasToast('已恢复')), (await toastTexts()).join(' | '))
-  check('the failure is reported', await hasToast('恢复失败'), (await toastTexts()).join(' | '))
-  check('the browser tried to restore it in the account', JSON.parse(await blockedProcedures()).includes('docs.restore'), beforeRestore)
+  check('the failure is reported', await hasToast('恢复失败'), `${(await toastTexts()).join(' | ')} blocked=${await blockedProcedures()}`)
+  check('the browser tried to restore it in the account', JSON.parse(await blockedProcedures()).includes('docs.restore'), `${beforeRestore} now=${await blockedProcedures()}`)
   await unblockProcedures()
   await goDrafts()
   check('the article is still in the bin after the failed restore', await evaluate(`document.body.innerText.includes(${JSON.stringify(CLOUD_NAME)})`))
-  check('a later restore still works', await restoreFromBin(CLOUD_NAME))
+  check('a later restore still works', await restoreFromBin(CLOUD_NAME), JSON.stringify({ toasts: await toastTexts(), bin: await evaluate('document.body.innerText.slice(0, 120)') }))
   await goEditor({ signedIn: true })
   await openArticle(CLOUD_NAME)
   check('the body came back after the failed restore and retry', (await editorText()) === CLOUD_TEXT, String(await editorText()).slice(0, 60))
