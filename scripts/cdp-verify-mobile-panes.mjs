@@ -4,11 +4,12 @@
 // measured roughly 202/116/70px and up to eleven header buttons were pushed
 // past the right edge, the copy button among them. This script proves the fix:
 //
-//   * 320 / 390 / 430 / 768px show one pane at a time behind a switcher, with
-//     no page-level horizontal scroll and no clipped header button or copy
-//     button;
-//   * 1025 / 1440px keep the three draggable columns, none squeezed below its
-//     minimum;
+//   * 320 / 390 / 430 / 768 / 1024px show one pane at a time behind a switcher,
+//     with no page-level horizontal scroll and no clipped or overlapping
+//     control — the copy button and the save status among them;
+//   * 1440 / 1600px keep the three draggable columns, none squeezed below its
+//     minimum, with the article-name group and the save status readable in the
+//     bar;
 //   * switching panes, and rotating the device, keep the same CodeMirror view:
 //     the typed text, the caret and the scroll offset all survive, because the
 //     hidden panes stay mounted and laid out;
@@ -307,11 +308,22 @@ try {
       visible: getComputedStyle(el).visibility !== 'hidden',
       box: el.getBoundingClientRect().width > 0,
     }))
-    const visibleButtons = [...document.querySelectorAll('header button')].filter((b) => b.getBoundingClientRect().width > 0)
+    const visibleButtons = [...document.querySelectorAll('[data-topbar] button, [data-topbar] a')].filter((b) => b.getBoundingClientRect().width > 0)
     const buttons = visibleButtons.map((b) => { const r = b.getBoundingClientRect(); return { text: (b.innerText || b.title || '').trim().slice(0, 22), left: r.left, right: r.right } })
+    // Two controls that overlap are as broken as one pushed off screen; the
+    // desktop bar used to let the save-status button slide over the drafts
+    // button when the header ran out of room.
+    const sorted = [...buttons].sort((a, b) => a.left - b.left)
+    const overlaps = []
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i - 1].right > sorted[i].left + 0.5) overlaps.push(sorted[i - 1].text + ' x ' + sorted[i].text)
+    }
+    const saveEl = document.querySelector('[data-save-status]')
+    const sr = saveEl ? saveEl.getBoundingClientRect() : null
     const copyEl = document.querySelector('[data-onboarding="copy"]')
     const cr = copyEl ? copyEl.getBoundingClientRect() : null
     const tabs = [...document.querySelectorAll('[data-pane-tab]')].map((el) => { const r = el.getBoundingClientRect(); return { id: el.dataset.paneTab, w: Math.round(r.width), h: Math.round(r.height) } })
+    const groups = [...document.querySelector('[data-topbar]').children].map((el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width * 10) / 10, left: r.left, right: r.right } }).filter((g) => g.w > 0)
     return {
       vw,
       overflow: document.documentElement.scrollWidth - vw,
@@ -322,20 +334,25 @@ try {
       panels: [...document.querySelectorAll('[data-slot="resizable-panel"]')].map((el) => Math.round(el.getBoundingClientRect().width)),
       handles: document.querySelectorAll('[data-slot="resizable-handle"]').length,
       clipped: buttons.filter((b) => b.left < -0.5 || b.right > vw + 0.5).map((b) => b.text),
+      overlaps,
+      groups,
+      save: sr ? { visible: sr.width > 0, w: Math.round(sr.width) } : null,
       copy: cr ? { visible: cr.width > 0, w: Math.round(cr.width), h: Math.round(cr.height), inside: cr.left >= -0.5 && cr.right <= vw + 0.5 } : null,
       tabs,
       docText: window.__mopaiCodemirror ? window.__mopaiCodemirror.state.doc.toString() : '',
     }
   })()`
 
-  // ---------- 1. narrow widths: one pane, nothing clipped ----------
-  for (const width of [320, 390, 430, 768]) {
+  // ---------- 1. narrow widths: one pane, nothing clipped or overlapping ----------
+  for (const width of [320, 390, 430, 768, 1024]) {
     await setWidth(width)
     const l = await evaluate(layoutProbe)
     check(`${width}px: a pane switcher is shown and exactly one pane is visible`, l.switcher === true && l.paneDivs === 3 && l.visiblePanes.length === 1, JSON.stringify({ switcher: l.switcher, visible: l.visiblePanes }))
     check(`${width}px: all three panes keep a layout box (so scroll and caret survive)`, l.panesWithBox === 3, `panesWithBox=${l.panesWithBox}`)
     check(`${width}px: no page-level horizontal scroll`, l.overflow <= 0, `overflow=${l.overflow}`)
     check(`${width}px: no header button is clipped`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
+    check(`${width}px: no two bar controls overlap`, l.overlaps.length === 0, l.overlaps.join(', ') || 'none')
+    check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
     check(`${width}px: the copy button is fully on screen`, Boolean(l.copy && l.copy.visible && l.copy.inside), JSON.stringify(l.copy))
     check(`${width}px: pane tabs are touch-sized`, l.tabs.length === 3 && l.tabs.every((t) => t.h >= 28 && t.w >= 48), JSON.stringify(l.tabs))
     check(`${width}px: the three-column group is not rendered`, l.panels.length === 0 && l.handles === 0, JSON.stringify({ panels: l.panels, handles: l.handles }))
@@ -343,13 +360,16 @@ try {
   }
 
   // ---------- 2. wide widths: the desktop three columns survive ----------
-  for (const width of [1025, 1440]) {
+  for (const width of [1440, 1600]) {
     await setWidth(width, 900)
     const l = await evaluate(layoutProbe)
     check(`${width}px: three draggable columns`, l.switcher === false && l.panels.length === 3 && l.handles === 2, JSON.stringify({ panels: l.panels, handles: l.handles }))
     check(`${width}px: no column is squeezed below its minimum`, l.panels[0] >= 318 && l.panels[1] >= 378 && l.panels[2] >= 238, JSON.stringify(l.panels))
     check(`${width}px: no page-level horizontal scroll`, l.overflow <= 0, `overflow=${l.overflow}`)
     check(`${width}px: no header button is clipped`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
+    check(`${width}px: no two bar controls overlap`, l.overlaps.length === 0, l.overlaps.join(', ') || 'none')
+    check(`${width}px: the article-name group still has room in the bar`, l.groups[0].w > 0, JSON.stringify(l.groups))
+    check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
     check(`${width}px: the narrow pane stack is not rendered`, l.paneDivs === 0, `paneDivs=${l.paneDivs}`)
     await screenshot(`desktop-${width}.png`)
   }
@@ -485,6 +505,12 @@ try {
   // ---------- 8. language and theme through the narrow More menu ----------
   await click(`document.querySelector('[data-topbar-more]')`)
   await waitFor(`!!document.querySelector('[role=menu]')`, 'More menu for appearance')
+  // The narrow bar keeps only the article name, the save status and the copy
+  // button, so the owner sign-in entry moves in here; it still has to be
+  // reachable. (The wording itself is asserted by the guest-save-guidance
+  // suite, which owns the "owner sign-in" rename.)
+  const accountEntry = await evaluate(`([...document.querySelectorAll('[role=menuitem]')].find((el) => el.textContent.includes('登录')) || {}).textContent || ''`)
+  check('390px: the owner sign-in entry is reachable from the More menu', accountEntry.includes('登录'), accountEntry.trim() || 'not found')
   await click(`document.querySelector('[role=menu] [data-lang="en"]')`)
   await sleep(200)
   const english = await evaluate(`(() => ({ lang: document.documentElement.lang, tab: document.querySelector('[data-pane-tab="editor"]').innerText.trim(), overflow: document.documentElement.scrollWidth - window.innerWidth }))()`)

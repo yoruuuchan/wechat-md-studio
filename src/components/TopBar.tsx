@@ -132,7 +132,7 @@ export default function TopBar(p: Props) {
   return (
     <header
       data-topbar
-      className={`ya-glass flex h-14 shrink-0 items-center ${p.narrow ? 'gap-2 px-2' : 'gap-3 px-4'}`}
+      className={`ya-glass flex h-14 shrink-0 items-center ${p.narrow ? 'gap-2 px-2' : 'gap-3 px-3'}`}
     >
       {/* 左：标识 + 稿件 */}
       <div className={`flex min-w-0 items-center ${p.narrow ? 'flex-1 gap-2' : 'gap-3'}`}>
@@ -143,7 +143,8 @@ export default function TopBar(p: Props) {
           {!p.narrow && <YoruMark height={17} />}
           <div className="flex items-baseline gap-2">
             <span className="whitespace-nowrap text-[14px] font-bold tracking-wide text-ink-1">{t('app.name')}</span>
-            <span className="ya-eyebrow hidden whitespace-nowrap xl:inline">{APP_BYLINE}</span>
+{/* 副标只在最宽的一档出现：栏位紧张时先让它让路，登录入口才不会被挤出屏幕 */}
+            <span className="ya-eyebrow hidden whitespace-nowrap 2xl:inline">{APP_BYLINE}</span>
           </div>
         </div>
         <span className={`h-4 w-px bg-line-2 ${p.narrow ? 'hidden' : ''}`} />
@@ -152,7 +153,7 @@ export default function TopBar(p: Props) {
             value={p.docName}
             onChange={(e) => p.onRename(e.target.value)}
             placeholder={t('common.unnamedDoc')}
-            className={`${p.narrow ? 'w-full min-w-0' : 'w-36'} bg-transparent px-1.5 py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4`}
+            className={`${p.narrow ? 'w-full min-w-0' : 'w-36 min-w-0 max-w-full'} bg-transparent px-1.5 py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4`}
             title={t('topbar.docNameTitle')}
           />
           <DropdownMenu>
@@ -391,7 +392,7 @@ export default function TopBar(p: Props) {
             target="_blank"
             rel="noreferrer"
             title={t('topbar.github')}
-            className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-1 transition-colors hover:bg-line-1 xl:flex"
+            className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-1 transition-colors hover:bg-line-1 2xl:flex"
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.66.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .31.21.67.8.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/>
