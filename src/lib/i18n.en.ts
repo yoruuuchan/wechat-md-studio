@@ -647,6 +647,47 @@ export const en: Record<MsgKey, Msg> = {
   'themes.applied': 'Switched to “{name}”',
   'themes.appliedDesc': 'The article is re-typeset with the new template back in the editor',
   'themes.countRatio': '{shown}/{total}',
+  'themes.trial.cta': 'Try current article',
+  'themes.trial.hint':
+    'Cards compare the standard sample; trial and comparison can switch to the current article without editing it or saving a theme.',
+  'themes.trial.sourceLabel': 'Preview content',
+  'themes.trial.sample': 'Standard sample',
+  'themes.trial.current': 'Current article',
+  'themes.trial.loading': 'Reading the current article…',
+  'themes.trial.ready': 'Current article: {name}',
+  'themes.trial.empty':
+    'The current article has no body yet; the standard sample is shown. Applying a theme will not change the article.',
+  'themes.trial.none': 'No current article is available in this browser; using the standard sample.',
+  'themes.trial.deleted': 'The current article is in the bin; using the standard sample.',
+  'themes.trial.readFailed':
+    'The local body could not be read, so the current article cannot be trialled right now. The original is untouched; retry in the editor or use the standard sample.',
+  'themes.trial.stub':
+    'This body lives in the cloud; the theme library does not fetch cloud bodies, so the standard sample is shown.',
+  'themes.trial.missing':
+    'The body is missing locally; the standard sample is shown while the editor can still recover the original.',
+  'themes.trial.failed': 'Reading the current article failed; retry.',
+  'themes.trial.retry': 'Retry reading',
+  'themes.trial.useSample': 'Use standard sample',
+  'themes.trial.mathPending': 'Formulas are still rendering; the preview updates when ready',
+  'themes.compare.add': 'Compare',
+  'themes.compare.added': 'Selected',
+  'themes.compare.max': 'Compare up to {n} themes',
+  'themes.compare.title': 'Compare themes',
+  'themes.compare.subtitle':
+    'See 1–{max} themes side by side on the same content. Previewing never edits the article; only “Apply this theme” saves it.',
+  'themes.compare.selected': '{n} selected',
+  'themes.compare.open': 'Compare',
+  'themes.compare.clear': 'Clear',
+  'themes.compare.remove': 'Remove “{name}”',
+  'themes.compare.apply': 'Apply this theme',
+  'themes.compare.current': 'Current theme',
+  'themes.compare.close': 'Close comparison',
+  'themes.compare.cancel': 'Cancel',
+  'themes.compare.empty': 'Select 1–{max} themes from the cards first.',
+  'themes.compare.loadingPreview': 'Loading theme…',
+  'themes.compare.previewFailed': 'Preview failed to load',
+  'themes.compare.trialNote':
+    'Previewing does not edit the article or save a theme; only “Apply this theme” writes the setting.',
 
   // ---- theme metadata vocabulary ----
   'meta.style.商务': 'Business',

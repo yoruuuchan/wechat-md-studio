@@ -10,6 +10,16 @@ import {
 import type { CarouselRatio } from './types'
 import { t } from './i18n'
 
+/**
+ * `img:key` → the stable public address of this site's image. The editor preview,
+ * the copy payload and the theme trial all resolve the same short reference the
+ * same way, so a trial cannot disagree with the article's final rendering.
+ */
+export function resolveImgSrc(src: string): string {
+  if (src.startsWith('img:')) return `${window.location.origin}/api/img/${src.slice(4)}`
+  return src
+}
+
 /** Human-readable size, for upload reports and the over-limit warning. Whole
  *  megabytes drop the ".0" so the 20 MiB cap reads as "20 MB" beside them. */
 export function formatBytes(n: number): string {

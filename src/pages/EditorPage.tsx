@@ -81,6 +81,7 @@ import {
   cropToRatio,
   fileFromImageUrl,
   filenameForMime,
+  resolveImgSrc,
 } from '@/lib/image'
 import type { UploadSizeChoice } from '@/lib/image-compress'
 import { DEFAULT_CAROUSEL_RATIO, type Block, type CarouselRatio, type Doc } from '@/lib/types'
@@ -130,12 +131,6 @@ function loadLayout(): Record<string, number> | undefined {
   } catch {
     return undefined
   }
-}
-
-// img:key → 本站稳定图片地址（复制进公众号后由微信转存）
-function resolveImg(src: string): string {
-  if (src.startsWith('img:')) return `${window.location.origin}/api/img/${src.slice(4)}`
-  return src
 }
 
 /** When the cloud version of a conflicted article was last written. */
@@ -401,7 +396,7 @@ export default function EditorPage() {
   const pendingPublish = useRef<PublishAction | null>(null)
 
   const renderThemePreview = useCallback(
-    (previewTheme: Theme) => renderDoc(parsed, previewTheme, settings.sig, resolveImg).html,
+    (previewTheme: Theme) => renderDoc(parsed, previewTheme, settings.sig, resolveImgSrc).html,
     [parsed, settings.sig],
   )
 
@@ -411,7 +406,7 @@ export default function EditorPage() {
         parsed,
         theme,
         settings.sig,
-        resolveImg,
+        resolveImgSrc,
         (tex, display) => mathSvgs.get(tex, display),
         resolveDiagram,
       ),
@@ -683,7 +678,7 @@ export default function EditorPage() {
 
   /** The article's publish state right now, from the source on screen. */
   const buildPreflightReport = (article: Doc, snapshot: MathSnapshot): PreflightReport => {
-    const { stats } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
+    const { stats } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
       snapshot.get(tex, display), resolveDiagram)
     return buildPreflight({
       blocks: article.blocks,
@@ -701,7 +696,7 @@ export default function EditorPage() {
       return
     }
     const { article, snapshot } = currentArticle()
-    const { html, stats } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
+    const { html, stats } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
       snapshot.get(tex, display), resolveDiagram)
     const ok = await copyRichText(cleanHtml(html), plainTextOf(html))
     if (ok) {
@@ -721,7 +716,7 @@ export default function EditorPage() {
   const exportHtml = (kind: 'clean' | 'page', allowUnfinished: boolean, notices?: PreflightReport) => {
     const { article, doc, snapshot } = currentArticle()
     const name = doc?.name || t('io.fallbackArticle')
-    const { html } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
+    const { html } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
       snapshot.get(tex, display), resolveDiagram)
     const safe = safeFilename(name, t('io.fallbackArticle'), 'html')
     if (kind === 'clean') downloadFile(safe.replace(/\.html$/, `_${t('io.suffixClean')}.html`), cleanHtml(html))
