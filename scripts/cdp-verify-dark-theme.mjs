@@ -140,8 +140,11 @@ const measure = `(() => {
     }
     return 'rgb(255, 255, 255)'
   }
-  const triggers = [...document.querySelectorAll('[role=tab]')]
-  const track = document.querySelector('[role=tablist]')
+  // U03 adds a pane switcher with its own tablist on narrow layouts; the side
+  // panel is the tablist that owns the 图片 / 稿件信息 / 设置 tabs.
+  const lists = [...document.querySelectorAll('[role=tablist]')]
+  const track = lists.find((l) => [...l.querySelectorAll('[role=tab]')].some((x) => x.textContent.trim() === '稿件信息')) ?? lists[0]
+  const triggers = track ? [...track.querySelectorAll('[role=tab]')] : []
   if (!triggers.length || !track) return JSON.stringify({ error: 'tabs not found' })
   const active = triggers.find((t) => t.dataset.state === 'active')
   const inactive = triggers.filter((t) => t !== active)
