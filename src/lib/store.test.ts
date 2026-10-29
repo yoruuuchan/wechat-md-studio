@@ -116,6 +116,17 @@ describe('migrating the old localStorage documents', () => {
     expect(s.healthy).toBe(true)
   })
 
+  it('advances the migrated revision on the first edit instead of creating a false conflict', async () => {
+    storage.setItem(LEGACY_KEY, JSON.stringify([doc('a', 'LEGACY')]))
+    const loaded = await loadDocs()
+    const migrated = loaded.docs.find((d) => d.id === 'a')!
+    await saveDocs([{ ...migrated, content: 'FIRST EDIT', updatedAt: 2000 }], 'a')
+
+    __resetLocalStoreForTests()
+    const after = await loadDocs()
+    expect(after.docs.map((d) => [d.id, d.content])).toEqual([['a', 'FIRST EDIT']])
+  })
+
   it('keeps the old key and reports when the new store cannot take the bodies', async () => {
     storage.setItem(LEGACY_KEY, JSON.stringify([doc('a', 'A')]))
     // The write path fails: the fallback store is what a browser without
@@ -212,30 +223,21 @@ describe('saving', () => {
     const loaded = await loadDocs()
     const b = loaded.docs.find((d) => d.id === 'b')
     expect(b?.content).toBe('新写的')
-    expect(b?.name).toBe('未命名稿件 · 本地恢复')
+    // Metadata now commits with the body, so a missing index no longer reduces
+    // the recovered article to its default name.
+    expect(b?.name).toBe('稿件 b')
   })
 
-  it('keeps a deleted article deleted even when its body could not be removed', async () => {
-    // The store refuses the removal while the index write goes through - the
-    // order that would otherwise leave the body on disk with nothing pointing at it.
-    const store = await import('./body-store')
-    const original = await store.createBodyStore()
-    vi.spyOn(store, 'createBodyStore').mockResolvedValue({
-      ...original,
-      remove: () => Promise.reject(new Error('delete failed')),
-    })
-    __resetLocalStoreForTests()
-
+  it('keeps a permanent delete durable when the index cache cannot be written', async () => {
     await saveDocs([doc('a', 'A'), doc('b', 'B')], 'a')
+    storage.blocked.add(INDEX_KEY)
     const ok = await saveDocs([doc('a', 'A')], 'a')
     expect(ok).toBe(false)
-    expect(persistenceStatus().failure?.kind).toBe('write-failed')
+    expect(persistenceStatus().failure?.kind).toBe('quota')
 
-    vi.restoreAllMocks()
+    storage.blocked.clear()
     __resetLocalStoreForTests()
     const loaded = await loadDocs()
-    // b is still a body without an index entry, but its tombstone keeps it from
-    // coming back as a 本地恢复 article.
     expect(loaded.docs.map((d) => d.id)).toEqual(['a'])
   })
 
@@ -243,7 +245,7 @@ describe('saving', () => {
     await saveDocs([doc('a', 'A')], 'a')
     const store = await import('./body-store')
     const created = await store.createBodyStore()
-    const write = vi.spyOn(created, 'write')
+    const write = vi.spyOn(created, 'transact')
     vi.spyOn(store, 'createBodyStore').mockResolvedValue(created)
     // Re-open through the watched store, then let a load fill in what is
     // already on disk - otherwise "unchanged" is not knowable.
@@ -299,7 +301,14 @@ describe('loading', () => {
 
     const ok = await saveDocs([doc('a', '无 IDB 的正文')], 'a')
     expect(ok).toBe(true)
-    expect(JSON.parse(storage.getItem(BODIES_KEY) as string)).toEqual({ a: '无 IDB 的正文' })
+    expect(JSON.parse(storage.getItem(BODIES_KEY) as string)).toMatchObject({
+      a: {
+        id: 'a',
+        content: '无 IDB 的正文',
+        revision: 1,
+        metadata: { name: '稿件 a' },
+      },
+    })
     // Working, but the user is told the store is the small one.
     expect(persistenceStatus().healthy).toBe(false)
     expect(persistenceStatus().failure?.kind).toBe('unsupported')

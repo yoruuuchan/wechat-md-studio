@@ -895,6 +895,10 @@ export const en: Record<MsgKey, Msg> = {
   'docs.switchedToCloud': 'Switched to the cloud version',
   'docs.copySavedAs': 'Your version was saved as “{name}”; the cloud version is unchanged',
   'docs.copySaveFailed': 'Saving the copy failed; your version is intact in the editor and local cache — try again shortly',
+  'docs.localConflictCopy': 'Local conflict version',
+  'docs.localConflict': 'Another tab changed this article at the same time. Both versions were kept and the editor switched to “{name}”.',
+  'docs.localTabChanged': 'Another tab updated the local articles; the latest content is loaded',
+  'docs.localRefreshFailed': 'Another tab updated the local articles, but this page could not read them yet. More edits will not overwrite them, and the page will retry.',
 
   // ---- login merge ----
   'merge.copyName': '{name} (local version)',

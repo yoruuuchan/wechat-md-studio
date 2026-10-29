@@ -265,7 +265,7 @@ async function setEditorText(text) {
 async function bodyInDb(id) {
   return evaluate(`(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('mopai', 1);
+      const request = indexedDB.open('mopai');
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains('bodies')) request.result.createObjectStore('bodies', { keyPath: 'id' });
       };
@@ -296,7 +296,7 @@ async function indexEntry(id) {
 async function seedLocalDoc({ id = 'read-fault', name = 'Read Fault Probe', content = ORIGINAL } = {}) {
   return evaluate(`(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('mopai', 1);
+      const request = indexedDB.open('mopai');
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains('bodies')) request.result.createObjectStore('bodies', { keyPath: 'id' });
       };
