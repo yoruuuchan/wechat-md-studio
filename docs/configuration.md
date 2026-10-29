@@ -63,6 +63,8 @@ HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_
 | `STORAGE_QUOTA_BYTES` | `2147483648`（2 GiB） | 登录后素材库显示的用量上限 |
 | `REMOTE_MCP_TTL_HOURS` | `24`，整数 1–168 | 单篇 MCP 授权有效期，创建时固定；重新生成令牌不续期 |
 | `REMOTE_MCP_TOTAL_BYTES` | `52428800`（50 MiB），整数 ≥ 0 | 全部临时协作正文的 UTF-8 字节硬顶，与匿名图片额度独立 |
+| `REMOTE_MCP_MAX_ACTIVE_PER_SOURCE` | `20`，整数 1–200 | 同一可信来源同时有效的临时协作连接上限；撤销或到期释放 |
+| `REMOTE_MCP_CREATES_PER_SOURCE_PER_DAY` | `40`，整数 ≥ 1 | 同一可信来源每 UTC 日实际新建次数；Cookie 更换、撤销和重启都不重置 |
 | `RESEND_API_KEY` / `RESEND_FROM` / `FEEDBACK_TO` | 默认空；三者缺一做反馈接口返回 503 | 站内反馈的邮件转发（Resend）；只存在于服务端配置，页面与接口响应不含这些值 |
 | `RESEND_API_URL` | 默认 `https://api.resend.com/emails` | 仅本地端到端测试或自托管时覆盖邮件接口地址；生产不设 |
 | `FEEDBACK_PER_MINUTE` / `FEEDBACK_PER_DAY` | `3` / `20`，整数 ≥ 0 | 每来源 IP 的反馈提交上限（内存计数）；拒绝写 `[feedback-deny]` 日志 |

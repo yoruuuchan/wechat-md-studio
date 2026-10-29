@@ -66,6 +66,15 @@ export const remoteMcpConnections = sqliteTable("remote_mcp_connections", {
   tokenHash: text("tokenHash").notNull(),
   createdAt: integer("createdAt").notNull(),
   expiresAt: integer("expiresAt").notNull(),
+  /** SHA-256-prefix of the trusted-proxy-normalized source address. */
+  source: text("source"),
+});
+
+/** Persistent per-source daily creation budget; old days are swept at boot. */
+export const remoteMcpSourceBudget = sqliteTable("remote_mcp_source_budget", {
+  source: text("source").notNull(),
+  day: text("day").notNull(),
+  count: integer("count").notNull(),
 });
 
 /**

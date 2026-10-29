@@ -12,7 +12,7 @@ process.env.PUBLIC_BASE_URL = ''
 const { default: app } = await import('./boot')
 const { getSqlite } = await import('./queries/connection')
 const { documentHash } = await import('./lib/doc-hash')
-const { cleanupExpiredConnections, mcpTokenHash } = await import('./lib/remote-mcp')
+const { cleanupExpiredConnections, mcpSourceKey, mcpTokenHash } = await import('./lib/remote-mcp')
 const { env } = await import('./lib/env')
 
 type RpcResult = {
@@ -31,12 +31,19 @@ let ipSerial = 0
 const testNodeEnv = {
   incoming: { socket: { remoteAddress: '127.0.0.1' } },
 } as unknown as HttpBindings
-async function browser(url: string, method = 'GET', body?: object, cookie?: string, origin?: string) {
+async function browser(
+  url: string,
+  method = 'GET',
+  body?: object,
+  cookie?: string,
+  origin?: string,
+  sourceIp?: string,
+) {
   return app.request(`http://localhost${url}`, {
     method, headers: {
       ...(body ? { 'content-type': 'application/json' } : {}),
       ...(cookie ? { cookie } : {}), ...(origin ? { origin } : {}),
-      'cf-connecting-ip': `198.51.100.${(++ipSerial % 200) + 1}`,
+      'cf-connecting-ip': sourceIp ?? `198.51.100.${(++ipSerial % 200) + 1}`,
     }, body: body ? JSON.stringify(body) : undefined,
   }, testNodeEnv)
 }
@@ -81,6 +88,7 @@ describe('anonymous single-document MCP', () => {
     expect(connection.endpoint).toBe('http://localhost/api/mcp')
     const lease = getSqlite().prepare('SELECT * FROM remote_mcp_connections WHERE id = ?').get(connection.connection.id)!
     expect(lease.tokenHash).toBe(mcpTokenHash(connection.token))
+    expect(lease.source).toMatch(/^[0-9a-f]{32}$/)
     expect(Object.values(lease)).not.toContain(connection.token)
     expect(connection.doc.hash).toBe(documentHash('稿件', '原稿'))
   })
@@ -186,8 +194,15 @@ describe('anonymous single-document MCP', () => {
   })
   it('invalidates old tokens on rotation and immediately revokes access', async () => {
     const c = await create()
+    const budgetBefore = Number(
+      getSqlite().prepare('SELECT coalesce(sum(count), 0) AS n FROM remote_mcp_source_budget').get()!.n,
+    )
     const rotated = await browser(`/api/remote-mcp/connections/${c.connection.localDocId}/rotate`, 'POST', { connectionId: c.connection.id }, c.cookie)
     const next = await rotated.json() as RemoteMcpCredentials
+    const budgetAfter = Number(
+      getSqlite().prepare('SELECT coalesce(sum(count), 0) AS n FROM remote_mcp_source_budget').get()!.n,
+    )
+    expect(budgetAfter).toBe(budgetBefore)
     expect((await rpc(c.token, 'tools/list')).status).toBe(401)
     expect((await rpc(next.token, 'tools/list')).status).toBe(200)
     expect(next.connection.expiresAt).toBe(c.connection.expiresAt)
@@ -205,6 +220,105 @@ describe('anonymous single-document MCP', () => {
     expect(await status.json()).toBeNull()
     cleanupExpiredConnections()
     expect(getSqlite().prepare('SELECT id FROM docs WHERE id = ?').get(docId)).toBeUndefined()
+  })
+  it('caps active connections per source and releases a revoked slot', async () => {
+    const saved = env.remoteMcpMaxActivePerSource
+    env.remoteMcpMaxActivePerSource = 2
+    const sourceIp = '192.0.2.240'
+    const post = (localDocId: string, cookie?: string) =>
+      browser('/api/remote-mcp/connections', 'POST', {
+        localDocId,
+        name: '来源预算',
+        content: localDocId,
+      }, cookie, undefined, sourceIp)
+    try {
+      const first = await post('source-1')
+      const second = await post('source-2')
+      expect(first.status).toBe(201)
+      expect(second.status).toBe(201)
+      expect(first.headers.get('set-cookie')).not.toBe(second.headers.get('set-cookie'))
+      expect((await post('source-3')).status).toBe(429)
+
+      const cookie = first.headers.get('set-cookie')?.split(';')[0]
+      expect(cookie).toContain('mopai_vid=')
+      const body = await first.json() as RemoteMcpCredentials
+      const revoked = await browser(
+        `/api/remote-mcp/connections/${body.connection.localDocId}`,
+        'DELETE',
+        { connectionId: body.connection.id },
+        cookie,
+        undefined,
+        sourceIp,
+      )
+      expect(revoked.status).toBe(200)
+      expect((await post('source-4')).status).toBe(201)
+    } finally {
+      env.remoteMcpMaxActivePerSource = saved
+    }
+  })
+  it('releases an expired source slot before periodic cleanup runs', async () => {
+    const saved = env.remoteMcpMaxActivePerSource
+    env.remoteMcpMaxActivePerSource = 1
+    const sourceIp = '192.0.2.243'
+    const post = (localDocId: string) =>
+      browser('/api/remote-mcp/connections', 'POST', {
+        localDocId,
+        name: '到期来源',
+        content: localDocId,
+      }, undefined, undefined, sourceIp)
+    try {
+      const first = await post('expired-source-1')
+      expect(first.status).toBe(201)
+      const body = await first.json() as RemoteMcpCredentials
+      expect((await post('expired-source-2')).status).toBe(429)
+
+      getSqlite().prepare('UPDATE remote_mcp_connections SET expiresAt = ? WHERE id = ?')
+        .run(Date.now() - 1, body.connection.id)
+      expect((await post('expired-source-3')).status).toBe(201)
+    } finally {
+      env.remoteMcpMaxActivePerSource = saved
+    }
+  })
+  it('keeps the per-source daily budget through revocation and cleanup', async () => {
+    const saved = env.remoteMcpCreatesPerSourcePerDay
+    env.remoteMcpCreatesPerSourcePerDay = 2
+    const sourceIp = '192.0.2.241'
+    const post = (localDocId: string) =>
+      browser('/api/remote-mcp/connections', 'POST', {
+        localDocId,
+        name: '日预算',
+        content: localDocId,
+      }, undefined, undefined, sourceIp)
+    try {
+      expect((await post('daily-1')).status).toBe(201)
+      expect((await post('daily-2')).status).toBe(201)
+      cleanupExpiredConnections()
+      expect((await post('daily-3')).status).toBe(429)
+      const row = getSqlite().prepare(
+        'SELECT count FROM remote_mcp_source_budget WHERE source = ?',
+      ).get(mcpSourceKey(sourceIp)) as { count: number }
+      expect(row.count).toBe(2)
+    } finally {
+      env.remoteMcpCreatesPerSourcePerDay = saved
+    }
+  })
+  it('serializes concurrent creations against the per-source active cap', async () => {
+    const saved = env.remoteMcpMaxActivePerSource
+    env.remoteMcpMaxActivePerSource = 3
+    const sourceIp = '192.0.2.242'
+    const post = (i: number) =>
+      browser('/api/remote-mcp/connections', 'POST', {
+        localDocId: `concurrent-source-${i}`,
+        name: '并发来源',
+        content: `并发 ${i}`,
+      }, undefined, undefined, sourceIp)
+    try {
+      const responses = await Promise.all(Array.from({ length: 6 }, (_, i) => post(i)))
+      expect(responses.filter((r) => r.status === 201)).toHaveLength(3)
+      expect(responses.filter((r) => r.status === 429)).toHaveLength(3)
+    } finally {
+      env.remoteMcpMaxActivePerSource = saved
+    }
   })
   it('does not let forged forwarding headers split Remote MCP creation limits', async () => {
     const request = (i: number) => app.request('http://localhost/api/remote-mcp/connections', {
@@ -248,5 +362,14 @@ describe('anonymous single-document MCP', () => {
     const responses = await Promise.all(['writer-one', 'writer-two'].map((content) => call(c.token, 'update_current_document', { content, baseHash: c.doc.hash })))
     expect(responses.filter((r) => !r.isError)).toHaveLength(1)
     expect(responses.filter((r) => r.value.error === 'conflict')).toHaveLength(1)
+  })
+})
+
+describe('source budget key', () => {
+  it('is stable and does not store the address itself', () => {
+    const first = mcpSourceKey('203.0.113.7')
+    expect(first).toMatch(/^[0-9a-f]{32}$/)
+    expect(first).toBe(mcpSourceKey('203.0.113.7'))
+    expect(first).not.toContain('203.0.113.7')
   })
 })
