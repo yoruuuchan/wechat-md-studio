@@ -100,7 +100,11 @@ try {
   const waitFor = async (expression, label, ms = 15000) => {
     const until = Date.now() + ms
     while (Date.now() < until) {
-      if (await ev(`(async () => Boolean(await (${expression})))()`)) return
+      try {
+        if (await ev(`(async () => Boolean(await (${expression})))()`)) return
+      } catch {
+        // Navigation briefly has no execution document; retry in that window.
+      }
       await sleep(250)
     }
     const detail = await ev(`JSON.stringify({body:document.body.innerText.slice(0,1200),alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent),buttons:[...document.querySelectorAll('[role="dialog"] button')].map(e=>({text:e.textContent,disabled:e.disabled})),tabs:[...document.querySelectorAll('[role="tab"]')].map(e=>({text:e.textContent,state:e.dataset.state})),errors:${JSON.stringify(runtimeErrors).slice(0, 2000)}})`)
