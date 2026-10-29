@@ -149,7 +149,7 @@ try {
     '--no-first-run',
     '--disable-gpu',
     '--no-proxy-server',
-    '--window-size=1440,900',
+    '--window-size=1600,1000',
     'about:blank',
   ], { stdio: 'ignore' })
 
