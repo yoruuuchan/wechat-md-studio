@@ -44,6 +44,16 @@ export interface DocRecord {
 /** Why a record has no trustworthy body in memory. See `DocRecord.bodyState`. */
 export type BodyState = 'stub' | 'read-failed' | 'missing'
 
+/**
+ * True when this browser's record points at a row in the account: it was
+ * archived (`savedAt`), or a login merge / save stamped it with the cloud hash
+ * of a working copy. A record that is neither has only ever existed here — its
+ * body is the only copy, so deleting it must not depend on the cloud.
+ */
+export function hasCloudCopy(doc: Pick<DocRecord, 'savedAt' | 'baseHash'>): boolean {
+  return doc.savedAt !== null || Boolean(doc.baseHash)
+}
+
 /** Everything about a document except its body. Small enough for localStorage. */
 type DocIndexEntry = Omit<DocRecord, 'content'>
 

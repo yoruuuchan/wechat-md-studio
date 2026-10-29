@@ -315,15 +315,23 @@ export const docsRouter = createRouter({
   /**
    * 移入回收站，不是销毁。行还在，`list` / `drafts` 跳过它，`restore` 能把它
    * 原样请回来。
+   *
+   * `removed` says whether this account actually had a row to move. The browser
+   * writes articles that never reach the cloud (a new draft made between two
+   * login merges), and a blind UPDATE reports success for an id that was never
+   * here. The client needs that distinction: only when the account really holds
+   * the row may it drop its own copy of the body.
    */
   remove: authedQuery
     .input(z.object({ id: z.string().min(1).max(64) }))
     .mutation(async ({ ctx, input }) => {
-      await getDb()
+      const res = (await getDb()
         .update(docs)
         .set({ deletedAt: new Date() })
-        .where(and(eq(docs.id, input.id), eq(docs.ownerId, ctx.user.id)));
-      return { ok: true };
+        .where(and(eq(docs.id, input.id), eq(docs.ownerId, ctx.user.id)))) as unknown as {
+        rows?: { changes?: number | bigint }[];
+      };
+      return { ok: true as const, removed: Number(res?.rows?.[0]?.changes ?? 0) > 0 };
     }),
 
   /** 回收站： newest first, without the content — the bin only needs names. */

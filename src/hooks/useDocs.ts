@@ -3,6 +3,7 @@ import { trpc } from '@/providers/trpc'
 import {
   createDoc,
   createSampleDoc,
+  hasCloudCopy,
   loadActiveId,
   loadDocs,
   persistenceStatus,
@@ -77,9 +78,11 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   /** 内容变过但还没写进数据库的稿件 id，用来点亮保存按钮。 */
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   /**
-   * Trashed docs this browser holds while anonymous. Once signed in the server's
-   * bin is the truth and this stays empty; purely local trashed drafts (never
-   * saved) live here so they survive a reload.
+   * Trashed docs whose body this browser still holds. A purely local article
+   * (never pushed, never saved) is deleted and restored here whether or not a
+   * session is active; a cloud article also leaves a copy here until the server
+   * confirms it trashed the row, so a failed delete or a row purged on another
+   * device cannot take the only local text with it.
    */
   const [localTrash, setLocalTrash] = useState<DocRecord[]>([])
   /**
@@ -118,6 +121,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const lastSavedRef = useRef<Map<string, string>>(new Map())
   const docsRef = useRef<DocRecord[]>([])
   docsRef.current = docs
+  /** The trash as of now, for callbacks a toast captured before the delete. */
+  const localTrashRef = useRef<DocRecord[]>([])
+  localTrashRef.current = localTrash
+  /**
+   * Cloud deletes still in flight, so an undo never races the remove that is
+   * about to land on the server.
+   */
+  const pendingRemoves = useRef(new Map<string, Promise<void>>())
   const activeIdRef = useRef('')
   activeIdRef.current = activeId
 
@@ -672,13 +683,27 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   }, [docs, activeId, enabled, conflicts, saveToDraftsMutation, utils, t])
 
   /**
-   * 移入回收站：列表里立刻消失，但服务端只做软删除，所以回收站能原样请回来。
-   * 未登录时回收站只存在这个浏览器里。
+   * 移入回收站：列表里立刻消失。云端只做软删除，所以云端回收站能原样请回来；
+   * 还没进云端的稿件（登录后新建、两次登录合并之间写的）则在任何登录状态下都
+   * 进本机回收站。
+   *
+   * The body is copied into the local bin *before* the server answers. That copy
+   * is the only thing that can bring back an article the account never had, and
+   * it also covers a delete that fails or a row that was purged on another
+   * device. Once the account confirms it trashed that row the local copy is
+   * dropped again: from then on the account's bin is the truth, and a purge
+   * there stays final.
    */
   const removeDoc = useCallback(
     (id: string) => {
       const doc = docs.find((d) => d.id === id)
       if (!doc) return
+      const holdsBody = doc.contentLoaded !== false
+      // Written first: a request that hangs, or a tab closed mid-delete, must
+      // never leave the body behind only in memory.
+      if (holdsBody) {
+        setLocalTrash((tr) => [{ ...doc, deletedAt: Date.now() }, ...tr.filter((d) => d.id !== id)])
+      }
       const rest = docs.filter((d) => d.id !== id)
       const next = rest.length ? rest : [createDoc()]
       setDocs(next)
@@ -691,60 +716,112 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         map.delete(id)
         return map
       })
-      if (enabled) {
-        removeMutation
-          .mutateAsync({ id })
-          .then(() => utils.docs.trash.invalidate())
-          .catch(() => setNotice(t('docs.deleteSyncFailed')))
-      } else {
-        setLocalTrash((tr) => [{ ...doc, deletedAt: Date.now() }, ...tr])
-      }
+      if (!enabled) return
+
+      const pending = (async () => {
+        try {
+          const res = await removeMutation.mutateAsync({ id })
+          if (res.removed) {
+            // The account owns the only other copy now.
+            setLocalTrash((tr) => tr.filter((d) => d.id !== id))
+          }
+          await utils.docs.trash.invalidate()
+        } catch {
+          setNotice(t(holdsBody ? 'docs.deleteSyncKeptLocal' : 'docs.deleteSyncFailed'))
+          if (!holdsBody) {
+            // Nothing local to fall back on: keep the article visible instead
+            // of letting stale metadata erase the only pointer to its row.
+            setDocs((ds) => (ds.some((d) => d.id === id) ? ds : [{ ...doc, deletedAt: null }, ...ds]))
+          }
+        }
+      })()
+      pendingRemoves.current.set(id, pending)
+      void pending.finally(() => {
+        if (pendingRemoves.current.get(id) === pending) pendingRemoves.current.delete(id)
+      })
     },
     [docs, activeId, enabled, removeMutation, utils, t],
   )
 
-  /** 从回收站请回来。匿名时是纯本地操作。 */
+  /**
+   * 从回收站请回来。只有正文真的回到列表才返回 true。
+   *
+   * Where the article lives decides the path: a local-only article comes back
+   * from this browser without touching the network; an article the account may
+   * hold is restored by the server, with the local copy as the fallback when the
+   * account has no row left. A cloud failure is reported and keeps the recovery
+   * copy — never a success for a body that did not come back.
+   */
   const restoreDoc = useCallback(
     async (id: string): Promise<boolean> => {
-      const local = localTrash.find((d) => d.id === id)
-      if (local) {
-        setLocalTrash((t) => t.filter((d) => d.id !== id))
-        setDocs((ds) => (ds.some((d) => d.id === id) ? ds : [{ ...local, deletedAt: null }, ...ds]))
+      const bringBack = (doc: DocRecord): boolean => {
+        setLocalTrash((tr) => tr.filter((d) => d.id !== doc.id))
+        setDocs((ds) => (ds.some((d) => d.id === doc.id) ? ds : [{ ...doc, deletedAt: null }, ...ds]))
+        // Undo puts the article back on screen, not just in the list: a
+        // success toast over a still-hidden article reads like it failed.
+        setActiveId(doc.id)
         return true
       }
-      if (!enabled) return false
+      // Already live: a failed delete put it back, or a second undo click.
+      if (docsRef.current.some((d) => d.id === id)) return true
+      const local = localTrashRef.current.find((d) => d.id === id) ?? null
+      if (!enabled) return local ? bringBack(local) : false
+      // An article that never reached the account is restored from its local
+      // copy, network or not.
+      if (local && !hasCloudCopy(local)) return bringBack(local)
+      // A remove still in flight could land after the restore and trash the row
+      // again; wait for it to settle first.
+      const pendingRemove = pendingRemoves.current.get(id)
+      if (pendingRemove) await pendingRemove
+      if (docsRef.current.some((d) => d.id === id)) return true
       try {
-        const row = (await restoreMutation.mutateAsync({ id })).doc
+        const { doc: row } = await restoreMutation.mutateAsync({ id })
         if (row) {
-          lastSavedRef.current.set(row.id, row.content)
-          setDocs((ds) =>
-            ds.some((d) => d.id === row.id)
-              ? ds
-              : [
-                  {
-                    id: row.id,
-                    name: row.name,
-                    content: row.content,
-                    updatedAt: row.updatedAt.getTime(),
-                    savedAt: row.savedAt ? row.savedAt.getTime() : null,
-                    deletedAt: null,
-                    source: row.source ?? null,
-                    baseHash: row.hash ?? null,
-                    contentLoaded: true,
-                    bodyState: undefined,
-                  },
-                  ...ds,
-                ],
-          )
+          // Prefer the body this browser last held (it may include edits the
+          // account never saw), but never claim it is based on a version it is
+          // not: a mismatched base turns the next save into a conflict instead
+          // of a silent overwrite.
+          const content = local?.content ?? row.content
+          const sameContent = content === row.content
+          const baseHash = sameContent
+            ? row.hash ?? local?.baseHash ?? null
+            : local?.baseHash && local.baseHash === row.hash
+              ? row.hash
+              : null
+          lastSavedRef.current.set(row.id, content)
+          setDocs((ds) => {
+            if (ds.some((d) => d.id === row.id)) return ds
+            const restored: DocRecord = {
+              id: row.id,
+              name: local?.name ?? row.name,
+              content,
+              updatedAt: Math.max(row.updatedAt.getTime(), local?.updatedAt ?? 0),
+              savedAt: row.savedAt ? row.savedAt.getTime() : null,
+              deletedAt: null,
+              source: row.source ?? local?.source ?? null,
+              baseHash,
+              contentLoaded: true,
+              bodyState: undefined,
+            }
+            return [restored, ...ds]
+          })
+          setLocalTrash((tr) => tr.filter((d) => d.id !== id))
+          setActiveId(row.id)
+          await utils.docs.trash.invalidate()
+          return true
         }
-        await utils.docs.trash.invalidate()
-        return true
+        // No row in the account: the local copy is the only copy left.
+        if (local) return bringBack(local)
+        setNotice(t('docs.restoreFailed'))
+        return false
       } catch {
+        // Keep the recovery copy: a restore that did not happen must not
+        // consume it.
         setNotice(t('docs.restoreFailed'))
         return false
       }
     },
-    [localTrash, enabled, restoreMutation, utils, t],
+    [enabled, restoreMutation, utils, t],
   )
 
   /** The 10-second toast action; the bin page calls restoreDoc directly. */
@@ -753,21 +830,28 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   /** 彻底删除。图不会被连带删，它们会进素材库的「没在用的旧图」。 */
   const purgeDoc = useCallback(
     async (id: string): Promise<boolean> => {
-      if (localTrash.some((d) => d.id === id)) {
-        setLocalTrash((t) => t.filter((d) => d.id !== id))
+      const local = localTrashRef.current.find((d) => d.id === id) ?? null
+      if (!enabled) {
+        if (!local) return false
+        setLocalTrash((tr) => tr.filter((d) => d.id !== id))
         return true
       }
-      if (!enabled) return false
-      try {
-        await purgeMutation.mutateAsync({ id })
-        await utils.docs.trash.invalidate()
-        return true
-      } catch {
-        setNotice(t('docs.purgeFailed'))
-        return false
+      // An account row may still exist (archived, imported, or a delete that
+      // failed); it has to go too, or the next merge brings the article back. A
+      // failed purge keeps the local copy for another attempt.
+      if (!local || hasCloudCopy(local)) {
+        try {
+          await purgeMutation.mutateAsync({ id })
+          await utils.docs.trash.invalidate()
+        } catch {
+          setNotice(t('docs.purgeFailed'))
+          return false
+        }
       }
+      if (local) setLocalTrash((tr) => tr.filter((d) => d.id !== id))
+      return true
     },
-    [localTrash, enabled, purgeMutation, utils, t],
+    [enabled, purgeMutation, utils, t],
   )
 
   /* ---- conflict resolution: nothing is discarded without this choice ---- */
@@ -991,20 +1075,24 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     if (doc && doc.contentLoaded === false) void hydrateDoc(doc.id)
   }, [hydrateDoc])
 
-  const trashDocs = useMemo(
-    () =>
-      enabled
-        ? (trashQuery.data ?? []).map((t) => ({
-            id: t.id,
-            name: t.name,
-            content: '',
-            updatedAt: 0,
-            savedAt: t.savedAt ? t.savedAt.getTime() : null,
-            deletedAt: t.deletedAt ? t.deletedAt.getTime() : null,
-          }))
-        : localTrash,
-    [enabled, trashQuery.data, localTrash],
-  )
+  const trashDocs = useMemo(() => {
+    if (!enabled) return localTrash
+    const cloud = (trashQuery.data ?? []).map(
+      (t): DocRecord => ({
+        id: t.id,
+        name: t.name,
+        content: '',
+        updatedAt: 0,
+        savedAt: t.savedAt ? t.savedAt.getTime() : null,
+        deletedAt: t.deletedAt ? t.deletedAt.getTime() : null,
+        contentLoaded: false,
+      }),
+    )
+    const inCloud = new Set(cloud.map((d) => d.id))
+    // Local-only deletions live here even with a session: the account's bin
+    // cannot know about an article that was never pushed.
+    return [...cloud, ...localTrash.filter((d) => !inCloud.has(d.id))]
+  }, [enabled, trashQuery.data, localTrash])
 
   const refresh = useCallback(() => {
     void utils.docs.list.invalidate()

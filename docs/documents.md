@@ -44,8 +44,20 @@ Agent 更新的 400 / 409 / `force` 语义见 [Agent API](agent-api.md)。
 - 云端回收站稿件视为已存在，避免从旧本地缓存复活；旧缓存缺 hash 时按内容补比较。
 
 `docs.save` 是 update-only；新稿走 `saveToDrafts` / `importLocal`，避免删除后迟到的自动保存重新插入稿件。
-删除支持撤销与回收站，Agent 无删除入口。对应 [docs-merge.test.ts](../src/lib/docs-merge.test.ts)、
-[docs-router.test.ts](../api/docs-router.test.ts)、[cdp-verify-docs-sync.mjs](../scripts/cdp-verify-docs-sync.mjs)。
+删除按稿件实际所在位置保存可恢复副本，Agent 无删除入口：
+
+- 仅在本机、还没进云端的稿件（登录后新建、两次登录合并之间写的）在登录状态下也进本机回收站，
+  删除、撤销与回收站恢复都不依赖网络；已入云稿件走云端软删除，撤销与回收站仍以云端为准。
+- `docs.remove` 的 `removed` 回报账号里是否真的移走了一行。没有这一行时客户端保留本机副本，
+  避免把唯一一份正文删掉；云端删除失败时同样保留副本并提示，不会出现「回收站看不到、本机也没了」。
+- `restore` 先问云端：账号里有这一行就以云端为准解除删除，正文优先用本机最后持有的副本
+  （删除前未同步的修改不丢；副本与云端正文不一致时不沿用旧 base，下一次保存会走冲突选择）；
+  没有这一行才回退到本机副本。云端恢复失败时保留回收站里的副本并返回失败，正文没有真正回来就不报成功。
+- 回收站列表是本机与云端两条来源的并集，同一 id 只显示一条；彻底删除先删云端行（若存在）再删本机副本。
+
+对应 [docs-merge.test.ts](../src/lib/docs-merge.test.ts)、
+[docs-router.test.ts](../api/docs-router.test.ts)、[cdp-verify-docs-sync.mjs](../scripts/cdp-verify-docs-sync.mjs)、
+[cdp-verify-draft-recovery.mjs](../scripts/cdp-verify-draft-recovery.mjs)。
 
 ## 草稿箱与素材库
 

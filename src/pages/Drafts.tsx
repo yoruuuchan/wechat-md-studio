@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
 import { useAuth } from '@/hooks/useAuth'
-import { loadActiveId, loadDocs, saveActiveId, saveDocs, type DocRecord } from '@/lib/store'
+import { loadActiveId, loadDocs, saveActiveId, saveDocs, hasCloudCopy, type DocRecord } from '@/lib/store'
 import { UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageToggle } from '@/components/LanguageToggle'
@@ -157,48 +157,74 @@ export default function Drafts() {
     })
   }
 
-  // Signed-out visitors keep their bin in localStorage; without this the only
-  // way back from a delete there would be the 10-second toast.
-  const [localBin, setLocalBin] = useState<BinRow[]>([])
+  // The bin has two sources: the account's soft-deleted rows and the copies this
+  // browser holds. A local-only article (never pushed, never saved) exists only
+  // here, so without the local half it would be unrecoverable while signed in.
   const [localDocs, setLocalDocs] = useState<DocRecord[] | null>(null)
   useEffect(() => {
     // StrictMode runs this twice; the load is idempotent, so both runs may land.
-    void loadDocs().then(({ docs }) => {
-      setLocalDocs(docs)
-      setLocalBin(
-        docs
-          .filter((d) => d.deletedAt)
-          .map((d) => ({ id: d.id, name: d.name, deletedAt: d.deletedAt as number })),
-      )
-    })
+    void loadDocs().then(({ docs }) => setLocalDocs(docs))
   }, [])
   const rewriteLocal = async (fn: (docs: DocRecord[]) => DocRecord[]) => {
     const current = localDocs ?? (await loadDocs()).docs
     const next = fn(current)
     setLocalDocs(next)
-    setLocalBin(
-      next
-        .filter((d) => d.deletedAt)
-        .map((d) => ({ id: d.id, name: d.name, deletedAt: d.deletedAt as number })),
-    )
     await saveDocs(next, loadActiveId())
   }
-  const restoreBin = (id: string) => {
-    if (isAuthenticated) restoreMutation.mutate({ id })
-    else void rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
+  const localTrash = (localDocs ?? []).filter((d) => d.deletedAt)
+  const localTrashById = new Map(localTrash.map((d) => [d.id, d]))
+  const cloudBinRows: BinRow[] = (trashQuery.data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    deletedAt: row.deletedAt ? row.deletedAt.getTime() : 0,
+  }))
+  const cloudBinIds = new Set(cloudBinRows.map((row) => row.id))
+  // The same id can sit in both bins; the account's row is shown once, and the
+  // local copy is still used as the body fallback.
+  const localBinRows: BinRow[] = localTrash
+    .filter((d) => !isAuthenticated || !cloudBinIds.has(d.id))
+    .map((d) => ({ id: d.id, name: d.name, deletedAt: d.deletedAt as number }))
+  const binRows: BinRow[] = isAuthenticated ? [...cloudBinRows, ...localBinRows] : localBinRows
+
+  const restoreBin = async (id: string) => {
+    const local = localTrashById.get(id) ?? null
+    if (!isAuthenticated) {
+      if (local) await rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
+      return
+    }
+    if (cloudBinIds.has(id)) {
+      try {
+        const res = await restoreMutation.mutateAsync({ id })
+        if (!res.doc && !local) {
+          toast.error(t('drafts.restoreFailed'))
+          return
+        }
+      } catch {
+        // The error toast comes from the mutation; the row stays in the bin.
+        return
+      }
+    }
+    if (local) {
+      // Make the local copy live as well; the next editor merge reconciles its
+      // body with the account row (same text merges, a divergence keeps both).
+      await rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
+    }
   }
-  const purgeBin = (id: string, name: string) => {
+  const purgeBin = async (id: string, name: string) => {
     if (!window.confirm(t('drafts.purgeConfirm', { name: name || t('common.unnamedDoc') }))) return
-    if (isAuthenticated) purgeMutation.mutate({ id })
-    else void rewriteLocal((ds) => ds.filter((d) => d.id !== id))
+    const local = localTrashById.get(id) ?? null
+    // An account row may still exist even when the local copy has no cloud hash
+    // any more; only a purely local article can be purged locally alone.
+    if (isAuthenticated && (!local || hasCloudCopy(local))) {
+      try {
+        await purgeMutation.mutateAsync({ id })
+      } catch {
+        // The error toast comes from the mutation; keep the local copy.
+        return
+      }
+    }
+    if (local) await rewriteLocal((ds) => ds.filter((d) => d.id !== id))
   }
-  const binRows: BinRow[] = isAuthenticated
-    ? (trashQuery.data ?? []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        deletedAt: row.deletedAt ? row.deletedAt.getTime() : 0,
-      }))
-    : localBin
 
   const items = useMemo(() => {
     const seen = new Set<string>()
