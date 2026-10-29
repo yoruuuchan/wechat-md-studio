@@ -865,11 +865,15 @@ export default function EditorPage() {
     })
   }
 
-  /** Loose images: dropped into the editor at the drop point. Cropping is optional. */
+  /**
+   * Loose images: editor drops, pastes and the toolbar insert them where they
+   * started. A sidebar row is different — it names one exact image slot, so it
+   * fills that slot wherever the cursor happens to be.
+   */
   const uploadLoose = async (files: File[], ratio?: CarouselRatio | null, task?: FrameTask | null) => {
     const docId = task?.docId ?? activeIdRef.current
-    const recrop = Boolean(task?.item && task.replacedKey)
     const item = task?.item
+    const recrop = Boolean(item && task.replacedKey)
     // Capture every drop point before the first request. Registering the next
     // one after an earlier image has landed would point at the old offset and
     // put a multi-file drop in reverse order; pre-captured positions are folded
@@ -879,10 +883,9 @@ export default function EditorPage() {
       return {
         file,
         image: true,
-        targetId:
-          recrop && item
-            ? trackImage(docId, item.alt, item.occurrence)
-            : trackInsert(docId, task?.at ?? null),
+        targetId: item
+          ? trackImage(docId, item.alt, item.occurrence)
+          : trackInsert(docId, task?.at ?? null),
       }
     })
     for (const { file, image, targetId } of planned) {
@@ -891,7 +894,7 @@ export default function EditorPage() {
         continue
       }
       setUploadingKey(`drop-${file.name}`)
-      const label = recrop && item ? item.no : file.name
+      const label = item ? item.no : file.name
       if (targetId === null) {
         reportMissingTarget(docId, label)
         setUploadingKey(null)
@@ -899,11 +902,20 @@ export default function EditorPage() {
       }
       try {
         const { ref, saved } = await uploadOne(file, ratio ?? undefined, task?.uploadSize)
-        if (recrop && item) {
-          // Re-crop of a standalone image via the ratio picker: replace in place.
+        if (item) {
+          // Write into the clicked slot: a placeholder stops being one, and a
+          // replaced image keeps its alt and position. Never insert a second
+          // image at the cursor for a row the author explicitly targeted.
           if (writeTrackedImage(docId, targetId, ref, item.no)) {
-            toast.success(t('editor.toast.replaced', { no: item.no }))
-            announceReplacedImage()
+            if (recrop) {
+              // Re-crop of a standalone image via the ratio picker: replace in place.
+              toast.success(t('editor.toast.replaced', { no: item.no }))
+              announceReplacedImage()
+            } else {
+              toast.success(t('editor.toast.slotFilled', { no: item.no }), {
+                description: placementNote(docId) ?? saved ?? undefined,
+              })
+            }
           }
           continue
         }
@@ -1013,10 +1025,11 @@ export default function EditorPage() {
     if (task.mode === 'carousel' && task.item && task.ratio && task.item.ratio !== task.ratio) {
       changeTrackedRatio(docId, task.item.carouselOrdinal!, task.ratio)
     }
-    const targetId =
-      task.item && (task.mode === 'carousel' || isRecrop)
-        ? trackImage(docId, task.item.alt, task.item.occurrence)
-        : trackInsert(docId, task.at ?? null)
+    // A sidebar row names its slot, so a hand crop lands there too. Drops and
+    // pastes have no slot and still go to the point they started at.
+    const targetId = task.item
+      ? trackImage(docId, task.item.alt, task.item.occurrence)
+      : trackInsert(docId, task.at ?? null)
     if (targetId === null) {
       reportMissingTarget(docId, label)
       setUploadingKey(null)
@@ -1029,10 +1042,16 @@ export default function EditorPage() {
           toast.success(t('editor.toast.croppedFilled', { label }))
           if (isRecrop) announceReplacedImage()
         }
-      } else if (isRecrop && task.item) {
+      } else if (task.item) {
         if (writeTrackedImage(docId, targetId, ref, task.item.no)) {
-          toast.success(t('editor.toast.replaced', { no: task.item.no }))
-          announceReplacedImage()
+          if (isRecrop) {
+            toast.success(t('editor.toast.replaced', { no: task.item.no }))
+            announceReplacedImage()
+          } else {
+            toast.success(t('editor.toast.croppedFilled', { label }), {
+              description: placementNote(docId),
+            })
+          }
         }
       } else {
         const alt = file.name.replace(/\.[^.]+$/, '')
@@ -1187,9 +1206,15 @@ export default function EditorPage() {
     }
     const docId = activeId
     if (item.kind === '单图') {
-      // 单图不强制裁切，但给一个选项，省得想统一高度时还得重传
+      // One sidebar row is one slot. Limit the task before either crop dialog,
+      // so manual crops and original / auto-cropped uploads handle extras alike.
+      if (files.length > 1) {
+        toast.warning(t('editor.toast.slotSingleExtra', { n: files.length - 1 }), {
+          description: t('editor.toast.slotSingleExtraDesc'),
+        })
+      }
       setFrameTask({
-        files,
+        files: files.slice(0, 1),
         docId,
         item,
         mode: 'loose',
@@ -1609,8 +1634,8 @@ export default function EditorPage() {
           if (task.mode === 'carousel' && task.item && ratio) {
             void uploadToGroup(next.files, task.item, ratio, next.docId)
           } else {
-            // Pass the task so a re-crop replaces the image instead of inserting
-            // a second copy at the cursor.
+            // Sidebar tasks fill their image slot; editor tasks insert at their
+            // captured position. Keep that distinction through the picker.
             void uploadLoose(next.files, ratio, next)
           }
         }}
