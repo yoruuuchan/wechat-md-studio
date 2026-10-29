@@ -329,8 +329,20 @@ async function openArticle(name) {
 }
 
 /**
+ * Cloud-state expression for "the session/merge has settled".
+ *
+ * U01 replaced the old sync chip (span[title]) with SaveStatus, which exposes
+ * data-cloud-state on the active article. Signed out settles on "signed-out";
+ * signed in settles on any state except "loading"/"signed-out".
+ */
+const cloudSettledExpr = (signedIn) =>
+  signedIn
+    ? `(() => { const el = document.querySelector('[data-save-status]'); return !!el && el.dataset.cloudState !== 'loading' && el.dataset.cloudState !== 'signed-out' })()`
+    : `(document.querySelector('[data-save-status]')?.dataset.cloudState === 'signed-out')`
+
+/**
  * Open the editor and wait until it is usable. `signedIn` matters: on a signed-in
- * reload the session resolves a moment after first paint, and the sync label
+ * reload the session resolves a moment after first paint, and the save status
  * shows the signed-out state in between — waiting for that would race the login
  * merge and look at an incomplete article list.
  */
@@ -339,12 +351,7 @@ async function goEditor({ signedIn = false } = {}) {
   if (!(await waitFor(`!!document.querySelector('.cm-content')`, 20000))) throw new Error('the editor never mounted')
   await waitFor(`window.__mopaiCodemirror !== undefined`, 10000)
   await waitFor(`(document.querySelector('input[placeholder="未命名稿件"]')?.value ?? '') !== ''`, 20000)
-  await waitFor(
-    signedIn
-      ? `[...document.querySelectorAll('span[title]')].some(s => s.title === '这篇已经在草稿箱里了')`
-      : `[...document.querySelectorAll('span[title]')].some(s => s.title === '这篇已经在草稿箱里了' || s.title === '未登录：内容只存在这个浏览器里')`,
-    20000,
-  )
+  await waitFor(cloudSettledExpr(signedIn), 20000)
   await sleep(300)
 }
 
@@ -406,7 +413,10 @@ const indexEntryById = (id) =>
 const bodyInDb = (id) =>
   evaluate(`(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('mopai', 1)
+      // Open the current version: body-store raises it to 2 as a write barrier,
+      // and asking for 1 on an already-migrated profile throws VersionError.
+      // A fresh profile still gets upgraded here, which keeps the seed readable.
+      const request = indexedDB.open('mopai')
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains('bodies')) request.result.createObjectStore('bodies', { keyPath: 'id' })
       }
@@ -471,9 +481,8 @@ const blockedProcedures = () => evaluate(`JSON.stringify(window.__r01Blocked || 
 
 const hasToast = (text) => evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].some(e => e.innerText.includes(${JSON.stringify(text)}))`)
 
-/** True once the login merge has settled: the sync label is in its synced state. */
-const mergeSettled = () =>
-  evaluate(`[...document.querySelectorAll('span[title]')].some(s => s.title === '这篇已经在草稿箱里了')`)
+/** True once the login merge has settled: the save status has left loading/signed-out. */
+const mergeSettled = () => evaluate(cloudSettledExpr(true))
 
 const isLive = (name) =>
   evaluate(`(() => {
@@ -596,7 +605,7 @@ try {
   }
   // Wait for the login merge, not just the first paint: the article created
   // next has to be written *after* the merge to stay local-only.
-  if (!(await waitFor(`[...document.querySelectorAll('span[title]')].some(s => s.title === '这篇已经在草稿箱里了')`, 25000))) {
+  if (!(await waitFor(cloudSettledExpr(true), 25000))) {
     throw new Error('the login merge never settled')
   }
   await sleep(500)
