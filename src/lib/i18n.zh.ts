@@ -932,6 +932,7 @@ export const zh = {
   'io.exportPreview.suffix': '预览页',
   'io.exportPreview.copy': '复制到公众号',
   'io.exportPreview.copied': '已复制，去公众号后台粘贴吧',
+  'io.exportPreview.copyFailed': '复制失败，请回到编辑器改用「导出」',
 
   // ---- 主题渲染占位（theme-kit / 手写主题共用） ----
   'theme.pendingImage': '待插入图片',

@@ -958,6 +958,7 @@ export const en: Record<MsgKey, Msg> = {
   'io.exportPreview.suffix': 'preview page',
   'io.exportPreview.copy': 'Copy to WeChat',
   'io.exportPreview.copied': 'Copied — paste it into the WeChat editor',
+  'io.exportPreview.copyFailed': 'Copy failed — go back to the editor and use Export instead',
 
   // ---- theme render placeholders (shared by theme-kit and hand-written themes) ----
   'theme.pendingImage': 'Image placeholder',

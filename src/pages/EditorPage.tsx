@@ -1702,8 +1702,10 @@ export default function EditorPage() {
                 onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
                 onJump={(line) => editorRef.current?.jumpToLine(line)}
                 onCopyTitle={(title) => {
-                  copyPlain(title)
-                  toast.success(t('editor.toast.titleCopied'))
+                  void copyPlain(title).then((ok) => {
+                    if (ok) toast.success(t('editor.toast.titleCopied'))
+                    else toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedDesc') })
+                  })
                 }}
                 onUpload={(files, item) => startUpload(files, item)}
                 onClear={clearImage}
