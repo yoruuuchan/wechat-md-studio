@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { mapStyles } from '../../scripts/themes/lib/map'
 import { THEMES } from './themes'
 import { normalizeRootStyle } from './theme-kit'
 
@@ -41,6 +42,12 @@ describe('theme root geometry', () => {
       style: 'padding:8px 0',
       maxWidth: 661,
     })
+  })
+
+  it('leaves the importer wrapper intact until buildTheme performs the width fold', () => {
+    expect(mapStyles({ wrapper: 'max-width:677px;padding:8px' }).wrapper).toBe(
+      'max-width:677px;padding:8px',
+    )
   })
 
   it.each([

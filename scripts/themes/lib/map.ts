@@ -5,7 +5,7 @@
 // 完整 CSS 文件），但都能归一到「语义元素 → 一段内联 CSS」。这里负责归一，
 // 以及从归一结果里把配色挖出来——多数来源不单独给色板，只能从样式反推。
 
-import { normalizeRootStyle, type ThemePalette, type ThemeStyles } from '../../../src/lib/theme-kit'
+import type { ThemePalette, ThemeStyles } from '../../../src/lib/theme-kit'
 import { collectColors, hsl, mix, parseColor, saturatedHues, tint, toHex } from './color'
 
 /** 上游字段名 → 内部 ThemeStyles 字段名。同一个内部字段可以有多个别名，先到先得。 */
@@ -79,9 +79,7 @@ export function mapStyles(raw: Record<string, string>): ThemeStyles {
     if (!internal) continue
     // 同一内部字段有多个上游别名时，保留信息量更大的那份
     const prev = out[internal]
-    const next = internal === 'wrapper'
-      ? normalizeRootStyle(stripImportant(value).trim()).style
-      : stripImportant(value).trim()
+    const next = stripImportant(value).trim()
     if (!prev || next.length > prev.length) out[internal] = next
   }
   return out
