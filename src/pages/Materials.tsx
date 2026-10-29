@@ -28,20 +28,79 @@ function formatDate(ts: number | null, lang: 'zh' | 'en'): string {
  *
  * Bodies live in IndexedDB now, so this is a promise: the orphan query waits for
  * it rather than running with an empty keep-list and calling live images dead.
+ * `ok: false` means the local side could not be fully read (a failed body-store
+ * read or a throwing loader), so "not referenced locally" is unknown rather
+ * than false: the caller must not offer batch deletion on that answer.
  */
-async function localDraftKeys(): Promise<string[]> {
+async function localDraftKeys(): Promise<{ keys: string[]; ok: boolean }> {
   const out = new Set<string>()
   try {
-    for (const d of (await loadDocs()).docs) {
+    const loaded = await loadDocs()
+    for (const d of loaded.docs) {
       for (const m of d.content.matchAll(/img:([^\s)\]]+)/g)) out.add(m[1])
     }
     // A diagram's PNG is referenced only here: the fence in the document holds
     // mermaid source, so the server-side scan of 稿件 content cannot see it.
     for (const ref of loadDiagramCache().values()) out.add(ref.replace(/^img:/, ''))
+    return { keys: [...out], ok: !loaded.bodyReadFailed }
   } catch {
-    // 本地读不出来时，孤儿判定退回只看云端稿件
+    return { keys: [], ok: false }
   }
-  return [...out]
+}
+
+/** A browser network failure is already explained by the section copy. */
+function errorDetail(error: { message?: string } | null | undefined): string | null {
+  const message = error?.message?.trim()
+  if (!message) return null
+  if (/^(failed to fetch|networkerror|load failed|fetch failed)$/i.test(message)) return null
+  return message
+}
+
+function SectionError({
+  scope,
+  title,
+  hint,
+  error,
+  retrying,
+  onRetry,
+}: {
+  scope: string
+  title: string
+  hint: string
+  error?: { message?: string } | null
+  retrying: boolean
+  onRetry: () => void
+}) {
+  const { t } = useI18n()
+  const detail = errorDetail(error)
+  return (
+    <div data-materials-error={scope} role="alert" className="mt-4 rounded-xl bg-bad-100 p-3 text-bad-700">
+      <p className="text-[13px] font-medium">{title}</p>
+      <p className="mt-1 text-[12px] leading-relaxed">{hint}</p>
+      {detail ? <p className="mt-1 break-words text-[11px] opacity-80">{detail}</p> : null}
+      <button
+        type="button"
+        data-materials-retry={scope}
+        disabled={retrying}
+        onClick={onRetry}
+        className="ya-btn ya-btn-secondary ya-btn-sm mt-2"
+      >
+        {retrying ? t('materials.retrying') : t('materials.retry')}
+      </button>
+    </div>
+  )
+}
+
+/** Loaded data is still worth showing, but it must not look current. */
+function StaleNote({ scope, text }: { scope: string; text: string }) {
+  return (
+    <p
+      data-materials-stale={scope}
+      className="mt-3 rounded-lg bg-warn-100 px-3 py-2 text-[12px] leading-relaxed text-warn-700"
+    >
+      {text}
+    </p>
+  )
 }
 
 export default function Materials() {
@@ -53,17 +112,31 @@ export default function Materials() {
 
   // 图片按「账号或这台浏览器」归属，未登录也能看自己的
   const enabled = !authLoading
-  // 本地草稿引用的图也算“在用”，避免误判成可清理的旧图
-  const [draftKeys, setDraftKeys] = useState<string[] | null>(null)
+  // 本地草稿引用的图也算“在用”，避免误判成可清理的旧图。
+  // `null` = 本机草稿还在扫描，引用状态尚未确定。
+  const [draftScan, setDraftScan] = useState<{ keys: string[]; ok: boolean } | null>(null)
   useEffect(() => {
     // StrictMode runs this twice; reading the drafts twice is harmless.
-    void localDraftKeys().then(setDraftKeys)
+    let alive = true
+    void localDraftKeys().then((next) => {
+      if (alive) setDraftScan(next)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
+  const rescanDraftKeys = () => {
+    setDraftScan(null)
+    void localDraftKeys().then(setDraftScan)
+  }
+
   const stats = trpc.storage.stats.useQuery(undefined, { enabled, retry: false })
   const orphans = trpc.storage.orphans.useQuery(
-    { alsoKeep: draftKeys ?? [] },
-    // Reading the local drafts can fail; it is not a reason to leave the page empty.
-    { enabled: enabled && draftKeys !== null, retry: false },
+    { alsoKeep: draftScan?.keys ?? [] },
+    // Waiting for the local scan is what keeps it from calling a local-only
+    // reference dead. A failed scan still asks the server, so cloud references
+    // stay visible, but the page marks the answer incomplete.
+    { enabled: enabled && draftScan !== null, retry: false },
   )
   const files = trpc.storage.list.useQuery(undefined, { enabled, retry: false })
 
@@ -108,9 +181,45 @@ export default function Materials() {
   const orphanKeys = useMemo(() => (orphans.data ?? []).map((o) => o.key), [orphans.data])
   const selectedOrphans = orphanKeys.filter((k) => selected.has(k))
 
-  const usagePct = stats.data && stats.data.quotaBytes > 0
-    ? Math.min(100, (stats.data.totalBytes / stats.data.quotaBytes) * 100)
+  const statsData = stats.data
+  const usagePct = statsData && statsData.quotaBytes > 0
+    ? Math.min(100, (statsData.totalBytes / statsData.quotaBytes) * 100)
     : 0
+
+  const statsNumbers = statsData ? (
+    <>
+      <div className="mt-3 flex items-end gap-4">
+        <div>
+          <p className="text-[26px] font-bold tabular-nums leading-none text-ink-1" style={{ fontFamily: 'var(--font-mono)' }}>
+            {formatBytes(statsData.totalBytes)}
+          </p>
+          <p className="mt-1 text-[12px] text-ink-3">
+            {t('materials.total', { n: statsData.count, size: formatBytes(statsData.quotaBytes) })}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-sunken" style={{ boxShadow: 'var(--shadow-inset)' }}>
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${Math.max(usagePct, statsData.count ? 1.5 : 0)}%`, background: usagePct > 85 ? 'var(--error-500)' : 'var(--primary-500)' }}
+        />
+      </div>
+      <p className="mt-2 text-[11px] text-ink-3">
+        {t('materials.r2Note')}
+      </p>
+    </>
+  ) : null
+
+  const draftScanFailed = draftScan?.ok === false
+  // Only a finished local scan plus a finished server check knows which images
+  // are free to delete. Every other combination is "unknown", never "unused".
+  const referenceReady = draftScan?.ok === true && orphans.isSuccess
+  const referenceState: 'ready' | 'checking' | 'unknown' = referenceReady
+    ? 'ready'
+    : draftScan === null || orphans.isLoading
+      ? 'checking'
+      : 'unknown'
+  const referenceLoading = draftScan === null || orphans.isLoading
 
   if (authLoading) {
     return (
@@ -128,37 +237,53 @@ export default function Materials() {
           <section className="ya-well p-5">
             <div className="flex items-baseline justify-between">
               <h2 className="text-[14px] font-semibold text-ink-1">{t('materials.usage')}</h2>
-              <span className="text-[12px] text-ink-3">{t('materials.oldest', { date: formatDate(stats.data?.oldestAt ?? null, lang) })}</span>
+              {statsData ? (
+                <span className="text-[12px] text-ink-3">{t('materials.oldest', { date: formatDate(statsData.oldestAt, lang) })}</span>
+              ) : null}
             </div>
-            <div className="mt-3 flex items-end gap-4">
-              <div>
-                <p className="text-[26px] font-bold tabular-nums leading-none text-ink-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {formatBytes(stats.data?.totalBytes ?? 0)}
-                </p>
-                <p className="mt-1 text-[12px] text-ink-3">
-                  {t('materials.total', { n: stats.data?.count ?? 0, size: formatBytes(stats.data?.quotaBytes ?? 0) })}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-sunken" style={{ boxShadow: 'var(--shadow-inset)' }}>
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${Math.max(usagePct, stats.data?.count ? 1.5 : 0)}%`, background: usagePct > 85 ? 'var(--error-500)' : 'var(--primary-500)' }}
+            {stats.isLoading ? (
+              <p data-materials-loading="stats" className="mt-3 text-[13px] text-ink-3">{t('common.loading')}</p>
+            ) : null}
+            {stats.isError ? (
+              <SectionError
+                scope="stats"
+                title={t('materials.statsFailed')}
+                hint={t('materials.statsFailedHint')}
+                error={stats.error}
+                retrying={stats.isFetching}
+                onRetry={() => { void stats.refetch() }}
               />
-            </div>
-            <p className="mt-2 text-[11px] text-ink-3">
-              {t('materials.r2Note')}
-            </p>
+            ) : null}
+            {stats.isError && statsData ? <StaleNote scope="stats" text={t('materials.staleNote')} /> : null}
+            {!stats.isLoading ? statsNumbers : null}
           </section>
         ) : (
           <section className="ya-well p-5">
             <h2 className="text-[14px] font-semibold text-ink-1">{t('materials.browserTitle')}</h2>
-            <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
-              {t('materials.browserNote', { n: stats.data?.count ?? 0, size: formatBytes(stats.data?.totalBytes ?? 0) })}
-            </p>
-            <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
-              {t('materials.dailyNote', { n: stats.data?.dailyImages ?? 0, size: formatBytes(stats.data?.dailyBytes ?? 0) })}
-            </p>
+            {stats.isLoading ? (
+              <p data-materials-loading="stats" className="mt-3 text-[13px] text-ink-3">{t('common.loading')}</p>
+            ) : null}
+            {stats.isError ? (
+              <SectionError
+                scope="stats"
+                title={t('materials.statsFailed')}
+                hint={t('materials.statsFailedHint')}
+                error={stats.error}
+                retrying={stats.isFetching}
+                onRetry={() => { void stats.refetch() }}
+              />
+            ) : null}
+            {stats.isError && statsData ? <StaleNote scope="stats" text={t('materials.staleNote')} /> : null}
+            {statsData ? (
+              <>
+                <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
+                  {t('materials.browserNote', { n: statsData.count, size: formatBytes(statsData.totalBytes) })}
+                </p>
+                <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
+                  {t('materials.dailyNote', { n: statsData.dailyImages ?? 0, size: formatBytes(statsData.dailyBytes ?? 0) })}
+                </p>
+              </>
+            ) : null}
           </section>
         )}
 
@@ -172,8 +297,10 @@ export default function Materials() {
               </p>
             </div>
             <button
-              disabled={selectedOrphans.length === 0 || removeMutation.isPending}
+              data-materials-clean
+              disabled={!referenceReady || selectedOrphans.length === 0 || removeMutation.isPending}
               onClick={() => {
+                if (!referenceReady) return
                 if (!window.confirm(t('materials.cleanConfirm', { n: selectedOrphans.length }))) return
                 removeMutation.mutate({ keys: selectedOrphans })
               }}
@@ -183,34 +310,75 @@ export default function Materials() {
             </button>
           </div>
 
-          {orphans.isLoading ? (
-            <p className="mt-4 text-[13px] text-ink-3">{t('common.loading')}</p>
-          ) : orphanKeys.length === 0 ? (
-            <p className="mt-4 rounded-xl bg-ok-100 p-3 text-[13px] text-ok-700">
+          {referenceLoading ? (
+            <p data-materials-loading="orphans" className="mt-4 text-[13px] text-ink-3">{t('common.loading')}</p>
+          ) : null}
+
+          {!referenceLoading && draftScanFailed ? (
+            <SectionError
+              scope="drafts"
+              title={t('materials.draftScanFailed')}
+              hint={t('materials.draftScanFailedHint')}
+              retrying={false}
+              onRetry={rescanDraftKeys}
+            />
+          ) : null}
+
+          {!referenceLoading && orphans.isError ? (
+            <SectionError
+              scope="orphans"
+              title={t('materials.orphansFailed')}
+              hint={t('materials.orphansFailedHint')}
+              error={orphans.error}
+              retrying={orphans.isFetching}
+              onRetry={() => { void orphans.refetch() }}
+            />
+          ) : null}
+
+          {!referenceLoading && orphans.isError && orphans.data ? (
+            <StaleNote scope="orphans" text={t('materials.staleNote')} />
+          ) : null}
+
+          {!referenceLoading && !orphans.isError && draftScanFailed && orphans.isSuccess ? (
+            <StaleNote scope="drafts" text={t('materials.draftScanIncomplete')} />
+          ) : null}
+
+          {!referenceLoading && referenceReady && orphanKeys.length === 0 ? (
+            <p data-materials-clean-empty className="mt-4 rounded-xl bg-ok-100 p-3 text-[13px] text-ok-700">
               {t('materials.cleanEmpty')}
             </p>
-          ) : (
+          ) : null}
+
+          {!referenceLoading && orphanKeys.length > 0 ? (
             <>
-              <div className="mt-3 flex items-center gap-3">
-                <button
-                  onClick={() => setSelected(new Set(orphanKeys))}
-                  className="ya-link-btn !text-[12px] !text-brand"
-                >
-                  {t('materials.selectAll', { n: orphanKeys.length })}
-                </button>
-                <button
-                  onClick={() => setSelected(new Set())}
-                  className="ya-link-btn !text-[12px]"
-                >
-                  {t('materials.clearSelection')}
-                </button>
-              </div>
+              {referenceReady ? (
+                <div className="mt-3 flex items-center gap-3">
+                  <button
+                    data-materials-select-all
+                    onClick={() => setSelected(new Set(orphanKeys))}
+                    className="ya-link-btn !text-[12px] !text-brand"
+                  >
+                    {t('materials.selectAll', { n: orphanKeys.length })}
+                  </button>
+                  <button
+                    onClick={() => setSelected(new Set())}
+                    className="ya-link-btn !text-[12px]"
+                  >
+                    {t('materials.clearSelection')}
+                  </button>
+                </div>
+              ) : (
+                <p data-materials-readonly className="mt-3 text-[12px] leading-relaxed text-warn-700">
+                  {t('materials.cleanBlocked')}
+                </p>
+              )}
               <ul className="mt-2 divide-y divide-line-2">
                 {(orphans.data ?? []).map((o) => (
-                  <li key={o.key} className="flex items-center gap-3 py-2">
+                  <li key={o.key} data-materials-orphan-item={o.key} className="flex items-center gap-3 py-2">
                     <input
                       type="checkbox"
                       checked={selected.has(o.key)}
+                      disabled={!referenceReady}
                       onChange={(e) => {
                         setSelected((prev) => {
                           const next = new Set(prev)
@@ -231,7 +399,7 @@ export default function Materials() {
                 ))}
               </ul>
             </>
-          )}
+          ) : null}
         </section>
 
         {/* 全部图片 */}
@@ -239,16 +407,31 @@ export default function Materials() {
           <h2 className="text-[14px] font-semibold text-ink-1">
             {t('materials.allImages')} <span className="font-normal text-ink-3">{t('materials.recent200')}</span>
           </h2>
+
+          {files.isError ? (
+            <SectionError
+              scope="files"
+              title={t('materials.filesFailed')}
+              hint={t('materials.filesFailedHint')}
+              error={files.error}
+              retrying={files.isFetching}
+              onRetry={() => { void files.refetch() }}
+            />
+          ) : null}
+          {files.isError && files.data ? <StaleNote scope="files" text={t('materials.staleNote')} /> : null}
+
           {files.isLoading ? (
-            <p className="mt-3 text-[13px] text-ink-3">{t('common.loading')}</p>
+            <p data-materials-loading="files" className="mt-3 text-[13px] text-ink-3">{t('common.loading')}</p>
           ) : (files.data ?? []).length === 0 ? (
-            <p className="mt-3 text-[13px] text-ink-3">{t('materials.empty')}</p>
+            files.isSuccess ? (
+              <p data-materials-files-empty className="mt-3 text-[13px] text-ink-3">{t('materials.empty')}</p>
+            ) : null
           ) : (
             <ul className="mt-2 divide-y divide-line-2">
               {(files.data ?? []).map((f) => {
-                const inUse = !orphanKeys.includes(f.key)
+                const inUse = referenceReady ? !orphanKeys.includes(f.key) : null
                 return (
-                  <li key={f.key} className="flex items-center gap-3 py-2">
+                  <li key={f.key} data-materials-file-item={f.key} className="flex items-center gap-3 py-2">
                     <img
                       src={`/api/img/${encodeURIComponent(f.key)}`}
                       alt={f.name || f.key}
@@ -261,11 +444,25 @@ export default function Materials() {
                       }}
                     />
                     <span
+                      data-materials-reference={f.key}
+                      title={inUse === null && referenceState === 'unknown' ? t('materials.referenceUnknownHint') : undefined}
                       className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] ${
-                        inUse ? 'bg-ok-100 text-ok-700' : 'bg-warn-100 text-warn-700'
+                        inUse === null
+                          ? referenceState === 'unknown'
+                            ? 'bg-warn-100 text-warn-700'
+                            : 'bg-surface-sunken text-ink-3'
+                          : inUse
+                            ? 'bg-ok-100 text-ok-700'
+                            : 'bg-warn-100 text-warn-700'
                       }`}
                     >
-                      {inUse ? t('materials.inUse') : t('materials.notInUse')}
+                      {inUse === null
+                        ? referenceState === 'unknown'
+                          ? t('materials.referenceUnknown')
+                          : t('materials.referenceChecking')
+                        : inUse
+                          ? t('materials.inUse')
+                          : t('materials.notInUse')}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[12px] text-ink-1" title={f.key}>{f.name || f.key}</p>
