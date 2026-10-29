@@ -56,7 +56,7 @@ try {
       DATABASE_URL: `file:${path.join(temporary, 'app.db').replaceAll('\\', '/')}`,
       ACCESS_KEY: key, SESSION_SECRET: randomBytes(32).toString('hex'),
       IMG_BASE_URL: `http://127.0.0.1:${workerPort}`, IMG_ADMIN_KEY: randomBytes(24).toString('hex'),
-      AGENT_TOKENS: `status-writer:${token}:write`, ANON_GC_ENABLED: 'false', PUBLIC_BASE_URL: origin,
+      AGENT_TOKENS: `status-writer:${token}`, ANON_GC_ENABLED: 'false', PUBLIC_BASE_URL: origin,
       RESEND_API_KEY: '', RESEND_FROM: '', FEEDBACK_TO: '',
     },
   })
