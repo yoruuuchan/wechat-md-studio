@@ -35,11 +35,13 @@ localStorage 索引是兼容缓存，不再是正文元数据的唯一来源。�
 
 ## 同步与并发
 
-`docs.hash` 是正文 sha256 前 16 位，浏览器与 Agent 共用 `baseHash` 乐观锁。
-服务端 compare-and-swap 更新正文与 hash；时间戳只负责展示，不作为并发依据。
+`docs.hash` 是稿件名称与正文共同计算的 sha256 前 16 位，浏览器、Agent 与 Remote MCP
+共用 `baseHash` 乐观锁。服务端 compare-and-swap 同时保护名称与正文；
+时间戳只负责展示，不作为并发依据。旧数据里的纯正文 hash 仍可作为最后一次 base，
+第一次成功写入时会升级为新版本 token。
 浏览器 stale save 返回冲突与云端当前正文，提供「保留我的 / 用云端的 / 两边都留」。
 Agent 更新的 400 / 409 / `force` 语义见 [Agent API](agent-api.md)。
-单篇 MCP 与浏览器也复用正文 hash / `baseHash` CAS，没有 `force` 写入入口。
+单篇 MCP 与浏览器也复用稿件 hash / `baseHash` CAS，没有 `force` 写入入口。
 本地记录的 `remoteMcp` 只保存连接 id 与已确认版本，不保存 Bearer；它的 `baseHash` 与站长云端同步的 `baseHash` 独立。
 
 登录合并由 [docs-merge.ts](../src/lib/docs-merge.ts) 定义：

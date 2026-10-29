@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { RemoteMcpCredentials, RemoteMcpDoc, RemoteMcpSnapshot, RemoteMcpWriteResult } from '@contracts/remote-mcp'
-import { contentHash } from '@/lib/content-hash'
+import { documentHash } from '@/lib/content-hash'
 import { createDoc, type DocRecord } from '@/lib/store'
 import { remoteSyncDecision } from '@/lib/remote-mcp-sync'
 import { t } from '@/lib/i18n'
@@ -104,7 +104,7 @@ export function useRemoteMcp({ docs, activeId, setDocs }: {
         setError(t('mcp.err.revoked'))
         return
       }
-      const hash = await contentHash(local.content)
+      const hash = await documentHash(local.name, local.content)
       const live = docsRef.current.find((d) => d.id === id)
       if (live?.remoteMcp?.id !== binding.id || live.content !== local.content || live.name !== local.name) return
       setSnapshot(remote)

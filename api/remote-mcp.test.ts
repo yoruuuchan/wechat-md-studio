@@ -10,7 +10,7 @@ process.env.DATABASE_URL = `file:${path.join(dir, 'test.db')}`
 process.env.PUBLIC_BASE_URL = ''
 const { default: app } = await import('./boot')
 const { getSqlite } = await import('./queries/connection')
-const { contentHash } = await import('./lib/doc-hash')
+const { documentHash } = await import('./lib/doc-hash')
 const { cleanupExpiredConnections, mcpTokenHash } = await import('./lib/remote-mcp')
 const { env } = await import('./lib/env')
 
@@ -77,7 +77,7 @@ describe('anonymous single-document MCP', () => {
     const lease = getSqlite().prepare('SELECT * FROM remote_mcp_connections WHERE id = ?').get(connection.connection.id)!
     expect(lease.tokenHash).toBe(mcpTokenHash(connection.token))
     expect(Object.values(lease)).not.toContain(connection.token)
-    expect(connection.doc.hash).toBe(contentHash('原稿'))
+    expect(connection.doc.hash).toBe(documentHash('稿件', '原稿'))
   })
   it('supports initialize, tool discovery, Skill and document reads', async () => {
     const connection = await create()
@@ -109,6 +109,27 @@ describe('anonymous single-document MCP', () => {
     }, c.cookie)
     expect(saved.status).toBe(200)
     expect((await call(c.token, 'read_current_document')).value.doc.content).toBe('本机精修')
+  })
+  it('includes the article name in the Remote MCP version', async () => {
+    const c = await create()
+    const renamed = await call(c.token, 'update_current_document', {
+      name: 'AI 改名', content: '原稿', baseHash: c.doc.hash,
+    })
+    expect(renamed.isError).toBe(false)
+    expect(renamed.value.doc.name).toBe('AI 改名')
+    expect(renamed.value.doc.hash).not.toBe(c.doc.hash)
+
+    const stale = await browser(`/api/remote-mcp/connections/${c.connection.localDocId}`, 'PUT', {
+      connectionId: c.connection.id,
+      name: '浏览器改名',
+      content: '原稿',
+      baseHash: c.doc.hash,
+    }, c.cookie)
+    expect(stale.status).toBe(409)
+    expect((await stale.json() as { current: { name: string; content: string } }).current).toMatchObject({
+      name: 'AI 改名',
+      content: '原稿',
+    })
   })
   it('isolates visitors with colliding local ids and different documents', async () => {
     const a = await create('same-local-id', '游客 A')

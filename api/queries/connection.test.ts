@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { backfillDocHashes, backfillSavedAt, DOCHASH_BACKFILL, runMigrations, SAVEDAT_BACKFILL } from './connection'
-import { contentHash } from '../lib/doc-hash'
+import { documentHash } from '../lib/doc-hash'
 
 // Timestamp columns declared with `mode: 'timestamp'` are stored in *seconds*.
 // Getting that wrong makes the cut-off comparison always true and archives
@@ -69,7 +69,7 @@ describe('backfillDocHashes', () => {
     insert(db, 'old', LONG_AGO)
     expect(backfillDocHashes(db)).toBe(1)
     const row = db.prepare('SELECT hash FROM docs WHERE id = ?').get('old') as { hash: string }
-    expect(row.hash).toBe(contentHash('body'))
+    expect(row.hash).toBe(documentHash('old', 'body'))
   })
 
   it('leaves rows that already carry a hash alone', () => {

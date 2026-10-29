@@ -223,7 +223,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 - Project 聚合与 attach/detach 那一整套（约 250 行）。我们的对应物是扁平的稿件库，不需要第二个聚合维度。
 - 给令牌删除权（main.go:585-645）。我们的 agent 只能读和写，删除始终是人在网页里做的动作，回收站也归人管。
 - 把样式表硬编码进脚本和 SKILL.md 两处（publish.py:51-79 的 27 个 key）。主题会增删，两份手工同步的副本迟早对不上，所以 mopai.py 里一个主题名都没有，一律现拉 GET /api/agent/themes。
-- 用时间戳做乐观锁。原打算照上游那样比对 updatedAt，实测发现 docs.updatedAt 落库是秒级精度、带的还是客户端时钟，同一秒内的两次写入无法区分——agent 会在毫无察觉的情况下冲掉人工精修。改成内容 sha256 的前 16 位（hash / baseHash），顺带让「重推同样内容」变成幂等成功而不是假冲突。
+- 用时间戳做乐观锁。原打算照上游那样比对 updatedAt，实测发现 docs.updatedAt 落库是秒级精度、带的还是客户端时钟，同一秒内的两次写入无法区分——agent 会在毫无察觉的情况下冲掉人工精修。改成稿件名称与正文共同计算的 sha256 前 16 位（hash / baseHash），只改名称也会推进版本，重推同样名称和正文仍是幂等成功。
 - MCP server。上游也没有（全仓库零命中）；我们的 agent 跑在本机、能用 shell，一个零依赖脚本比 MCP 更普适，MCP 还要每个 harness 单独配置并维护 stdio 进程生命周期。
 - 它 fork 之后保留的 huasheng_editor 渲染路线（选择器查表 + applyInlineStyles）。同 huasheng_editor 条目。
 

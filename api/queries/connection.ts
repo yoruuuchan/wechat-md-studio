@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import fs from 'node:fs'
 import path from 'node:path'
 import { env } from '../lib/env'
-import { contentHash } from '../lib/doc-hash'
+import { documentHash } from '../lib/doc-hash'
 import * as schema from '@db/schema'
 
 /**
@@ -172,20 +172,21 @@ export const DOCHASH_BACKFILL = 'backfill-doc-hash-from-content'
 /**
  * Compute `docs.hash` for articles written before the column existed.
  *
- * The concurrency token is derived from the content, so backfilling it is
- * mechanical — but it has to actually be done: NULL would make the
+ * The concurrency token is derived from the article name and content, so
+ * backfilling it is mechanical — but it has to actually be done: NULL would make the
  * compare-and-swap predicate match nothing and every save would come back as a
  * conflict. Runs once at boot against upgraded databases only (fresh tables get
  * the column filled by their writers).
  */
 export function backfillDocHashes(db: DatabaseSync): number {
-  const rows = db.prepare('SELECT id, content FROM docs WHERE hash IS NULL').all() as {
+  const rows = db.prepare('SELECT id, name, content FROM docs WHERE hash IS NULL').all() as {
     id: string
+    name: string
     content: string
   }[]
   if (!rows.length) return 0
   const update = db.prepare('UPDATE docs SET hash = ? WHERE id = ?')
-  for (const row of rows) update.run(contentHash(row.content), row.id)
+  for (const row of rows) update.run(documentHash(row.name, row.content), row.id)
   return rows.length
 }
 

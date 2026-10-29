@@ -1,4 +1,4 @@
-import type { Block, CarouselRatio, Doc, InlineSeg, RenderStats, SignatureConfig } from './types'
+import type { Block, CarouselRatio, Doc, InlineSeg, ListBlock, RenderStats, SignatureConfig } from './types'
 import { isCarouselRatio } from './types'
 import { baseTableBlock, BLANK, esc, type Theme } from './themes'
 import { ext, type FootnoteItem } from './theme-fallbacks'
@@ -84,6 +84,40 @@ export function renderDoc(
     if (boxed) parts.push({ html: BLANK, block })
   }
 
+  /**
+   * Preserve the existing Theme.listBlock path for genuinely flat lists. A
+   * recursive list uses standard semantic tags shared by every theme, keeping
+   * hierarchy valid without requiring 219 theme implementations.
+   */
+  const renderList = (list: ListBlock, nested = false): string => {
+    const flat = !nested && list.items.every((item) =>
+      item.parts.length === 1 && item.parts[0].type === 'paragraph',
+    )
+    if (flat) {
+      const items = list.items.map((item) => {
+        const part = item.parts[0]
+        if (part.type !== 'paragraph') return ''
+        chars += countSegs(part.segs)
+        warnLinks(part.segs, warnings)
+        return renderSegs(theme, part.segs, links)
+      })
+      return theme.listBlock(list.ordered, items, list.start)
+    }
+
+    const tag = list.ordered ? 'ol' : 'ul'
+    const start = list.ordered && list.start !== 1 ? ` start="${list.start}"` : ''
+    const items = list.items.map((item) => {
+      const inner = item.parts.map((part) => {
+        if (part.type === 'list') return renderList(part.list, true)
+        chars += countSegs(part.segs)
+        warnLinks(part.segs, warnings)
+        return theme.paragraph(renderSegs(theme, part.segs, links))
+      }).join('')
+      return `<li style="margin:6px 0;">${inner}</li>`
+    }).join('')
+    return `<${tag}${start} style="margin:12px 0;padding-left:1.5em;line-height:1.8;">${items}</${tag}>`
+  }
+
   for (let bi = 0; bi < doc.blocks.length; bi++) {
     const b = doc.blocks[bi]
     switch (b.type) {
@@ -161,11 +195,7 @@ export function renderDoc(
         pushBlock(theme.signature(sig), true, bi)
         break
       case 'list':
-        b.items.forEach((it) => {
-          chars += countSegs(it)
-          warnLinks(it, warnings)
-        })
-        parts.push({ html: theme.listBlock(b.ordered, b.items.map((it) => renderSegs(theme, it, links))), block: bi })
+        parts.push({ html: renderList(b), block: bi })
         break
       case 'table': {
         const cells = [...b.head, ...b.rows.flat()]
