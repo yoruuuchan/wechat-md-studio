@@ -104,12 +104,12 @@ export const moyuGreenTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:36px 20px 0;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:16px;padding:24px 20px;text-align:center;"><p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#111827;"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p><p style="margin:0;font-size:10px;color:#9CA3AF;letter-spacing:1px;"><span leaf="">THANKS FOR READING</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     if (ordered) {
       return `<section style="margin:0 20px 24px;">${items
         .map(
           (it, i) =>
-            `<section style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#059669;color:#FFFFFF;font-size:11px;font-weight:700;border-radius:50%;flex-shrink:0;margin-top:2px;"><span leaf="">${i + 1}</span></span><p style="font-size:14px;color:#374151;margin:0;line-height:1.9;flex:1;">${it}</p></section>`,
+            `<section style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:#059669;color:#FFFFFF;font-size:11px;font-weight:700;border-radius:50%;flex-shrink:0;margin-top:2px;"><span leaf="">${start + i}</span></span><p style="font-size:14px;color:#374151;margin:0;line-height:1.9;flex:1;">${it}</p></section>`,
         )
         .join('')}</section>`
     }
@@ -204,12 +204,12 @@ export const redWhiteTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:40px 10px 0;padding:20px 0 0;border-top:1px solid #FEE2E2;text-align:center;"><p style="margin:0 0 4px;font-size:13px;color:#9CA3AF;"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p><p style="margin:0;font-size:10px;color:#FCA5A5;letter-spacing:2px;"><span leaf="">THE END</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     if (ordered) {
       return `<section style="margin:0 10px 24px;">${items
         .map(
           (it, i) =>
-            `<section style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><span style="display:inline-block;background:#DC2626;color:#FFFFFF;font-size:12px;font-weight:800;padding:1px 9px;border-radius:4px;flex-shrink:0;margin-top:2px;"><span leaf="">${String(i + 1).padStart(2, '0')}</span></span><p style="font-size:15px;color:#374151;margin:0;line-height:1.8;flex:1;">${it}</p></section>`,
+            `<section style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><span style="display:inline-block;background:#DC2626;color:#FFFFFF;font-size:12px;font-weight:800;padding:1px 9px;border-radius:4px;flex-shrink:0;margin-top:2px;"><span leaf="">${String(start + i).padStart(2, '0')}</span></span><p style="font-size:15px;color:#374151;margin:0;line-height:1.8;flex:1;">${it}</p></section>`,
         )
         .join('')}</section>`
     }
@@ -304,12 +304,12 @@ export const graphiteTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:48px 10px 0;padding:24px 0 0;border-top:1px solid #E4E4E7;text-align:center;"><p style="margin:0;font-size:13px;color:#A1A1AA;letter-spacing:1px;"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     if (ordered) {
       return `<section style="margin:0 10px 24px;">${items
         .map(
           (it, i) =>
-            `<section style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px;"><span style="font-size:13px;color:#A1A1AA;font-weight:500;flex-shrink:0;"><span leaf="">${String(i + 1).padStart(2, '0')}</span></span><p style="font-size:15px;color:#52525B;margin:0;line-height:1.8;flex:1;">${it}</p></section>`,
+            `<section style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px;"><span style="font-size:13px;color:#A1A1AA;font-weight:500;flex-shrink:0;"><span leaf="">${String(start + i).padStart(2, '0')}</span></span><p style="font-size:15px;color:#52525B;margin:0;line-height:1.8;flex:1;">${it}</p></section>`,
         )
         .join('')}</section>`
     }
@@ -399,9 +399,10 @@ export const zenTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:56px 16px 0;padding:24px 0 0;border-top:1px solid #E8E8E8;text-align:center;"><p style="margin:0;font-family:${ZEN_SERIF};font-size:13px;color:#A3A3A3;letter-spacing:1.5px;"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     const tag = ordered ? 'ol' : 'ul'
-    return `<section style="margin:0 16px 26px;"><${tag} style="margin:0;padding-left:1.5em;line-height:1.9;font-size:15px;color:#525252;">${items
+    const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
+    return `<section style="margin:0 16px 26px;"><${tag}${startAttr} style="margin:0;padding-left:1.5em;line-height:1.9;font-size:15px;color:#525252;">${items
       .map((it) => `<li style="margin:8px 0;">${it}</li>`)
       .join('')}</${tag}></section>`
   },
@@ -489,12 +490,12 @@ export const moyuTicketTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:36px 20px 0;background:#FFFEF8;border:2px solid #1A1A1A;box-shadow:4px 4px 0 #1A1A1A;padding:14px 16px;text-align:center;"><p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#1A1A1A;"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p><p style="margin:0;font-size:10px;color:#999999;letter-spacing:1px;"><span leaf="">VALID FOR ONE READ · ADMIT ONE</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     if (ordered) {
       return `<section style="margin:0 20px 24px;">${items
         .map(
           (it, i) =>
-            `<section style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><span style="display:inline-block;background:#1A1A1A;color:#FFFFFF;font-size:11px;font-weight:800;padding:2px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;"><span leaf="">${String(i + 1).padStart(2, '0')}</span></span><p style="font-size:14px;color:#555555;margin:0;line-height:1.9;flex:1;">${it}</p></section>`,
+            `<section style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;"><span style="display:inline-block;background:#1A1A1A;color:#FFFFFF;font-size:11px;font-weight:800;padding:2px 8px;flex-shrink:0;margin-top:2px;letter-spacing:1px;"><span leaf="">${String(start + i).padStart(2, '0')}</span></span><p style="font-size:14px;color:#555555;margin:0;line-height:1.9;flex:1;">${it}</p></section>`,
         )
         .join('')}</section>`
     }
@@ -589,9 +590,10 @@ export const oliveTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:32px 8px 0;background:#EEEFE9;border:1px solid #BFC1B7;border-radius:6px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;"><p style="margin:0;font-size:10px;font-weight:800;letter-spacing:3px;color:#23251D;"><span leaf="">COLOPHON</span></p><p style="margin:0;font-size:11px;color:#65675E;"><span leaf="">排版 ${esc(cfg.layout)} · 校对 ${esc(cfg.proof)} · 审核 ${esc(cfg.review)}</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     const tag = ordered ? 'ol' : 'ul'
-    return `<section style="margin:24px 8px 0;"><${tag} style="margin:0;padding-left:22px;line-height:1.8;list-style-position:outside;font-size:15px;color:#4D4F46;">${items
+    const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
+    return `<section style="margin:24px 8px 0;"><${tag}${startAttr} style="margin:0;padding-left:22px;line-height:1.8;list-style-position:outside;font-size:15px;color:#4D4F46;">${items
       .map((it) => `<li style="margin-bottom:8px;">${it}</li>`)
       .join('')}</${tag}></section>`
   },

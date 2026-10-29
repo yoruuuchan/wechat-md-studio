@@ -36,7 +36,7 @@ export interface Theme {
   imageBlock(src: string, caption: string): string
   carousel(title: string, caption: string, items: { src: string; alt: string }[], ratio: CarouselRatio): string
   signature(cfg: SignatureConfig): string
-  listBlock(ordered: boolean, items: string[]): string
+  listBlock(ordered: boolean, items: string[], start?: number): string
   /** 缺省时用 baseTableBlock：表格是可选风格，不是可选能力 */
   tableBlock?(head: string[], rows: string[][], align: CellAlign[]): string
   codeBlock(lang: string, code: string): string
@@ -579,13 +579,13 @@ export function buildTheme(spec: ImportedThemeSpec): Theme {
     signature: (cfg: SignatureConfig) =>
       `<section style="margin:36px 0 0;padding:16px 0 0;border-top:1px solid ${p.border};text-align:center;"><p style="margin:0 0 6px;font-size:13px;line-height:1.75;letter-spacing:1px;text-indent:0;color:${p.muted};"><span leaf="">${t('render.sigLayout')} ${esc(cfg.layout)} · ${t('render.sigProof')} ${esc(cfg.proof)} · ${t('render.sigReview')} ${esc(cfg.review)}</span></p><p style="margin:0;font-size:10px;letter-spacing:2px;text-indent:0;color:${p.soft};"><span leaf="">THE END</span></p></section>`,
 
-    listBlock: (ordered, items) => {
+    listBlock: (ordered, items, start = 1) => {
       // 上游给了自定义符号（xiaohu 系主题普遍给）就用它的行结构，否则退回标准列表
       if (ordered && d.olBullet) {
         return `<section style="${d.listWrap}">${items
           .map(
             (it, i) =>
-              `<section style="${d.listRow || 'display:flex;align-items:flex-start;margin-bottom:10px;'}"><span style="${d.olBullet}"><span leaf="">${i + 1}</span></span><p style="${d.listText};flex:1;">${it}</p></section>`,
+              `<section style="${d.listRow || 'display:flex;align-items:flex-start;margin-bottom:10px;'}"><span style="${d.olBullet}"><span leaf="">${start + i}</span></span><p style="${d.listText};flex:1;">${it}</p></section>`,
           )
           .join('')}</section>`
       }
@@ -598,7 +598,8 @@ export function buildTheme(spec: ImportedThemeSpec): Theme {
           .join('')}</section>`
       }
       const tag = ordered ? 'ol' : 'ul'
-      return `<${tag} style="${ordered ? d.olStyle : d.ulStyle}">${items
+      const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
+      return `<${tag}${startAttr} style="${ordered ? d.olStyle : d.ulStyle}">${items
         .map((it) => `<li style="${d.liStyle}">${it}</li>`)
         .join('')}</${tag}>`
     },

@@ -91,6 +91,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 改动范围 | 现有入口与参数 |
 |---|---|
 | 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` |
+| 嵌套列表层级 / 起始序号 | [cdp-verify-nested-list.mjs](../scripts/cdp-verify-nested-list.mjs)：`node scripts/cdp-verify-nested-list.mjs <url> [CDP端口]` |
 | 界面语言 / 反馈表单 | [cdp-verify-i18n.mjs](../scripts/cdp-verify-i18n.mjs)：`node scripts/cdp-verify-i18n.mjs <url> [CDP端口] [mock邮件端口]`；自起 mock 邮件服务，应用需按脚本头部注释配置 `RESEND_*` 指向它；勿对公网运行 |
 | 收藏 / References | [cdp-verify-favorites.mjs](../scripts/cdp-verify-favorites.mjs)：`node scripts/cdp-verify-favorites.mjs <url> [CDP端口]`；无需登录 |
 | 使用规范 /terms 与侧栏入口 | [cdp-verify-terms.mjs](../scripts/cdp-verify-terms.mjs)：`node scripts/cdp-verify-terms.mjs <url> [CDP端口]`；无需登录 |

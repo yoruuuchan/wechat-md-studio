@@ -120,9 +120,10 @@ export const goldenTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:36px 0 0;padding:8px 0 0;"><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">${t('render.sigLayout')} | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">${t('render.sigProof')} | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#888888;text-indent:0;"><span leaf="">${t('render.sigReview')} | ${esc(cfg.review)}</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     const tag = ordered ? 'ol' : 'ul'
-    return `<${tag} style="margin:24px 0;padding-left:1.5em;font-size:15px;line-height:1.75;letter-spacing:1px;color:#333333;">${items
+    const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
+    return `<${tag}${startAttr} style="margin:24px 0;padding-left:1.5em;font-size:15px;line-height:1.75;letter-spacing:1px;color:#333333;">${items
       .map((it) => `<li style="margin:6px 0;">${it}</li>`)
       .join('')}</${tag}>`
   },
@@ -216,9 +217,10 @@ export const minimalTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:40px 0 0;padding:16px 0 0;border-top:1px solid #EAEAEA;"><p style="margin:0 0 6px;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">${t('render.sigLayout')} | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">${t('render.sigProof')} | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:14px;line-height:1.75;letter-spacing:1px;text-align:center;color:#9A9A9A;text-indent:0;"><span leaf="">${t('render.sigReview')} | ${esc(cfg.review)}</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     const tag = ordered ? 'ol' : 'ul'
-    return `<${tag} style="margin:24px 0;padding-left:1.5em;font-size:15px;line-height:1.75;letter-spacing:1px;color:#333333;">${items
+    const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
+    return `<${tag}${startAttr} style="margin:24px 0;padding-left:1.5em;font-size:15px;line-height:1.75;letter-spacing:1px;color:#333333;">${items
       .map((it) => `<li style="margin:6px 0;">${it}</li>`)
       .join('')}</${tag}>`
   },
@@ -319,9 +321,10 @@ export const steadyTheme: Theme = {
   signature: (cfg) =>
     `<section style="margin:40px 0 0;padding:16px 0 0;border-top:1px solid #E4E9F0;"><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">${t('render.sigLayout')} | ${esc(cfg.layout)}</span></p><p style="margin:0 0 6px;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">${t('render.sigProof')} | ${esc(cfg.proof)}</span></p><p style="margin:0;font-size:15px;line-height:1.75;letter-spacing:1px;text-align:center;color:#8C9BB3;text-indent:0;"><span leaf="">${t('render.sigReview')} | ${esc(cfg.review)}</span></p></section>`,
 
-  listBlock: (ordered, items) => {
+  listBlock: (ordered, items, start = 1) => {
     const tag = ordered ? 'ol' : 'ul'
-    return `<${tag} style="margin:24px 0;padding-left:1.5em;font-size:15px;line-height:1.8;letter-spacing:1px;color:#333333;">${items
+    const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
+    return `<${tag}${startAttr} style="margin:24px 0;padding-left:1.5em;font-size:15px;line-height:1.8;letter-spacing:1px;color:#333333;">${items
       .map((it) => `<li style="margin:8px 0;">${it}</li>`)
       .join('')}</${tag}>`
   },

@@ -2,7 +2,18 @@ import MarkdownIt from 'markdown-it'
 import type { Token } from 'markdown-it'
 import markdownItMark from 'markdown-it-mark'
 import markdownItContainer from 'markdown-it-container'
-import type { Block, CarouselItem, CarouselRatio, CellAlign, Doc, DocMeta, InlineSeg, SourceSpan } from './types'
+import type {
+  Block,
+  CarouselItem,
+  CarouselRatio,
+  CellAlign,
+  Doc,
+  DocMeta,
+  InlineSeg,
+  ListBlock,
+  ListItemPart,
+  SourceSpan,
+} from './types'
 import {
   DEFAULT_CAROUSEL_RATIO,
   DEFAULT_GALLERY_COLS,
@@ -311,6 +322,55 @@ export function parseMarkdown(src: string): Doc {
     return { line, lineEnd }
   }
 
+  /**
+   * Consume one list level from markdown-it's token stream. Nested list tokens
+   * recurse with a stable item path instead of flattening into the parent, and
+   * every item keeps paragraph / child-list parts in their original order.
+   */
+  const parseListAt = (startIndex: number, path: string): { list: ListBlock; next: number } => {
+    const open = tokens[startIndex]
+    const ordered = open?.type === 'ordered_list_open'
+    const closeType = ordered ? 'ordered_list_close' : 'bullet_list_close'
+    const rawStart = Number(open?.attrGet('start') ?? 1)
+    const start = Number.isInteger(rawStart) && rawStart > 0 ? rawStart : 1
+    const items: ListBlock['items'] = []
+    let cursor = startIndex + 1
+    let itemIndex = 0
+
+    while (cursor < tokens.length && tokens[cursor].type !== closeType) {
+      if (tokens[cursor].type !== 'list_item_open') {
+        cursor++
+        continue
+      }
+      const id = `${path ? `${path}.` : ''}${++itemIndex}`
+      const parts: ListItemPart[] = []
+      cursor++
+      while (cursor < tokens.length && tokens[cursor].type !== 'list_item_close') {
+        if (tokens[cursor].type === 'paragraph_open') {
+          const inline = tokens[cursor + 1]
+          if (inline?.type === 'inline') parts.push({ type: 'paragraph', segs: walkInline(inline.children) })
+          cursor += 2
+          continue
+        }
+        if (tokens[cursor].type === 'bullet_list_open' || tokens[cursor].type === 'ordered_list_open') {
+          const nested = parseListAt(cursor, id)
+          parts.push({ type: 'list', list: nested.list })
+          cursor = nested.next
+          continue
+        }
+        // A list item may contain a blank paragraph or other block syntax. Keep
+        // advancing so its close token is not mistaken for the parent list.
+        cursor++
+      }
+      items.push({ id, parts })
+      cursor++ // consume list_item_close
+    }
+    return {
+      list: { ordered, start, items },
+      next: cursor < tokens.length ? cursor + 1 : cursor,
+    }
+  }
+
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
 
@@ -501,14 +561,9 @@ export function parseMarkdown(src: string): Doc {
     }
 
     if (t.type === 'bullet_list_open' || t.type === 'ordered_list_open') {
-      const ordered = t.type === 'ordered_list_open'
-      const close = ordered ? 'ordered_list_close' : 'bullet_list_close'
-      const items: InlineSeg[][] = []
-      while (i < tokens.length && tokens[i].type !== close) {
-        if (tokens[i].type === 'inline') items.push(walkInline(tokens[i].children))
-        i++
-      }
-      blocks.push({ type: 'list', ordered, items, ...span(t, tokens[i]) })
+      const parsed = parseListAt(i, '')
+      blocks.push({ type: 'list', ...parsed.list, ...span(t, tokens[parsed.next - 1]) })
+      i = parsed.next - 1
       continue
     }
 
