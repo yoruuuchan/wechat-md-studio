@@ -11,13 +11,17 @@
  *   两条线互不重复——这里只管主题素材，credits 只管代码。
  *
  * README 的许可证统计与致谢章节、THEME-SOURCES.md 的来源表与统计、
- * /references 页面的来源区块都从这里（以及 credits.ts / THEMES）生成。
+ * /references 页面的来源区块都从这里（以及 credits.ts / THEME_CATALOG）生成。
  */
 
-import type { Theme } from './theme-kit'
-import { ORIGINAL_LICENSE, type Complexity, type ColorFamily, type StyleTag, type ThemeLicense } from './theme-meta'
+import { ORIGINAL_LICENSE, type Complexity, type ColorFamily, type StyleTag, type ThemeLicense, type ThemeMeta } from './theme-meta'
 import { APP_BYLINE, APP_NAME, REPO_URL } from './brand'
 import { t } from './i18n'
+
+/** 统计只需要 meta；完整 Theme 与 metadata-only 目录条目都满足它。 */
+interface ThemeMetaCarrier {
+  meta: ThemeMeta
+}
 
 export interface ThemeSource {
   /** 连接键：theme.meta.origin.project 必须逐字等于它。 */
@@ -154,7 +158,7 @@ function byCountDesc<T extends { count: number }>(rows: T[]): T[] {
 }
 
 /** 把 catalog 按来源归组；顺序跟 THEME_SOURCES 一致，来源至少有一套主题时才有输出。 */
-export function tallyThemeSources(themes: readonly Theme[]): SourceTally[] {
+export function tallyThemeSources(themes: readonly ThemeMetaCarrier[]): SourceTally[] {
   return THEME_SOURCES.map((source) => {
     const own = themes.filter((t) => t.meta.origin.project === source.project)
     const perLicense = new Map<ThemeLicense, number>()
@@ -168,26 +172,26 @@ export function tallyThemeSources(themes: readonly Theme[]): SourceTally[] {
 }
 
 /** 按 meta.origin.license 统计套数，降序。 */
-export function tallyByLicense(themes: readonly Theme[]): { license: ThemeLicense; count: number }[] {
+export function tallyByLicense(themes: readonly ThemeMetaCarrier[]): { license: ThemeLicense; count: number }[] {
   const m = new Map<ThemeLicense, number>()
   for (const t of themes) m.set(t.meta.origin.license, (m.get(t.meta.origin.license) ?? 0) + 1)
   return byCountDesc([...m.entries()].map(([license, count]) => ({ license, count })))
 }
 
 /** 按风格标签统计（多标签，一套主题计多次），降序。标签顺序沿用 STYLE_TAGS。 */
-export function tallyByTag(themes: readonly Theme[]): { tag: StyleTag; count: number }[] {
+export function tallyByTag(themes: readonly ThemeMetaCarrier[]): { tag: StyleTag; count: number }[] {
   const m = new Map<StyleTag, number>()
   for (const t of themes) for (const tag of t.meta.styles) m.set(tag, (m.get(tag) ?? 0) + 1)
   return byCountDesc([...m.entries()].map(([tag, count]) => ({ tag, count })))
 }
 
-export function tallyByComplexity(themes: readonly Theme[]): { complexity: Complexity; count: number }[] {
+export function tallyByComplexity(themes: readonly ThemeMetaCarrier[]): { complexity: Complexity; count: number }[] {
   const m = new Map<Complexity, number>()
   for (const t of themes) m.set(t.meta.complexity, (m.get(t.meta.complexity) ?? 0) + 1)
   return [...m.entries()].map(([complexity, count]) => ({ complexity, count })).sort((a, b) => a.complexity - b.complexity)
 }
 
-export function tallyByColor(themes: readonly Theme[]): { color: ColorFamily; count: number }[] {
+export function tallyByColor(themes: readonly ThemeMetaCarrier[]): { color: ColorFamily; count: number }[] {
   const m = new Map<ColorFamily, number>()
   for (const t of themes) m.set(t.meta.color, (m.get(t.meta.color) ?? 0) + 1)
   return byCountDesc([...m.entries()].map(([color, count]) => ({ color, count })))

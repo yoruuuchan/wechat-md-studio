@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router'
 import { Link } from 'react-router'
 import { YoruMark } from '@/components/YoruMark'
 import { APP_BYLINE } from '@/lib/brand'
-import { THEMES } from '@/lib/themes'
+import { THEME_COUNT } from '@/lib/theme-catalog'
 import { RichText } from '@/components/RichText'
 import { LanguageToggle } from '@/components/LanguageToggle'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -219,7 +219,7 @@ export default function Terms() {
               {t('terms.liability.b3')}
             </Bullet>
             <Bullet>
-              <RichText text={t('terms.liability.b4', { n: THEMES.length })} />
+              <RichText text={t('terms.liability.b4', { n: THEME_COUNT })} />
             </Bullet>
           </ul>
         </Section>

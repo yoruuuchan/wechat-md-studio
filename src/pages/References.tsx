@@ -9,7 +9,7 @@ import {
   type Usage,
 } from '@/lib/credits'
 import { CREDITS_EN } from '@/lib/credits.en'
-import { THEMES } from '@/lib/themes'
+import { THEME_CATALOG, THEME_COUNT } from '@/lib/theme-catalog'
 import { licenseLabel, tallyByLicense, tallyThemeSources } from '@/lib/theme-sources'
 import { ORIGINAL_LICENSE } from '@/lib/theme-meta'
 import { LanguageToggle } from '@/components/LanguageToggle'
@@ -302,12 +302,12 @@ export default function References() {
 
   // 主题库的账：按许可证（自研放最后）与按来源（套数降序）。
   const themeLicenseTally = useMemo(() => {
-    const rows = tallyByLicense(THEMES)
+    const rows = tallyByLicense(THEME_CATALOG)
     return [...rows.filter((r) => r.license !== ORIGINAL_LICENSE), ...rows.filter((r) => r.license === ORIGINAL_LICENSE)]
   }, [])
   const sourceRows = useMemo(
     () =>
-      [...tallyThemeSources(THEMES)]
+      [...tallyThemeSources(THEME_CATALOG)]
         .sort((a, b) => b.count - a.count)
         .map((s) => ({ ...s, label: s.kind === 'original' ? t('meta.license.original') : s.project })),
     [t],
@@ -404,10 +404,10 @@ export default function References() {
             <h2 className="text-[14px] font-semibold" style={{ color: 'var(--ink-1)' }}>
               {t('refs.themes.heading')}
             </h2>
-            <span className="ya-eyebrow">{t('refs.themes.eyebrow', { n: THEMES.length })}</span>
+            <span className="ya-eyebrow">{t('refs.themes.eyebrow', { n: THEME_COUNT })}</span>
           </div>
           <p className="mt-2.5 text-[12.5px] leading-[1.75]" style={{ color: 'var(--ink-2)' }}>
-            {t('refs.themes.summaryLead', { n: THEMES.length })}
+            {t('refs.themes.summaryLead', { n: THEME_COUNT })}
             {themeLicenseTally.map((r, i) => (
               <span key={r.license}>
                 {i > 0 && ' · '}

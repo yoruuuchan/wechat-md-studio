@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
-import { THEMES } from '@/lib/themes'
+import { KNOWN_THEME_IDS } from '@/lib/theme-catalog'
 import {
   favoritesSnapshot,
   keepKnownIds,
@@ -8,12 +8,12 @@ import {
   toggleId,
 } from '@/lib/favorites'
 
-/** 当前 catalog 的真实 id 集合；存储里的旧 id 用它过滤。 */
-const KNOWN_THEME_IDS = new Set(THEMES.map((t) => t.id))
-
 /**
  * 收藏状态 + 切换函数。模板库卡片和顶栏快速切换器共用它：
  * 两边订阅同一份快照，任何一边的改动立即反映到另一边。
+ *
+ * 已知 id 来自 metadata 目录而不是完整主题注册表，所以首屏不必为了过滤
+ * 幽灵收藏去下载 219 套主题实现。
  */
 export function useThemeFavorites() {
   const stored = useSyncExternalStore(subscribeFavorites, favoritesSnapshot, favoritesSnapshot)

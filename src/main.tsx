@@ -15,6 +15,13 @@ applyZoom(loadSettings().zoom)
 // 以及语言：<html lang> 与标题在首帧前就是用户上次选的
 applyLanguage()
 
+// Vite 默认会在 preload 失败时整页刷新：编辑中的未落盘内容可能因此丢掉。
+// 页面与主题分块各自有可重试的错误出口，这里只阻止默认刷新并留下线索。
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  console.warn('[chunk] dynamic import failed', (event as Event & { payload?: unknown }).payload)
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

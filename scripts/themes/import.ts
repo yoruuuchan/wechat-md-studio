@@ -20,7 +20,7 @@ import { derivePalette, mapStyles, type PaletteHints } from './lib/map'
 import { categoryOf, complexityOf, keywordHits, measureStyles, styleTagsFrom } from './lib/classify'
 import { collectColors, colorFamilyOf, saturatedHues } from './lib/color'
 import { parseCssHeader, parseCssTheme } from './lib/css'
-import { writeIndex, writePack, type GeneratedPack } from './lib/emit'
+import { writeCatalog, writeIndex, writeLoaders, writePack, type GeneratedPack } from './lib/emit'
 
 const SOURCES_ROOT = process.env.THEME_SOURCES || '<local tmp>/theme-sources'
 
@@ -458,6 +458,10 @@ for (const pack of packs) {
 }
 const indexFile = writeIndex(packs)
 console.log(`wrote ${path.relative(process.cwd(), indexFile)}`)
+const catalogFile = writeCatalog(packs)
+console.log(`wrote ${path.relative(process.cwd(), catalogFile)}`)
+const loadersFile = writeLoaders(packs)
+console.log(`wrote ${path.relative(process.cwd(), loadersFile)}`)
 
 // ---------- 统计：直接喂给授权与分类审计报告 ----------
 const all = packs.flatMap((p) => p.themes)

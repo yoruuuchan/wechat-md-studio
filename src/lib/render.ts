@@ -1,6 +1,6 @@
 import type { Block, CarouselRatio, Doc, InlineSeg, ListBlock, RenderStats, SignatureConfig } from './types'
 import { isCarouselRatio } from './types'
-import { baseTableBlock, BLANK, esc, type Theme } from './themes'
+import { baseTableBlock, BLANK, esc, type Theme } from './theme-kit'
 import { ext, type FootnoteItem } from './theme-fallbacks'
 import { diagramOf } from './diagram'
 import { fencedRanges, isInFence, type Range } from './fences'

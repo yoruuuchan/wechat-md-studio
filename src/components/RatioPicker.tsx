@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MaxImageBytes } from '@contracts/constants'
-import { carouselFrame } from '@/lib/themes'
+import { carouselFrame } from '@/lib/theme-kit'
 import { UPLOAD_SIZE_CHOICES, type UploadSizeChoice } from '@/lib/image-compress'
 import { formatBytes } from '@/lib/image'
 import { CAROUSEL_RATIOS, type CarouselRatio } from '@/lib/types'

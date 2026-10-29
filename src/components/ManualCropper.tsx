@@ -4,7 +4,7 @@ import Cropper, { type Area } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cropToArea, type CropArea } from '@/lib/image'
-import { carouselFrame } from '@/lib/themes'
+import { carouselFrame } from '@/lib/theme-kit'
 import { ratioValue, type CarouselRatio } from '@/lib/types'
 import { useI18n } from '@/hooks/useI18n'
 

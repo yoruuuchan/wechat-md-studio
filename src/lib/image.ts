@@ -1,4 +1,4 @@
-import { carouselFrame } from './themes'
+import { carouselFrame } from './theme-kit'
 import { MaxImageBytes } from '@contracts/constants'
 import {
   compressImage,

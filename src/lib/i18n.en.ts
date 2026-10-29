@@ -25,7 +25,10 @@ export const en: Record<MsgKey, Msg> = {
   'common.unnamed': 'Untitled',
   'common.cancel': 'Cancel',
   'common.retry': 'Retry',
+  'common.refresh': 'Refresh page',
   'common.loading': 'Loading…',
+  'common.pageLoadFailed': 'This page could not load',
+  'common.pageLoadFailedDesc': 'A network or chunk download failed; local drafts and saved work are intact. Check the connection and retry.',
   'common.backToEditor': 'Back to editor',
   'common.copy': 'Copy',
   'common.copied': 'Copied',
@@ -98,6 +101,8 @@ export const en: Record<MsgKey, Msg> = {
   'saveStatus.recovery.restored': 'Restored from trash',
   'saveStatus.recovery.description': 'The recovered text is kept in this article. Its current save status is shown above.',
   'topbar.themes.eyebrow': 'Type themes · live preview of this article',
+  'topbar.themes.loading': 'Loading theme previews…',
+  'topbar.themes.loadFailed': 'Theme previews could not load',
   'topbar.themes.favorites': 'Favorites',
   'topbar.themes.moreFavorites': (p) =>
     Number(p.n) === 1
@@ -344,6 +349,8 @@ export const en: Record<MsgKey, Msg> = {
   'editor.toast.importedCount': (p) => `Imported ${Number(p.n) === 1 ? '1 article' : `${p.n} articles`}`,
   'editor.toast.importedSkipped': (p) => `${p.n} already existed on this device and were skipped`,
   'editor.toast.importFailed': 'Import failed',
+  'editor.toast.themeFailed': 'This theme could not load; the default theme is shown',
+  'editor.toast.themeFailedDesc': 'The article and local draft are intact. Retry once the connection is back, or keep editing.',
   'editor.toast.importUnknown': 'unrecognised file format',
   'editor.toast.bundleUnreadable': 'This backup file cannot be read',
   'editor.toast.notImage': '{name} is not an image; skipped',
@@ -558,6 +565,11 @@ export const en: Record<MsgKey, Msg> = {
 
   // ---- theme library ----
   'themes.title': 'Template library',
+  'themes.loading': 'Loading themes…',
+  'themes.loadFailed': 'Theme previews could not load',
+  'themes.loadFailedDesc': 'Filters, sources and licence details still work; previews need the network. Check the connection and retry.',
+  'themes.previewLoading': 'Loading preview…',
+  'themes.previewFailed': 'Preview could not load',
   'themes.search': 'Search name, description, source or author',
   'themes.favOnly': 'Favorites',
   'themes.favOnlyTitle': 'Only favorites (stars are stored in this browser)',
