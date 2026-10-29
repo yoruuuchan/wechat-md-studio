@@ -40,7 +40,7 @@ interface Props {
   onOpenConflict: () => void
   onSaveDraft: () => void
   onLogin: () => void
-  onExport: () => void
+  onExport: (kind: 'markdown' | 'bundle') => void
   remoteConnected?: boolean
 }
 
@@ -129,6 +129,12 @@ export function SaveStatus(p: Props) {
             <dt className="font-medium" style={{ color: cloudColor }}>{cloudLabel}</dt>
             <dd className="mt-0.5 text-ink-3">{t(CLOUD_DESCRIPTION_KEYS[status.cloud])}</dd>
           </div>
+          {status.cloud === 'signed-out' && (
+            <div data-guest-local-guide className="rounded-lg bg-surface-sunken p-2.5">
+              <dt className="font-medium text-ink-1">{t('saveStatus.guest.title')}</dt>
+              <dd className="mt-0.5 text-ink-3">{t('saveStatus.guest.body')}</dd>
+            </div>
+          )}
           {status.recovery && (
             <div data-recovery-status className="rounded-lg bg-surface-sunken p-2.5">
               <dt className="font-medium text-ink-1">{recoveryLabel}</dt>
@@ -144,7 +150,8 @@ export function SaveStatus(p: Props) {
           {status.cloud === 'conflict' && <button data-save-review-conflict onClick={() => runAndClose(p.onOpenConflict)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.reviewConflict')}</button>}
           {status.cloud === 'unarchived' && <button onClick={p.onSaveDraft} disabled={!p.readable} className="ya-btn ya-btn-secondary ya-btn-sm">{t('topbar.save')}</button>}
           {status.cloud === 'signed-out' && <button onClick={p.onLogin} className="ya-btn ya-btn-secondary ya-btn-sm">{t('topbar.login')}</button>}
-          <button data-save-export onClick={p.onExport} disabled={!p.readable} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.export')}</button>
+          <button data-save-export onClick={() => p.onExport('markdown')} disabled={!p.readable} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.exportMarkdown')}</button>
+          <button data-save-export-bundle onClick={() => p.onExport('bundle')} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.exportBundle')}</button>
         </div>
       </PopoverContent>
     </Popover>

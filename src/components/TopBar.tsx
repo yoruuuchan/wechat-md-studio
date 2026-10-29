@@ -173,7 +173,7 @@ export default function TopBar(p: Props) {
           onOpenConflict={p.onOpenConflict}
           onSaveDraft={p.onSaveDraft}
           onLogin={p.onLogin}
-          onExport={() => p.onExport('markdown')}
+          onExport={(kind) => p.onExport(kind)}
           remoteConnected={p.remoteConnected}
         />
       </div>

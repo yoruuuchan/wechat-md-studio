@@ -367,7 +367,10 @@ try {
   await click(`document.querySelector('button[data-lang="en"]')`)
   await waitFor(`document.documentElement.lang==='en'`, 'English language')
   await openDetails()
-  check('English save details contain translated states and actions', await evaluate(`document.querySelector('[data-save-details]').innerText.includes('Saved locally')&&document.querySelector('[data-save-details]').innerText.includes('Export backup')`))
+  // The single "Export backup" action became two explicit ones (Markdown and
+  // full backup) so a guest can tell what each download contains; assert both
+  // translated labels rather than the retired wording.
+  check('English save details contain translated states and actions', await evaluate(`document.querySelector('[data-save-details]').innerText.includes('Saved locally')&&document.querySelector('[data-save-details]').innerText.includes('Download Markdown')&&document.querySelector('[data-save-details]').innerText.includes('Download full backup')`))
   await screenshot('save-details-light-en.png')
   await closeDetails()
   await click(`document.querySelector('button[title="Dark"]')`)
