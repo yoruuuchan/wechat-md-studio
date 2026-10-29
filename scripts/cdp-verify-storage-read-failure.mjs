@@ -418,7 +418,8 @@ try {
   check('the failure is diagnosed', await waitFor(`!!document.querySelector('[data-local-body-error]')`))
   await sleep(1500)
   check('the persistent failure leaves the original body intact', (await bodyInDb('read-fault')) === EDITED, JSON.stringify(await bodyInDb('read-fault')))
-  check('the top bar reports the local failure', (await evaluate(`document.body.innerText.includes('本地未存')`)))
+  // U01 replaced the old "本地未存" sync chip with SaveStatus's "本机保存异常".
+  check('the top bar reports the local failure', (await evaluate(`/本地未存|本机保存异常/.test(document.body.innerText)`)), (await evaluate('document.body.innerText')).slice(0, 120))
   await removeInit(init)
   init = null
   await reload()

@@ -223,12 +223,32 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     // loads - would leave the editor empty.
     void loadDocs().then((local) => {
       observeLocalReceipts(local.docs)
-      localBaseRef.current = new Map(local.docs.map((d) => [d.id, d as LocalDocRecord]))
-      setLocalTrash(local.docs.filter((d) => d.deletedAt))
-      const live = local.docs.filter((d) => !d.deletedAt)
-      const shown = live.length ? live : [createDoc()]
-      setDocs(shown)
-      setActiveId(shown.some((d) => d.id === local.activeId) ? local.activeId : shown[0].id)
+      const loaded = local.docs as LocalDocRecord[]
+      // The read started before this page could import a backup or create an
+      // article. Replacing state with the snapshot would drop those newer
+      // articles, and the next save would tombstone their just-written bodies.
+      // Merge instead: articles already in this page win, stored ones fill in.
+      const base = new Map(localBaseRef.current)
+      for (const doc of loaded) if (!base.has(doc.id)) base.set(doc.id, doc)
+      localBaseRef.current = base
+      setLocalTrash((current) => {
+        const map = new Map(loaded.filter((d) => d.deletedAt).map((d) => [d.id, d as DocRecord]))
+        for (const doc of current) map.set(doc.id, doc)
+        return [...map.values()]
+      })
+      const live = loaded.filter((d) => !d.deletedAt)
+      // The functional form sees anything queued while the read was in flight
+      // (a fast bundle import or a new article), which a ref read can miss.
+      setDocs((current) => {
+        const byId = new Map<string, DocRecord>()
+        for (const doc of live) byId.set(doc.id, doc)
+        for (const doc of current) byId.set(doc.id, doc)
+        const merged = [...byId.values()]
+        return merged.length ? merged : [createDoc()]
+      })
+      setActiveId((previous) =>
+        previous ? previous : live.some((d) => d.id === local.activeId) ? local.activeId : (live[0]?.id ?? ''),
+      )
     })
     if (!enabled) setSyncState('local')
   }, [enabled, observeLocalReceipts])

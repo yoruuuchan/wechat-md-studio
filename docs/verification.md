@@ -51,7 +51,8 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 轮播复制 / 图片链路 | `node scripts/cdp-verify-carousel-copy.mjs 3232 9362` | 三次整篇复制 payload 逐字节一致、无固定像素宽度结构、URL 绝对可读、GET / HEAD 与并发、滑动几何；设 `MOPAI_CAROUSEL_URLS=<url,url>` 时同一套抓图检查跑在给定公网地址上 |
 | 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
 | 侧栏单图回填 | `node scripts/cdp-verify-single-slot-upload.mjs 4106 9706 4206` | 侧栏单图占位 / 替换精确回填、同 alt 多占位、自动与手动裁切、多选只传第一张并提示、切稿与上传中文字保留、编辑器工具栏 / 拖入 / 粘贴仍按发起位置新增 |
-| 公式就绪 / 复制与 HTML 导出 | `node scripts/cdp-verify-math-readiness.mjs 4113 9713 4213` | MathJax 慢加载、断网、坏公式、改公式、切稿、Mermaid 并存时，复制与干净正文 / 预览页导出都不交付未完成公式；完成后复制带真实 SVG |
+| 公式就绪 / 复制与 HTML 导出 | `node scripts/cdp-verify-math-readiness.mjs 4113 9713 4213` | MathJax 慢加载、断网、坏公式、改公式、切稿、Mermaid 并存时，复制与干净正文 / 预览页导出先开「发布前检查」；未完成公式与图表不能默认通过，确认后才复制真实 SVG |
+| 发布前检查 | `node scripts/cdp-verify-publish-preflight.mjs 4127 9727` | 纯文字稿一键通过；空图片位 / 本机内网地址 / 外链地址 / 坏公式 / 未完成图表各自可定位与可定位跳转；提醒需显式勾选、阻断项只能显式绕过；复制用点击那一刻的最新稿件；Markdown 与整包备份不受阻断；慢网、图床报错、切稿、键盘操作与中英文 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[draft-recovery](../scripts/cdp-verify-draft-recovery.mjs)、
@@ -59,6 +60,8 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 [save-status](../scripts/cdp-verify-save-status.mjs)、
 [guest-save-guidance](../scripts/cdp-verify-guest-save-guidance.mjs)、
 [mobile-panes](../scripts/cdp-verify-mobile-panes.mjs)、
+[math-readiness](../scripts/cdp-verify-math-readiness.mjs)、
+[publish-preflight](../scripts/cdp-verify-publish-preflight.mjs)、
 [materials-states](../scripts/cdp-verify-materials-states.mjs)、
 [diagram](../scripts/cdp-verify-diagram.mjs)、
 [gallery](../scripts/cdp-verify-gallery.mjs)、
@@ -77,6 +80,9 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 浮动视口宽度用 `Emulation.setDeviceMetricsOverride` 的 `mobile:false`，与 `cdp-verify-i18n.mjs` 的 390px 口径一致；
 真机触摸、真实软键盘与横竖屏传感器仍需在设备上复核，脚本只覆盖布局与交互行为。
 公式就绪脚本同样把 mock 图床放在应用端口 +100（默认 4213），数据库为 `data/audit-r13.db`。
+发布前检查脚本自带应用、Chrome 与内存 mock 图床（应用端口 +100，默认 4227），数据库在临时目录；
+它用一个 500 的上传与一个 500 的图片读取来模拟图床故障，截图与 JSON 默认写入临时目录，第三个参数可指定保留目录。
+外部图片地址只做「无法在这里验证」的标注，脚本不发起服务端抓取。
 脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
 `SKIP` 即使退出码为 0，也不能计作已完成该链路验收。
 

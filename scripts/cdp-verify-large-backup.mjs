@@ -157,7 +157,15 @@ try {
   await waitFor(`(() => {
     const index = JSON.parse(localStorage.getItem('mopai.index.v2') || '{"docs":[]}')
     return index.docs.filter((doc) => doc.name.includes('R10 稿件 ')).length === 1000
-  })()`, '1,000 imported article indexes')
+  })()`, '1,000 imported article indexes').catch(async (error) => {
+    const state = await evaluate(`(() => {
+      try {
+        const raw = localStorage.getItem('mopai.index.v2')
+        const index = JSON.parse(raw || '{"docs":[],"removed":[]}')
+        return JSON.stringify({ total: index.docs.length, byName: index.docs.filter((d) => d.name.includes('R10 稿件 ')).length, sample: index.docs.slice(0, 2).map((d) => d.name), removed: (index.removed || []).length, bytes: (raw || '').length })
+      } catch (e) { return 'parse failed: ' + e } })()`)
+    throw new Error(error.message + ' — index=' + state)
+  })
   check('all 1,000 names are present in the local index', (await importedCount()) === 1000)
   const firstBody = await readFirstBody()
   check('article bodies moved to IndexedDB without loss', firstBody === '正文 0\n\n==备份==', JSON.stringify(firstBody))

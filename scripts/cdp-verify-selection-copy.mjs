@@ -40,7 +40,7 @@ const chrome = spawn(
     '--disable-gpu',
     '--no-proxy-server',
     '--proxy-bypass-list=<-loopback>',
-    '--window-size=1440,900',
+    '--window-size=1600,1000',
     'about:blank',
   ],
   { stdio: 'ignore' },
@@ -599,6 +599,16 @@ await evaluate(`(() => {
   if (!btn) throw new Error('copy button not found')
   btn.click()
   return true
+})()`)
+await sleep(900)
+// U02's publish check asks before handing out an article whose image address
+// WeChat cannot fetch; the fixture uses this origin's own favicon.
+await evaluate(`(() => {
+  const d = document.querySelector('[role=dialog]')
+  if (!d) return false
+  const b = [...d.querySelectorAll('button')].find((x) => /仍要复制/.test(x.textContent || ''))
+  if (b) { b.click(); return true }
+  return false
 })()`)
 await sleep(900)
 {

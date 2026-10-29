@@ -55,7 +55,7 @@ try {
   check('/skill.md is the tracked Skill', await (await fetch(`${appUrl}skill.md`)).text() === skill)
   chrome = spawn(process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
     '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
-    '--no-first-run', '--no-proxy-server', '--disable-gpu', '--window-size=1440,900', 'about:blank',
+    '--no-first-run', '--no-proxy-server', '--disable-gpu', '--window-size=1600,1000', 'about:blank',
   ], { stdio: 'ignore' })
   let wsUrl
   for (let i = 0; i < 60; i++) {

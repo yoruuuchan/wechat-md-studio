@@ -15,8 +15,10 @@ import PreviewPane from '@/components/PreviewPane'
 import SidePanel from '@/components/SidePanel'
 import RatioPicker from '@/components/RatioPicker'
 import ManualCropper from '@/components/ManualCropper'
+import PublishPreflight, { type PublishAction } from '@/components/PublishPreflight'
+import { buildPreflight, type DiagramState, type PreflightLocation, type PreflightReport } from '@/lib/preflight'
 import { useSyncScroll, type PreviewScrollHandle } from '@/hooks/useSyncScroll'
-import { createMathRenderer, documentFormulas, mathReadiness, type MathSnapshot } from '@/lib/math'
+import { createMathRenderer, documentFormulas, type MathSnapshot } from '@/lib/math'
 import {
   diagramOf,
   loadDiagramCache,
@@ -81,7 +83,7 @@ import {
   filenameForMime,
 } from '@/lib/image'
 import type { UploadSizeChoice } from '@/lib/image-compress'
-import { DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type Doc } from '@/lib/types'
+import { DEFAULT_CAROUSEL_RATIO, type Block, type CarouselRatio, type Doc } from '@/lib/types'
 import {
   MAX_BUNDLE_BYTES,
   bundleFilename,
@@ -393,7 +395,10 @@ export default function EditorPage() {
   const resolveDiagram = useCallback((code: string) => diagramRefs.get(code) ?? null, [diagramRefs])
   const diagramBusy = useRef(new Set<string>())
   const diagramFailed = useRef(new Set<string>())
-  const [diagramPending, setDiagramPending] = useState(0)
+  /** The publish check the author is looking at, if any. */
+  const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null)
+  /** What the check was opened for, clicked through once the author agrees. */
+  const pendingPublish = useRef<PublishAction | null>(null)
 
   const renderThemePreview = useCallback(
     (previewTheme: Theme) => renderDoc(parsed, previewTheme, settings.sig, resolveImg).html,
@@ -659,74 +664,43 @@ export default function EditorPage() {
   }
 
   /**
-   * Refuse to hand out HTML that is still missing a formula or a diagram.
+   * How far each diagram fence in this article has got.
    *
-   * Returns true when the click has been answered, so the caller stops: either
-   * with a hint that the article is not finished yet, or with an explicit offer
-   * to continue with the source TeX. `runAnyway` is that offer - the author
-   * chooses, instead of the tool quietly shipping a half-rendered article.
+   * The counters only knew "something is still rendering"; the check needs to
+   * name which fence, and a fence that failed has to stay a blocker instead of
+   * dropping out of the count and looking finished.
    */
-  const blockHtmlOutput = (
-    article: Doc,
-    snapshot: MathSnapshot,
-    forceLabel: string,
-    runAnyway: () => void,
-  ): boolean => {
-    if (diagramPending > 0) {
-      toast.info(t('editor.toast.diagramPending'), {
-        description: t('editor.toast.diagramPendingDesc'),
-      })
-      return true
+  const diagramStates = (blocks: readonly Block[]): DiagramState[] => {
+    const out: DiagramState[] = []
+    for (const b of blocks) {
+      if (b.type !== 'code' || !b.code.trim() || !diagramOf(b.lang)) continue
+      if (out.some((d) => d.code === b.code)) continue
+      const state = diagramRefs.has(b.code) ? 'ready' : diagramFailed.current.has(b.code) ? 'failed' : 'pending'
+      out.push({ code: b.code, line: b.line, state })
     }
-    const formulas = documentFormulas(article.blocks)
-    const readiness = mathReadiness(formulas, snapshot)
-    if (!readiness.failed.length && readiness.pending === 0) return false
-    // The click is the author asking for the article now, so give a loader that
-    // gave up on its own another chance before reporting a wait.
-    for (const f of formulas) {
-      if (snapshot.status(f.tex, f.display) === 'pending') void mathRenderer.warm(f.tex, f.display)
-    }
-    const continueWithSource = {
-      label: forceLabel,
-      onClick: runAnyway,
-    }
-    if (readiness.failed.length) {
-      const tex = readiness.failed[0]
-      toast.error(t('editor.toast.mathFailed', { n: readiness.failed.length }), {
-        description: t('editor.toast.mathFailedDesc', {
-          tex: tex.length > 80 ? `${tex.slice(0, 80)}…` : tex,
-        }),
-        duration: 9000,
-        action: continueWithSource,
-      })
-      return true
-    }
-    if (readiness.engineUnavailable) {
-      toast.error(t('editor.toast.mathEngineFailed'), {
-        description: t('editor.toast.mathEngineFailedDesc'),
-        duration: 9000,
-        action: continueWithSource,
-      })
-      return true
-    }
-    toast.info(t('editor.toast.mathPending', { n: readiness.pending }), {
-      description: t('editor.toast.mathPendingDesc'),
-    })
-    return true
+    return out
   }
 
-  const copyArticle = async (force = false) => {
+  /** The article's publish state right now, from the source on screen. */
+  const buildPreflightReport = (article: Doc, snapshot: MathSnapshot): PreflightReport => {
+    const { stats } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
+      snapshot.get(tex, display), resolveDiagram)
+    return buildPreflight({
+      blocks: article.blocks,
+      materials: collectMaterials(article, resolveDiagram),
+      mathStatus: (tex, display) => snapshot.status(tex, display),
+      mathEngineUnavailable: snapshot.engineUnavailable(),
+      diagrams: diagramStates(article.blocks),
+      rendererWarnings: stats.warnings,
+    })
+  }
+
+  const copyArticle = async (allowUnfinished: boolean, notices?: PreflightReport) => {
     if (activeBodyError) {
       toast.error(activeBodyError)
       return
     }
     const { article, snapshot } = currentArticle()
-    if (
-      !force &&
-      blockHtmlOutput(article, snapshot, t('editor.toast.mathCopyAnyway'), () => void copyArticle(true))
-    ) {
-      return
-    }
     const { html, stats } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
       snapshot.get(tex, display), resolveDiagram)
     const ok = await copyRichText(cleanHtml(html), plainTextOf(html))
@@ -734,30 +708,109 @@ export default function EditorPage() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
       toast.success(t('editor.toast.copied', { chars: stats.chars, imgs: stats.images }), {
-        description: t('editor.toast.copiedDesc'),
+        description: allowUnfinished ? t('editor.toast.copiedUnfinished') : t('editor.toast.copiedDesc'),
       })
+      if (notices) announceNotices(notices)
     } else {
       toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedDesc') })
     }
   }
 
-  const handleCopy = () => void copyArticle()
+  const handleCopy = () => void startPublish('copy')
 
-  const exportHtml = (kind: 'clean' | 'page', force = false) => {
+  const exportHtml = (kind: 'clean' | 'page', allowUnfinished: boolean, notices?: PreflightReport) => {
     const { article, doc, snapshot } = currentArticle()
-    if (
-      !force &&
-      blockHtmlOutput(article, snapshot, t('editor.toast.mathExportAnyway'), () => exportHtml(kind, true))
-    ) {
-      return
-    }
     const name = doc?.name || t('io.fallbackArticle')
     const { html } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
       snapshot.get(tex, display), resolveDiagram)
     const safe = safeFilename(name, t('io.fallbackArticle'), 'html')
     if (kind === 'clean') downloadFile(safe.replace(/\.html$/, `_${t('io.suffixClean')}.html`), cleanHtml(html))
     else downloadFile(safe.replace(/\.html$/, `_${t('io.suffixPage')}.html`), previewPage(html, name))
-    toast.success(kind === 'clean' ? t('editor.toast.exportedClean') : t('editor.toast.exportedPage'))
+    toast.success(kind === 'clean' ? t('editor.toast.exportedClean') : t('editor.toast.exportedPage'), {
+      description: allowUnfinished ? t('editor.toast.exportedUnfinished') : undefined,
+    })
+    if (notices) announceNotices(notices)
+  }
+
+  /**
+   * Say what the check noticed without a modal.
+   *
+   * A link that gets collected into 参考链接, or an external address this tool
+   * cannot read across origins, is not a reason to stop a copy — but it still
+   * has to be stated at the last step rather than passed over in silence.
+   */
+  const announceNotices = (report: PreflightReport) => {
+    const notices = [...report.unverifiable, ...report.notes]
+    if (!notices.length) return
+    const first = notices[0]
+    toast.info(t('preflight.notesToast', { n: notices.length }), {
+      description: first.text ?? t(first.detailKey, first.detailParams),
+    })
+  }
+
+  /**
+   * The one gate in front of copy and both HTML exports.
+   *
+   * A finished article goes straight through without a dialog. Anything else
+   * puts the article's real state on screen first, because a toast that slides
+   * away is how an unfinished formula used to reach the clipboard.
+   */
+  const startPublish = (kind: PublishAction) => {
+    if (kind === 'copy' && activeBodyError) {
+      toast.error(activeBodyError)
+      return
+    }
+    const { article, snapshot } = currentArticle()
+    const report = buildPreflightReport(article, snapshot)
+    if (!report.gates) {
+      runPublish(kind, false, report)
+      return
+    }
+    // A loader that gave up on its own gets another chance before we report a
+    // wait; the author asking for the article is the strongest signal to retry.
+    // This runs for an unavailable engine too, not just for a slow one: the
+    // click is what re-attempts the download.
+    for (const f of documentFormulas(article.blocks)) {
+      if (snapshot.status(f.tex, f.display) === 'pending') void mathRenderer.warm(f.tex, f.display)
+    }
+    pendingPublish.current = kind
+    setPreflightReport(report)
+  }
+
+  const runPublish = (kind: PublishAction, allowUnfinished: boolean, notices?: PreflightReport) => {
+    if (kind === 'copy') void copyArticle(allowUnfinished, notices)
+    else exportHtml(kind, allowUnfinished, notices)
+  }
+
+  /**
+   * Run what the panel was opened for. Without an override the check is redone
+   * on the article as it stands now, so a blocker that appeared while the panel
+   * was open is shown instead of being copied as if it had never been seen.
+   */
+  const confirmPublish = ({ allowUnfinished }: { allowUnfinished: boolean }) => {
+    const kind = pendingPublish.current
+    if (!kind) return
+    if (!allowUnfinished) {
+      const { article, snapshot } = currentArticle()
+      const fresh = buildPreflightReport(article, snapshot)
+      // Only a blocker that appeared while the panel was up keeps it open. The
+      // warnings were just read and accepted; asking for that again would make
+      // the acknowledged path impossible to finish.
+      if (fresh.blockers.length) {
+        setPreflightReport(fresh)
+        return
+      }
+    }
+    setPreflightReport(null)
+    runPublish(kind, allowUnfinished)
+  }
+
+  const jumpToLocation = (location: PreflightLocation) => {
+    setPreflightReport(null)
+    if (location.line !== undefined) {
+      editorRef.current?.jumpToLine(location.line)
+    }
+    if (narrow) setPane('editor')
   }
 
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
@@ -789,7 +842,7 @@ export default function EditorPage() {
       })()
       return
     }
-    exportHtml(kind)
+    startPublish(kind)
   }
 
   /** Upload the images a Word document carried and fill them back into the placeholders. */
@@ -953,7 +1006,6 @@ export default function EditorPage() {
     }
     const rasterize = async (code: string) => {
       diagramBusy.current.add(code)
-      setDiagramPending((n) => n + 1)
       try {
         const png = await renderDiagramPng(code)
         try {
@@ -971,7 +1023,6 @@ export default function EditorPage() {
         park(code, t('editor.diagram.syntaxError'), e)
       } finally {
         diagramBusy.current.delete(code)
-        setDiagramPending((n) => n - 1)
       }
     }
 
@@ -1784,6 +1835,13 @@ export default function EditorPage() {
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
       <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />
       <OnboardingTour run={tourRun} onEnd={endTour} />
+      <PublishPreflight
+        report={preflightReport}
+        action={pendingPublish.current ?? 'copy'}
+        onClose={() => setPreflightReport(null)}
+        onConfirm={confirmPublish}
+        onJump={jumpToLocation}
+      />
 
       <RatioPicker
         open={frameTask !== null && manualOpen === false}

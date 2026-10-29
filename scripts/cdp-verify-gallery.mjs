@@ -151,7 +151,7 @@ try {
 
   chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
     '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
-    '--no-first-run', '--disable-gpu', '--no-proxy-server', '--window-size=1440,900', 'about:blank',
+    '--no-first-run', '--disable-gpu', '--no-proxy-server', '--window-size=1600,1000', 'about:blank',
   ], { stdio: 'ignore' })
 
   let wsBase = ''

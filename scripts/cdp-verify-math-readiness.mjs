@@ -149,7 +149,7 @@ try {
     '--no-first-run',
     '--disable-gpu',
     '--no-proxy-server',
-    '--window-size=1440,900',
+    '--window-size=1600,1000',
     'about:blank',
   ], { stdio: 'ignore' })
 
@@ -260,6 +260,36 @@ try {
     })()`)
   const resetSinks = () =>
     ev(`(() => { window.__copies = []; window.__downloads = []; return true })()`)
+  /**
+   * The publish check is the single gate in front of copy and both HTML
+   * exports, so these read it the way the author sees it: which findings it
+   * lists, whether the primary button is an override, and whether it is
+   * allowed to run at all.
+   */
+  const preflight = () =>
+    ev(`(() => {
+      const root = document.querySelector('[data-preflight]')
+      if (!root) return null
+      const go = root.querySelector('[data-preflight-go]')
+      return {
+        items: [...root.querySelectorAll('[data-preflight-item]')].map((el) => el.dataset.preflightItem),
+        text: root.innerText,
+        state: go ? go.dataset.preflightState : null,
+        goLabel: go ? go.innerText.trim() : null,
+        goDisabled: go ? Boolean(go.disabled) : null,
+        hasAck: Boolean(root.querySelector('[data-preflight-ack]')),
+      }
+    })()`)
+  const preflightGo = () =>
+    ev(`(() => { const b = document.querySelector('[data-preflight-go]'); if (!b) return 'missing'; if (b.disabled) return 'disabled'; b.click(); return 'clicked' })()`)
+  const preflightAck = () =>
+    ev(`(() => { const c = document.querySelector('[data-preflight-ack]'); if (!c) return 'missing'; c.click(); return 'clicked' })()`)
+  const preflightCancel = () =>
+    ev(`(() => { const b = document.querySelector('[data-preflight-cancel]'); if (!b) return 'missing'; b.click(); return 'clicked' })()`)
+  const closePreflight = async () => {
+    await preflightCancel()
+    await sleep(300)
+  }
   const copies = async () => {
     const raw = await ev(`(async () => {
       await new Promise(r => setTimeout(r, 120))
@@ -426,21 +456,34 @@ try {
   await resetSinks()
   await markToasts()
   await clickCopy()
-  const pendingToast = await freshToasts()
-  check('the copy is refused while the formula renders', /个公式还在渲染/.test(pendingToast), pendingToast)
-  check('nothing reaches the clipboard', (await copies()).length === 0)
-
-  await markToasts()
-  const cleanWhilePending = await exportMenu('干净正文')
-  check('the clean HTML export is refused too', cleanWhilePending === 'ok/ok', cleanWhilePending)
-  await markToasts()
-  const pageWhilePending = await exportMenu('预览页')
-  check('the preview page export is refused too', pageWhilePending === 'ok/ok', pageWhilePending)
+  const pendingCheck = await preflight()
   check(
-    'no HTML file is produced while the formula is pending',
-    (await downloads()).length === 0 && /个公式还在渲染/.test(await freshToasts()),
-    await freshToasts(),
+    'the copy opens the publish check while the formula renders',
+    Boolean(pendingCheck) && pendingCheck.items.includes('math-pending'),
+    JSON.stringify(pendingCheck && pendingCheck.items),
   )
+  check('... and names the formula as still rendering', /公式还在渲染/.test(pendingCheck?.text ?? ''))
+  check('an unfinished formula cannot be waved through', pendingCheck?.state === 'override' && !pendingCheck?.goDisabled, `${pendingCheck?.state} / ${pendingCheck?.goLabel}`)
+  check('nothing reaches the clipboard', (await copies()).length === 0)
+  await closePreflight()
+
+  const cleanWhilePending = await exportMenu('干净正文')
+  const cleanPending = await preflight()
+  check(
+    'the clean HTML export opens the same check',
+    cleanWhilePending === 'ok/ok' && Boolean(cleanPending) && cleanPending.items.includes('math-pending'),
+    `${cleanWhilePending} / ${JSON.stringify(cleanPending && cleanPending.items)}`,
+  )
+  await closePreflight()
+  const pageWhilePending = await exportMenu('预览页')
+  const pagePending = await preflight()
+  check(
+    'the preview page export is refused too',
+    pageWhilePending === 'ok/ok' && Boolean(pagePending) && pagePending.items.includes('math-pending'),
+    `${pageWhilePending} / ${JSON.stringify(pagePending && pagePending.items)}`,
+  )
+  await closePreflight()
+  check('no HTML file is produced while the formula is pending', (await downloads()).length === 0)
 
   console.log('\n=== a new article is not held back by the previous one ===')
   check('a third article can be created', (await docMenu('新建')) === 'ok/ok')
@@ -479,10 +522,20 @@ try {
   await resetSinks()
   await markToasts()
   await clickCopy()
-  const failedToast = await freshToasts()
-  check('the copy is refused for TeX that does not compile', /个公式没能编译/.test(failedToast), failedToast)
+  const failedCheck = await preflight()
+  check(
+    'the copy is refused for TeX that does not compile',
+    Boolean(failedCheck) && failedCheck.items.includes('math-failed'),
+    JSON.stringify(failedCheck && failedCheck.items),
+  )
+  check('the panel carries the offending TeX', /frac/.test(failedCheck?.text ?? ''), failedCheck?.text?.slice(0, 160))
   check('nothing reaches the clipboard', (await copies()).length === 0)
-  check('the toast offers the source on purpose', (await toastButton('仍按源稿复制')) === 'clicked')
+  check(
+    'the override is its own explicit button',
+    failedCheck?.state === 'override' && /仍要复制/.test(failedCheck?.goLabel ?? ''),
+    `${failedCheck?.state} / ${failedCheck?.goLabel}`,
+  )
+  check('the override runs the copy', (await preflightGo()) === 'clicked')
   const forced = (await copies())[0]
   check(
     'the author can explicitly copy the source instead',
@@ -513,22 +566,35 @@ try {
     throw new Error('the editor did not come back after the reload')
   }
   await installSinks()
+  // Offline alone is not enough any more: the bundle is already in Chrome's HTTP
+  // cache from earlier in this session, and an offline page still reads that
+  // cache, so the engine would load and the scenario would silently not happen.
+  await send('Network.setCacheDisabled', { cacheDisabled: true }, sessionId)
   await setOffline(true)
   await setContent('$$\nx = 1\n$$\n')
   await sleep(1800)
   await markToasts()
+  const engineArticle = await ev(`window.__mopaiCodemirror ? window.__mopaiCodemirror.state.doc.toString() : 'no editor'`)
   await clickCopy()
-  const engineToast = await freshToasts()
-  check('the failure is reported as an engine problem, not broken TeX', /公式引擎没加载成功/.test(engineToast), engineToast)
+  const engineCheck = await preflight()
+  check('the offline article still carries the formula that cannot render', engineArticle.includes('x = 1'), engineArticle.slice(0, 60))
+  check(
+    'the failure is reported as an engine problem, not broken TeX',
+    Boolean(engineCheck) && engineCheck.items.includes('math-engine'),
+    JSON.stringify({ panel: engineCheck && engineCheck.items, toasts: await freshToasts() }),
+  )
   check('nothing reaches the clipboard', (await copies()).length === 0)
-  check('the source is offered on demand too', (await toastButton('仍按源稿复制')) === 'clicked')
+  check('the source is offered on demand too', (await preflightGo()) === 'clicked')
   check('the source copy carries the TeX', Boolean((await copies()).at(-1)?.html?.includes('x = 1')))
   await setOffline(false)
+  await send('Network.setCacheDisabled', { cacheDisabled: false }, sessionId)
   await sleep(400)
   // The next click is what asks the loader to try again; the one after it
-  // copies the finished result.
+  // copies the finished result. That click opens the check again, so it is
+  // closed before the retry has a chance to land.
   await markToasts()
   await clickCopy()
+  await closePreflight()
   check('the retry after a failed bundle renders the formula', await waitFor(previewSvg, 45000))
   await resetSinks()
   await markToasts()
@@ -541,14 +607,40 @@ try {
   await resetSinks()
   await markToasts()
   await clickCopy()
-  const diagramToast = await freshToasts()
-  check('the copy waits while the diagram is still an image to be', /图表还在生成图片/.test(diagramToast), diagramToast)
+  const midway = await preflight()
+  check(
+    'the copy waits while the diagram is still an image to be',
+    Boolean(midway) && midway.items.some((i) => i === 'diagram-pending' || i === 'math-pending'),
+    JSON.stringify(midway && midway.items),
+  )
   check('nothing reaches the clipboard', (await copies()).length === 0)
+  await closePreflight()
   const bothReady = await waitFor(`(${previewSvg}) && (${previewImg})`, 90000)
   check('the diagram becomes an image next to the formula', bothReady)
   await resetSinks()
   await markToasts()
   await clickCopy()
+  // The diagram has no caption, which the renderer notes — a warning the author
+  // acknowledges rather than a blocker. Nothing here is still unfinished, so
+  // the note must not be able to hold the finished article back.
+  const coexistNotes = await preflight()
+  if (coexistNotes) {
+    check(
+      'the finished article only carries notes, no blockers',
+      coexistNotes.items.length > 0 && coexistNotes.items.every((i) => i !== 'math-pending' && i !== 'diagram-pending' && i !== 'math-failed' && i !== 'diagram-failed'),
+      JSON.stringify(coexistNotes.items),
+    )
+    check(
+      'a note has to be acknowledged before the copy is allowed',
+      coexistNotes.state === 'needs-ack' && coexistNotes.hasAck && coexistNotes.goDisabled === true,
+      `${coexistNotes.state} / ack=${coexistNotes.hasAck} / disabled=${coexistNotes.goDisabled}`,
+    )
+    await preflightAck()
+    const afterAck = await preflight()
+    check('acknowledging the note turns the copy on', afterAck?.state === 'ready' && afterAck?.goDisabled === false, `${afterAck?.state} / disabled=${afterAck?.goDisabled}`)
+    check('the acknowledged article copies without an override', (await preflightGo()) === 'clicked')
+    await sleep(400)
+  }
   const bothHtml = (await copies())[0]?.html ?? ''
   check(
     'the finished copy carries both the SVG and the diagram image',
