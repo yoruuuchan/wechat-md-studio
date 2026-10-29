@@ -357,8 +357,11 @@ export function parseMarkdown(src: string): Doc {
     }
 
     if (t.type === 'container_carousel_open') {
-      // :::carousel [比例] 标题 —— 比例可省略，老稿件照旧按默认比例渲染
-      let rest = (t.info || '').replace(/^carousel\s*/, '').trim()
+      // :::carousel [比例] 标题 —— 比例可省略，老稿件照旧按默认比例渲染。
+      // markdown-it-container trims the info string before comparing the name, so
+      // `::: carousel 16:9` opens a carousel too. Trim before stripping the name,
+      // or the name stays in the title and the ratio is never read.
+      let rest = (t.info || '').trim().replace(/^carousel\s*/, '').trim()
       let ratio: CarouselRatio = DEFAULT_CAROUSEL_RATIO
       const ratioMatch = rest.match(/^(\d+\s*:\s*\d+)\s*/)
       if (ratioMatch) {
