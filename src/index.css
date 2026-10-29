@@ -312,6 +312,31 @@ body {
   border-bottom: 1px solid var(--glass-border);
 }
 
+/*
+ * 手机安全区。带上 viewport-fit=cover 之后，横屏刘海会盖住左右两端，
+ * 竖屏的 Home 手势条会盖住底部；这两个类把内容让开，桌面下 env() 为 0，
+ * 不留任何多余空隙。
+ */
+.ya-safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.ya-safe-b {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 软键盘弹起时用动态视口高度，别让底部操作被键盘顶出屏幕 */
+.ya-viewport {
+  height: 100dvh;
+}
+
+@supports not (height: 100dvh) {
+  .ya-viewport {
+    height: 100vh;
+  }
+}
+
 /* 卡片用影子定义，不用描边 */
 .ya-card {
   background: var(--bg-surface);
