@@ -32,6 +32,7 @@ function client(id = 1) {
   return docsRouter.createCaller({
     req: new Request('http://test/'),
     resHeaders: new Headers(),
+    clientIp: '203.0.113.10',
     visitorIdentity: createVisitorResolver(new Headers(), new Headers()),
     user: { ...user, id },
   })

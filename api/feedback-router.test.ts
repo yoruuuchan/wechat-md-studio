@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HttpBindings } from '@hono/node-server'
 import { createFeedbackRouter } from './feedback-router'
 
 /**
@@ -30,15 +31,21 @@ function configure() {
   process.env.FEEDBACK_TO = 'owner@example.com'
 }
 
-/** A fresh IP per test: the limiter is module-independent in-memory state. */
-const freshIp = (label: string) => `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+/** A fresh valid IP per test: the limiter is module-independent in-memory state. */
+let ipSerial = 0
+const freshIp = () => `203.0.113.${(++ipSerial % 200) + 1}`
 
-function post(router: ReturnType<typeof createFeedbackRouter>, body: unknown, ip = freshIp('fb')) {
+function post(
+  router: ReturnType<typeof createFeedbackRouter>,
+  body: unknown,
+  ip = freshIp(),
+  remoteAddress = '127.0.0.1',
+) {
   return router.request('/', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
     body: JSON.stringify(body),
-  })
+  }, { incoming: { socket: { remoteAddress } } } as unknown as HttpBindings)
 }
 
 const MESSAGE = '这个页面在手机上有个小问题，附上截图地址。'
@@ -124,7 +131,7 @@ describe('POST /api/feedback', () => {
     configure()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const router = createFeedbackRouter({ fetchImpl: (async () => new Response('{}', { status: 200 })) as typeof fetch })
-    const ip = freshIp('burst')
+    const ip = freshIp()
     for (let i = 0; i < 3; i++) {
       expect((await post(router, { message: MESSAGE }, ip)).status).toBe(200)
     }
@@ -133,7 +140,17 @@ describe('POST /api/feedback', () => {
     expect(((await limited.json()) as { error: string }).error).toBe('rate_limited')
     expect(warn.mock.calls.some(([line]) => String(line).startsWith('[feedback-deny] minute'))).toBe(true)
     // A different address is not punished.
-    expect((await post(router, { message: MESSAGE }, freshIp('other'))).status).toBe(200)
+    expect((await post(router, { message: MESSAGE }, freshIp())).status).toBe(200)
     warn.mockRestore()
+  })
+
+  it('ignores forged forwarding headers from a direct peer', async () => {
+    configure()
+    const router = createFeedbackRouter({ fetchImpl: (async () => new Response('{}', { status: 200 })) as typeof fetch })
+    const peer = '198.51.100.202'
+    for (let i = 0; i < 3; i++) {
+      expect((await post(router, { message: MESSAGE }, `203.0.113.${i + 50}`, peer)).status).toBe(200)
+    }
+    expect((await post(router, { message: MESSAGE }, '203.0.113.90', peer)).status).toBe(429)
   })
 })

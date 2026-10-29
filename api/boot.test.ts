@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { HttpBindings } from '@hono/node-server'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -13,27 +14,37 @@ process.env.IMG_BASE_URL = 'https://img.test.example'
 const { default: app } = await import('./boot')
 const { env } = await import('./lib/env')
 
-function login(ip: string, accessKey: string, url = 'http://127.0.0.1/api/trpc/auth.login') {
+function nodeEnv(remoteAddress: string): HttpBindings {
+  return { incoming: { socket: { remoteAddress } } } as unknown as HttpBindings
+}
+
+function login(
+  ip: string,
+  accessKey: string,
+  remoteAddress = '127.0.0.1',
+  url = 'http://127.0.0.1/api/trpc/auth.login',
+) {
   return app.request(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
     body: JSON.stringify({ json: { accessKey } }),
-  })
+  }, nodeEnv(remoteAddress))
 }
 
-/** A fresh address per test: the limiter is module state keyed by IP. */
-const freshIp = (label: string) => `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+/** A fresh valid address per test: the limiter is module state keyed by IP. */
+let ipSerial = 0
+const freshIp = () => `203.0.113.${(++ipSerial % 200) + 1}`
 
 describe('auth.login', () => {
   it('answers a wrong key with the ordinary rejection, not an error envelope', async () => {
-    const res = await login(freshIp('wrong'), 'not-the-key')
+    const res = await login(freshIp(), 'not-the-key')
     expect(res.status).toBe(200)
     const body = (await res.json()) as { result?: { data?: { json?: { success: boolean } } } }
     expect(body.result?.data?.json?.success).toBe(false)
   })
 
   it('still lets the owner in and sets the session cookie', async () => {
-    const res = await login(freshIp('owner'), env.accessKey)
+    const res = await login(freshIp(), env.accessKey)
     expect(res.status).toBe(200)
     const body = (await res.json()) as { result?: { data?: { json?: { success: boolean } } } }
     expect(body.result?.data?.json?.success).toBe(true)
@@ -41,7 +52,7 @@ describe('auth.login', () => {
   })
 
   it('refuses the attempt past the per-IP ceiling with 429, and says so', async () => {
-    const ip = freshIp('brute')
+    const ip = freshIp()
     for (let i = 0; i < env.authLoginPerMinute; i++) {
       expect((await login(ip, `guess-${i}`)).status).toBe(200)
     }
@@ -61,18 +72,26 @@ describe('auth.login', () => {
   })
 
   it('does not punish a different address for someone else\'s attempts', async () => {
-    const victim = freshIp('victim')
+    const victim = freshIp()
     for (let i = 0; i < env.authLoginPerMinute; i++) await login(victim, `guess-${i}`)
     expect((await login(victim, 'guess')).status).toBe(429)
 
-    expect((await login(freshIp('bystander'), env.accessKey)).status).toBe(200)
+    expect((await login(freshIp(), env.accessKey)).status).toBe(200)
+  })
+
+  it('does not let forged forwarding headers split a direct peer\'s limit', async () => {
+    const peer = '198.51.100.200'
+    for (let i = 0; i < env.authLoginPerMinute; i++) {
+      expect((await login(`203.0.113.${i + 1}`, `guess-${i}`, peer)).status).toBe(200)
+    }
+    expect((await login('203.0.113.250', 'guess-again', peer)).status).toBe(429)
   })
 })
 
 describe('the app-wide response headers', () => {
   it('are on tRPC answers, the /api/img redirect and 404s alike', async () => {
     for (const res of [
-      await login(freshIp('headers'), 'wrong-key'),
+      await login(freshIp(), 'wrong-key'),
       await app.request('/api/img/some-key'),
       await app.request('/api/nope'),
     ]) {
