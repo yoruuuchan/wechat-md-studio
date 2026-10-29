@@ -19,11 +19,13 @@ export interface LocalCommit {
   changedIds: string[]
 }
 
-const FIELDS = ['name', 'content', 'savedAt', 'deletedAt', 'source', 'baseHash', 'remoteMcp', 'contentLoaded', 'bodyState'] as const
+const FIELDS = ['name', 'content', 'savedAt', 'deletedAt', 'source', 'baseHash', 'remoteMcp', 'contentLoaded', 'bodyState', 'recovery'] as const
 
 /** A stable representation of the fields a document writer actually owns. */
 export function localDocValue(doc: LocalDocRecord): DocRecord {
   const loaded = doc.contentLoaded !== false && doc.bodyState === undefined
+  const recovery = doc.recovery && (doc.recovery.kind === 'conflict' || doc.recovery.kind === 'restored') &&
+    Number.isFinite(doc.recovery.at) ? doc.recovery : undefined
   return {
     id: doc.id,
     name: doc.name,
@@ -34,6 +36,7 @@ export function localDocValue(doc: LocalDocRecord): DocRecord {
     source: doc.source ?? null,
     baseHash: doc.baseHash ?? null,
     remoteMcp: doc.remoteMcp ?? null,
+    ...(recovery ? { recovery } : {}),
     contentLoaded: loaded,
     bodyState: loaded ? undefined : (doc.bodyState ?? 'stub'),
   }
@@ -109,12 +112,13 @@ export function documentFromBody(row: BodyRecord, fallback?: LocalDocRecord): Lo
       bodyState: undefined,
     } as DocRecord),
     localRevision: row.revision ?? 0,
+    ...(typeof row.storedAt === 'number' && Number.isFinite(row.storedAt) ? { localSavedAt: row.storedAt } : {}),
   }
 }
 
 export function bodyFromDocument(doc: LocalDocRecord, revision: number): BodyRecord {
   const { content, ...metadata } = localDocValue(doc)
-  return { id: doc.id, content, revision, metadata }
+  return { id: doc.id, content, revision, metadata, storedAt: Date.now() }
 }
 
 /**
@@ -138,7 +142,7 @@ export function planLocalCommit(
     const row = bodyFromDocument(doc, revision)
     puts.set(row.id, row)
     currentRows.set(row.id, row)
-    keep({ ...localDocValue(doc), localRevision: revision })
+    keep({ ...localDocValue(doc), localRevision: revision, localSavedAt: row.storedAt })
   }
   const preserveConflict = (change: LocalDocChange, current?: LocalDocRecord) => {
     result.conflicted = true
@@ -157,6 +161,7 @@ export function planLocalCommit(
       deletedAt: null,
       baseHash: null,
       remoteMcp: null,
+      recovery: { kind: 'conflict', at: Date.now() },
     }, existing)
     result.copies.push({ originalId: change.id, copyId: change.conflictId })
   }
@@ -231,6 +236,11 @@ export function planLocalCommit(
       if (intended === base) continue
       const persisted = JSON.stringify(current[field])
       if (persisted !== base && persisted !== intended) {
+        if (field === 'recovery') {
+          // Recovery labels are provenance, not competing article contents.
+          if ((after.recovery?.at ?? 0) > (current.recovery?.at ?? 0)) merged.recovery = after.recovery
+          continue
+        }
         // Archive timestamps are bookkeeping, not competing article versions.
         if (field === 'savedAt' && after.savedAt !== null && current.savedAt !== null) {
           merged.savedAt = Math.max(after.savedAt, current.savedAt)

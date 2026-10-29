@@ -19,6 +19,7 @@ import {
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
 import { BUNDLE_IMPORT_BATCH_SIZE } from '@/lib/import-export'
 import { mergeLocalCommit, type LocalDocRecord } from '@/lib/local-docs'
+import { articleSaveStatus, sameLocalReceipt, type LocalSaveReceipt } from '@/lib/save-status'
 import { useI18n } from '@/hooks/useI18n'
 
 export type SyncState = 'loading' | 'synced' | 'saving' | 'local' | 'error'
@@ -110,12 +111,18 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const [retryingLocal, setRetryingLocal] = useState(false)
   /** Bumped after a successful local retry so a paused cloud merge runs again. */
   const [localRetryVersion, setLocalRetryVersion] = useState(0)
+  const [localSaveRetry, setLocalSaveRetry] = useState(0)
+  const [localReceipts, setLocalReceipts] = useState<Map<string, LocalSaveReceipt>>(new Map())
+  const [cloudWrites, setCloudWrites] = useState<Map<string, number>>(new Map())
+  const [cloudFailures, setCloudFailures] = useState<Set<string>>(new Set())
   /**
    * True once we know where we stand relative to the cloud: after the merge
    * completes, or right away when there is no account to merge with. Autosave
    * stays off until then so no pre-merge base ever races the merge itself.
    */
-  const [settled, setSettled] = useState(!enabled)
+  // Authentication resolves after the editor mounts. Starting "settled" for
+  // the anonymous first render would hide a later cloud-list failure forever.
+  const [settled, setSettled] = useState(false)
 
   const utils = trpc.useUtils()
   const bootedRef = useRef(false)
@@ -156,6 +163,57 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const restoreMutation = trpc.docs.restore.useMutation()
   const purgeMutation = trpc.docs.purge.useMutation()
 
+  const observeLocalReceipts = useCallback((records: DocRecord[]) => {
+    const alive = new Set([...docsRef.current, ...localTrashRef.current].map((doc) => doc.id))
+    setLocalReceipts((previous) => {
+      let next = previous
+      for (const doc of records) {
+        // A newly created in-memory article is not a successful disk read.
+        if (!alive.has(doc.id) || doc.contentLoaded === false || doc.localRevision === undefined) continue
+        const at = doc.localSavedAt ?? null
+        const known = previous.get(doc.id)
+        if (sameLocalReceipt(known, doc) && known?.at === at) continue
+        if (next === previous) next = new Map(previous)
+        next.set(doc.id, { ...doc, at })
+      }
+      return next
+    })
+  }, [])
+
+  const markCloudWrites = useCallback((ids: string[], delta: 1 | -1) => {
+    setCloudWrites((previous) => {
+      const next = new Map(previous)
+      for (const id of ids) {
+        const count = Math.max(0, (next.get(id) ?? 0) + delta)
+        if (count) next.set(id, count)
+        else next.delete(id)
+      }
+      return next
+    })
+  }, [])
+
+  const markCloudResult = useCallback((ids: string[], failed: boolean) => {
+    const alive = new Set([...docsRef.current, ...localTrashRef.current].map((doc) => doc.id))
+    setCloudFailures((previous) => {
+      const next = new Set(previous)
+      for (const id of ids) {
+        if (failed && alive.has(id)) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const alive = new Set([...docs, ...localTrash].map((doc) => doc.id))
+    const retain = <T,>(entries: Map<string, T>): Map<string, T> =>
+      [...entries.keys()].every((id) => alive.has(id)) ? entries : new Map([...entries].filter(([id]) => alive.has(id)))
+    setLocalReceipts(retain)
+    setCloudWrites(retain)
+    setCloudFailures((previous) => [...previous].every((id) => alive.has(id)) ? previous : new Set([...previous].filter((id) => alive.has(id))))
+    for (const id of lastSavedRef.current.keys()) if (!alive.has(id)) lastSavedRef.current.delete(id)
+  }, [docs, localTrash])
+
   // 1. 首次加载：先显示本地缓存（匿名时它就是全部真相）
   useEffect(() => {
     if (bootedRef.current) return
@@ -164,6 +222,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     // development, and dropping the result of the first run - the only one that
     // loads - would leave the editor empty.
     void loadDocs().then((local) => {
+      observeLocalReceipts(local.docs)
       localBaseRef.current = new Map(local.docs.map((d) => [d.id, d as LocalDocRecord]))
       setLocalTrash(local.docs.filter((d) => d.deletedAt))
       const live = local.docs.filter((d) => !d.deletedAt)
@@ -172,7 +231,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       setActiveId(shown.some((d) => d.id === local.activeId) ? local.activeId : shown[0].id)
     })
     if (!enabled) setSyncState('local')
-  }, [enabled])
+  }, [enabled, observeLocalReceipts])
 
   // A failed local read leaves the affected articles unloaded, with their
   // original bodies still on disk. Retrying opens the store again and fills
@@ -183,6 +242,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     setRetryingLocal(true)
     try {
       const loaded = await loadDocs()
+      observeLocalReceipts(loaded.docs)
       localBaseRef.current = new Map(loaded.docs.map((d) => [d.id, d as LocalDocRecord]))
       const byId = new Map(loaded.docs.map((d) => [d.id, d]))
       setDocs((current) => {
@@ -206,13 +266,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       })
       // A merge paused by the read failure may run again now.
       if (!loaded.bodyReadFailed) setLocalRetryVersion((n) => n + 1)
+      setLocalSaveRetry((n) => n + 1)
     } catch {
       // loadDocs reports its own failures; a retry that still cannot open the
       // store leaves the same diagnostic in place.
     } finally {
       setRetryingLocal(false)
     }
-  }, [retryingLocal])
+  }, [retryingLocal, observeLocalReceipts])
 
   const refreshLocalDocs = useCallback(async () => {
     if (localRefreshRef.current.running) {
@@ -224,6 +285,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       do {
         localRefreshRef.current.again = false
         const observed = await loadDocs({ trackBase: false })
+        observeLocalReceipts(observed.docs)
         const current = [...docsRef.current, ...localTrashRef.current]
         const merged = reconcileObservedLocalDocs(current, observed.docs)
         const live = merged.docs.filter((d) => !d.deletedAt)
@@ -242,7 +304,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     } finally {
       localRefreshRef.current.running = false
     }
-  }, [t])
+  }, [t, observeLocalReceipts])
 
   useEffect(
     () =>
@@ -454,6 +516,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     const requestedTrash = requested.filter((d) => d.deletedAt)
     const pageBase = [...localBaseRef.current.values()]
     void saveLocalDocs(requested, activeId, pageBase).then((result) => {
+      if (result.ok) observeLocalReceipts(result.persisted)
       const { commit } = result
       if (!commit.changedIds.length && !commit.removed.length && !commit.copies.length) return
 
@@ -482,7 +545,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         setNotice(t('docs.localConflict', { name: copyName }))
       }
     })
-  }, [docs, localTrash, activeId, t])
+  }, [docs, localTrash, activeId, t, localSaveRetry, observeLocalReceipts])
 
   useEffect(() => {
     if (activeId) saveActiveId(activeId)
@@ -613,6 +676,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       )
       if (!targets.length) return
       setSyncState('saving')
+      markCloudWrites(targets.map((d) => d.id), 1)
       const found: [string, ConflictCurrent][] = []
       try {
         for (const d of targets) {
@@ -633,6 +697,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             found.push([d.id, { ...res.current }])
           } else {
             lastSavedRef.current.set(d.id, syncedSnapshot(d))
+            markCloudResult([d.id], false)
             setDocs((ds) =>
               ds.map((x) => (x.id === d.id ? { ...x, baseHash: res.hash, savedAt: res.savedAt ?? x.savedAt } : x)),
             )
@@ -654,16 +719,19 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           setSyncState('synced')
         }
       } catch {
+        markCloudResult(targets.filter((d) => !sameSyncedDocument(lastSavedRef.current.get(d.id), d)).map((d) => d.id), true)
         setSyncState('error')
         setNotice(t('docs.syncFailed'))
+      } finally {
+        markCloudWrites(targets.map((d) => d.id), -1)
       }
     },
-    [enabled, docs, saveMutation, conflicts, t],
+    [enabled, docs, saveMutation, conflicts, t, markCloudWrites, markCloudResult],
   )
 
   // 6. 编辑后防抖同步（只针对已保存过、且正文在手、且没卡在冲突里的稿件）
   useEffect(() => {
-    if (!enabled || !settled || syncState === 'loading') return
+    if (!enabled || !settled || !reconciledRef.current || syncState === 'loading') return
     const dirty = docs.filter(
       (d) =>
         d.contentLoaded !== false &&
@@ -728,6 +796,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       return { ok: false as const, message: t('docs.saveConflictFirst') }
     }
     setSyncState('saving')
+    markCloudWrites([doc.id], 1)
     try {
       const res = await saveToDraftsMutation.mutateAsync({
         id: doc.id,
@@ -745,6 +814,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         }
       }
       lastSavedRef.current.set(doc.id, syncedSnapshot(doc))
+      markCloudResult([doc.id], false)
       setDirtyIds((prev) => {
         const next = new Set(prev)
         next.delete(doc.id)
@@ -761,10 +831,13 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       setSyncState('synced')
       return { ok: true as const, savedAt: res.savedAt }
     } catch {
+      markCloudResult([doc.id], true)
       setSyncState('error')
       return { ok: false as const, message: t('docs.saveFailed') }
+    } finally {
+      markCloudWrites([doc.id], -1)
     }
-  }, [docs, activeId, enabled, conflicts, saveToDraftsMutation, utils, t])
+  }, [docs, activeId, enabled, conflicts, saveToDraftsMutation, utils, t, markCloudWrites, markCloudResult])
 
   /**
    * 移入回收站：列表里立刻消失。云端只做软删除，所以云端回收站能原样请回来；
@@ -840,7 +913,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     async (id: string): Promise<boolean> => {
       const bringBack = (doc: DocRecord): boolean => {
         setLocalTrash((tr) => tr.filter((d) => d.id !== doc.id))
-        setDocs((ds) => (ds.some((d) => d.id === doc.id) ? ds : [{ ...doc, deletedAt: null }, ...ds]))
+        setDocs((ds) => (ds.some((d) => d.id === doc.id) ? ds : [{ ...doc, deletedAt: null, recovery: { kind: 'restored', at: Date.now() } }, ...ds]))
         // Undo puts the article back on screen, not just in the list: a
         // success toast over a still-hidden article reads like it failed.
         setActiveId(doc.id)
@@ -887,6 +960,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
               baseHash,
               contentLoaded: true,
               bodyState: undefined,
+              recovery: { kind: 'restored', at: Date.now() },
             }
             return [restored, ...ds]
           })
@@ -957,6 +1031,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       const doc = docs.find((d) => d.id === id)
       if (!current || !doc) return
       setSyncState('saving')
+      markCloudWrites([id], 1)
       try {
         const res = await saveMutation.mutateAsync({
           id,
@@ -972,6 +1047,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           return
         }
         lastSavedRef.current.set(id, syncedSnapshot(doc))
+        markCloudResult([id], false)
         setDocs((ds) =>
           ds.map((x) => (x.id === id ? { ...x, baseHash: res.hash, savedAt: res.savedAt ?? x.savedAt } : x)),
         )
@@ -979,11 +1055,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         setSyncState('synced')
         setNotice(t('docs.keptLocalOverCloud'))
       } catch {
+        markCloudResult([id], true)
         setSyncState('error')
         setNotice(t('docs.conflictNetwork'))
+      } finally {
+        markCloudWrites([id], -1)
       }
     },
-    [conflicts, docs, saveMutation, clearConflict, t],
+    [conflicts, docs, saveMutation, clearConflict, t, markCloudWrites, markCloudResult],
   )
 
   /** 「用云端版本」：本机内容被明确放弃（云端的正文在这里才第一次展示给用户）。 */
@@ -1022,6 +1101,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       const doc = docs.find((d) => d.id === id)
       if (!current || !doc) return
       setSyncState('saving')
+      markCloudWrites([id], 1)
       const copyId = uid()
       const copy: DocRecord = {
         id: copyId,
@@ -1033,6 +1113,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         source: doc.source ?? null,
         baseHash: null,
         contentLoaded: true,
+        recovery: { kind: 'conflict', at: Date.now() },
       }
       try {
         const res = await saveToDraftsMutation.mutateAsync({
@@ -1048,6 +1129,8 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           return
         }
         const saved: DocRecord = { ...copy, savedAt: res.savedAt, baseHash: res.hash ?? null }
+        lastSavedRef.current.set(copyId, syncedSnapshot(saved))
+        markCloudResult([id, copyId], false)
         lastSavedRef.current.set(id, syncedSnapshot(current))
         setDocs((ds) => {
           const next = ds.map((x) =>
@@ -1074,11 +1157,14 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         setSyncState('synced')
         setNotice(t('docs.copySavedAs', { name: saved.name }))
       } catch {
+        markCloudResult([id], true)
         setSyncState('error')
         setNotice(t('docs.copySaveFailed'))
+      } finally {
+        markCloudWrites([id], -1)
       }
     },
-    [conflicts, docs, saveToDraftsMutation, clearConflict, utils, t],
+    [conflicts, docs, saveToDraftsMutation, clearConflict, utils, t, markCloudWrites, markCloudResult],
   )
 
   /* ---- bulk hydration, for the whole-library backup export ---- */
@@ -1199,6 +1285,36 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       ? t(activeDoc.bodyState === 'read-failed' ? 'docs.bodyReadFailed' : 'docs.bodyMissing')
       : null
 
+  const saveStatus = activeDoc ? articleSaveStatus({
+    doc: activeDoc,
+    enabled,
+    settled: settled && reconciledRef.current,
+    localReceipt: localReceipts.get(activeDoc.id),
+    localFailed: !localFault.healthy,
+    cloudVersion: lastSavedRef.current.get(activeDoc.id),
+    cloudSaving: (cloudWrites.get(activeDoc.id) ?? 0) > 0,
+    cloudFailed: cloudFailures.has(activeDoc.id),
+    cloudLoadFailed: syncState === 'error' && !reconciledRef.current,
+    conflict: Boolean(activeConflict),
+  }) : null
+
+  const retryCloudSave = async () => {
+    const current = docsRef.current.find((doc) => doc.id === activeIdRef.current)
+    if (!current || conflicts.has(current.id)) return
+    if (!reconciledRef.current) {
+      if (reconcilingRef.current) return
+      setSyncState('loading')
+      setSettled(false)
+      await Promise.all([utils.docs.list.invalidate(), utils.docs.trash.invalidate()])
+      // A failed merge may have kept an otherwise unchanged list in the query
+      // cache. Retry reconciliation even when structural sharing reuses it.
+      setLocalRetryVersion((version) => version + 1)
+      return
+    }
+    if (current.savedAt === null) await saveCurrentToDrafts()
+    else await flush([current.id])
+  }
+
   return {
     docs,
     setDocs,
@@ -1224,6 +1340,8 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     // about, so it replaces whatever the cloud is doing.
     syncState: localFault.healthy ? syncState : ('local-error' as const),
     localFault,
+    saveStatus,
+    retryCloudSave,
     notice,
     clearNotice: () => setNotice(null),
     hasUnsavedChanges,

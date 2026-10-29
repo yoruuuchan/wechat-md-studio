@@ -51,6 +51,10 @@ export interface DocRecord {
   remoteMcp?: RemoteMcpBinding | null
   /** Local IndexedDB revision; it protects tabs, not cloud writes. */
   localRevision?: number
+  /** The time of the durable local record, never the time it was read. */
+  localSavedAt?: number
+  /** Local recovery provenance remains available after its toast disappears. */
+  recovery?: { kind: 'conflict' | 'restored'; at: number }
 }
 
 /** Why a record has no trustworthy body in memory. See `DocRecord.bodyState`. */
@@ -67,7 +71,7 @@ export function hasCloudCopy(doc: Pick<DocRecord, 'savedAt' | 'baseHash'>): bool
 }
 
 /** Everything about a document except its body. Small enough for localStorage. */
-type DocIndexEntry = Omit<DocRecord, 'content' | 'localRevision'>
+type DocIndexEntry = Omit<DocRecord, 'content' | 'localRevision' | 'localSavedAt'>
 
 export interface AppSettings {
   themeId: string
@@ -491,12 +495,14 @@ export async function loadDocs(options: { trackBase?: boolean } = {}): Promise<L
     // Without a successful body read the index entries cannot be compared with
     // what is on disk, so a migration would "verify" unreadable documents as
     // empty. Keep the legacy copy and retry on the next load instead.
-    if (bodiesFailed || !(await migrate(docs, removed))) {
+    const verified = bodiesFailed ? null : await migrate(docs, removed)
+    if (!verified) {
       // Keep working on the legacy data in memory, keep the legacy key on disk,
       // and try again next load. Nothing is lost; the user is told.
       if (trackBase) rememberLocalDocs(docs)
       return { docs, activeId: pickActive(docs, safeGet(ACTIVE_KEY)), bodyReadFailed: bodiesFailed }
     }
+    docs = verified
   } else if (index) {
     docs = hydrate(index.docs, bodies, bodiesFailed)
     removed = index.removed
@@ -621,40 +627,43 @@ function mergeLegacy(
 }
 
 /** Write the whole set to the new stores and verify the bodies came back. */
-async function migrate(docs: DocRecord[], removed: string[]): Promise<boolean> {
+async function migrate(docs: DocRecord[], removed: string[]): Promise<DocRecord[] | null> {
   const store = await bodyStore().catch((e) => {
     reportFailure('migration-failed', t('store.migrationFailedError', { err: describe(e) }))
     return null
   })
-  if (!store) return false
+  if (!store) return null
 
   // Only bodies we actually hold may be written or verified: a stub or an
   // unreadable body would be "verified" as an empty article.
   const cacheable = docs.filter((d) => d.contentLoaded !== false && d.bodyState === undefined)
+  let verified = docs
   try {
     await store.write(cacheable.map((d) => bodyFromDocument({ ...d, localRevision: 1 }, 1)))
-    if (!writeIndex({ docs: docs.map(indexEntryOf), removed })) return false
+    if (!writeIndex({ docs: docs.map(indexEntryOf), removed })) return null
     const back = await store.readAll()
     const read = new Map(back.map((r) => [r.id, r.content]))
     for (const doc of cacheable) {
       if (!read.has(doc.id) || read.get(doc.id) !== doc.content) {
         reportFailure('migration-failed', t('store.migrationFailed'))
-        return false
+        return null
       }
     }
+    const rows = new Map(back.map((row) => [row.id, row]))
+    const migratedIds = new Set(cacheable.map((doc) => doc.id))
+    verified = docs.map((doc) => migratedIds.has(doc.id)
+      ? documentFromBody(rows.get(doc.id)!, doc) ?? doc
+      : doc)
   } catch (e) {
     reportFailure('migration-failed', t('store.migrationFailedError', { err: describe(e) }))
-    return false
+    return null
   }
-  const migratedIds = new Set(cacheable.map((doc) => doc.id))
-  rememberLocalDocs(docs.map((doc) =>
-    migratedIds.has(doc.id) ? { ...doc, localRevision: 1 } : doc,
-  ))
+  rememberLocalDocs(verified)
   safeSet(MIGRATED_KEY, '1')
   // Verified: the legacy copy can go, and with it the quota it was holding.
   safeRemove(LEGACY_DOCS_KEY)
   reportHealthy(store.kind)
-  return true
+  return verified
 }
 
 function safeSet(key: string, value: string): void {
@@ -677,6 +686,8 @@ export interface LocalSaveResult {
   ok: boolean
   request: LocalDocRecord[]
   commit: LocalCommit
+  /** Versions known durable after this result, including unchanged records. */
+  persisted: LocalDocRecord[]
 }
 
 const EMPTY_COMMIT: LocalCommit = {
@@ -758,7 +769,7 @@ async function performLocalSave(
     store = await bodyStore()
   } catch (e) {
     reportFailure('write-failed', t('store.writeOpenFailed', { err: describe(e) }))
-    return { ok: false, request, commit: EMPTY_COMMIT }
+    return { ok: false, request, commit: EMPTY_COMMIT, persisted: [] }
   }
 
   let commit = EMPTY_COMMIT
@@ -789,7 +800,7 @@ async function performLocalSave(
           ? t('store.migrationFailedError', { err: describe(e) })
           : t('store.quotaWrite', { err: describe(e) }),
       )
-      return { ok: false, request, commit: EMPTY_COMMIT }
+      return { ok: false, request, commit: EMPTY_COMMIT, persisted: [] }
     }
   }
 
@@ -812,7 +823,12 @@ async function performLocalSave(
       safeRemove(LEGACY_DOCS_KEY)
     }
   }
-  return { ok, request, commit }
+  const ids = new Set([...request.map((doc) => doc.id), ...commit.docs.map((doc) => doc.id)])
+  const persisted = [...ids].flatMap((id) => {
+    const doc = confirmed.get(id)
+    return doc && doc.contentLoaded !== false ? [doc] : []
+  })
+  return { ok, request, commit, persisted }
 }
 
 /**
