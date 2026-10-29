@@ -1,10 +1,11 @@
 import type { Block, CarouselRatio, Doc, InlineSeg, RenderStats, SignatureConfig } from './types'
+import { isCarouselRatio } from './types'
 import { baseTableBlock, BLANK, esc, type Theme } from './themes'
 import { ext, type FootnoteItem } from './theme-fallbacks'
 import { diagramOf } from './diagram'
 import { fencedRanges, isInFence, type Range } from './fences'
 import { commentRanges, isInComment } from './comments'
-import { inlineImageEnd } from './parse'
+import { inlineImageEnd, parseMarkdown } from './parse'
 import { t } from './i18n'
 
 // 盒式模块的前后空行由 pushBlock(boxed=true) 统一插入
@@ -520,34 +521,53 @@ export function canLocateImage(content: string, alt: string, occurrence: number)
 
 /**
  * Write the chosen frame ratio into the `:::carousel` opener of a given carousel.
- * The opener carries `:::carousel [比例] 标题`; a later `:::carousel-open` marker
- * found after an earlier ratio belongs to a different carousel.
+ *
+ * The opener carries `:::carousel [比例] 标题`. Which opener the ordinal means is
+ * decided by the parser, not by scanning lines: `parseMarkdown` numbers carousels
+ * in document order and already skips fenced code, editor notes and front matter,
+ * so the Nth carousel there is the Nth carousel the reader sees. The old
+ * line-matching count also knew a `:::carousel-open` / `:::carousel-close` pair
+ * that the parser never accepted, so one example parked in a ```` ``` ```` block
+ * shifted every real carousel after it by one.
+ *
+ * Only the ratio token on that one line changes. The marker run, indentation,
+ * title, trailing spaces and line ending all survive, and an unsupported
+ * `7:5` stays title text instead of being overwritten as if it were a frame.
  */
 export function setCarouselRatio(
   content: string,
   occurrence: number,
   ratio: CarouselRatio,
 ): string {
+  if (occurrence < 1) return content
+  const carousels = parseMarkdown(content).blocks.filter((b) => b.type === 'carousel')
+  const target = carousels[occurrence - 1]
+  if (!target) return content
   const lines = content.split('\n')
-  const openers: number[] = []
-  const OPEN = /^(\s*:::carousel(?:-open)?)(?![-\w])/
-  for (let i = 0; i < lines.length; i++) {
-    if (!OPEN.test(lines[i])) continue
-    // 在遇到本行之前，若最近一个 :::carousel-close 之后已经有开启器，则该行不是新轮播
-    const since = openers.length ? openers[openers.length - 1] : -1
-    let hasClose = false
-    for (let j = since; j < i; j++) {
-      if (/^\s*:::carousel-close\s*$/.test(lines[j])) hasClose = true
-    }
-    if (!hasClose) openers.push(i)
-  }
-  const target = openers[occurrence - 1]
-  if (target === undefined) return content
-  lines[target] = lines[target].replace(
-    /^(\s*:::carousel(?:-open)?)(?![-\w])\s*(?:\d+\s*:\s*\d+)?\s*/,
-    (_m, head: string) => `${head} ${ratio} `,
-  )
+  const opener = lines[target.line]
+  if (opener === undefined) return content
+  const next = withCarouselRatio(opener, ratio)
+  if (next === opener) return content
+  lines[target.line] = next
   return lines.join('\n')
+}
+
+/** `:::carousel` with any marker run of three or more colons, as the parser accepts it. */
+const CAROUSEL_OPENER = /(:{3,})[ \t]*carousel(?![-\w])/
+const LEADING_RATIO = /^([ \t]*)(\d+[ \t]*:[ \t]*\d+)/
+
+function withCarouselRatio(line: string, ratio: CarouselRatio): string {
+  const opener = CAROUSEL_OPENER.exec(line)
+  if (!opener) return line
+  const nameEnd = opener.index + opener[0].length
+  const rest = line.slice(nameEnd)
+  const existing = LEADING_RATIO.exec(rest)
+  if (existing && isCarouselRatio(existing[2].replace(/\s+/g, ''))) {
+    return line.slice(0, nameEnd + existing[1].length) + ratio + rest.slice(existing[0].length)
+  }
+  // No frame yet: insert one between the name and the title without touching
+  // either. A `7:5` title stays where it is, right after the new frame.
+  return line.slice(0, nameEnd) + ' ' + ratio + rest
 }
 
 export { esc }
