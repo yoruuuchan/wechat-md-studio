@@ -429,16 +429,24 @@ const bodyInDb = (id) =>
       request.onerror = () => reject(request.error)
     })
     db.close()
-    return row ? row.content : null
+    // A purged id may remain as an empty tombstone (removed: true), which is
+    // how a stale tab is stopped from recreating it; its content is gone.
+    return row ? { content: row.content, removed: Boolean(row.removed) } : null
   })()`)
 
 /** Purge/removal is written by the queued local save, so give it a moment. */
 async function bodyGone(id) {
   for (let i = 0; i < 24; i++) {
-    if ((await bodyInDb(id)) === null) return true
+    if ((await bodyText(id)) === null) return true
     await sleep(250)
   }
   return false
+}
+
+/** The readable body, or null when the row is absent or a purge tombstone. */
+async function bodyText(id) {
+  const row = await bodyInDb(id)
+  return row && !row.removed ? row.content : null
 }
 
 /** Look for the article in the account by exact name (agent/draft door). */
@@ -542,7 +550,7 @@ try {
   const signedOutId = await createArticle(SIGNED_OUT_NAME, SIGNED_OUT_TEXT)
   const outEntry = await indexEntryById(signedOutId)
   check('the new article is local-only (no savedAt, no cloud hash)', outEntry && outEntry.savedAt === null && !outEntry.baseHash, JSON.stringify(outEntry))
-  check('its body is in IndexedDB', (await bodyInDb(signedOutId)) === SIGNED_OUT_TEXT, String(await bodyInDb(signedOutId)).slice(0, 60))
+  check('its body is in IndexedDB', (await bodyText(signedOutId)) === SIGNED_OUT_TEXT, String(await bodyText(signedOutId)).slice(0, 60))
 
   await deleteArticle(SIGNED_OUT_NAME)
   check('the delete toast is shown', await hasToast('已移入回收站'))
@@ -563,7 +571,7 @@ try {
   check('restore from the bin works', await restoreFromBin(SIGNED_OUT_NAME))
   const outRestored = await indexEntryById(signedOutId)
   check('the restored record is live', outRestored && outRestored.deletedAt === null, JSON.stringify(outRestored))
-  check('the restored body is intact', (await bodyInDb(signedOutId)) === SIGNED_OUT_TEXT)
+  check('the restored body is intact', (await bodyText(signedOutId)) === SIGNED_OUT_TEXT)
   await goEditor()
   await openArticle(SIGNED_OUT_NAME)
   check('the restored article opens with its name', (await docName()) === SIGNED_OUT_NAME, String(await docName()))
@@ -578,7 +586,7 @@ try {
   await goDrafts()
   check('the bin still lists it after the reload', await evaluate(`document.body.innerText.includes(${JSON.stringify(SIGNED_OUT_NAME)})`))
   check('it restores after the reload', await restoreFromBin(SIGNED_OUT_NAME))
-  check('the body survived the reload', (await bodyInDb(signedOutId)) === SIGNED_OUT_TEXT)
+  check('the body survived the reload', (await bodyText(signedOutId)) === SIGNED_OUT_TEXT)
 
   section('signed out: permanent delete still removes it for good')
   await goEditor()
@@ -646,7 +654,7 @@ try {
   check('restore from the bin works', await restoreFromBin(SIGNED_IN_NAME))
   const inRestored = await indexEntryById(signedInId)
   check('the restored record is live', inRestored && inRestored.deletedAt === null, JSON.stringify(inRestored))
-  check('the restored body is intact', (await bodyInDb(signedInId)) === SIGNED_IN_TEXT)
+  check('the restored body is intact', (await bodyText(signedInId)) === SIGNED_IN_TEXT)
   await goEditor({ signedIn: true })
   await openArticle(SIGNED_IN_NAME)
   check('the restored article opens with its name', (await docName()) === SIGNED_IN_NAME, String(await docName()))
@@ -677,7 +685,7 @@ try {
   await goDrafts()
   check('the bin still lists it after the reload', await evaluate(`document.body.innerText.includes(${JSON.stringify(SIGNED_IN_RELOAD_NAME)})`))
   check('it restores after the reload', await restoreFromBin(SIGNED_IN_RELOAD_NAME))
-  check('the body survived the reload', (await bodyInDb(reloadId)) === SIGNED_IN_RELOAD_TEXT)
+  check('the body survived the reload', (await bodyText(reloadId)) === SIGNED_IN_RELOAD_TEXT)
   await goEditor({ signedIn: true })
   await openArticle(SIGNED_IN_RELOAD_NAME)
   check('the restored local-only article has its body', await editorShows(SIGNED_IN_RELOAD_NAME, SIGNED_IN_RELOAD_TEXT))
