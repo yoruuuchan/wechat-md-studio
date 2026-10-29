@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
 import { useAuth } from '@/hooks/useAuth'
+import { copyPlain } from '@/lib/clipboard'
 import { loadActiveId, loadDocs, saveActiveId, saveDocs, hasCloudCopy, type DocRecord } from '@/lib/store'
 import { UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -271,7 +272,11 @@ export default function Drafts() {
         toast.error(t('drafts.copyGone'))
         return
       }
-      await navigator.clipboard.writeText(res.doc.content)
+      const ok = await copyPlain(res.doc.content)
+      if (!ok) {
+        toast.error(t('common.copyFailed'))
+        return
+      }
       setCopiedId(card.id)
       setTimeout(() => setCopiedId(null), 1500)
       toast.success(t('drafts.copyDone'))

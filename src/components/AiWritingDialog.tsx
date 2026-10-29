@@ -33,8 +33,8 @@ export default function AiWritingDialog({ open, onOpenChange }: { open: boolean;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, skill])
 
-  const copyWithToast = (text: string, label: string) => {
-    void copyAiText(text, label)
+  const copyWithToast = async (text: string, label: string) => {
+    await copyAiText(text, label)
   }
 
   return (
@@ -47,18 +47,18 @@ export default function AiWritingDialog({ open, onOpenChange }: { open: boolean;
         <div className="ya-well space-y-3 p-4 text-[13px] leading-relaxed">
           <p>{t('ai.promptNote')}</p>
           <textarea aria-label={t('ai.promptAria')} readOnly value={prompt} className="ya-input !h-48 w-full resize-y !py-3 !text-[12px]" />
-          <button data-ai-copy="prompt" onClick={() => copyWithToast(prompt, t('ai.label.prompt'))} className="ya-btn ya-btn-primary">{t('ai.copyPrompt')}</button>
+          <button data-ai-copy="prompt" onClick={() => void copyWithToast(prompt, t('ai.label.prompt'))} className="ya-btn ya-btn-primary">{t('ai.copyPrompt')}</button>
         </div>
         <div className="space-y-3 text-[12px] text-ink-3">
           <p>{t('ai.skillNote')}</p>
           <p>{t('ai.skillLangNote')}</p>
           <a href={WRITING_SKILL_URL} target="_blank" rel="noreferrer" className="break-all text-brand underline underline-offset-2">{WRITING_SKILL_URL}</a>
           <div className="flex flex-wrap gap-2">
-            <button data-ai-copy="url" onClick={() => copyWithToast(WRITING_SKILL_URL, t('ai.label.url'))} className="ya-btn ya-btn-secondary">{t('ai.copyUrl')}</button>
+            <button data-ai-copy="url" onClick={() => void copyWithToast(WRITING_SKILL_URL, t('ai.label.url'))} className="ya-btn ya-btn-secondary">{t('ai.copyUrl')}</button>
             <button data-ai-copy="skill" disabled={skill === null || copying} onClick={async () => {
               if (skill === null) return
               setCopying(true)
-              try { copyWithToast(skill, t('ai.label.skill')) } finally { setCopying(false) }
+              try { await copyWithToast(skill, t('ai.label.skill')) } finally { setCopying(false) }
             }} className="ya-btn ya-btn-secondary">{copying ? t('ai.copying') : t('ai.copySkill')}</button>
           </div>
           {error && <p role="alert" className="text-warn-700">{error}</p>}
