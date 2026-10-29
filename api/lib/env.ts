@@ -87,6 +87,9 @@ export interface Env {
   /** Anonymous, explicitly shared article copies; independent of image quotas. */
   remoteMcpTtlHours: number;
   remoteMcpTotalBytes: number;
+  /** Persistent abuse budgets for anonymous collaboration leases. */
+  remoteMcpMaxActivePerSource: number;
+  remoteMcpCreatesPerSourcePerDay: number;
 
   port: number;
   /** Bind address. Loopback by default: the only intended entry point is the
@@ -249,6 +252,16 @@ export function parseEnv(input: EnvInput): Env {
 
     remoteMcpTtlHours: readInt(ctx, "REMOTE_MCP_TTL_HOURS", { fallback: 24, min: 1, max: 168 }),
     remoteMcpTotalBytes: readInt(ctx, "REMOTE_MCP_TOTAL_BYTES", { fallback: 50 * MIB, min: 0 }),
+    remoteMcpMaxActivePerSource: readInt(ctx, "REMOTE_MCP_MAX_ACTIVE_PER_SOURCE", {
+      fallback: 20,
+      min: 1,
+      max: 200,
+    }),
+    remoteMcpCreatesPerSourcePerDay: readInt(ctx, "REMOTE_MCP_CREATES_PER_SOURCE_PER_DAY", {
+      fallback: 40,
+      min: 1,
+      max: 100_000,
+    }),
 
     port: readInt(ctx, "PORT", { fallback: 3100, min: 1, max: 65535 }),
     host: readString(ctx, "HOST", "127.0.0.1"),

@@ -932,6 +932,7 @@ export const en: Record<MsgKey, Msg> = {
   'io.reason.noVersion': 'The file has no version number, so it was probably not exported by this tool.',
   'io.reason.version': 'This backup is version v{n}; only v{m} is supported.',
   'io.reason.noDocs': 'The backup has no docs array; the file may be incomplete.',
+  'io.reason.tooLarge': 'The backup is above the {mb} MiB import limit; split it into smaller files.',
   'io.reason.tooMany': (p) => `The backup holds ${p.n} articles, above the ${p.max}-article import limit; split it into several files.`,
   'io.entryLabel': 'Article {n}',
   'io.reason.entryNotObject': '{label} is not an object.',

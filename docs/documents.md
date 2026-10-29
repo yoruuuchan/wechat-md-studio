@@ -91,7 +91,7 @@ CodeMirror 的 `Ctrl/⌘ + Space` 与行首触发字符提供方言补全；图�
 | 富文本粘贴 | [rich-paste.ts](../src/lib/rich-paste.ts) 区分 Markdown、IDE 代码、代码块和图片占位；清理 Office HTML，再用 Turndown 转公众号方言；粘贴的外链图片不自动上传 |
 | Markdown 导入 / 导出 | [import-export.ts](../src/lib/import-export.ts) 保留方言与原始正文，导入仅剥 BOM；不做通用 Markdown round-trip |
 | DOCX 导入 | 动态加载 mammoth → HTML → 复用 `htmlToDialect`；抽出图片、命名占位后上传 / 回填，失败保留占位并显示张数 |
-| 整包备份 | JSON 包含稿件与可选主题 / 署名设置；先 `hydrateAllForExport` 补全所有正文，拉取失败拒绝导出空稿；图片字节不打包，引用仍依赖图床生命周期 |
+| 整包备份 | JSON 包含稿件与可选主题 / 署名设置；先 `hydrateAllForExport` 补全所有正文，拉取失败拒绝导出空稿；图片字节不打包，引用仍依赖图床生命周期。单文件上限 64 MiB / 10,000 篇；更大的库需拆包。登录后云端导入按每批 100 篇执行，已有 id 保留原正文 |
 | HTML 导出 / 复制 | [clipboard.ts](../src/lib/clipboard.ts) 提供干净正文与完整预览页；富文本复制优先 HTML + plain 双通道，失败可改用导出 |
 
 逻辑测试在 [import-export.test.ts](../src/lib/import-export.test.ts)、

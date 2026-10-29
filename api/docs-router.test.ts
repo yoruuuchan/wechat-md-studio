@@ -324,6 +324,36 @@ describe('importLocal', () => {
     expect((await caller.drafts()).items.map((d) => d.id)).not.toContain('imp-1')
     expect((await caller.list()).items.map((d) => d.id)).toContain('imp-1')
   })
+
+  it('imports a 501-article backup in bounded batches', async () => {
+    const bulk = client(22)
+    const batchSize = 100
+    const incoming = Array.from({ length: 501 }, (_, i) => ({
+      id: `bulk-import-${i}`,
+      name: `批量稿件 ${i}`,
+      content: `批量正文 ${i}`,
+      updatedAt: 1_700_000_000_000 + i,
+      baseHash: null,
+    }))
+    let imported = 0
+    for (let i = 0; i < incoming.length; i += batchSize) {
+      const res = await bulk.importLocal({
+        docs: incoming.slice(i, i + batchSize),
+      })
+      imported += res.imported
+    }
+    expect(imported).toBe(501)
+
+    const stored = await getDb()
+      .select({ id: docs.id, name: docs.name, content: docs.content })
+      .from(docs)
+      .where(eq(docs.ownerId, 22))
+    expect(stored).toHaveLength(501)
+    expect(stored.find((d) => d.id === 'bulk-import-500')).toMatchObject({
+      name: '批量稿件 500',
+      content: '批量正文 500',
+    })
+  })
 })
 
 describe('the metadata list', () => {

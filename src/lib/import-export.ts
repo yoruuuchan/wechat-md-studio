@@ -169,12 +169,13 @@ export interface DocBundle {
 }
 
 /**
- * Per-field limits, mirroring `DocInput` in `api/docs-router.ts` and the
- * `.max(500)` on its `importLocal` route. Validating against the same numbers
- * here means a bundle that parses locally is also one the server will accept,
- * instead of failing later with a much less helpful message.
+ * A local backup can contain the whole library, while the authenticated cloud
+ * import still moves it in bounded batches. These limits apply to external
+ * input as a whole, not to the server request size.
  */
-const MAX_DOCS = 500
+export const MAX_BUNDLE_BYTES = 64 * 1024 * 1024
+export const MAX_BUNDLE_DOCS = 10_000
+export const BUNDLE_IMPORT_BATCH_SIZE = 100
 const MAX_ID_LENGTH = 64
 const MAX_NAME_LENGTH = 200
 const MAX_CONTENT_LENGTH = 2_000_000
@@ -225,6 +226,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * truncated" and neither is debuggable from a stack trace.
  */
 export function parseBundle(text: string): BundleParseResult {
+  const bytes = new TextEncoder().encode(text).byteLength
+  if (bytes > MAX_BUNDLE_BYTES) {
+    return {
+      ok: false,
+      reason: t('io.reason.tooLarge', { mb: Math.floor(MAX_BUNDLE_BYTES / 1024 / 1024) }),
+    }
+  }
+
   let raw: unknown
   try {
     raw = JSON.parse(stripBom(text))
@@ -251,10 +260,10 @@ export function parseBundle(text: string): BundleParseResult {
   if (!Array.isArray(docs)) {
     return { ok: false, reason: t('io.reason.noDocs') }
   }
-  if (docs.length > MAX_DOCS) {
+  if (docs.length > MAX_BUNDLE_DOCS) {
     return {
       ok: false,
-      reason: t('io.reason.tooMany', { n: docs.length, max: MAX_DOCS }),
+      reason: t('io.reason.tooMany', { n: docs.length, max: MAX_BUNDLE_DOCS }),
     }
   }
 
@@ -324,6 +333,23 @@ export function parseBundle(text: string): BundleParseResult {
   }
 
   return { ok: true, docs: out, version, settings: readSettings(raw.settings) }
+}
+
+/**
+ * Merge a validated bundle into the on-device library. Existing ids win, so a
+ * replay or a backup restored over newer local work never overwrites a body.
+ */
+export function mergeBundleDocs(
+  existing: DocRecord[],
+  incoming: DocRecord[],
+): { docs: DocRecord[]; added: number; skipped: number } {
+  const known = new Set(existing.map((d) => d.id))
+  const fresh = incoming.filter((d) => !known.has(d.id))
+  return {
+    docs: [...fresh, ...existing],
+    added: fresh.length,
+    skipped: incoming.length - fresh.length,
+  }
 }
 
 /**

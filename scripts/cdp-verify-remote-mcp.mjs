@@ -67,8 +67,10 @@ try {
   await new Promise((resolve, reject) => { ws.addEventListener('open', resolve); ws.addEventListener('error', reject) })
   let nextId = 1
   const pending = new Map()
+  const runtimeErrors = []
   ws.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data)
+    if (message.method === 'Runtime.exceptionThrown') runtimeErrors.push(message.params?.exceptionDetails)
     const entry = pending.get(message.id)
     if (!entry) return
     pending.delete(message.id)
@@ -84,6 +86,7 @@ try {
   const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
   await send('Page.enable', {}, sessionId)
+  await send('Runtime.enable', {}, sessionId)
   // A fresh profile would meet the first-run tour on the editor; this suite
   // drives the app as a returning visitor.
   await send('Page.addScriptToEvaluateOnNewDocument', { source: 'try{localStorage.setItem("mopai.onboarding.v1","done")}catch{}' }, sessionId)
@@ -96,8 +99,15 @@ try {
   }
   const waitFor = async (expression, label, ms = 15000) => {
     const until = Date.now() + ms
-    while (Date.now() < until) { if (await ev(`Boolean(${expression})`)) return; await sleep(250) }
-    const detail = await ev(`JSON.stringify({alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent),buttons:[...document.querySelectorAll('[role="dialog"] button')].map(e=>({text:e.textContent,disabled:e.disabled})),tabs:[...document.querySelectorAll('[role="tab"]')].map(e=>({text:e.textContent,state:e.dataset.state}))})`)
+    while (Date.now() < until) {
+      try {
+        if (await ev(`(async () => Boolean(await (${expression})))()`)) return
+      } catch {
+        // Navigation briefly has no execution document; retry in that window.
+      }
+      await sleep(250)
+    }
+    const detail = await ev(`JSON.stringify({body:document.body.innerText.slice(0,1200),alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent),buttons:[...document.querySelectorAll('[role="dialog"] button')].map(e=>({text:e.textContent,disabled:e.disabled})),tabs:[...document.querySelectorAll('[role="tab"]')].map(e=>({text:e.textContent,state:e.dataset.state})),errors:${JSON.stringify(runtimeErrors).slice(0, 2000)}})`)
     throw new Error(`Browser timeout: ${label}\n${detail}\n${appLog.slice(-500)}`)
   }
   const click = async (expression) => {
@@ -144,9 +154,13 @@ try {
 
   await send('Page.navigate', { url: appUrl }, sessionId)
   await waitFor(`window.__mopaiCodemirror?.state.doc.length > 100 && localStorage.getItem('mopai.active.v1')`, 'hydrated editor')
-  await ev(`localStorage.setItem('mopai.theme.v1','akari'); true`)
-  await send('Page.reload', {}, sessionId)
-  await waitFor(`window.__mopaiCodemirror?.state.doc.length > 100`, 'light editor')
+  await ev(`(() => {
+    localStorage.setItem('mopai.theme.v1','akari')
+    document.documentElement.dataset.theme = 'akari'
+    document.documentElement.classList.remove('dark')
+    document.documentElement.style.colorScheme = 'light'
+    return true
+  })()`)
   const demoContent = await editor()
   await edit(initial)
   await waitFor(`window.__mopaiCodemirror.state.doc.toString() === ${JSON.stringify(initial)}`, 'initial browser input')
@@ -273,7 +287,7 @@ try {
 
   // Reload proves both body persistence and a token-free local binding.
   const beforeReload = await editor()
-  await send('Page.reload', {}, sessionId)
+  await send('Page.navigate', { url: appUrl }, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'reload')
   check('body survives reload with active grant', await editor() === beforeReload)
   check('local storage does not contain bearer', !(await ev('JSON.stringify(localStorage)')).includes(token))
@@ -292,7 +306,7 @@ try {
   const afterRevoke = beforeReload + '\n撤销后继续本机编辑。\n'
   await edit(afterRevoke)
   await sleep(800)
-  await send('Page.reload', {}, sessionId)
+  await send('Page.navigate', { url: appUrl }, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'revoked draft reload')
   check('revoked local draft remains complete and editable', await editor() === afterRevoke)
 
@@ -308,7 +322,7 @@ try {
     await waitFor(`!document.querySelector('[data-mcp-editor-status]')`, 'expired binding detached')
     check('expiry preserves browser body', await editor() === afterRevoke)
     await sleep(700)
-    await send('Page.reload', {}, sessionId)
+    await send('Page.navigate', { url: appUrl }, sessionId)
     await waitFor('Boolean(window.__mopaiCodemirror)', 'expired draft reload')
     check('expired local draft survives reopen', await editor() === afterRevoke)
   } else console.log('[SKIP] forced expiry: validated on the private database, no live SQL change')
@@ -318,13 +332,13 @@ try {
   await sleep(800)
   await click(`[...document.querySelectorAll('[role="tab"]')].find(e => e.textContent.includes('图片'))`)
   await ev(`localStorage.setItem('mopai.theme.v1','akari'); true`)
-  await send('Page.reload', {}, sessionId)
+  await send('Page.navigate', { url: appUrl }, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'light screenshot')
   await ev('document.fonts.ready.then(()=>true)')
   check('Reed brand appears in title, header and sample', await ev(`document.title.startsWith('芦苇') && document.querySelector('header').textContent.includes('芦苇') && window.__mopaiCodemirror.state.doc.toString().includes('欢迎使用芦苇')`))
   await shot(publicUrl ? path.join(shots, 'public-editor-akari.png') : path.resolve('docs/images/editor-akari.png'))
   await ev(`localStorage.setItem('mopai.theme.v1','yoru'); true`)
-  await send('Page.reload', {}, sessionId)
+  await send('Page.navigate', { url: appUrl }, sessionId)
   await waitFor('Boolean(window.__mopaiCodemirror)', 'dark screenshot')
   await ev('document.fonts.ready.then(()=>true)')
   await shot(publicUrl ? path.join(shots, 'public-editor-yoru.png') : path.resolve('docs/images/editor-yoru.png'))

@@ -102,9 +102,26 @@ function openDatabase(): DatabaseSync {
       tokenHash TEXT NOT NULL UNIQUE,
       createdAt INTEGER NOT NULL,
       expiresAt INTEGER NOT NULL,
+      source TEXT,
       UNIQUE (visitor, localDocId)
     );
     CREATE INDEX IF NOT EXISTS remote_mcp_expiry ON remote_mcp_connections (expiresAt);
+  `)
+  const remoteMcpColumns = db.prepare('PRAGMA table_info(remote_mcp_connections)').all() as {
+    name: string
+  }[]
+  if (!remoteMcpColumns.some((c) => c.name === 'source')) {
+    db.exec('ALTER TABLE remote_mcp_connections ADD COLUMN source TEXT')
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS remote_mcp_source_expiry
+      ON remote_mcp_connections (source, expiresAt);
+    CREATE TABLE IF NOT EXISTS remote_mcp_source_budget (
+      source TEXT NOT NULL,
+      day TEXT NOT NULL,
+      count INTEGER NOT NULL,
+      PRIMARY KEY (source, day)
+    );
   `)
 
   // In-flight anonymous uploads. `CREATE TABLE IF NOT EXISTS` is the whole

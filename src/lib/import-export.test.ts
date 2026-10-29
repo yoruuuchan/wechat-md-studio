@@ -1,13 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
   BUNDLE_MIME,
   BUNDLE_VERSION,
+  MAX_BUNDLE_BYTES,
+  MAX_BUNDLE_DOCS,
   MARKDOWN_MIME,
   bundleFilename,
   docxToDocxImport,
+  mergeBundleDocs,
   parseBundle,
   parseMarkdownFile,
   safeFilename,
@@ -350,6 +353,20 @@ describe('parseBundle', () => {
     expect(result.reason).toContain('JSON')
   })
 
+  it('rejects an oversized file before parsing it as JSON', () => {
+    const encode = vi
+      .spyOn(TextEncoder.prototype, 'encode')
+      .mockReturnValue({ byteLength: MAX_BUNDLE_BYTES + 1 } as unknown as Uint8Array<ArrayBuffer>)
+    try {
+      const result = parseBundle('{}')
+      expect(result.ok).toBe(false)
+      if (result.ok) return
+      expect(result.reason).toContain('64 MiB')
+    } finally {
+      encode.mockRestore()
+    }
+  })
+
   it('rejects JSON that is not an object', () => {
     expect(parseBundle('[1,2,3]').ok).toBe(false)
     expect(parseBundle('"a string"').ok).toBe(false)
@@ -385,13 +402,34 @@ describe('parseBundle', () => {
     expect(result.docs).toEqual([])
   })
 
-  it('rejects more docs than one import can take', () => {
-    const many = Array.from({ length: 501 }, (_, i) => doc({ id: `id${i}` }))
-    const result = parseBundle(toBundle(many))
+  it.each([0, 1, 500, 501, 1000])(
+    'round trips a %i-article library without changing names or bodies',
+    (count) => {
+      const docs = Array.from({ length: count }, (_, i) =>
+        doc({
+          id: `bundle-${i}`,
+          name: `备份稿件 ${i}`,
+          content: `第 ${i} 篇正文\n\n==重点==`,
+          savedAt: null,
+        }),
+      )
+      const result = parseBundle(toBundle(docs))
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.docs.map((d) => [d.id, d.name, d.content])).toEqual(
+        docs.map((d) => [d.id, d.name, d.content]),
+      )
+    },
+  )
+
+  it('keeps a bounded article-count ceiling for corrupted inputs', () => {
+    const tooMany = Array.from({ length: MAX_BUNDLE_DOCS + 1 }, (_, i) =>
+      doc({ id: `bounded-${i}`, content: '' }),
+    )
+    const result = parseBundle(toBundle(tooMany))
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.reason).toContain('501')
-    expect(result.reason).toContain('500')
+    expect(result.reason).toContain(String(MAX_BUNDLE_DOCS))
   })
 
   it('points at the offending article and the missing field', () => {
@@ -508,6 +546,19 @@ describe('parseBundle', () => {
   it('tolerates a BOM on the file', () => {
     const result = parseBundle(`\uFEFF${toBundle([doc()])}`)
     expect(result.ok).toBe(true)
+  })
+
+  it('merges without silently replacing an existing article', () => {
+    const existing = doc({ id: 'same-id', name: '本机新稿', content: '不能覆盖' })
+    const incoming = [
+      doc({ id: 'same-id', name: '旧备份', content: '旧正文' }),
+      doc({ id: 'new-id', name: '另一篇', content: '新正文' }),
+    ]
+    const merged = mergeBundleDocs([existing], incoming)
+    expect(merged.added).toBe(1)
+    expect(merged.skipped).toBe(1)
+    expect(merged.docs.map((d) => d.id)).toEqual(['new-id', 'same-id'])
+    expect(merged.docs.find((d) => d.id === 'same-id')).toEqual(existing)
   })
 })
 
