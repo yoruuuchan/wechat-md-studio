@@ -15,6 +15,7 @@ process.env.ANON_BURST_PER_MINUTE = '1000'
 process.env.ANON_IP_DAILY_IMAGES = '1000'
 
 const { storageRouter } = await import('./storage-router')
+const { createVisitorResolver } = await import('./lib/visitor')
 const { getSqlite } = await import('./queries/connection')
 const { env } = await import('./lib/env')
 
@@ -50,9 +51,11 @@ function caller(tag: string, options: { signal?: AbortSignal; owner?: boolean } 
     headers: { cookie: `mopai_vid=${visitorId(tag)}` },
     ...(options.signal ? { signal: options.signal } : {}),
   })
+  const resHeaders = new Headers()
   return storageRouter.createCaller({
     req,
-    resHeaders: new Headers(),
+    resHeaders,
+    visitorIdentity: createVisitorResolver(req.headers, resHeaders),
     ...(options.owner ? { user } : {}),
   })
 }

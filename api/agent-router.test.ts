@@ -37,6 +37,7 @@ vi.mock('./lib/storage', () => {
 
 const { agentRouter } = await import('./agent-router')
 const { docsRouter } = await import('./docs-router')
+const { createVisitorResolver } = await import('./lib/visitor')
 const { OWNER } = await import('./auth-types')
 const { getDb } = await import('./queries/connection')
 const { files } = await import('../db/schema')
@@ -48,6 +49,7 @@ const READ = { authorization: 'Bearer mopai_read_tok' }
 const browser = docsRouter.createCaller({
   req: new Request('http://test/'),
   resHeaders: new Headers(),
+  visitorIdentity: createVisitorResolver(new Headers(), new Headers()),
   user: OWNER,
 })
 

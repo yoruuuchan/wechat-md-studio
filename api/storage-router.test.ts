@@ -12,6 +12,7 @@ process.env.IMG_BASE_URL = 'https://img.example.test'
 process.env.IMG_ADMIN_KEY = 'test-admin-key'
 
 const { storageRouter } = await import('./storage-router')
+const { createVisitorResolver } = await import('./lib/visitor')
 const { getDb } = await import('./queries/connection')
 const { files, docs } = await import('../db/schema')
 
@@ -29,6 +30,7 @@ const user = {
 const caller = storageRouter.createCaller({
   req: new Request('http://test/'),
   resHeaders: new Headers(),
+  visitorIdentity: createVisitorResolver(new Headers(), new Headers()),
   user,
 })
 
