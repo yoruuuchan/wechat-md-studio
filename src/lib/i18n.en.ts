@@ -269,6 +269,16 @@ export const en: Record<MsgKey, Msg> = {
   'editor.narrowNote': 'This editor is built for desktop browsers for now.',
   'editor.toast.diagramPending': 'The diagram is still rendering',
   'editor.toast.diagramPendingDesc': 'Wait until it becomes an image; copying now would paste the mermaid source',
+  'editor.toast.mathPending': (p) =>
+    `${p.n} formula${Number(p.n) === 1 ? '' : 's'} still rendering`,
+  'editor.toast.mathPendingDesc': 'Wait until the formula becomes an SVG; copying now would only carry the TeX source',
+  'editor.toast.mathFailed': (p) =>
+    `${p.n} formula${Number(p.n) === 1 ? '' : 's'} did not compile`,
+  'editor.toast.mathFailedDesc': 'Copying or exporting now would include the red error box and the TeX source ({tex}). Fix the formula, or continue with the source.',
+  'editor.toast.mathEngineFailed': 'The formula engine did not load',
+  'editor.toast.mathEngineFailedDesc': 'The MathJax bundles could not be fetched, so formulas cannot render yet. Check the connection and try again, or continue with the TeX source.',
+  'editor.toast.mathCopyAnyway': 'Copy the source anyway',
+  'editor.toast.mathExportAnyway': 'Export the source anyway',
   'editor.toast.copied': (p) =>
     `Copied ${p.chars} chars · ${Number(p.imgs) === 1 ? '1 image' : `${p.imgs} images`}`,
   'editor.toast.copiedDesc': 'Paste straight into the WeChat article editor',

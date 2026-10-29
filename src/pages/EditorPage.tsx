@@ -16,7 +16,7 @@ import SidePanel from '@/components/SidePanel'
 import RatioPicker from '@/components/RatioPicker'
 import ManualCropper from '@/components/ManualCropper'
 import { useSyncScroll, type PreviewScrollHandle } from '@/hooks/useSyncScroll'
-import { createMathRenderer, type MathSnapshot } from '@/lib/math'
+import { createMathRenderer, documentFormulas, mathReadiness, type MathSnapshot } from '@/lib/math'
 import {
   diagramOf,
   loadDiagramCache,
@@ -79,7 +79,7 @@ import {
   filenameForMime,
 } from '@/lib/image'
 import type { UploadSizeChoice } from '@/lib/image-compress'
-import { DEFAULT_CAROUSEL_RATIO, type CarouselRatio } from '@/lib/types'
+import { DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type Doc } from '@/lib/types'
 import {
   MAX_BUNDLE_BYTES,
   bundleFilename,
@@ -616,22 +616,97 @@ export default function EditorPage() {
     }
   }
 
-  const handleCopy = async () => {
-    if (activeBodyError) {
-      toast.error(activeBodyError)
-      return
-    }
+  /**
+   * The article exactly as the author has it now, with the formulas that
+   * actually landed.
+   *
+   * The body is read through the refs rather than the render closure: the
+   * "continue with the source" action on a toast can fire seconds after it was
+   * shown, and it must hand out what is on screen then, not what was there when
+   * the toast appeared. `rendered` is deliberately not reused either - it is
+   * built from the deferred body the preview lags a frame behind on.
+   */
+  const currentArticle = () => {
+    const doc = docsRef.current.find((d) => d.id === activeIdRef.current)
+    return { article: parseMarkdown(doc?.content ?? ''), doc, snapshot: mathRenderer.snapshot() }
+  }
+
+  /**
+   * Refuse to hand out HTML that is still missing a formula or a diagram.
+   *
+   * Returns true when the click has been answered, so the caller stops: either
+   * with a hint that the article is not finished yet, or with an explicit offer
+   * to continue with the source TeX. `runAnyway` is that offer - the author
+   * chooses, instead of the tool quietly shipping a half-rendered article.
+   */
+  const blockHtmlOutput = (
+    article: Doc,
+    snapshot: MathSnapshot,
+    forceLabel: string,
+    runAnyway: () => void,
+  ): boolean => {
     if (diagramPending > 0) {
       toast.info(t('editor.toast.diagramPending'), {
         description: t('editor.toast.diagramPendingDesc'),
       })
+      return true
+    }
+    const formulas = documentFormulas(article.blocks)
+    const readiness = mathReadiness(formulas, snapshot)
+    if (!readiness.failed.length && readiness.pending === 0) return false
+    // The click is the author asking for the article now, so give a loader that
+    // gave up on its own another chance before reporting a wait.
+    for (const f of formulas) {
+      if (snapshot.status(f.tex, f.display) === 'pending') void mathRenderer.warm(f.tex, f.display)
+    }
+    const continueWithSource = {
+      label: forceLabel,
+      onClick: runAnyway,
+    }
+    if (readiness.failed.length) {
+      const tex = readiness.failed[0]
+      toast.error(t('editor.toast.mathFailed', { n: readiness.failed.length }), {
+        description: t('editor.toast.mathFailedDesc', {
+          tex: tex.length > 80 ? `${tex.slice(0, 80)}…` : tex,
+        }),
+        duration: 9000,
+        action: continueWithSource,
+      })
+      return true
+    }
+    if (readiness.engineUnavailable) {
+      toast.error(t('editor.toast.mathEngineFailed'), {
+        description: t('editor.toast.mathEngineFailedDesc'),
+        duration: 9000,
+        action: continueWithSource,
+      })
+      return true
+    }
+    toast.info(t('editor.toast.mathPending', { n: readiness.pending }), {
+      description: t('editor.toast.mathPendingDesc'),
+    })
+    return true
+  }
+
+  const copyArticle = async (force = false) => {
+    if (activeBodyError) {
+      toast.error(activeBodyError)
       return
     }
-    const ok = await copyRichText(cleanHtml(rendered.html), plainTextOf(rendered.html))
+    const { article, snapshot } = currentArticle()
+    if (
+      !force &&
+      blockHtmlOutput(article, snapshot, t('editor.toast.mathCopyAnyway'), () => void copyArticle(true))
+    ) {
+      return
+    }
+    const { html, stats } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
+      snapshot.get(tex, display), resolveDiagram)
+    const ok = await copyRichText(cleanHtml(html), plainTextOf(html))
     if (ok) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-      toast.success(t('editor.toast.copied', { chars: rendered.stats.chars, imgs: rendered.stats.images }), {
+      toast.success(t('editor.toast.copied', { chars: stats.chars, imgs: stats.images }), {
         description: t('editor.toast.copiedDesc'),
       })
     } else {
@@ -639,8 +714,26 @@ export default function EditorPage() {
     }
   }
 
+  const handleCopy = () => void copyArticle()
+
+  const exportHtml = (kind: 'clean' | 'page', force = false) => {
+    const { article, doc, snapshot } = currentArticle()
+    if (
+      !force &&
+      blockHtmlOutput(article, snapshot, t('editor.toast.mathExportAnyway'), () => exportHtml(kind, true))
+    ) {
+      return
+    }
+    const name = doc?.name || t('io.fallbackArticle')
+    const { html } = renderDoc(article, theme, settings.sig, resolveImg, (tex, display) =>
+      snapshot.get(tex, display), resolveDiagram)
+    const safe = safeFilename(name, t('io.fallbackArticle'), 'html')
+    if (kind === 'clean') downloadFile(safe.replace(/\.html$/, `_${t('io.suffixClean')}.html`), cleanHtml(html))
+    else downloadFile(safe.replace(/\.html$/, `_${t('io.suffixPage')}.html`), previewPage(html, name))
+    toast.success(kind === 'clean' ? t('editor.toast.exportedClean') : t('editor.toast.exportedPage'))
+  }
+
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
-    const name = activeDoc?.name || t('io.fallbackArticle')
     // Copying or exporting the placeholder would hand the author an empty
     // article. The bundle path has its own check in hydrateAllForExport.
     if (kind !== 'bundle' && activeBodyError) {
@@ -648,6 +741,7 @@ export default function EditorPage() {
       return
     }
     if (kind === 'markdown') {
+      const name = activeDoc?.name || t('io.fallbackArticle')
       const f = toMarkdownFile(name, activeDoc?.content || '')
       downloadFile(f.filename, f.content, f.mime)
       toast.success(t('editor.toast.exportedMarkdown'), { description: t('editor.toast.exportedMarkdownDesc') })
@@ -668,10 +762,7 @@ export default function EditorPage() {
       })()
       return
     }
-    const safe = safeFilename(name, t('io.fallbackArticle'), 'html')
-    if (kind === 'clean') downloadFile(safe.replace(/\.html$/, `_${t('io.suffixClean')}.html`), cleanHtml(rendered.html))
-    else downloadFile(safe.replace(/\.html$/, `_${t('io.suffixPage')}.html`), previewPage(rendered.html, name))
-    toast.success(kind === 'clean' ? t('editor.toast.exportedClean') : t('editor.toast.exportedPage'))
+    exportHtml(kind)
   }
 
   /** Upload the images a Word document carried and fill them back into the placeholders. */

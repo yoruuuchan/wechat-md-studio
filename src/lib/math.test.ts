@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TEX_PACKAGES, TEX_PACKAGE_NAMES, createMathRenderer } from './math'
+import {
+  TEX_PACKAGES,
+  TEX_PACKAGE_NAMES,
+  createMathRenderer,
+  documentFormulas,
+  mathReadiness,
+} from './math'
 import { parseMarkdown } from './parse'
 import { renderDoc } from './render'
 import { mathFailure } from './theme-fallbacks'
@@ -312,5 +318,86 @@ describe('hostile TeX', () => {
     const svg = r.snapshot().get(tex, true) ?? ''
     expect(svg).not.toContain('data-latex')
     expect(svg).not.toContain('\\sqrt')
+  }, 60000)
+})
+
+describe('readiness for copy and HTML export', () => {
+  it('has nothing to wait for in an article without formulas', () => {
+    const r = createMathRenderer(async () => ({ convert: () => FAKE_SVG }))
+    const readiness = mathReadiness(documentFormulas(parseMarkdown('只有正文。').blocks), r.snapshot())
+    expect(readiness).toEqual({ total: 0, pending: 0, failed: [], engineUnavailable: false })
+  })
+
+  it('collapses a repeated formula into one entry', () => {
+    const doc = parseMarkdown('$$\nE = mc^2\n$$\n\n$$\nE = mc^2\n$$\n\n$$\nx=1\n$$\n')
+    expect(documentFormulas(doc.blocks)).toEqual([
+      { tex: 'E = mc^2', display: true },
+      { tex: 'x=1', display: true },
+    ])
+  })
+
+  it('tells a formula that is still rendering from one that cannot compile', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = createMathRenderer(async () => ({
+      convert: (tex: string) => {
+        if (tex.includes('\\frac{1}{')) throw new Error('bad TeX')
+        return FAKE_SVG
+      },
+    }))
+    const doc = parseMarkdown('$$\nE = mc^2\n$$\n\n$$\n\\frac{1}{\n$$\n')
+    const formulas = documentFormulas(doc.blocks)
+    expect(mathReadiness(formulas, r.snapshot())).toEqual({
+      total: 2,
+      pending: 2,
+      failed: [],
+      engineUnavailable: false,
+    })
+
+    await r.warm(formulas[0].tex, formulas[0].display)
+    expect(mathReadiness(formulas, r.snapshot())).toMatchObject({ pending: 1, failed: [] })
+
+    await r.warm(formulas[1].tex, formulas[1].display)
+    const after = mathReadiness(formulas, r.snapshot())
+    expect(after.pending).toBe(0)
+    expect(after.failed).toEqual([formulas[1].tex])
+    logged.mockRestore()
+  })
+
+  it('does not blame the TeX when the engine itself fails to load', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let attempts = 0
+    const r = createMathRenderer(async () => {
+      attempts++
+      if (attempts === 1) throw new Error('chunk never arrived')
+      return { convert: () => FAKE_SVG }
+    })
+    const [f] = documentFormulas(parseMarkdown('$$\nE = mc^2\n$$\n').blocks)
+
+    expect(await r.warm(f.tex, f.display)).toBe(false)
+    // Still pending, never "failed": the formula itself was not the problem.
+    expect(mathReadiness([f], r.snapshot())).toEqual({
+      total: 1,
+      pending: 1,
+      failed: [],
+      engineUnavailable: true,
+    })
+
+    // Asking again retries the load instead of replaying the failure forever.
+    expect(await r.warm(f.tex, f.display)).toBe(true)
+    expect(r.snapshot().status(f.tex, f.display)).toBe('rendered')
+    expect(mathReadiness([f], r.snapshot()).engineUnavailable).toBe(false)
+    expect(logged).toHaveBeenCalledWith('[math] engine load failed', expect.anything())
+    logged.mockRestore()
+  })
+
+  it('reports pending, rendered and failed through the snapshot', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r = createMathRenderer()
+    expect(r.snapshot().status('E = mc^2', true)).toBe('pending')
+    expect(await r.warm('E = mc^2', true)).toBe(true)
+    expect(r.snapshot().status('E = mc^2', true)).toBe('rendered')
+    expect(await r.warm('\\frac{1}{', true)).toBe(false)
+    expect(r.snapshot().status('\\frac{1}{', true)).toBe('failed')
+    logged.mockRestore()
   }, 60000)
 })
