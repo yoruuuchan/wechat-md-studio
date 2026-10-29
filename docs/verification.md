@@ -43,14 +43,18 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 多图网格 | `node scripts/cdp-verify-gallery.mjs 3221 9353` | 参数、上传前裁切、网格布局、HTML 输出 |
 | 轮播复制 / 图片链路 | `node scripts/cdp-verify-carousel-copy.mjs 3232 9362` | 三次整篇复制 payload 逐字节一致、无固定像素宽度结构、URL 绝对可读、GET / HEAD 与并发、滑动几何；设 `MOPAI_CAROUSEL_URLS=<url,url>` 时同一套抓图检查跑在给定公网地址上 |
 | 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
+| 侧栏单图回填 | `node scripts/cdp-verify-single-slot-upload.mjs 4106 9706 4206` | 侧栏单图占位 / 替换精确回填、同 alt 多占位、自动与手动裁切、多选只传第一张并提示、切稿与上传中文字保留、编辑器工具栏 / 拖入 / 粘贴仍按发起位置新增 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[storage-read-failure](../scripts/cdp-verify-storage-read-failure.mjs)、
 [diagram](../scripts/cdp-verify-diagram.mjs)、
 [gallery](../scripts/cdp-verify-gallery.mjs)、
 [carousel-copy](../scripts/cdp-verify-carousel-copy.mjs)、
-[upload-size](../scripts/cdp-verify-upload-size.mjs)。
+[upload-size](../scripts/cdp-verify-upload-size.mjs)、
+[single-slot-upload](../scripts/cdp-verify-single-slot-upload.mjs)。
 本机正文读取失败脚本的 mock 图床用应用端口 +100（默认 4202），数据库为本工作树的 `data/audit-r02.db`。
+侧栏单图回填脚本的 mock 图床同样用应用端口 +100（默认 4206），数据库为本工作树的 `data/audit-r06.db`。
+结果与截图写入 `verify-out/single-slot-upload/`；粘贴 / 拖入使用浏览器合成文件事件，覆盖应用处理与写回，不代表原生操作系统交互已验收。
 脚本当前 Chrome 路径主要按 Windows 环境写定，跨设备先读脚本。
 `SKIP` 即使退出码为 0，也不能计作已完成该链路验收。
 

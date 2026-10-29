@@ -293,6 +293,7 @@ export const en: Record<MsgKey, Msg> = {
   'editor.toast.notImageShort': '{name} is not an image',
   'editor.toast.imageInserted': 'Image inserted',
   'editor.toast.imageFileInserted': '{name} inserted',
+  'editor.toast.slotFilled': '{no} uploaded and filled in',
   'editor.toast.uploadFailed': 'Upload failed: {name}',
   'editor.toast.uploadRetry': 'Try again in a moment',
   'editor.toast.locateFailed': 'Could not locate {no}',
@@ -314,6 +315,9 @@ export const en: Record<MsgKey, Msg> = {
   'editor.toast.uploadFailedPlain': 'Upload failed',
   'editor.toast.slotMissed': 'No matching slot for {name}',
   'editor.toast.slotMissedDesc': 'This {where} has no more placeholder slots; insert extra images by hand',
+  'editor.toast.slotSingleExtra': (p) =>
+    `A single-image slot holds one image; ${p.n === 1 ? 'one extra was' : `${p.n} extras were`} not uploaded`,
+  'editor.toast.slotSingleExtraDesc': 'Drop the extras into the editor, or use the toolbar image button',
   'editor.toast.slotWhereCarousel': 'carousel',
   'editor.toast.slotWhereGallery': 'grid',
   'editor.toast.batchCroppedAll': (p) => `${p.n} images uploaded, cropped to ${p.ratio}`,
