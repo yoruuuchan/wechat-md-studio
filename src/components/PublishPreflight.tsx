@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n } from '@/hooks/useI18n'
 import type { PreflightItem, PreflightLocation, PreflightReport } from '@/lib/preflight'
@@ -40,12 +40,11 @@ function severityLabel(severity: PreflightItem['severity']): 'preflight.blocker'
  */
 export default function PublishPreflight({ report, action, onClose, onConfirm, onJump }: Props) {
   const { t } = useI18n()
-  const [acknowledged, setAcknowledged] = useState(false)
-
-  // A fresh check is a fresh decision: never carry a previous "I read it" over.
-  useEffect(() => {
-    if (report) setAcknowledged(false)
-  }, [report])
+  const [ack, setAck] = useState<{ report: PreflightReport | null; value: boolean }>({ report: null, value: false })
+  // A fresh check is a fresh decision: an acknowledgement only counts for the
+  // exact report the author read, so a new report derives back to "not read".
+  const acknowledged = ack.report === report ? ack.value : false
+  const setAcknowledged = (value: boolean) => setAck({ report, value })
 
   if (!report) return null
 
