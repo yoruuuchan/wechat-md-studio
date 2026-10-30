@@ -163,14 +163,14 @@ async function page(context, silence = false) {
   return { call, ev, until, click, editor, edit, open, menu, select, create, rows }
 }
 
-async function scenario(run) {
+async function scenario(run, metadata = {}) {
   const { browserContextId } = await send('Target.createBrowserContext')
   try {
     const seed = await page(browserContextId)
     await seed.call('Page.navigate', { url: `${APP}/skill.md` })
     await seed.until(`location.origin === ${JSON.stringify(APP)}`, 'seed origin')
     await seed.ev(`(async () => {
-      const docs = ['shared', 'other'].map(id => ({ id, name: 'R04 '+id, content: 'BASE_'+id, updatedAt: 1, savedAt: null, deletedAt: null, contentLoaded: true }));
+      const docs = ['shared', 'other'].map(id => ({ id, name: 'R04 '+id, content: 'BASE_'+id, updatedAt: 1, savedAt: null, deletedAt: null, contentLoaded: true, ...${JSON.stringify(metadata)} }));
       const db = await new Promise((resolve, reject) => {
         const open = indexedDB.open('mopai', 1);
         open.onupgradeneeded = () => open.result.createObjectStore('bodies', { keyPath: 'id' });
@@ -298,6 +298,27 @@ try {
     await a.until(`window.__mopaiCodemirror?.state.doc.toString() === 'BASE_shared'`, 'committed body after reload')
     check('refresh after interruption recovers the last committed body', await a.editor() === 'BASE_shared')
   })
+
+  for (const [label, metadata] of [
+    ['archived', { savedAt: 100 }],
+    ['previously restored', { recovery: { kind: 'restored', at: 50 } }],
+  ]) {
+    await scenario(async (a, b) => {
+      await a.menu()
+      await a.click(`[...document.querySelectorAll('[role="menuitem"]')].find(node => node.querySelector('span')?.textContent.trim() === 'R04 shared')?.querySelector('button')`)
+      await a.until(`new Promise(resolve=>{const r=indexedDB.open('mopai');r.onsuccess=()=>{const db=r.result;const q=db.transaction('bodies').objectStore('bodies').get('shared');q.onsuccess=()=>{resolve(Boolean(q.result?.metadata?.deletedAt));db.close()}}})`, `${label} local soft deletion`)
+      await a.call('Page.navigate', { url: `${APP}/drafts` })
+      await a.until(`[...document.querySelectorAll('li')].some(node=>node.innerText.includes('R04 shared'))`, `${label} trash row`)
+      await a.ev(`window.confirm = () => true`)
+      await a.click(`[...document.querySelectorAll('li')].find(node=>node.innerText.includes('R04 shared'))?.querySelectorAll('button')[1]`)
+      await a.until(`new Promise(resolve=>{const r=indexedDB.open('mopai');r.onsuccess=()=>{const db=r.result;const q=db.transaction('bodies').objectStore('bodies').get('shared');q.onsuccess=()=>{resolve(q.result?.removed===true);db.close()}}})`, `${label} durable purge`)
+      await b.edit(`LATE_${label.toUpperCase().replaceAll(' ', '_')}_EDIT`)
+      await sleep(600)
+      const saved = await b.rows()
+      check(`${label}: a stale page leaves the original permanent deletion intact`, saved.find(row=>row.id==='shared')?.removed === true)
+      check(`${label}: the stale edit survives in a separate live copy`, saved.some(row=>row.id!=='shared'&&row.content===`LATE_${label.toUpperCase().replaceAll(' ', '_')}_EDIT`&&!row.metadata?.deletedAt))
+    }, metadata)
+  }
   check('no uncaught browser exceptions', errors.length === 0, JSON.stringify(errors).slice(0, 500))
 } catch (error) {
   results.push({ name: 'suite', ok: false, detail: error.stack })

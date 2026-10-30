@@ -7,6 +7,7 @@ import {
   loadActiveId,
   loadDocs,
   persistenceStatus,
+  readLocalRestoreBase,
   reconcileObservedLocalDocs,
   saveActiveId,
   saveLocalDocs,
@@ -18,7 +19,7 @@ import {
 } from '@/lib/store'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
 import { BUNDLE_IMPORT_BATCH_SIZE } from '@/lib/import-export'
-import { mergeLocalCommit, type LocalDocRecord } from '@/lib/local-docs'
+import { LOCAL_RESTORE, mergeLocalCommit, type LocalDocRecord, type LocalRestoreBase } from '@/lib/local-docs'
 import { articleSaveStatus, sameLocalReceipt, type LocalSaveReceipt } from '@/lib/save-status'
 import { useI18n } from '@/hooks/useI18n'
 
@@ -90,9 +91,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   /**
    * Trashed docs whose body this browser still holds. A purely local article
    * (never pushed, never saved) is deleted and restored here whether or not a
-   * session is active; a cloud article also leaves a copy here until the server
-   * confirms it trashed the row, so a failed delete or a row purged on another
-   * device cannot take the only local text with it.
+   * session is active; a cloud article also leaves a copy here unless its name
+   * and body were already confirmed in the account. Moving an older cloud row
+   * to trash must never discard the only copy of an unsynced local edit.
    */
   const [localTrash, setLocalTrash] = useState<DocRecord[]>([])
   /**
@@ -583,6 +584,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       setHydrating(id)
       setHydrateError(null)
       try {
+        const restoreBase = await readLocalRestoreBase(id)
         const res = await utils.docs.get.fetch({ id })
         if (!res.doc) {
           // Purged from another device between the list arriving and now.
@@ -608,6 +610,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
                   baseHash: row.hash,
                   contentLoaded: true,
                   bodyState: undefined,
+                  [LOCAL_RESTORE]: restoreBase,
                 }
               : d,
           ),
@@ -653,10 +656,11 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     }
     void (async () => {
       try {
+        const restoreBase = await readLocalRestoreBase(id)
         const res = await utils.docs.get.fetch({ id })
         if (res.doc) {
           const row = res.doc
-          const doc: DocRecord = {
+          const doc: LocalDocRecord = {
             id: row.id,
             name: row.name,
             content: row.content,
@@ -667,6 +671,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             baseHash: row.hash,
             contentLoaded: true,
             bodyState: undefined,
+            [LOCAL_RESTORE]: restoreBase,
           }
           lastSavedRef.current.set(doc.id, syncedSnapshot(doc))
           setDocs((ds) => (ds.some((x) => x.id === doc.id) ? ds : [doc, ...ds]))
@@ -867,15 +872,15 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
    * The body is copied into the local bin *before* the server answers. That copy
    * is the only thing that can bring back an article the account never had, and
    * it also covers a delete that fails or a row that was purged on another
-   * device. Once the account confirms it trashed that row the local copy is
-   * dropped again: from then on the account's bin is the truth, and a purge
-   * there stays final.
+   * device. The account's bin can replace that copy only when it already holds
+   * the same name and body; an unsynced local version stays recoverable.
    */
   const removeDoc = useCallback(
     (id: string) => {
       const doc = docs.find((d) => d.id === id)
       if (!doc) return
       const holdsBody = doc.contentLoaded !== false
+      const cloudVersion = lastSavedRef.current.get(id)
       // Written first: a request that hangs, or a tab closed mid-delete, must
       // never leave the body behind only in memory.
       if (holdsBody) {
@@ -899,8 +904,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         try {
           const res = await removeMutation.mutateAsync({ id })
           if (res.removed) {
-            // The account owns the only other copy now.
-            setLocalTrash((tr) => tr.filter((d) => d.id !== id))
+            // Moving the old cloud row does not save this browser's latest
+            // text. Drop only a copy whose name and body the account confirmed.
+            setLocalTrash((tr) => tr.filter((d) => d.id !== id || !sameSyncedDocument(cloudVersion, d)))
           }
           await utils.docs.trash.invalidate()
         } catch {
@@ -931,9 +937,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
    */
   const restoreDoc = useCallback(
     async (id: string): Promise<boolean> => {
-      const bringBack = (doc: DocRecord): boolean => {
+      const bringBack = (doc: DocRecord, restoreBase: LocalRestoreBase): boolean => {
         setLocalTrash((tr) => tr.filter((d) => d.id !== doc.id))
-        setDocs((ds) => (ds.some((d) => d.id === doc.id) ? ds : [{ ...doc, deletedAt: null, recovery: { kind: 'restored', at: Date.now() } }, ...ds]))
+        setDocs((ds) => (ds.some((d) => d.id === doc.id) ? ds : [{ ...doc, deletedAt: null, recovery: { kind: 'restored', at: Date.now() }, [LOCAL_RESTORE]: restoreBase }, ...ds]))
         // Undo puts the article back on screen, not just in the list: a
         // success toast over a still-hidden article reads like it failed.
         setActiveId(doc.id)
@@ -941,16 +947,22 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       }
       // Already live: a failed delete put it back, or a second undo click.
       if (docsRef.current.some((d) => d.id === id)) return true
-      const local = localTrashRef.current.find((d) => d.id === id) ?? null
-      if (!enabled) return local ? bringBack(local) : false
+      let local = localTrashRef.current.find((d) => d.id === id) ?? null
       // An article that never reached the account is restored from its local
       // copy, network or not.
-      if (local && !hasCloudCopy(local)) return bringBack(local)
+      if (!enabled || (local && !hasCloudCopy(local))) {
+        if (!local) return false
+        const restoreBase = await readLocalRestoreBase(id)
+        return restoreBase ? bringBack(local, restoreBase) : false
+      }
       // A remove still in flight could land after the restore and trash the row
       // again; wait for it to settle first.
       const pendingRemove = pendingRemoves.current.get(id)
       if (pendingRemove) await pendingRemove
       if (docsRef.current.some((d) => d.id === id)) return true
+      local = localTrashRef.current.find((d) => d.id === id) ?? local
+      const restoreBase = await readLocalRestoreBase(id)
+      if (!restoreBase) return false
       try {
         const { doc: row } = await restoreMutation.mutateAsync({ id })
         if (row) {
@@ -966,10 +978,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
             : local?.baseHash && local.baseHash === row.hash
               ? row.hash
               : null
-          lastSavedRef.current.set(row.id, { name: local?.name ?? row.name, content })
+          lastSavedRef.current.set(row.id, syncedSnapshot(row))
           setDocs((ds) => {
             if (ds.some((d) => d.id === row.id)) return ds
-            const restored: DocRecord = {
+            const restored: LocalDocRecord = {
               id: row.id,
               name,
               content,
@@ -981,6 +993,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
               contentLoaded: true,
               bodyState: undefined,
               recovery: { kind: 'restored', at: Date.now() },
+              [LOCAL_RESTORE]: restoreBase,
             }
             return [restored, ...ds]
           })
@@ -990,7 +1003,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           return true
         }
         // No row in the account: the local copy is the only copy left.
-        if (local) return bringBack(local)
+        if (local) return bringBack(local, restoreBase)
         setNotice(t('docs.restoreFailed'))
         return false
       } catch {
@@ -1211,9 +1224,11 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
       string,
       { name: string; content: string; updatedAt: Date; savedAt: Date | null; source: string | null; hash: string | null }
     >()
+    const restoreBases = new Map<string, LocalRestoreBase | undefined>()
     try {
       for (let i = 0; i < missing.length; i += 100) {
         const ids = missing.slice(i, i + 100).map((d) => d.id)
+        await Promise.all(ids.map(async (id) => restoreBases.set(id, await readLocalRestoreBase(id))))
         const res = await utils.docs.getMany.fetch({ ids })
         for (const row of res.docs) fetched.set(row.id, row)
       }
@@ -1237,6 +1252,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         baseHash: row.hash,
         contentLoaded: true,
         bodyState: undefined,
+        [LOCAL_RESTORE]: restoreBases.get(d.id),
       }
     })
     for (const [id, row] of fetched) lastSavedRef.current.set(id, syncedSnapshot(row))
@@ -1254,6 +1270,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           baseHash: row.hash,
           contentLoaded: true,
           bodyState: undefined,
+          [LOCAL_RESTORE]: restoreBases.get(d.id),
         }
       }),
     )

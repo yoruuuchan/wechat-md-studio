@@ -5,11 +5,13 @@ import {
   createDoc,
   loadDocs,
   persistenceStatus,
+  readLocalRestoreBase,
   saveDocs,
   saveLocalDocs,
   subscribePersistence,
   type DocRecord,
 } from './store'
+import { LOCAL_RESTORE, type LocalDocRecord } from './local-docs'
 import { SAMPLE_DOC } from './sample'
 
 const LEGACY_KEY = 'mopai.docs.v1'
@@ -290,6 +292,66 @@ describe('saving', () => {
 
     await saveDocs([doc('a', 'A changed')], 'a')
     expect(write).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('explicit local restore permissions', () => {
+  it('observes queued deletes before restoring the original id without persisting the permission', async () => {
+    await saveDocs([doc('a', 'BODY'), doc('other', 'OTHER')], 'a')
+    const loaded = await loadDocs()
+    const original = loaded.docs.find((d) => d.id === 'a')!
+    const other = loaded.docs.find((d) => d.id === 'other')!
+    const removal = saveLocalDocs([other], other.id, loaded.docs)
+    const restoreBase = await readLocalRestoreBase('a')
+    expect((await removal).ok).toBe(true)
+    expect(restoreBase).toEqual({ id: 'a', revision: 2 })
+
+    const restored: LocalDocRecord = { ...original, [LOCAL_RESTORE]: restoreBase }
+    const result = await saveLocalDocs([restored, other], 'a')
+    expect(result.ok).toBe(true)
+    expect(result.commit.copies).toEqual([])
+    expect(result.persisted.find((d) => d.id === 'a')).toMatchObject({ content: 'BODY', localRevision: 3 })
+    expect(result.persisted.find((d) => d.id === 'a')?.[LOCAL_RESTORE]).toBeUndefined()
+    __resetLocalStoreForTests()
+    const reloaded = await loadDocs()
+    expect(reloaded.docs.find((d) => d.id === 'a')).toMatchObject({ content: 'BODY', localRevision: 3 })
+    expect(Object.getOwnPropertySymbols(reloaded.docs.find((d) => d.id === 'a')!)).toEqual([])
+  })
+
+  it('retains an unconsumed restore permission across a failed body write and retry', async () => {
+    await saveDocs([doc('a', 'BODY'), doc('other', 'OTHER')], 'a')
+    const loaded = await loadDocs()
+    const original = loaded.docs.find((d) => d.id === 'a')!
+    const other = loaded.docs.find((d) => d.id === 'other')!
+    await saveLocalDocs([other], other.id, loaded.docs)
+    const restored: LocalDocRecord = { ...original, [LOCAL_RESTORE]: await readLocalRestoreBase('a') }
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => { throw new Error('injected restore write failure') })
+    const failed = await saveLocalDocs([restored, other], 'a')
+    expect(failed.ok).toBe(false)
+    expect(failed.persisted).toEqual([])
+    put.mockRestore()
+
+    const retry = await saveLocalDocs([restored, other], 'a')
+    expect(retry.ok).toBe(true)
+    expect(retry.commit.copies).toEqual([])
+    expect(retry.persisted.find((d) => d.id === 'a')).toMatchObject({ content: 'BODY', localRevision: 3 })
+  })
+
+  it('refuses an old restore response after the original was restored and deleted again', async () => {
+    await saveDocs([doc('a', 'BODY'), doc('other', 'OTHER')], 'a')
+    const loaded = await loadDocs()
+    const original = loaded.docs.find((d) => d.id === 'a')!
+    const other = loaded.docs.find((d) => d.id === 'other')!
+    await saveLocalDocs([other], other.id, loaded.docs)
+    const response: LocalDocRecord = { ...original, [LOCAL_RESTORE]: await readLocalRestoreBase('a') }
+    const first = await saveLocalDocs([response, other], 'a')
+    const current = first.persisted.find((d) => d.id === 'a')!
+    await saveLocalDocs([other], other.id, [current, other])
+    const late = await saveLocalDocs([{ ...response, content: 'LATE_RESPONSE' }, other], 'a', [original, other])
+    expect(late.commit.removed).toContain('a')
+    expect(late.commit.copies).toHaveLength(1)
+    expect(late.persisted.some((d) => d.id === 'a')).toBe(false)
+    expect(late.persisted.some((d) => d.id !== 'a' && d.content === 'LATE_RESPONSE')).toBe(true)
   })
 })
 

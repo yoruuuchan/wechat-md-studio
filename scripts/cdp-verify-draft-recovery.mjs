@@ -1,7 +1,7 @@
 // Browser acceptance for deleting and restoring an article that is not in the
 // account yet (R01).
 //
-// Usage: node scripts/cdp-verify-draft-recovery.mjs [appPort] [cdpPort]
+// Usage: node scripts/cdp-verify-draft-recovery.mjs [appPort] [cdpPort] [outputDir]
 //   appPort defaults to 4101; the inert image worker listens on appPort + 100
 //   (4201) and the CDP port defaults to 9701. The SQLite file is private to this
 //   suite (data/audit-r01.db) and is deleted before the run.
@@ -20,6 +20,8 @@
 //   C. an article that lives in the account: delete -> undo, bin restore,
 //      and two fault injections (remove / restore) that must not lose the only
 //      local copy nor claim a restore that did not happen.
+//   D. unsynced cloud articles: body/name changes survive a completed remove,
+//      undo, and a reload into the bin; cloud status waits for a real write.
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -30,6 +32,8 @@ const APP_PORT = Number(process.argv[2] || 4101)
 const WORKER_PORT = APP_PORT + 100
 const CDP_PORT = Number(process.argv[3] || 9701)
 const APP = `http://127.0.0.1:${APP_PORT}`
+const OUTPUT = process.argv[4] || fs.mkdtempSync(path.join(os.tmpdir(), 'reed-draft-recovery-evidence-'))
+fs.mkdirSync(OUTPUT, { recursive: true })
 const DB_FILE = path.resolve('data/audit-r01.db')
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 
@@ -53,7 +57,9 @@ const CLOUD_TEXT = 'CLOUD_ARTICLE_BODY_R01 must come back from the account bin.'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let failures = 0
+const results = []
 const check = (name, ok, detail = '') => {
+  results.push({ name, ok: Boolean(ok), ...(detail ? { detail } : {}) })
   if (!ok) failures++
   console.log(`  [${ok ? 'PASS' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`)
 }
@@ -112,10 +118,11 @@ async function waitUp() {
   throw new Error(`app never came up on ${APP}\n${appLog.slice(-800)}`)
 }
 
-async function agent(method, urlPath) {
+async function agent(method, urlPath, body) {
   const res = await fetch(`${APP}${urlPath}`, {
     method,
-    headers: { authorization: `Bearer ${AGENT_TOKEN}` },
+    headers: { authorization: `Bearer ${AGENT_TOKEN}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
   })
   const text = await res.text()
   let json = null
@@ -528,6 +535,29 @@ const editorShows = (name, text) =>
     10000,
   )
 
+async function archivedArticle(name, content) {
+  const created = await agent('POST', '/api/agent/docs', { name, content })
+  if (created.status !== 201) throw new Error(`Could not create archive fixture: ${created.text}`)
+  const id = created.json.id
+  await send('Page.navigate', { url: `${APP}/?doc=${id}` }, sessionId)
+  if (!(await editorShows(name, content))) throw new Error('The archive fixture did not open')
+  if (!(await waitFor(`document.querySelector('[data-save-status]')?.dataset.cloudState === 'synced'`))) {
+    throw new Error('The archive fixture never reached its confirmed cloud version')
+  }
+  return id
+}
+
+async function unsyncedEdit(name, content) {
+  await evaluate(`(() => {
+    const input = document.querySelector('input[placeholder="未命名稿件"]')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(name)})
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    const view = window.__mopaiCodemirror
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: ${JSON.stringify(content)} } })
+  })()`)
+  await sleep(120)
+}
+
 try {
   await waitUp()
   ws = new WebSocket(await wsUrl())
@@ -776,12 +806,81 @@ try {
   await openArticle(CLOUD_NAME)
   check('the body came back after the failed restore and retry', (await editorText()) === CLOUD_TEXT, String(await editorText()).slice(0, 60))
 
+  // ================= D. the local version is ahead of the cloud =================
+  for (const variant of ['body', 'name']) {
+    section(`cloud article: an unsynced ${variant} survives completed delete and undo`)
+    const baseName = `R01 unsynced ${variant} base`
+    const baseText = `CLOUD_CONFIRMED_${variant}`
+    const localName = variant === 'name' ? `R01 unsynced ${variant} renamed` : baseName
+    const localText = variant === 'body' ? `LOCAL_UNSYNCED_${variant}_MUST_SURVIVE` : baseText
+    const id = await archivedArticle(baseName, baseText)
+    // Only autosave is unavailable. Remove and restore really reach the server.
+    await blockProcedure('docs.save')
+    await unsyncedEdit(localName, localText)
+    check(`the unsynced ${variant} is durable before deletion`,
+      (await bodyText(id)) === localText && (await indexEntryById(id))?.name === localName)
+    const before = (await agent('GET', `/api/agent/docs/${id}`)).json
+    check(`the account still holds the older ${variant}`, before?.content === baseText && before?.name === baseName)
+    await deleteArticle(localName)
+    check(`the ${variant} removal completed in the account`, await accountDocGone(baseName))
+    check(`the completed ${variant} removal retained the local recovery body`, (await bodyText(id)) === localText)
+    check(`the ${variant} undo was offered`, await clickUndo())
+    check(`undo restores the unsynced ${variant}`, await editorShows(localName, localText), JSON.stringify(await editorSnapshot()))
+    check(`the unsynced ${variant} is not falsely shown as cloud-synced`,
+      await evaluate(`document.querySelector('[data-save-status]')?.dataset.cloudState !== 'synced'`))
+    const restored = (await agent('GET', `/api/agent/docs/${id}`)).json
+    check(`the ${variant} restore did not pretend a write happened`, restored?.content === baseText && restored?.name === baseName)
+    const screenshot = await send('Page.captureScreenshot', { format: 'png' }, sessionId)
+    fs.writeFileSync(path.join(OUTPUT, `unsynced-${variant}-restored.png`), Buffer.from(screenshot.data, 'base64'))
+    await unblockProcedures()
+    check(`the unsynced ${variant} later receives a real cloud acknowledgement`,
+      await waitFor(`document.querySelector('[data-save-status]')?.dataset.cloudState === 'synced'`, 15000))
+    const saved = (await agent('GET', `/api/agent/docs/${id}`)).json
+    check(`the account finally holds the complete ${variant} edit`, saved?.content === localText && saved?.name === localName)
+  }
+
+  section('cloud article: an unsynced name and body survive reload and bin restore')
+  const reloadCloudName = 'R01 unsynced reload base'
+  const reloadCloudText = 'R01_CLOUD_RELOAD_BASE'
+  const reloadLocalName = 'R01 unsynced reload renamed'
+  const reloadLocalText = 'R01_UNSYNCED_RELOAD_BODY_MUST_SURVIVE'
+  const reloadCloudId = await archivedArticle(reloadCloudName, reloadCloudText)
+  await blockProcedure('docs.save')
+  await unsyncedEdit(reloadLocalName, reloadLocalText)
+  await deleteArticle(reloadLocalName)
+  check('the unsynced reload removal completed', await accountDocGone(reloadCloudName))
+  await goDrafts()
+  // A full navigation drops the earlier fetch fault; keep the restored version
+  // unsynced until the test can compare it with the server's actual response.
+  await blockProcedure('docs.save')
+  check('the reload retains the locally edited trash body', (await bodyText(reloadCloudId)) === reloadLocalText)
+  check('the account bin can restore the edited local copy', await restoreFromBin(reloadCloudName))
+  check('the bin restore keeps both the local name and body',
+    (await indexEntryById(reloadCloudId))?.name === reloadLocalName && (await bodyText(reloadCloudId)) === reloadLocalText)
+  const afterBinRestore = (await agent('GET', `/api/agent/docs/${reloadCloudId}`)).json
+  check('the bin restore keeps its pending cloud version honest',
+    afterBinRestore?.name === reloadCloudName && afterBinRestore?.content === reloadCloudText)
+  await goEditor({ signedIn: true })
+  await openArticle(reloadLocalName)
+  check('the reopened article retains the unsynced recovered text', await editorShows(reloadLocalName, reloadLocalText))
+  check('the reopened recovered article eventually syncs',
+    await waitFor(`document.querySelector('[data-save-status]')?.dataset.cloudState === 'synced'`, 15000))
+  const finallySaved = (await agent('GET', `/api/agent/docs/${reloadCloudId}`)).json
+  check('the reopened article writes the recovered name and body to the account',
+    finallySaved?.name === reloadLocalName && finallySaved?.content === reloadLocalText)
+
+  check('the production editor remains identifiable and nonblank',
+    await evaluate(`location.origin === ${JSON.stringify(APP)} && document.title.includes('芦苇') && !!document.querySelector('.cm-content')`))
+  check('no framework error overlay replaced the editor',
+    await evaluate(`!document.querySelector('.vite-error-overlay,[data-nextjs-dialog],#webpack-dev-server-client-overlay')`))
   check('no uncaught page exception during the run', pageErrors.length === 0, pageErrors.join(' | '))
 } catch (e) {
   failures++
   console.error('\n[FAIL] suite crashed:', e)
   console.error(appLog.slice(-1500))
 } finally {
+  fs.writeFileSync(path.join(OUTPUT, 'results.json'), JSON.stringify({ results, pageErrors, failures }, null, 2))
+  fs.writeFileSync(path.join(OUTPUT, 'app.log'), appLog)
   try {
     ws?.close()
   } catch {
@@ -793,4 +892,5 @@ try {
 }
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`)
+console.log(`Evidence: ${OUTPUT}`)
 process.exit(failures === 0 ? 0 : 1)
