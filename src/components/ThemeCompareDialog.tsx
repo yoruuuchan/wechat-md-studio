@@ -72,7 +72,7 @@ export function ThemeCompareDialog({
   onApply: (theme: ThemeCatalogEntry) => void
 }) {
   const { t } = useI18n()
-  const reason = reasonText(t, article)
+  const reason = article.status === 'ready' ? null : reasonText(t, article)
   const loading = source === 'current' && article.status === 'loading'
 
   const sourceSwitch = <ThemeTrialSourceSwitch source={source} onChange={onSourceChange} />
@@ -82,10 +82,11 @@ export function ThemeCompareDialog({
       <DialogContent
         showCloseButton={false}
         className="flex h-[min(92vh,920px)] w-[min(96vw,1400px)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+        style={{ background: 'var(--bg-base)' }}
       >
         <div className="flex flex-col gap-2.5 border-b px-4 py-3.5 sm:px-5" style={{ borderColor: 'var(--line-2)' }}>
           <div className="flex flex-wrap items-start gap-2.5">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-full sm:basis-0">
               <DialogTitle className="text-[15px] leading-tight">{t('themes.compare.title')}</DialogTitle>
               <DialogDescription className="mt-1 text-[11.5px] leading-relaxed">
                 {t('themes.compare.subtitle', { max: 3 })}
@@ -164,18 +165,18 @@ export function ThemeCompareDialog({
                 key={theme.id}
                 data-compare-panel={theme.id}
                 className="flex min-h-0 min-w-[85vw] snap-center flex-col overflow-hidden rounded-2xl sm:min-w-[420px] md:min-w-0"
-                style={{ background: '#FFFFFF', boxShadow: 'var(--shadow-pop)' }}
+                style={{ background: 'var(--bg-elevated)', boxShadow: 'var(--shadow-pop)' }}
               >
                 <header className="flex items-start gap-2 border-b px-3 py-2.5" style={{ borderColor: 'var(--line-2)' }}>
                   <span className="ya-dot mt-1.5 shrink-0" style={{ background: theme.ui.accent }} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-ink-1">{theme.name}</p>
-                    <p className="mt-0.5 truncate text-[10px] text-ink-3">
+                    <p className="mt-0.5 truncate text-[10px] text-ink-2">
                       {theme.meta.origin.project} · {theme.meta.origin.license}
                     </p>
                   </div>
                 </header>
-                <div className="min-h-0 flex-1 overflow-y-auto p-2.5" data-compare-scroll>
+                <div className="min-h-0 flex-1 overflow-y-auto bg-white p-2.5" data-compare-scroll>
                   <ThemeTrialPreview
                     theme={theme}
                     doc={article.doc}
