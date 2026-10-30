@@ -6,6 +6,7 @@
 // language.
 
 import { t } from './i18n'
+import type { ThemeCategory } from './theme-kit'
 
 /** 风格标签：多标签体系，一套主题可以同时属于多个风格。 */
 export const STYLE_TAGS = [
@@ -125,4 +126,43 @@ export interface ThemeMeta {
   complexity: Complexity
   color: ColorFamily
   origin: ThemeOrigin
+}
+
+/**
+ * 主题目录条目：主题库、顶栏切换器和筛选只需要这些字段。
+ *
+ * 它和 Theme 的区别只有一个——没有渲染函数。把这份元数据留在首屏包里，
+ * 渲染实现按来源动态加载，219 套主题的样式代码就不会跟着首屏一起下载。
+ */
+export interface ThemeCatalogEntry {
+  id: string
+  name: string
+  desc: string
+  category: ThemeCategory
+  ui: { accent: string; soft: string; ink: string }
+  meta: ThemeMeta
+  /** 导入主题的打包来源 id；自研与手写主题没有这个字段。 */
+  source?: string
+}
+
+/** 从一个主题（或它的等价字段）取出目录条目；只保留展示与筛选用到的字段。 */
+export function catalogEntryOf(theme: {
+  id: string
+  name: string
+  desc: string
+  category: ThemeCategory
+  ui: { accent: string; soft: string; ink: string }
+  meta: ThemeMeta
+  source?: string
+}): ThemeCatalogEntry {
+  const entry: ThemeCatalogEntry = {
+    id: theme.id,
+    name: theme.name,
+    desc: theme.desc,
+    category: theme.category,
+    ui: theme.ui,
+    meta: theme.meta,
+  }
+  if (theme.source) entry.source = theme.source
+  return entry
 }

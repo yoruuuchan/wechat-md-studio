@@ -1,4 +1,4 @@
-import { esc, type Theme } from './themes'
+import { esc, type Theme } from './theme-kit'
 import type { CarouselRatio } from './types'
 import { t } from './i18n'
 

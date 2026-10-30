@@ -1,7 +1,9 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
-import { THEMES, type Theme } from '@/lib/themes'
+import type { Theme } from '@/lib/theme-kit'
+import { THEME_CATALOG, THEME_COUNT } from '@/lib/theme-catalog'
+import { getCachedTheme, loadTheme } from '@/lib/theme-api'
 import {
   COLOR_FAMILIES,
   COMPLEXITY_LEVELS,
@@ -10,11 +12,13 @@ import {
   type ColorFamily,
   type Complexity,
   type StyleTag,
+  type ThemeCatalogEntry,
 } from '@/lib/theme-meta'
 import { parseMarkdown } from '@/lib/parse'
 import { renderDoc } from '@/lib/render'
 import { loadSettings, saveSettings } from '@/lib/store'
 import { THEME_PREVIEW_DOC } from '@/lib/sample'
+import type { SignatureConfig } from '@/lib/types'
 import { YoruMark } from '@/components/YoruMark'
 import { APP_BYLINE } from '@/lib/brand'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -23,14 +27,32 @@ import { useThemeFavorites } from '@/hooks/useThemeFavorites'
 import { useI18n } from '@/hooks/useI18n'
 
 // 模板库：全部主题渲染同一份 THEME_PREVIEW_DOC，视觉差异才可比。
-// 主题数量上百，所以预览 DOM 只在卡片滚进视口附近时才注入，
-// 否则一次性挂几万个节点会把页面拖死。
+//
+// 卡片与筛选只读 metadata 目录，进入页面不下载任何主题实现；卡片滚进视口附近
+// 才开始按来源加载实现并渲染预览，所以首屏与一次访问的下载量都跟实际看到的
+// 卡片数量挂钩。预览 HTML 按「主题 + 署名设置」缓存，来回滚动不重算。
+
+type ParsedPreview = ReturnType<typeof parseMarkdown>
+type Sig = SignatureConfig
+
+const previewCache = new Map<string, string>()
+
+function previewKey(themeId: string, sig: Sig): string {
+  return `${themeId}\u0000${JSON.stringify(sig)}`
+}
 
 /** 把 375px 宽的渲染结果等比缩进卡片宽度的容器。 */
-function ScaledPreview({ html }: { html: string }) {
+function ThemePreview({ theme, doc, sig }: { theme: ThemeCatalogEntry; doc: ParsedPreview; sig: Sig }) {
+  const { t } = useI18n()
   const boxRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.5)
   const [visible, setVisible] = useState(false)
+  const [loadedImpl, setLoadedImpl] = useState<Theme | null>(null)
+  const impl = loadedImpl ?? getCachedTheme(theme.id)
+  const [renderedHtml, setRenderedHtml] = useState<string | null>(null)
+  const html = renderedHtml ?? previewCache.get(previewKey(theme.id, sig)) ?? null
+  const [error, setError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useLayoutEffect(() => {
     const el = boxRef.current
@@ -42,7 +64,7 @@ function ScaledPreview({ html }: { html: string }) {
     return () => ro.disconnect()
   }, [])
 
-  // 进视口前 400px 才开始渲染，滚动时不会看到空白卡
+  // 进视口前 400px 才开始准备，滚动时不会看到空白卡
   useLayoutEffect(() => {
     const el = boxRef.current
     if (!el || visible) return
@@ -59,20 +81,70 @@ function ScaledPreview({ html }: { html: string }) {
     return () => io.disconnect()
   }, [visible])
 
+  // 只加载这一套主题所属的来源 pack；同一个 pack 的其他主题共用缓存。
+  useEffect(() => {
+    if (!visible || impl) return
+    let alive = true
+    loadTheme(theme.id)
+      .then((loaded) => {
+        if (alive) setLoadedImpl(loaded)
+      })
+      .catch(() => {
+        if (alive) setError(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [visible, theme.id, attempt, impl])
+
+  // 渲染本身是同步 CPU 工作；让出一帧，避免滚动时和布局挤在一起。
+  useEffect(() => {
+    if (!impl || html) return
+    const key = previewKey(theme.id, sig)
+    let alive = true
+    const timer = window.setTimeout(() => {
+      if (!alive) return
+      const out = renderDoc(doc, impl, sig).html
+      previewCache.set(key, out)
+      setRenderedHtml(out)
+    }, 0)
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+    }
+  }, [impl, doc, sig, theme.id, html])
+
   return (
     <div
       ref={boxRef}
-      data-theme-preview={visible ? 'rendered' : 'pending'}
+      data-theme-preview={html ? 'rendered' : visible ? 'loading' : 'pending'}
       className="relative h-56 overflow-hidden rounded-xl bg-white"
       style={{ boxShadow: 'var(--shadow-inset)' }}
     >
-      {visible && (
+      {html ? (
         <div
           className="pointer-events-none absolute left-0 top-0 origin-top-left"
           style={{ width: 375, transform: `scale(${scale})` }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
-      )}
+      ) : visible ? (
+        <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-[11px] leading-relaxed text-ink-3">
+          {error ? (
+            <button
+              type="button"
+              className="ya-link-btn"
+              onClick={() => {
+                setError(false)
+                setAttempt((n) => n + 1)
+              }}
+            >
+              {t('themes.previewFailed')} · {t('common.retry')}
+            </button>
+          ) : (
+            t('themes.previewLoading')
+          )}
+        </div>
+      ) : null}
       {/* 底部渐隐，示意「内容未完」 */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 h-14"
@@ -154,7 +226,7 @@ function IconStar({ filled }: { filled: boolean }) {
   )
 }
 
-function OriginDetails({ theme }: { theme: Theme }) {
+function OriginDetails({ theme }: { theme: ThemeCatalogEntry }) {
   const { t } = useI18n()
   const o = theme.meta.origin
   return (
@@ -198,16 +270,18 @@ function OriginDetails({ theme }: { theme: Theme }) {
 
 function ThemeCard({
   theme,
+  doc,
+  sig,
   active,
   favorited,
-  previewHtml,
   onUse,
   onToggleFavorite,
 }: {
-  theme: Theme
+  theme: ThemeCatalogEntry
+  doc: ParsedPreview
+  sig: Sig
   active: boolean
   favorited: boolean
-  previewHtml: string
   onUse: () => void
   onToggleFavorite: () => void
 }) {
@@ -251,7 +325,7 @@ function ThemeCard({
         </button>
       </div>
 
-      <ScaledPreview html={previewHtml} />
+      <ThemePreview theme={theme} doc={doc} sig={sig} />
 
       <div className="flex flex-wrap items-center gap-1 px-0.5">
         {theme.meta.styles.map((style) => (
@@ -299,6 +373,7 @@ export default function Themes() {
   const navigate = useNavigate()
   const [themeId, setThemeId] = useState(() => loadSettings().themeId)
   const sig = useMemo(() => loadSettings().sig, [])
+  const doc = useMemo(() => parseMarkdown(THEME_PREVIEW_DOC), [])
   const { favorites, count: favCount, toggle: toggleFavorite } = useThemeFavorites()
 
   const [tags, setTags] = useState<Set<StyleTag>>(new Set())
@@ -315,18 +390,9 @@ export default function Themes() {
     apply(next)
   }
 
-  // 每个主题渲染一遍统一样例。上百套主题一次性算完约几百毫秒，
-  // 之后筛选只在结果里挑，不重算。
-  const previews = useMemo(() => {
-    const doc = parseMarkdown(THEME_PREVIEW_DOC)
-    const out: Record<string, string> = {}
-    for (const theme of THEMES) out[theme.id] = renderDoc(doc, theme, sig).html
-    return out
-  }, [sig])
-
   const sourceOptions = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const theme of THEMES) {
+    for (const theme of THEME_CATALOG) {
       const p = theme.meta.origin.project
       counts.set(p, (counts.get(p) ?? 0) + 1)
     }
@@ -335,7 +401,7 @@ export default function Themes() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return THEMES.filter((theme) => {
+    return THEME_CATALOG.filter((theme) => {
       if (favOnly && !favorites.has(theme.id)) return false
       if (tags.size && !theme.meta.styles.some((s) => tags.has(s))) return false
       if (levels.size && !levels.has(theme.meta.complexity)) return false
@@ -365,7 +431,7 @@ export default function Themes() {
   const filtering =
     tags.size + levels.size + colors.size + sources.size > 0 || favOnly || query.trim() !== ''
 
-  const applyTheme = (theme: Theme) => {
+  const applyTheme = (theme: ThemeCatalogEntry) => {
     const s = loadSettings()
     saveSettings({ ...s, themeId: theme.id })
     setThemeId(theme.id)
@@ -388,7 +454,7 @@ export default function Themes() {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <span className="ya-eyebrow tabular-nums hidden sm:inline">
-            {t('themes.countRatio', { shown: filtered.length, total: THEMES.length })}
+            {t('themes.countRatio', { shown: filtered.length, total: THEME_COUNT })}
           </span>
           <LanguageToggle />
           <ThemeToggle />
@@ -470,9 +536,10 @@ export default function Themes() {
               <ThemeCard
                 key={theme.id}
                 theme={theme}
+                doc={doc}
+                sig={sig}
                 active={theme.id === themeId}
                 favorited={favorites.has(theme.id)}
-                previewHtml={previews[theme.id]}
                 onUse={() => applyTheme(theme)}
                 onToggleFavorite={() => toggleFavorite(theme.id)}
               />

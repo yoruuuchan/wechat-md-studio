@@ -12,7 +12,7 @@
 | 模块 | 实现入口与职责 |
 |---|---|
 | Parser / renderer | [types.ts](src/lib/types.ts)、[parse.ts](src/lib/parse.ts)、[render.ts](src/lib/render.ts)：语义节点、源位置、图号、素材定位、HTML；[clipboard.ts](src/lib/clipboard.ts)：复制和 HTML 导出 |
-| Theme system | [theme-kit.ts](src/lib/theme-kit.ts)：Theme 契约、共享构件、样式消毒；[themes.ts](src/lib/themes.ts)：总注册表；[theme-fallbacks.ts](src/lib/theme-fallbacks.ts)：扩展组件；[themes-extra.ts](src/lib/themes-extra.ts)：手写移植；[importer](scripts/themes/import.ts) → [生成目录](src/lib/themes-imported/) |
+| Theme system | [theme-kit.ts](src/lib/theme-kit.ts)：Theme 契约、共享构件、样式消毒；[theme-catalog.ts](src/lib/theme-catalog.ts)：metadata-only 目录，首屏列表 / 筛选 / 收藏只读它；[theme-api.ts](src/lib/theme-api.ts)：按来源懒加载主题实现；[themes.ts](src/lib/themes.ts)：测试与校验用的完整注册表；[themes-core.ts](src/lib/themes-core.ts)：三套自研主题；[theme-fallbacks.ts](src/lib/theme-fallbacks.ts)：扩展组件；[themes-extra.ts](src/lib/themes-extra.ts)：手写移植；[importer](scripts/themes/import.ts) → [生成目录](src/lib/themes-imported/)（catalog / loaders / pack 同源生成） |
 | Metadata / credits | [theme-meta.ts](src/lib/theme-meta.ts) 定义结构，[theme-sources.ts](src/lib/theme-sources.ts) 注册来源，各 Theme 的 `meta.origin` 引用它；[credits.ts](src/lib/credits.ts) 驱动 [References 页面](src/pages/References.tsx) 与完整致谢；[sources/report.ts](scripts/sources/report.ts) 生成文档区块，许可统一在 `LICENSES/` |
 | Editor | [EditorPage.tsx](src/pages/EditorPage.tsx) 编排；[EditorPane.tsx](src/components/EditorPane.tsx)、[PreviewPane.tsx](src/components/PreviewPane.tsx)、[SidePanel.tsx](src/components/SidePanel.tsx) 分工；[MarkdownToolbar.tsx](src/components/MarkdownToolbar.tsx) 调用 [md-format.ts](src/lib/md-format.ts) 的语义变换；[sync-scroll.ts](src/lib/sync-scroll.ts) / [useSyncScroll.ts](src/hooks/useSyncScroll.ts) 负责块映射滚动；[selection-copy.ts](src/lib/selection-copy.ts) 负责预览区局部复制，从用户 Range 保留真实选区，并克隆祖先结构与内联样式直到正文根 `section` |
 | UI theme | [ui-theme.ts](src/lib/ui-theme.ts)：应用级浅色 / 深色 / 跟随系统，`yoru` 模式同步设置 `.dark`，是当前 UI theme 切换入口；[ThemeToggle.tsx](src/components/ThemeToggle.tsx) 是各页面里的三态切换控件 |
@@ -56,7 +56,7 @@ README / README_EN 的界面截图共用 `docs/images/`，界面结构或品牌�
 
 - 延续语义 AST → Theme 的边界和已有测试确认的行为。成熟模块优先复用当前实现，特别是 parser、裁切、富文本转换与上传链路。
 - 微信正文输出服从 renderer 与 `verify:themes`：单一根 `section`、内联样式、文字 leaf 包装，图片短引用必须解析。具体标签、样式、公式及比例规则见 [渲染说明](docs/rendering.md) 和验证脚本。
-- 主题注册、来源、License 与 attribution 使用现有统一数据源；`themes-imported/` 是生成物，修改 importer 后重生成，保留完整 metadata 与许可副本。
+- 主题注册、来源、License 与 attribution 使用现有统一数据源；`themes-imported/` 是生成物，修改 importer 后重生成，保留完整 metadata 与许可副本。首屏只读 metadata 目录，主题实现通过 `theme-api.ts` 按来源加载；新增主题时让 importer 一并生成 catalog / loaders，不要在页面里重新 import 完整注册表。
 - 保存、同步、图片处理与 Agent API 的失败必须显式、可诊断。保留保存状态、上传警告与冲突结果；`savedAt` 表示归档，内容 hash / `baseHash` 表示并发版本。存储协议、升级与覆盖语义见 [稿件说明](docs/documents.md) 和 [Agent API](docs/agent-api.md)。
 - 并行开发使用独立 worktree / branch。开工时确认主线和其他开发线状态；修改 `EditorPage`、Theme 总注册表、schema 等共享入口前确认文件分工与合并顺序。端口、数据库、图床隔离和统一部署流程见 [HANDOFF](HANDOFF.md)。
 - 凭证只进被忽略的本机配置或环境变量；验收使用独立数据与 mock / 本地图床。生产发布和真实环境变更按 HANDOFF 执行。

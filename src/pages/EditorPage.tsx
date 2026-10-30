@@ -60,7 +60,8 @@ import {
   setCarouselRatio,
   type MaterialItem,
 } from '@/lib/render'
-import { getTheme } from '@/lib/themes'
+import { useActiveTheme } from '@/hooks/useActiveTheme'
+import type { Theme } from '@/lib/theme-kit'
 import { cleanHtml, copyPlain, copyRichText, downloadFile, previewPage } from '@/lib/clipboard'
 import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
@@ -330,7 +331,22 @@ export default function EditorPage() {
     if (conflictKey) setConflictOpen(true)
   }, [conflictKey])
 
-  const theme = getTheme(settings.themeId)
+  // 主题实现按需加载：自研/手写主题同步可用，导入主题只拉取它所属的 pack。
+  // pack 未到时先用 golden 兜底，正文、保存与复制都不等主题。
+  const { theme, error: themeError, retry: retryTheme } = useActiveTheme(settings.themeId)
+
+  useEffect(() => {
+    if (!themeError) {
+      toast.dismiss('theme-load-error')
+      return
+    }
+    toast.error(t('editor.toast.themeFailed'), {
+      id: 'theme-load-error',
+      description: t('editor.toast.themeFailedDesc'),
+      duration: Infinity,
+      action: { label: t('common.retry'), onClick: retryTheme },
+    })
+  }, [themeError, retryTheme, t])
 
   // Parsing, rendering and the materials list are all O(document) and used to run
   // on every keystroke. Deferring the content keeps the keystroke itself on the
@@ -383,6 +399,11 @@ export default function EditorPage() {
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null)
   /** What the check was opened for, clicked through once the author agrees. */
   const pendingPublish = useRef<PublishAction | null>(null)
+
+  const renderThemePreview = useCallback(
+    (previewTheme: Theme) => renderDoc(parsed, previewTheme, settings.sig, resolveImg).html,
+    [parsed, settings.sig],
+  )
 
   const rendered = useMemo(
     () =>
@@ -1715,7 +1736,7 @@ export default function EditorPage() {
         onOpenMaterials={() => navigate('/materials')}
         themeId={settings.themeId}
         onTheme={(id) => setSettings((s) => ({ ...s, themeId: id }))}
-        miniPreview={(id) => renderDoc(parsed, getTheme(id), settings.sig, resolveImg).html}
+        renderPreview={renderThemePreview}
         onOpenThemes={() => navigate('/themes')}
         copying={copied}
         onCopy={handleCopy}
