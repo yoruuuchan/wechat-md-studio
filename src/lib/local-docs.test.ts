@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { applyLocalDelta, bodyFromDocument, documentFromBody, mergeLocalCommit, planLocalCommit, type LocalDocRecord } from './local-docs'
+import { applyLocalDelta, bodyFromDocument, documentFromBody, LOCAL_RESTORE, mergeLocalCommit, planLocalCommit, type LocalDocRecord } from './local-docs'
 import type { BodyRecord } from './body-store'
+import { toBundle } from './import-export'
 
 const copyName = (name: string) => `${name} (conflict)`
 const doc = (id: string, content: string, extra: Partial<LocalDocRecord> = {}): LocalDocRecord => ({
@@ -115,20 +116,63 @@ describe('local document version planning', () => {
   it('revives a tombstoned id for a user-initiated restore', () => {
     const base = doc('a', 'BODY', { savedAt: 100, baseHash: 'hash' })
     const tombstone: BodyRecord = { id: 'a', content: '', revision: 2, removed: true }
-    const restored = { ...base, updatedAt: 120, recovery: { kind: 'restored' as const, at: 5 } }
+    const restored = { ...base, updatedAt: 120, recovery: { kind: 'restored' as const, at: 5 }, [LOCAL_RESTORE]: { id: 'a', revision: 2 } }
     const plan = planLocalCommit([tombstone], [change(base, restored)], copyName)
     expect(plan.result.copies).toEqual([])
     expect(plan.result.removed).toEqual([])
     expect(plan.put?.find((r) => r.id === 'a')).toMatchObject({ content: 'BODY' })
   })
 
-  it('revives a tombstoned id when the account still archives the article', () => {
+  it('preserves an archived stale edit without reviving a tombstoned id', () => {
     const base = doc('a', 'BODY')
     const tombstone: BodyRecord = { id: 'a', content: '', revision: 2, removed: true }
     const archived = { ...base, savedAt: 100, baseHash: 'hash', updatedAt: 120 }
     const plan = planLocalCommit([tombstone], [change(base, archived)], copyName)
-    expect(plan.result.copies).toEqual([])
-    expect(plan.put?.find((r) => r.id === 'a')).toMatchObject({ content: 'BODY', metadata: { savedAt: 100 } })
+    expect(plan.result.removed).toEqual(['a'])
+    expect(plan.put?.map((r) => r.id)).toEqual(['a-copy'])
+    expect(plan.put?.[0]).toMatchObject({ content: 'BODY', metadata: { savedAt: null } })
+  })
+
+  it('does not treat an old restored label as permission after another purge', () => {
+    const base = doc('a', 'RESTORED_ONCE', { recovery: { kind: 'restored', at: 50 } })
+    const plan = planLocalCommit([{ id: 'a', content: '', revision: 3, removed: true }], [
+      change(base, { ...base, content: 'OLD_TAB_EDIT' }),
+    ], copyName)
+    expect(plan.put?.map((r) => r.id)).toEqual(['a-copy'])
+    expect(plan.result.removed).toEqual(['a'])
+  })
+
+  it.each([
+    { id: 'a', revision: 2 },
+    { id: 'another-id', revision: 3 },
+  ])('rejects a restore permission that no longer matches the deletion: %j', (restore) => {
+    const base = doc('a', 'BODY', { savedAt: 100, recovery: { kind: 'restored', at: 50 } })
+    const plan = planLocalCommit([{ id: 'a', content: '', revision: 3, removed: true }], [
+      change(base, { ...base, content: 'RESTORE_RESPONSE', [LOCAL_RESTORE]: restore }),
+    ], copyName)
+    expect(plan.put?.map((r) => r.id)).toEqual(['a-copy'])
+    expect(plan.result.removed).toEqual(['a'])
+  })
+
+  it('consumes the observed deletion once, so a later purge invalidates the old permission', () => {
+    const base = doc('a', 'BODY')
+    const request = { ...base, [LOCAL_RESTORE]: { id: 'a', revision: 2 } }
+    const first = planLocalCommit([{ id: 'a', content: '', revision: 2, removed: true }], [change(base, request)], copyName)
+    expect(first.put?.[0]).toMatchObject({ id: 'a', revision: 3 })
+    expect(first.result.docs[0][LOCAL_RESTORE]).toBeUndefined()
+    const purged = planLocalCommit(first.put!, [change(first.result.docs[0], undefined)], copyName)
+    const late = planLocalCommit(purged.put!, [change(base, { ...request, content: 'LATE_RESPONSE' })], copyName)
+    expect(late.put?.map((r) => r.id)).toEqual(['a-copy'])
+    expect(late.result.removed).toEqual(['a'])
+  })
+
+  it('keeps restore permissions out of JSON backups and durable body metadata', () => {
+    const request = doc('a', 'BODY', { [LOCAL_RESTORE]: { id: 'a', revision: 2 } })
+    const fromBackup = JSON.parse(toBundle([request])).docs[0] as LocalDocRecord
+    expect(fromBackup[LOCAL_RESTORE]).toBeUndefined()
+    expect(Object.getOwnPropertySymbols(bodyFromDocument(request, 3).metadata!)).toEqual([])
+    const plan = planLocalCommit([{ id: 'a', content: '', revision: 2, removed: true }], [change(undefined, fromBackup)], copyName)
+    expect(plan.put?.map((r) => r.id)).toEqual(['a-copy'])
   })
 
   it('deletes after a cloud save without making a (local version) copy', () => {
