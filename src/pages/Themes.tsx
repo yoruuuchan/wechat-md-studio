@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import type { Theme } from '@/lib/theme-kit'
-import { THEME_CATALOG, THEME_COUNT } from '@/lib/theme-catalog'
+import { THEME_CATALOG, THEME_COUNT, catalogTheme } from '@/lib/theme-catalog'
 import { getCachedTheme, loadTheme } from '@/lib/theme-api'
 import {
   COLOR_FAMILIES,
@@ -18,19 +18,34 @@ import { parseMarkdown } from '@/lib/parse'
 import { renderDoc } from '@/lib/render'
 import { loadSettings, saveSettings } from '@/lib/store'
 import { THEME_PREVIEW_DOC } from '@/lib/sample'
+import { createMathRenderer, documentFormulas, mathReadiness, type MathSnapshot } from '@/lib/math'
+import { loadDiagramCache, type DiagramCache } from '@/lib/diagram'
+import {
+  MAX_COMPARE_THEMES,
+  loadThemeLibraryState,
+  saveThemeLibraryState,
+  toggleCompareTheme,
+  type ThemeLibraryUiState,
+  type ThemePreviewSource,
+} from '@/lib/theme-library-state'
 import type { SignatureConfig } from '@/lib/types'
 import { YoruMark } from '@/components/YoruMark'
+import { ThemeCompareDialog } from '@/components/ThemeCompareDialog'
+import { ThemeTrialSourceSwitch } from '@/components/ThemeTrialSourceSwitch'
 import { APP_BYLINE } from '@/lib/brand'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageToggle } from '@/components/LanguageToggle'
 import { useThemeFavorites } from '@/hooks/useThemeFavorites'
+import { useTrialArticle } from '@/hooks/useTrialArticle'
 import { useI18n } from '@/hooks/useI18n'
 
-// 模板库：全部主题渲染同一份 THEME_PREVIEW_DOC，视觉差异才可比。
+// 模板库：卡片统一渲染 THEME_PREVIEW_DOC，视觉差异才可比；「试排当前文章」
+// 与对比改用当前稿，但只渲染选中的 1–3 套，不把长稿铺满 219 张卡片。
 //
 // 卡片与筛选只读 metadata 目录，进入页面不下载任何主题实现；卡片滚进视口附近
 // 才开始按来源加载实现并渲染预览，所以首屏与一次访问的下载量都跟实际看到的
 // 卡片数量挂钩。预览 HTML 按「主题 + 署名设置」缓存，来回滚动不重算。
+// 试排/对比不改正文、不持久化主题，只有明确的「应用」才 saveSettings。
 
 type ParsedPreview = ReturnType<typeof parseMarkdown>
 type Sig = SignatureConfig
@@ -274,16 +289,22 @@ function ThemeCard({
   sig,
   active,
   favorited,
+  compareSelected,
+  compareDisabled,
   onUse,
   onToggleFavorite,
+  onToggleCompare,
 }: {
   theme: ThemeCatalogEntry
   doc: ParsedPreview
   sig: Sig
   active: boolean
   favorited: boolean
+  compareSelected: boolean
+  compareDisabled: boolean
   onUse: () => void
   onToggleFavorite: () => void
+  onToggleCompare: () => void
 }) {
   const { t } = useI18n()
   const [showOrigin, setShowOrigin] = useState(false)
@@ -351,7 +372,7 @@ function ThemeCard({
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-1.5">
         <button
           onClick={onUse}
           disabled={active}
@@ -359,7 +380,20 @@ function ThemeCard({
         >
           {active ? t('themes.card.current') : t('themes.card.use')}
         </button>
-        <button onClick={() => setShowOrigin((v) => !v)} className="ya-btn ya-btn-secondary !px-3">
+        <button
+          type="button"
+          data-theme-compare={theme.id}
+          onClick={onToggleCompare}
+          disabled={compareDisabled}
+          aria-pressed={compareSelected}
+          title={compareDisabled ? t('themes.compare.max', { n: MAX_COMPARE_THEMES }) : undefined}
+          className={`ya-btn !px-2.5 ${
+            compareSelected ? 'ya-selected text-ink-1' : 'ya-btn-secondary'
+          } disabled:opacity-40`}
+        >
+          {compareSelected ? t('themes.compare.added') : t('themes.compare.add')}
+        </button>
+        <button onClick={() => setShowOrigin((v) => !v)} className="ya-btn ya-btn-secondary !px-2.5">
           {showOrigin ? t('themes.card.collapse') : t('themes.card.source')}
         </button>
       </div>
@@ -371,17 +405,60 @@ function ThemeCard({
 export default function Themes() {
   const { t } = useI18n()
   const navigate = useNavigate()
+  const initialUi = useMemo(() => loadThemeLibraryState(), [])
   const [themeId, setThemeId] = useState(() => loadSettings().themeId)
   const sig = useMemo(() => loadSettings().sig, [])
   const doc = useMemo(() => parseMarkdown(THEME_PREVIEW_DOC), [])
   const { favorites, count: favCount, toggle: toggleFavorite } = useThemeFavorites()
 
-  const [tags, setTags] = useState<Set<StyleTag>>(new Set())
-  const [levels, setLevels] = useState<Set<Complexity>>(new Set())
-  const [colors, setColors] = useState<Set<ColorFamily>>(new Set())
-  const [sources, setSources] = useState<Set<string>>(new Set())
-  const [favOnly, setFavOnly] = useState(false)
-  const [query, setQuery] = useState('')
+  const [tags, setTags] = useState<Set<StyleTag>>(() => new Set(initialUi.tags))
+  const [levels, setLevels] = useState<Set<Complexity>>(() => new Set(initialUi.levels))
+  const [colors, setColors] = useState<Set<ColorFamily>>(() => new Set(initialUi.colors))
+  const [sources, setSources] = useState<Set<string>>(() => new Set(initialUi.sources))
+  const [favOnly, setFavOnly] = useState(initialUi.favOnly)
+  const [query, setQuery] = useState(initialUi.query)
+  const [source, setSource] = useState<ThemePreviewSource>(initialUi.source)
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [compareOpen, setCompareOpen] = useState(false)
+
+  // 当前稿只在用户真的选择「当前文章」或点「试排」时读取；卡片仍用样稿，
+  // 所以长稿不会为 219 张卡片各渲染一遍。
+  const article = useTrialArticle(source)
+  const mathRenderer = useMemo(() => createMathRenderer(), [])
+  const [math, setMath] = useState<MathSnapshot>(() => mathRenderer.snapshot())
+  useEffect(() => mathRenderer.subscribe(() => setMath(mathRenderer.snapshot())), [mathRenderer])
+  const formulas = useMemo(() => documentFormulas(article.doc.blocks), [article.doc])
+  useEffect(() => {
+    const snapshot = mathRenderer.snapshot()
+    for (const formula of formulas) {
+      if (snapshot.status(formula.tex, formula.display) === 'pending') {
+        void mathRenderer.warm(formula.tex, formula.display)
+      }
+    }
+  }, [formulas, mathRenderer])
+  const formulaState = useMemo(() => mathReadiness(formulas, math), [formulas, math])
+  const mathPending = formulaState.pending > 0 && !formulaState.engineUnavailable
+  const diagrams = useMemo<DiagramCache>(() => loadDiagramCache(), [])
+
+  const compareThemes = useMemo(
+    () =>
+      compareIds
+        .map((id) => THEME_CATALOG.find((entry) => entry.id === id))
+        .filter((entry): entry is ThemeCatalogEntry => Boolean(entry)),
+    [compareIds],
+  )
+
+  const toggleCompare = useCallback(
+    (id: string) => {
+      const result = toggleCompareTheme(compareIds, id)
+      if (result.limitReached) {
+        toast(t('themes.compare.max', { n: MAX_COMPARE_THEMES }))
+        return
+      }
+      setCompareIds(result.ids)
+    },
+    [compareIds, t],
+  )
 
   const toggle = <T,>(set: Set<T>, v: T, apply: (s: Set<T>) => void) => {
     const next = new Set(set)
@@ -431,10 +508,105 @@ export default function Themes() {
   const filtering =
     tags.size + levels.size + colors.size + sources.size > 0 || favOnly || query.trim() !== ''
 
+  // ---- filters / source / scroll survive a detour to the editor ----
+  const uiSnapshot = useMemo<ThemeLibraryUiState>(
+    () => ({
+      query,
+      tags: [...tags],
+      levels: [...levels],
+      colors: [...colors],
+      sources: [...sources],
+      favOnly,
+      source,
+      scrollY: 0,
+    }),
+    [query, tags, levels, colors, sources, favOnly, source],
+  )
+  const uiRef = useRef<ThemeLibraryUiState>(uiSnapshot)
+  const uiReadyRef = useRef(false)
+  const compareOpenRef = useRef(false)
+  // Radix's scroll lock moves the page to the top while the dialog is open, so
+  // window.scrollY is no longer the library position. Keep the last real one.
+  const lastScrollRef = useRef(initialUi.scrollY)
+  useEffect(() => {
+    uiRef.current = uiSnapshot
+  }, [uiSnapshot])
+
+  const persist = useCallback(() => {
+    if (!uiReadyRef.current) return
+    saveThemeLibraryState({
+      ...uiRef.current,
+      scrollY: Math.max(0, Math.round(lastScrollRef.current)),
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    const saved = initialUi.scrollY
+    lastScrollRef.current = saved
+    if (saved > 0) {
+      const frame = window.requestAnimationFrame(() => {
+        window.scrollTo(0, saved)
+        uiReadyRef.current = true
+      })
+      return () => window.cancelAnimationFrame(frame)
+    }
+    uiReadyRef.current = true
+    return undefined
+  }, [initialUi])
+
+  useEffect(() => {
+    if (!uiReadyRef.current) return
+    const timer = window.setTimeout(persist, 250)
+    return () => window.clearTimeout(timer)
+  }, [uiSnapshot, persist])
+
+  useEffect(() => {
+    let timer = 0
+    const onScroll = () => {
+      if (!compareOpenRef.current) lastScrollRef.current = Math.max(0, window.scrollY)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(persist, 250)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.clearTimeout(timer)
+      persist()
+    }
+  }, [persist])
+
+  const setCompareOpenSafe = (open: boolean) => {
+    compareOpenRef.current = open
+    setCompareOpen(open)
+  }
+
+  const openCurrentTrial = () => {
+    compareOpenRef.current = true
+    setSource('current')
+    if (!compareIds.length) setCompareIds([catalogTheme(themeId).id])
+    setCompareOpen(true)
+  }
+
+  const openComparison = () => {
+    if (!compareThemes.length) {
+      toast(t('themes.compare.empty', { max: MAX_COMPARE_THEMES }))
+      return
+    }
+    compareOpenRef.current = true
+    setCompareOpen(true)
+  }
+
   const applyTheme = (theme: ThemeCatalogEntry) => {
     const s = loadSettings()
     saveSettings({ ...s, themeId: theme.id })
     setThemeId(theme.id)
+    // Save before navigating: applied themes must return to the same filtered,
+    // scrolled library, not a fresh one. The last real scroll position survives
+    // the dialog's scroll lock.
+    saveThemeLibraryState({
+      ...uiSnapshot,
+      scrollY: Math.max(0, Math.round(lastScrollRef.current)),
+    })
     toast.success(t('themes.applied', { name: theme.name }), { description: t('themes.appliedDesc') })
     setTimeout(() => navigate('/'), 450)
   }
@@ -461,7 +633,7 @@ export default function Themes() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-5">
+      <main className={`mx-auto max-w-6xl px-4 py-5 ${compareThemes.length ? 'pb-28' : ''}`}>
         <div className="ya-well mb-5 flex flex-col gap-2.5 rounded-2xl p-3.5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
@@ -520,6 +692,20 @@ export default function Themes() {
             onToggle={(v) => toggle(sources, v, setSources)}
             render={(v) => `${v} ${sourceOptions.find(([n]) => n === v)?.[1] ?? ''}`}
           />
+          <div
+            className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5"
+            style={{ borderColor: 'var(--line-2)' }}
+          >
+            <p className="min-w-0 max-w-2xl text-[11px] leading-relaxed text-ink-3">{t('themes.trial.hint')}</p>
+            <button
+              type="button"
+              data-trial-current
+              onClick={openCurrentTrial}
+              className="ya-btn ya-btn-secondary ya-btn-sm shrink-0"
+            >
+              {t('themes.trial.cta')}
+            </button>
+          </div>
         </div>
 
         <p className="mb-4 px-0.5 text-[12px] leading-relaxed text-ink-3">
@@ -540,8 +726,13 @@ export default function Themes() {
                 sig={sig}
                 active={theme.id === themeId}
                 favorited={favorites.has(theme.id)}
+                compareSelected={compareIds.includes(theme.id)}
+                compareDisabled={
+                  compareIds.length >= MAX_COMPARE_THEMES && !compareIds.includes(theme.id)
+                }
                 onUse={() => applyTheme(theme)}
                 onToggleFavorite={() => toggleFavorite(theme.id)}
+                onToggleCompare={() => toggleCompare(theme.id)}
               />
             ))}
           </div>
@@ -551,6 +742,74 @@ export default function Themes() {
           {t('themes.footer')}
         </p>
       </main>
+
+      {compareThemes.length > 0 && (
+        <div
+          data-compare-tray
+          className="ya-glass fixed inset-x-0 bottom-0 z-30 border-t px-3 py-2.5"
+          style={{ borderColor: 'var(--line-2)' }}
+        >
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
+            <span className="shrink-0 text-[11px] font-medium text-ink-2">
+              {t('themes.compare.selected', { n: compareThemes.length })}
+            </span>
+            <div className="flex min-w-0 flex-wrap gap-1.5">
+              {compareThemes.map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  data-compare-chip={theme.id}
+                  onClick={() => toggleCompare(theme.id)}
+                  aria-label={t('themes.compare.remove', { name: theme.name })}
+                  className="flex max-w-[170px] items-center gap-1 rounded-full px-2 py-1 text-[10.5px] text-ink-2 transition-colors hover:text-ink-1"
+                  style={{ background: 'var(--bg-sunken)', boxShadow: 'var(--shadow-inset)' }}
+                >
+                  <span className="ya-dot shrink-0" style={{ background: theme.ui.accent }} />
+                  <span className="truncate">{theme.name}</span>
+                  <span className="shrink-0 text-ink-4">×</span>
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <ThemeTrialSourceSwitch source={source} onChange={setSource} />
+              {source === 'current' && article.status === 'loading' && (
+                <span className="text-[10px] text-ink-3">{t('themes.trial.loading')}</span>
+              )}
+              <button
+                type="button"
+                data-compare-open
+                onClick={openComparison}
+                className="ya-btn ya-btn-primary ya-btn-sm"
+              >
+                {t('themes.compare.open')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompareIds([])}
+                className="ya-btn ya-btn-ghost ya-btn-sm"
+              >
+                {t('themes.compare.clear')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ThemeCompareDialog
+        open={compareOpen}
+        onOpenChange={setCompareOpenSafe}
+        themes={compareThemes}
+        activeThemeId={themeId}
+        article={article}
+        source={source}
+        onSourceChange={setSource}
+        math={math}
+        diagrams={diagrams}
+        mathPending={mathPending}
+        sig={sig}
+        onApply={applyTheme}
+      />
+
       <Toaster position="bottom-center" toastOptions={{ style: { borderRadius: 10 } }} />
     </div>
   )

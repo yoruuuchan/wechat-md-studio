@@ -64,7 +64,7 @@ flowchart LR
 
 ## Editor and typesetting
 
-- **<!-- gen:theme-count -->219 themes<!-- /gen:theme-count -->** with filters for style, complexity, color and source. Favorite templates and compare them using the same sample. Author, license and provenance are retained.
+- **<!-- gen:theme-count -->219 themes<!-- /gen:theme-count -->** with filters for style, complexity, color and source. Favorite templates, trial the current article, or compare up to three candidates side by side. Author, license and provenance are retained.
 - **Article-oriented Markdown**: numbered sections, highlights, pull quotes, quotation boxes, centered text, credits, tables, block equations and Mermaid diagrams.
 - **Images**: upload, compression, automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
 - **Editing and preview**: CodeMirror, a Markdown toolbar, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
@@ -72,7 +72,7 @@ flowchart LR
 - **Import / export**: import Markdown and DOCX; export Markdown, article HTML, a complete preview page or a full document backup.
 - **Agent REST API**: a separate API and dependency-free Python client for pushing a draft, opening it for human editing and reading it back. This interface accesses the site owner's cloud documents, requires an Agent token, and needs browser login for its editor links. See [Agent API](docs/agent-api.md).
 
-Every theme card renders the same sample article, so comparisons show the theme rather than different content. Author, color and license information are shown directly on each card.
+Every theme card renders the same sample article, so comparisons show the theme rather than different content. Switch to the current article to trial it, or put up to three candidates side by side; trying and comparing never edit the article or save a theme. Author, color and license information stay on each card.
 
 ![Theme library with filters and real rendered previews](docs/images/theme-library.png)
 
