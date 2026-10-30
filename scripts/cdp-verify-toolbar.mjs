@@ -774,9 +774,12 @@ titles:
   if (themeBtn) {
     await clickAt(themeBtn.x, themeBtn.y)
     await sleep(500)
-    const golden = await boxOf(`document.querySelector('[data-theme-quick="golden"]')`)
-    if (golden) await clickAt(golden.x, golden.y)
+    // Click the button itself rather than its coordinates: the popover is tall
+    // enough at this width that a coordinate click can land on the "all themes"
+    // link underneath it and leave the editor for /themes.
+    await evaluate(`document.querySelector('[data-theme-quick="golden"]')?.click()`)
     await sleep(700)
+    if ((await evaluate(`location.pathname`)) !== '/') await goto(appUrl)
   }
 
   // -------------------------------------------------------------------------
