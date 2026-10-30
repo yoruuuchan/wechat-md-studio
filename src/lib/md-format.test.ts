@@ -11,7 +11,9 @@ import {
   clearInline,
   convertBlocksTo,
   inlineStateAt,
+  setTableAlign,
   snapshotAt,
+  tableAt,
   toggleInline,
   toggleLink,
   toggleList,
@@ -408,5 +410,83 @@ describe('insert templates', () => {
     const ph = buildImagePlaceholder()
     expect(ph.text).toBe('![图注]()')
     expect(ph.text.slice(ph.caret!, ph.caretEnd!)).toBe('图注')
+  })
+})
+
+describe('table alignment', () => {
+  const TABLE = '| 语法 | 作用 | 什么时候用 |\n| --- | :---: | ---: |\n| 甲 | 乙 | 丙 |\n'
+  const tableOf = (src: string) => parseMarkdown(src).blocks[0]
+
+  it('reports the column and every alignment under the cursor', () => {
+    const info = tableAt(TABLE, TABLE.indexOf('乙'))!
+    expect(info.column).toBe(1)
+    expect(info.columns).toBe(3)
+    expect(info.align).toEqual(['none', 'center', 'right'])
+    expect(info.delimiterLine).toBe(1)
+  })
+
+  it('finds the table from the header row and from the delimiter row', () => {
+    expect(tableAt(TABLE, TABLE.indexOf('语法'))!.column).toBe(0)
+    expect(tableAt(TABLE, TABLE.indexOf(':---:'))!.column).toBe(1)
+    expect(tableAt(TABLE, TABLE.indexOf('什么时候用'))!.column).toBe(2)
+  })
+
+  it('returns null outside a table and inside a fence', () => {
+    expect(tableAt('普通段落\n\n另一段', 2)).toBeNull()
+    const fenced = '```\n| 甲 | 乙 |\n| --- | --- |\n| 1 | 2 |\n```\n'
+    expect(tableAt(fenced, fenced.indexOf('1 | 2'))).toBeNull()
+    // A setext heading is not a table: one cell, no pipe in the title.
+    expect(tableAt('标题\n---\n', 0)).toBeNull()
+  })
+
+  it('ignores escaped pipes when counting columns', () => {
+    const src = '| a \\| b | c |\n| --- | --- |\n| 1 | 2 |\n'
+    expect(tableAt(src, src.indexOf('2 |'))!.column).toBe(1)
+  })
+
+  it('sets one column and leaves the others alone', () => {
+    const at = { from: TABLE.indexOf('乙'), to: TABLE.indexOf('乙') }
+    const r = setTableAlign(TABLE, at, 'column', 'left')!
+    expect(r.doc.split('\n')[1]).toBe('| --- | :--- | ---: |')
+    expect(tableOf(r.doc)).toMatchObject({ type: 'table', align: ['left', 'left', 'right'] })
+  })
+
+  it('sets every column at once', () => {
+    const r = setTableAlign(TABLE, { from: TABLE.indexOf('丙'), to: TABLE.indexOf('丙') }, 'table', 'center')!
+    expect(r.doc.split('\n')[1]).toBe('| :---: | :---: | :---: |')
+    expect(tableOf(r.doc)).toMatchObject({ type: 'table', align: ['center', 'center', 'center'] })
+  })
+
+  it('drops the colons back to the default alignment', () => {
+    const r = setTableAlign(TABLE, { from: TABLE.indexOf('丙'), to: TABLE.indexOf('丙') }, 'column', 'none')!
+    expect(r.doc.split('\n')[1]).toBe('| --- | :---: | --- |')
+    const back = setTableAlign(r.doc, { from: r.doc.indexOf('乙'), to: r.doc.indexOf('乙') }, 'column', 'none')!
+    expect(back.doc.split('\n')[1]).toBe('| --- | --- | --- |')
+  })
+
+  it('keeps the dash runs and spaces the author typed', () => {
+    const src = '| 甲 | 乙 |\n|:--- |  :--:  |\n| 1 | 2 |\n'
+    const r = setTableAlign(src, { from: src.indexOf('1'), to: src.indexOf('1') }, 'column', 'right')!
+    expect(r.doc.split('\n')[1]).toBe('|---: |  :--:  |')
+    const whole = setTableAlign(src, { from: src.indexOf('甲'), to: src.indexOf('甲') }, 'table', 'none')!
+    expect(whole.doc.split('\n')[1]).toBe('|--- |  --  |')
+  })
+
+  it('carries the caret through the changed delimiter row', () => {
+    const caret = TABLE.indexOf('丙')
+    const r = setTableAlign(TABLE, { from: caret, to: caret }, 'column', 'center')!
+    expect(r.doc.slice(r.from, r.from + 1)).toBe('丙')
+  })
+
+  it('does nothing when the column already has that alignment', () => {
+    expect(setTableAlign(TABLE, { from: TABLE.indexOf('乙'), to: TABLE.indexOf('乙') }, 'column', 'center')).toBeNull()
+    expect(setTableAlign('没有表格', { from: 0, to: 0 }, 'table', 'center')).toBeNull()
+  })
+
+  it('produces a table the parser renders with the new alignment', () => {
+    const r = setTableAlign(TABLE, { from: TABLE.indexOf('甲'), to: TABLE.indexOf('甲') }, 'column', 'right')!
+    const table = tableOf(r.doc)
+    expect(table.type).toBe('table')
+    if (table.type === 'table') expect(table.align).toEqual(['right', 'center', 'right'])
   })
 })

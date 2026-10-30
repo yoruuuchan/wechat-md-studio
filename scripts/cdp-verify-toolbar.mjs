@@ -91,7 +91,7 @@ const chrome = spawn(
     '--disable-gpu',
     '--no-proxy-server',
     '--proxy-bypass-list=<-loopback>',
-    '--window-size=1440,900',
+    '--window-size=1728,1080',
     'about:blank',
   ],
   { stdio: 'ignore' },
@@ -189,6 +189,13 @@ async function doubleClickAt(x, y) {
   await clickAt(x, y, 2)
 }
 
+/** A real Escape keypress: Radix menus listen for it on their own content. */
+async function pressEscape() {
+  await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
+  await sleep(250)
+}
+
 async function boxOf(expr) {
   const raw = await evaluate(`(() => { const el = ${expr}; if (!el) return null; const r = el.getBoundingClientRect(); return JSON.stringify({ x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height }) })()`)
   return raw ? JSON.parse(raw) : null
@@ -213,7 +220,9 @@ async function clickMenuItem(text) {
   const raw = await evaluate(`(() => {
     const all = [...document.querySelectorAll('[role=menuitem],[role=menuitemradio],[role=menuitemcheckbox]')]
     const items = all.filter(el => el.getClientRects().length > 0)
-    const el = items.find(i => i.textContent.includes(${JSON.stringify(text)}))
+    // Exact label first: 「表格」 must not match 「表格对齐」.
+    const el = items.find(i => i.textContent.trim() === ${JSON.stringify(text)}) ||
+      items.find(i => i.textContent.includes(${JSON.stringify(text)}))
     if (!el) return JSON.stringify({
       error: 'not found',
       total: all.length,
@@ -573,6 +582,72 @@ try {
   await sleep(300)
   check('redo brings it back', (await doc()).includes('| 表头 |'))
 
+  // -------------------------------------------------------------------------
+  console.log('\n=== table alignment ===')
+  // Distinct cell text per column: the alignment control is aimed by caret, and
+  // a 3×3 template repeats 表头 in every header cell.
+  const TABLE_FIXTURE = `---
+titles:
+  - 表格对齐验收
+---
+
+| 语法 | 作用 | 什么时候用 |
+| --- | --- | --- |
+| 重点 | 行内下划线 | 点关键词 |
+
+表外文字。
+`
+  const sepRow = async () => (await doc()).split('\n').find((l) => /^\|[\s:|-]+\|$/.test(l)) ?? ''
+  const previewAligns = () =>
+    evaluate(`(() => {
+      const cells = [...document.querySelectorAll('div.px-1.py-6 table tr:first-child th')]
+      return JSON.stringify(cells.map(c => ((c.getAttribute('style') || '').match(/text-align:\\s*(left|center|right)/) || [])[1] || ''))
+    })()`)
+  const clickChip = async (scope, align) => {
+    const chip = await boxOf(`document.querySelector('[data-menu="table"] [data-scope="${scope}"][data-align="${align}"]')`)
+    if (!chip) throw new Error(`no ${scope}/${align} chip in the alignment menu`)
+    await clickAt(chip.x, chip.y)
+    await sleep(350)
+  }
+
+  await setEditorDoc(TABLE_FIXTURE)
+  await cursorInside('作用', 0)
+  await clickTool('table')
+  await sleep(300)
+  check('the toolbar 表格 button opens the alignment menu', (await evaluate(`!!document.querySelector('[data-menu="table"]')`)) === true)
+  await clickChip('column', 'center')
+  check('center aligns only the column under the caret', (await sepRow()) === '| --- | :---: | --- |', await sepRow())
+  check('the preview centers that column', (await previewAligns()) === '["left","center","left"]', await previewAligns())
+
+  await pressEscape()
+  await sleep(200)
+  await cursorInside('点关键词', 0)
+  await clickTool('table')
+  await sleep(300)
+  await clickChip('column', 'right')
+  check('right aligns the third column', (await sepRow()) === '| --- | :---: | ---: |', await sepRow())
+  check('the preview follows the new column', (await previewAligns()) === '["left","center","right"]', await previewAligns())
+  await clickChip('table', 'left')
+  check('the whole-table row rewrites every column', (await sepRow()) === '| :--- | :--- | :--- |', await sepRow())
+  check('every preview column is left aligned', (await previewAligns()) === '["left","left","left"]', await previewAligns())
+
+  await pressEscape()
+  await sleep(250)
+  await clickTool('undo')
+  await sleep(350)
+  check('undo steps back to the previous alignment', (await sepRow()) === '| --- | :---: | ---: |', await sepRow())
+
+  await cursorInside('表外文字', 0)
+  await clickTool('table')
+  await sleep(300)
+  check('outside a table the menu explains what to do', await evaluate(`!!document.querySelector('[data-menu="table"] [data-table-hint]')`))
+  check('outside a table there are no alignment chips', (await evaluate(`!!document.querySelector('[data-menu="table"] [data-align]')`)) === false)
+  await pressEscape()
+  await sleep(200)
+
+  // The sections below expect the fixed article, not this fixture.
+  await setEditorDoc(FIXTURE)
+  await sleep(400)
   await cursorInside('尾段。', 0)
   await optionsMenu('数学公式')
   await sleep(250)

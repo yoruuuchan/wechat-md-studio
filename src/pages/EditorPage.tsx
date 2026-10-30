@@ -44,7 +44,9 @@ import {
   inlineStateAt,
   lineOfOffset,
   lineStarts,
+  setTableAlign,
   snapshotAt,
+  tableAt,
   toBlockInfo,
   toggleInline,
   toggleLink,
@@ -428,6 +430,7 @@ export default function EditorPage() {
         ordered: false,
         canUndo: false,
         canRedo: false,
+        table: null,
       }
     }
     const from = Math.max(0, Math.min(viewState.from, text.length))
@@ -436,12 +439,16 @@ export default function EditorPage() {
     const line = lineOfOffset(starts, from)
     const block = blockAtLine(blockInfos, line)
     const range = block ? blockCharRange(text, block, starts) : undefined
+    // The table alignment menu reads the delimiter row itself, so it can only
+    // ever offer a change on a table the parser actually rendered.
+    const table = block?.kind === 'table' ? tableAt(text, from) : null
     return {
       inline: inlineStateAt(text, { from, to }, range),
       block: block?.kind ?? 'paragraph',
       ordered: block?.ordered ?? false,
       canUndo: viewState.undoDepth > 0,
       canRedo: viewState.redoDepth > 0,
+      table: table ? { column: table.column, columns: table.columns, align: table.align } : null,
     }
   }, [activeDoc?.content, viewState, blockInfos])
 
@@ -1491,6 +1498,9 @@ export default function EditorPage() {
         ed.insertTemplate(t.text, t.caret)
         return
       }
+      case 'tableAlign':
+        apply(setTableAlign(st.text, sel, a.scope, a.align))
+        return
       case 'carousel': {
         const t = buildCarousel(a.ratio)
         ed.insertTemplate(t.text, t.caret)

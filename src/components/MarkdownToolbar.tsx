@@ -56,11 +56,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CAROUSEL_RATIOS, GALLERY_COLS, type CarouselRatio } from '@/lib/types'
 import { CHEATSHEET } from '@/lib/sample'
-import type { InlineFormat, InlineState } from '@/lib/md-format'
+import type { InlineFormat, InlineState, TableAlign } from '@/lib/md-format'
 import { useI18n } from '@/hooks/useI18n'
 import type { MsgKey } from '@/lib/i18n'
-
-export type TableAlign = 'none' | 'left' | 'center' | 'right'
 
 export type ToolbarAction =
   | { type: 'undo' }
@@ -74,6 +72,7 @@ export type ToolbarAction =
   | { type: 'image' }
   | { type: 'imagePlaceholder' }
   | { type: 'table'; cols: number; rows: number; align: TableAlign }
+  | { type: 'tableAlign'; scope: 'column' | 'table'; align: TableAlign }
   | { type: 'carousel'; ratio: CarouselRatio }
   | { type: 'gallery'; cols: number; ratio: CarouselRatio }
   | { type: 'math'; tex: string }
@@ -84,6 +83,15 @@ export type ToolbarAction =
 
 export type BrushMode = 'off' | 'single' | 'locked'
 
+/** The table around the caret, as the alignment menu needs to show it. */
+export interface ToolbarTable {
+  /** 0-based column the caret sits in; the menu shows it 1-based. */
+  column: number
+  columns: number
+  /** One entry per column, in source order. */
+  align: TableAlign[]
+}
+
 export interface ToolbarState {
   inline: InlineState
   /** The block the cursor sits in; only the six convertible kinds light a menu. */
@@ -91,6 +99,8 @@ export interface ToolbarState {
   ordered: boolean
   canUndo: boolean
   canRedo: boolean
+  /** Null whenever the caret is not inside a GFM table. */
+  table: ToolbarTable | null
 }
 
 interface Props {
@@ -111,14 +121,14 @@ const GROUPS: Group[] = [
   { key: 'history', items: ['undo', 'redo'] },
   { key: 'heading', items: ['heading'] },
   { key: 'inline', items: ['bold', 'mark', 'italic', 'strike', 'code', 'brush', 'clear'] },
-  { key: 'block', items: ['quote', 'list', 'link', 'image'] },
+  { key: 'block', items: ['quote', 'list', 'table', 'link', 'image'] },
 ]
 
 /**
  * Who folds into ··· first. The always-visible names (undo, redo, the heading
  * menu, B, the highlight, the brush) are simply absent — they never fold.
  */
-const FOLD_ORDER = ['image', 'link', 'list', 'quote', 'strike', 'code', 'clear', 'italic', 'label', 'helpText']
+const FOLD_ORDER = ['image', 'link', 'list', 'quote', 'table', 'strike', 'code', 'clear', 'italic', 'label', 'helpText']
 
 const GAP = 3
 /** Fallback separator width until the measuring row has rendered one. */
@@ -132,6 +142,15 @@ const RATIO_KEYS: Record<CarouselRatio, MsgKey> = {
   '16:9': 'toolbar.ratio.16:9',
   '9:16': 'toolbar.ratio.9:16',
   '1:1': 'toolbar.ratio.1:1',
+}
+
+const TABLE_ALIGNS: readonly TableAlign[] = ['none', 'left', 'center', 'right']
+
+const TABLE_ALIGN_KEYS: Record<TableAlign, MsgKey> = {
+  none: 'toolbar.table.alignDefault',
+  left: 'toolbar.table.alignLeft',
+  center: 'toolbar.table.alignCenter',
+  right: 'toolbar.table.alignRight',
 }
 
 /** Common fences offered by the code-block panel. '' means no language. */
@@ -172,7 +191,16 @@ function ToolButton({
   )
 }
 
-function Chip({ active, onClick, children }: { active?: boolean; onClick: () => void; children: ReactNode }) {
+function Chip({
+  active,
+  onClick,
+  children,
+  ...rest
+}: {
+  active?: boolean
+  onClick: () => void
+  children: ReactNode
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'>) {
   return (
     <button
       type="button"
@@ -180,6 +208,7 @@ function Chip({ active, onClick, children }: { active?: boolean; onClick: () => 
       className="ya-tool px-2"
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
+      {...rest}
     >
       {children}
     </button>
@@ -235,6 +264,46 @@ function TablePanel({ onInsert, onClose }: { onInsert: (cols: number, rows: numb
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The two chip rows behind the toolbar's 表格 button: the column the caret sits
+ * in, plus a shortcut for the whole table. Chips rather than menu items so the
+ * menu stays open — the caret cannot move while it is open, but the current
+ * alignment can be corrected without reopening it.
+ */
+function TableAlignBody({
+  table,
+  onAlign,
+}: {
+  table: ToolbarTable | null
+  onAlign: (scope: 'column' | 'table', align: TableAlign) => void
+}) {
+  const { t } = useI18n()
+  if (!table) {
+    return (
+      <div className="p-2">
+        <p className="ya-eyebrow px-1 pb-1">{t('toolbar.tableAlign')}</p>
+        <p data-table-hint className="px-1 text-[11px] leading-relaxed text-ink-3">{t('toolbar.table.hint')}</p>
+      </div>
+    )
+  }
+  const current = table.align[table.column] ?? 'none'
+  const whole = table.align.every((a) => a === table.align[0]) ? table.align[0] : null
+  const chips = (scope: 'column' | 'table', active: TableAlign | null, run: (align: TableAlign) => void) =>
+    TABLE_ALIGNS.map((a) => (
+      <Chip key={a} active={active === a} data-align={a} data-scope={scope} onClick={() => run(a)}>
+        {t(TABLE_ALIGN_KEYS[a])}
+      </Chip>
+    ))
+  return (
+    <div className="p-2">
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.table.currentColumn', { column: table.column + 1, columns: table.columns })}</p>
+      <div className="mb-2 flex flex-wrap gap-1 px-1">{chips('column', current, (a) => onAlign('column', a))}</div>
+      <p className="ya-eyebrow px-1 pb-1.5">{t('toolbar.table.whole')}</p>
+      <div className="flex flex-wrap gap-1 px-1">{chips('table', whole, (a) => onAlign('table', a))}</div>
     </div>
   )
 }
@@ -651,6 +720,30 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
             </DropdownMenuContent>
           </DropdownMenu>
         )
+      case 'table': {
+        const table = state.table
+        const current = table ? (table.align[table.column] ?? 'none') : 'none'
+        return (
+          <DropdownMenu key={id}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                data-tool="table"
+                data-active={current !== 'none' ? 'true' : undefined}
+                className="ya-tool"
+                title={t('toolbar.tableAlign')}
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                {t('toolbar.table')}
+                <ChevronDown size={10} strokeWidth={2.4} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent data-menu="table" align="start" className="ya-pop w-64 border-none p-0" onCloseAutoFocus={(e) => e.preventDefault()}>
+              <TableAlignBody table={table} onAlign={(scope, align) => onAction({ type: 'tableAlign', scope, align })} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      }
       case 'link':
         return (
           <ToolButton key={id} id={id} title={t('toolbar.link')} active={state.inline.link} onClick={act({ type: 'link' })}>
@@ -711,7 +804,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
           <span data-mid="label" className="px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3">
             {t('toolbar.label')}
           </span>
-          {['undo', 'redo', 'heading', 'bold', 'mark', 'italic', 'strike', 'code', 'brush', 'clear', 'quote', 'list', 'link', 'image'].map((id) => (
+          {['undo', 'redo', 'heading', 'bold', 'mark', 'italic', 'strike', 'code', 'brush', 'clear', 'quote', 'list', 'table', 'link', 'image'].map((id) => (
             <span key={id} data-mid={id} className="inline-flex">
               {renderItem(id)}
             </span>
@@ -847,6 +940,15 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
                       <DropdownMenuSeparator />
                     </>
                   ) : null}
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="rounded-lg">
+                      <Table2 size={13} strokeWidth={2} />
+                      {t('toolbar.tableAlign')}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="ya-pop w-64 border-none p-0">
+                      <TableAlignBody table={state.table} onAlign={(scope, align) => onAction({ type: 'tableAlign', scope, align })} />
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                   <DropdownMenuItem className="rounded-lg" onSelect={(e) => { e.preventDefault(); setPanel('table') }}>
                     <Table2 size={13} strokeWidth={2} />
                     {t('toolbar.table')}

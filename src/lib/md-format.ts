@@ -836,6 +836,170 @@ export function applyBrush(
   return changed ? cur : null
 }
 
+// ---------- tables ----------
+
+/** Column alignment as it appears in a GFM delimiter row; `none` is a bare `---`. */
+export type TableAlign = 'none' | 'left' | 'center' | 'right'
+
+export interface TableInfo {
+  /** 0-based source line of the delimiter row (`| --- | :---: |`). */
+  delimiterLine: number
+  /** 0-based column the position sits in. */
+  column: number
+  columns: number
+  /** One entry per column, in source order. */
+  align: TableAlign[]
+}
+
+const DELIMITER_CELL = /^:?-+:?$/
+
+interface RowCell {
+  /** Offsets of the cell text inside its row, separators excluded. */
+  start: number
+  end: number
+  text: string
+}
+
+/** Split a table row on its unescaped pipes, dropping the outer empty cells. */
+function splitRow(line: string): RowCell[] {
+  const cells: RowCell[] = []
+  let start = 0
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] !== '|') continue
+    let backslashes = 0
+    for (let j = i - 1; j >= 0 && line[j] === '\\'; j--) backslashes++
+    if (backslashes % 2 === 1) continue
+    cells.push({ start, end: i, text: line.slice(start, i) })
+    start = i + 1
+  }
+  cells.push({ start, end: line.length, text: line.slice(start) })
+  // A leading or trailing pipe produces an empty cell that is not a column.
+  if (cells.length > 1 && cells[0].text.trim() === '') cells.shift()
+  if (cells.length > 1 && cells[cells.length - 1].text.trim() === '') cells.pop()
+  return cells
+}
+
+function isDelimiterRow(line: string): boolean {
+  const cells = splitRow(line)
+  return cells.length > 0 && cells.every((c) => DELIMITER_CELL.test(c.text.trim()))
+}
+
+function alignOfDelimiter(cell: string): TableAlign {
+  const text = cell.trim()
+  const left = text.startsWith(':')
+  const right = text.endsWith(':')
+  return left && right ? 'center' : left ? 'left' : right ? 'right' : 'none'
+}
+
+/**
+ * The GFM table around a position: which column the caret sits in, how many
+ * columns there are, and how each one is aligned right now. Null outside a
+ * table.
+ *
+ * The rules mirror what the parser accepts — a header row, a delimiter row with
+ * the same number of cells, then pipe rows until a blank line — so an alignment
+ * is only ever offered on a table the preview really renders.
+ */
+export function tableAt(text: string, pos: number): TableInfo | null {
+  const at = clamp(pos, 0, text.length)
+  if (isInFence(fencedRanges(text), at)) return null
+  const starts = lineStarts(text)
+  const lineText = (i: number): string | null => {
+    if (i < 0 || i >= starts.length) return null
+    const end = i + 1 < starts.length ? starts[i + 1] - 1 : text.length
+    return text.slice(starts[i], end)
+  }
+  const line = lineOfOffset(starts, at)
+  const here = lineText(line)
+  if (here === null) return null
+
+  let delimiter = -1
+  const below = lineText(line + 1)
+  const above = lineText(line - 1)
+  if (below !== null && here.includes('|') && isDelimiterRow(below)) delimiter = line + 1
+  else if (above !== null && above.includes('|') && isDelimiterRow(here)) delimiter = line
+  else {
+    // A body row: the delimiter is above it, past nothing but pipe rows.
+    for (let i = line - 1; i >= 1; i--) {
+      const candidate = lineText(i)
+      if (candidate === null || candidate.trim() === '' || !candidate.includes('|')) break
+      if (isDelimiterRow(candidate)) {
+        delimiter = i
+        break
+      }
+    }
+  }
+  if (delimiter < 1) return null
+
+  const header = lineText(delimiter - 1)
+  const separator = lineText(delimiter)
+  if (header === null || separator === null || !header.includes('|')) return null
+  const headCells = splitRow(header)
+  const sepCells = splitRow(separator)
+  if (!headCells.length || sepCells.length !== headCells.length) return null
+
+  // Body rows run until a blank line or a line without a pipe.
+  let end = delimiter + 1
+  for (;;) {
+    const next = lineText(end)
+    if (next === null || next.trim() === '' || !next.includes('|')) break
+    end++
+  }
+  if (line < delimiter - 1 || line >= end) return null
+
+  const cells = line === delimiter - 1 ? headCells : splitRow(here)
+  const offset = at - starts[line]
+  let column = 0
+  for (let i = 0; i < cells.length; i++) {
+    column = i
+    if (offset <= cells[i].end) break
+  }
+  return {
+    delimiterLine: delimiter,
+    column: clamp(column, 0, sepCells.length - 1),
+    columns: sepCells.length,
+    align: sepCells.map((c) => alignOfDelimiter(c.text)),
+  }
+}
+
+/**
+ * Rewrite the delimiter row so one column — or every column — takes `align`.
+ *
+ * Only the colons move: dash runs, the spaces around them and the pipe style
+ * stay exactly as written, so the edit is one delimiter line and nothing else
+ * changes except by the length of the colons added or removed.
+ */
+export function setTableAlign(
+  text: string,
+  sel: Selection,
+  scope: 'column' | 'table',
+  align: TableAlign,
+): EditResult | null {
+  const info = tableAt(text, sel.from)
+  if (!info) return null
+  const starts = lineStarts(text)
+  const lineStart = starts[info.delimiterLine]
+  const lineEnd = info.delimiterLine + 1 < starts.length ? starts[info.delimiterLine + 1] - 1 : text.length
+  const edits: Edit[] = []
+  splitRow(text.slice(lineStart, lineEnd)).forEach((cell, i) => {
+    if (scope === 'column' && i !== info.column) return
+    if (info.align[i] === align) return
+    const m = /^(\s*)(:?-+:?)(\s*)$/.exec(cell.text)
+    if (!m) return
+    const dashes = m[2].replace(/:/g, '')
+    if (!dashes) return
+    const insert =
+      align === 'center' ? `:${dashes}:` : align === 'left' ? `:${dashes}` : align === 'right' ? `${dashes}:` : dashes
+    edits.push({
+      from: lineStart + cell.start + m[1].length,
+      to: lineStart + cell.start + m[1].length + m[2].length,
+      insert,
+    })
+  })
+  if (!edits.length) return null
+  return applyEdits(text, sel, edits)
+}
+
 // ---------- inserts ----------
 
 export interface Template {
@@ -857,7 +1021,7 @@ function withCaret(raw: string, marker = '|'): Template {
  * `rows` counts the header, so 2x2 means one header row and one body row —
  * the same meaning the size picker shows.
  */
-export function buildTable(cols: number, rows: number, align: 'none' | 'left' | 'center' | 'right'): Template {
+export function buildTable(cols: number, rows: number, align: TableAlign): Template {
   const dash = align === 'none' ? '---' : align === 'left' ? ':---' : align === 'center' ? ':---:' : '---:'
   const head = `| ${Array.from({ length: cols }, () => t('md.tableHeader')).join(' | ')} |`
   const sep = `| ${Array.from({ length: cols }, () => dash).join(' | ')} |`

@@ -122,7 +122,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 同步滚动 / 布局变化 | [cdp-verify-scroll-sync.mjs](../scripts/cdp-verify-scroll-sync.mjs)：先读脚本参数；覆盖缩放、换纸、图片变化与往返漂移 |
 | 匿名上传与公开访问 | [cdp-verify-public-access.mjs](../scripts/cdp-verify-public-access.mjs)：`node scripts/cdp-verify-public-access.mjs <url> 9335` |
 | 编辑器 / 富文本 / 复制 / 图片粘贴 | [cdp-verify-editor-upgrades.mjs](../scripts/cdp-verify-editor-upgrades.mjs)：`node scripts/cdp-verify-editor-upgrades.mjs <url> <key> 9335` |
-| 工具栏 / 语义格式刷 | [cdp-verify-toolbar.mjs](../scripts/cdp-verify-toolbar.mjs)：`node scripts/cdp-verify-toolbar.mjs <url> <key> 9336`；独立本地生产应用 |
+| 工具栏 / 语义格式刷 / 表格对齐 | [cdp-verify-toolbar.mjs](../scripts/cdp-verify-toolbar.mjs)：`node scripts/cdp-verify-toolbar.mjs <url> <key> 9336`；独立本地生产应用，含工具栏「表格」的按列与整表对齐 |
 | 公式与 SVG | [cdp-verify-math.mjs](../scripts/cdp-verify-math.mjs)：`node scripts/cdp-verify-math.mjs <url>`；CDP 固定 9339 |
 | 图片操作 / 重裁 / 清除 | [cdp-verify-image-ops.mjs](../scripts/cdp-verify-image-ops.mjs)：`node scripts/cdp-verify-image-ops.mjs <url> <key>`；CDP 固定 9333；另有 [recrop](../scripts/cdp-verify-recrop.mjs)（轮播/网格 9:16、3:4、1:1 的真实上传像素、单图自由裁切与取消） / [resize](../scripts/cdp-verify-resize.mjs) |
 | 导入导出菜单 | [cdp-verify-io-menus.mjs](../scripts/cdp-verify-io-menus.mjs)：本地 URL 固定 `http://127.0.0.1:3202/`，CDP 固定 9337 |
