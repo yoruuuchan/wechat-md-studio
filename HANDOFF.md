@@ -762,8 +762,8 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 中转用的一次性密钥装完已从东京 `authorized_keys` 删除，阿里云与 `/tmp` 的临时文件一并清掉。
 > **并行会话提醒**：本轮部署前另一个会话刚在 03:07:37 UTC 装过 `778f1ab`（entry
 > `index-B3S4qtGE.js`）；本次包已含其提交，未被回退，线上资产名因此是两者合并后的
-> `index-BjfnWPfC.js`。未做：README 截图（`docs/images/editor-*.png`）仍是旧工具栏；公开仓库
-> 这一轮没有推送。
+> `index-BjfnWPfC.js`。公开仓库随后按普通推送同步（`778f1ab..4195149`，历史未重写）。
+> 未做：README 截图（`docs/images/editor-*.png`）仍是旧工具栏。
 
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
