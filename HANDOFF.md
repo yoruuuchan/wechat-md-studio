@@ -740,6 +740,31 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 全 200。线上产物复核：新根样式 `max-width:657px` 在，golden 旧根
 > `padding:0 10px` 已消失。公开仓库随本次普通推送同步（历史未重写）。
 
+> 2026-10-30 部署记录（表格对齐上线）：`feat/table-align`（`3c4a4f6` 功能 + `352825d` 测试
+> 修复）合并 origin/master `778f1ab` 后 → master `a471c10`。工具栏新增「表格」下拉：光标在
+> 表格内时按列或整表改写分隔行（默认 / 左对齐 / 居中 / 右对齐），光标不在表格里时给一句提示；
+> 实现是 `md-format.ts` 的 `tableAt` / `setTableAlign` 两个纯函数（与其它工具栏命令同形，不
+> 依赖 CodeMirror / React），只动分隔行的冒号，破折号长度、空格与竖线风格原样保留。
+> 验收：`check`、`test` 2667 项、`verify:themes` ALL CHECKS PASSED；`cdp-verify-toolbar.mjs`
+> 新增 10 项对齐验收（真实表格、源码与预览两侧、整表行、撤销、表外提示），合并态
+> ALL CHECKS PASSED。**另修了两处既有测试基础设施**：无头窗口 1440 → 1728（编辑器窄屏断点
+> 是 1439，原窗口在新布局下只能得到单面板，宽栏与折叠两段必然全空）；主题恢复改用 DOM 点击
+> （宽窗口下弹层会盖住「全部模板」链接，坐标点击会跳到 /themes 把编辑区带走）。
+> 构建：entry `assets/index-BjfnWPfC.js` / `assets/index-CIDnJm6n.css`，`dist/boot.js` sha256
+> `cf23b48c…`（服务端 bundle 未变，与合并前同哈希）。包 `mopai-a471c10.tar.gz` 29,620,461 B，
+> sha256 `075b771f…`。
+> 部署：本机 → 东京的直连 scp 在 20 MB 处挂住不退出、4 MB 分块掉到约 3 KB/s，改走**阿里云
+> 中转**（本机 → 阿里云 30 s，阿里云 → 东京 5 s）；服务器整包 sha256 与本地一致后 `flock`
+> 安装于 **2026-10-30 03:22:13 UTC**（`ExecMainStartTimestamp` 核对一致）。三重核对全过：
+> 线上 `dist/boot.js` sha256 = 本地、`index.html` 资产名本地 = 线上 = 公网、`/` `/login`
+> `auth.me` 与公网均 200；公网 bundle 里能 grep 到「表格对齐」。公网只读复验 6/6：按钮在、
+> 菜单开、第二列居中后分隔行变 `| --- | :---: | --- |`、预览该列居中、整表右对齐生效。
+> 中转用的一次性密钥装完已从东京 `authorized_keys` 删除，阿里云与 `/tmp` 的临时文件一并清掉。
+> **并行会话提醒**：本轮部署前另一个会话刚在 03:07:37 UTC 装过 `778f1ab`（entry
+> `index-B3S4qtGE.js`）；本次包已含其提交，未被回退，线上资产名因此是两者合并后的
+> `index-BjfnWPfC.js`。未做：README 截图（`docs/images/editor-*.png`）仍是旧工具栏；公开仓库
+> 这一轮没有推送。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
