@@ -1,6 +1,6 @@
 // U06 acceptance: trial the current article and compare up to three candidates.
 //
-// Usage: node scripts/cdp-verify-theme-trial.mjs <appUrl> [cdpPort]
+// Usage: node scripts/cdp-verify-theme-trial.mjs <appUrl> [cdpPort] [outputDirectory]
 //
 // Seeds a local legacy article (title, table, image, carousel, formula) before
 // the app boots, then drives the real production build:
@@ -9,7 +9,8 @@
 //   - apply must persist the theme, and returning to the library must restore
 //     the filters and scroll position;
 //   - an unreadable local body must fall back to the sample with a reason;
-//   - English and 390px layouts must stay usable.
+//   - English and 390px layouts must stay usable;
+//   - comparison chrome stays readable in both UI themes, with white article paper.
 //
 // It does not claim to cover a cloud-stub body read (needs a logged-in cloud
 // article) or a full offline first navigation.
@@ -21,7 +22,7 @@ import path from 'node:path'
 
 const APP = (process.argv[2] || 'http://127.0.0.1:4131').replace(/\/$/, '')
 const PORT = Number(process.argv[3] || 9733)
-const SHOTS = 'node_modules/.tmp/u06-shots'
+const SHOTS = process.argv[4] || fs.mkdtempSync(path.join(os.tmpdir(), 'reed-theme-trial-shots-'))
 fs.mkdirSync(SHOTS, { recursive: true })
 
 const DOC = `## TRIAL | 当前文章试排
@@ -121,6 +122,8 @@ const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: t
 await send('Page.enable', {}, sessionId)
 await send('Runtime.enable', {}, sessionId)
 await send('Network.enable', {}, sessionId)
+await send('DOM.enable', {}, sessionId)
+await send('CSS.enable', {}, sessionId)
 
 const consoleErrors = []
 ws.addEventListener('message', (event) => {
@@ -186,6 +189,74 @@ const closeDialog = () =>
     return Boolean(btn)
   })()`)
 
+function contrast(foreground, background) {
+  const luminance = (color) => color.match(/[\d.]+/g).slice(0, 3).map(Number)
+    .map((value) => value / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0)
+  const a = luminance(foreground), b = luminance(background)
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+
+async function verifyComparisonSkin(mode, viewport) {
+  await closeDialog()
+  await waitFor(`document.querySelector('[data-slot="dialog-content"]') == null`)
+  await evaluate(`document.querySelectorAll('[role="radio"]:not([data-lang])')[${mode === 'akari' ? 0 : 2}]?.click()`)
+  check(`${viewport}: ${mode} UI mode is active`, await waitFor(`document.documentElement.dataset.theme === '${mode}'`))
+  await evaluate(`document.querySelector('[data-compare-open]')?.click()`)
+  await waitFor(`document.querySelectorAll('[data-compare-panel]').length === 3`)
+  await evaluate(`document.fonts.ready.then(() => true)`)
+  const skin = await evaluate(`(() => {
+    const dialog = document.querySelector('[data-slot="dialog-content"]')
+    const background = (el) => {
+      for (let current = el; current; current = current.parentElement) {
+        const color = getComputedStyle(current).backgroundColor
+        if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') return color
+      }
+      return 'rgb(255, 255, 255)'
+    }
+    const text = (el) => ({ color: getComputedStyle(el).color, background: background(el) })
+    const bounds = (el) => {
+      const { left, right, top, bottom, width } = el.getBoundingClientRect()
+      return { left, right, top, bottom, width }
+    }
+    const heading = dialog.querySelector('[data-slot="dialog-title"]')
+    return {
+      heading: text(heading),
+      headerLayout: {
+        title: bounds(heading),
+        description: bounds(dialog.querySelector('[data-slot="dialog-description"]')),
+        controls: bounds(heading.parentElement.nextElementSibling),
+      },
+      panels: [...dialog.querySelectorAll('[data-compare-panel]')].map(panel => ({
+        id: panel.dataset.comparePanel,
+        title: text(panel.querySelector('header p')),
+        metadata: text(panel.querySelector('header p + p')),
+        paper: getComputedStyle(panel.querySelector('[data-compare-scroll]')).backgroundColor,
+      })),
+    }
+  })()`)
+  check(`${viewport} ${mode}: dialog title has readable contrast`, contrast(skin.heading.color, skin.heading.background) >= 4.5, JSON.stringify(skin.heading))
+  check(`${viewport} ${mode}: candidate names and credits have readable contrast`, skin.panels.length === 3 && skin.panels.every(panel => [panel.title, panel.metadata].every(text => contrast(text.color, text.background) >= 4.5)), JSON.stringify(skin.panels.map(panel => ({ id: panel.id, title: contrast(panel.title.color, panel.title.background).toFixed(2), credits: contrast(panel.metadata.color, panel.metadata.background).toFixed(2) }))))
+  check(`${viewport} ${mode}: article paper remains white`, skin.panels.every(panel => panel.paper === 'rgb(255, 255, 255)'))
+  const { title, description, controls } = skin.headerLayout
+  const separate = (a, b) => a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1
+  check(`${viewport} ${mode}: header text does not overlap its controls`, separate(title, controls) && separate(description, controls), JSON.stringify(skin.headerLayout))
+  check(`${viewport} ${mode}: description has a readable line width`, description.width >= 260, `${description.width.toFixed(1)}px`)
+  if (viewport === 'desktop' && mode === 'akari') {
+    const { root } = await send('DOM.getDocument', {}, sessionId)
+    skin.fonts = []
+    for (const selector of ['[data-slot="dialog-title"]', '[data-slot="dialog-description"]', '[data-compare-panel] header p']) {
+      const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector }, sessionId)
+      const { fonts } = await send('CSS.getPlatformFontsForNode', { nodeId }, sessionId)
+      skin.fonts.push({ selector, fonts })
+    }
+    const fonts = skin.fonts.flatMap(entry => entry.fonts).filter(font => font.glyphCount > 0)
+    check('comparison UI renders Chinese, Latin, digits and punctuation with the bundled fonts', fonts.length > 0 && fonts.every(font => font.isCustomFont && /Geist|Noto Sans SC/.test(font.familyName)), JSON.stringify(skin.fonts))
+  }
+  fs.writeFileSync(path.join(SHOTS, `skin-${viewport}-${mode}.json`), JSON.stringify(skin, null, 2))
+  await shot(`skin-${viewport}-${mode}.png`)
+}
+
 // Seed local storage before the app module executes, so the migration creates the
 // article without any editor typing. The script is removed after the first load.
 const seed = await send(
@@ -204,6 +275,7 @@ const seed = await send(
       localStorage.setItem('mopai.docs.v1', JSON.stringify(docs))
       localStorage.setItem('mopai.active.v1', 'u06-trial')
       localStorage.setItem('mopai.sample.v1', '1')
+      localStorage.setItem('mopai.onboarding.v1', 'done')
       localStorage.setItem('mopai.settings.v1', JSON.stringify({
         themeId: 'golden',
         sig: { layout: 'Yoru', proof: 'Yoru', review: 'Yoru' },
@@ -256,6 +328,7 @@ if (afterHtml !== beforeHtml) {
   console.log('  first diff at', first, JSON.stringify(beforeHtml.slice(first, first + 120)), JSON.stringify(afterHtml.slice(first, first + 120)))
 }
 check('current article name is shown', await evaluate(`document.querySelector('[data-slot="dialog-content"]')?.innerText.includes('U06 当前文章')`))
+check('a ready current article does not show a missing-article fallback reason', await evaluate(`document.querySelector('[data-slot="dialog-content"] [data-trial-reason]') === null`))
 check('trial did not change the saved theme', (await themeId()) === 'golden')
 check('trial did not change the body', (await readBody('u06-trial')) === beforeBody)
 await shot('02-trial-current.png')
@@ -300,6 +373,10 @@ check(
   (await evaluate(`document.querySelectorAll('[data-theme-preview]').length`)) === 219,
 )
 await shot('03-compare-three.png')
+const unchangedPaper = await evaluate(`JSON.stringify([...document.querySelectorAll('[data-theme-trial]')].map(el => el.innerHTML))`)
+await verifyComparisonSkin('akari', 'desktop')
+await verifyComparisonSkin('yoru', 'desktop')
+check('changing the UI theme leaves rendered article HTML unchanged', (await evaluate(`JSON.stringify([...document.querySelectorAll('[data-theme-trial]')].map(el => el.innerHTML))`)) === unchangedPaper)
 await closeDialog()
 check('closing the comparison leaves the body untouched', (await readBody('u06-trial')) === beforeBody)
 
@@ -450,6 +527,8 @@ check(
   JSON.stringify(firstPanel),
 )
 await shot('07-mobile-compare.png')
+await verifyComparisonSkin('akari', '390px')
+await verifyComparisonSkin('yoru', '390px')
 
 const fatal = consoleErrors.filter((line) => /Uncaught|TypeError|ReferenceError/.test(line))
 check('no uncaught exception replaced the page', fatal.length === 0, fatal.slice(0, 2).join(' | '))

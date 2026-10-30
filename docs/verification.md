@@ -37,9 +37,9 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
 | 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱 |
-| 未入云稿件删除 / 撤销 / 回收站 | `node scripts/cdp-verify-draft-recovery.mjs 4101 9701` | 登录前后新稿的删除、立即撤销、撤销期结束后回收站恢复与刷新持久化、彻底删除；云端稿件的撤销 / 回收站；remove / restore 故障注入 |
+| 稿件删除 / 撤销 / 回收站 | `node scripts/cdp-verify-draft-recovery.mjs 4101 9701` | 登录前后新稿的删除、立即撤销、撤销期结束后回收站恢复与刷新持久化、彻底删除；云端稿件的撤销 / 回收站；未同步正文与改名的删除、撤销及刷新恢复；remove / restore 故障注入 |
 | 本机正文读取失败 | `node scripts/cdp-verify-storage-read-failure.mjs 4102 9702` | 一次 / 持续 `getAll` 失败、IndexedDB 打开失败、真实缺失正文、云端 stub、主动清空、旧版迁移失败；每项都核对 IndexedDB 原件未被空串覆盖 |
-| 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；事务中断回滚和可见失败 |
+| 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
 | 窄屏单面板编辑器 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 320/390/430/768/1024px 单面板切换、1440/1600px 三栏可拖拽、无横向滚动与被裁切 / 重叠的顶栏控件；切面板与横竖屏后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；窄屏弹窗可开可关、中英文与明暗主题、触控尺寸与键盘切换、软键盘高度的视口收缩 |
@@ -111,7 +111,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 改动范围 | 现有入口与参数 |
 |---|---|
 | 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` |
-| 主题库当前稿试排 / 对比 | [cdp-verify-theme-trial.mjs](../scripts/cdp-verify-theme-trial.mjs)：`node scripts/cdp-verify-theme-trial.mjs <url> [CDP端口]`；种一篇带标题 / 表格 / 单图 / 轮播 / 公式的本机稿，核对试排 HTML 与编辑器预览逐字节一致、1–3 套候选不写正文 / 主题、应用后返回保留筛选与滚动、缺失正文回退样稿，并在英文与 390px 下复验 |
+| 主题库当前稿试排 / 对比 | [cdp-verify-theme-trial.mjs](../scripts/cdp-verify-theme-trial.mjs)：`node scripts/cdp-verify-theme-trial.mjs <url> [CDP端口] [证据目录]`；种一篇带标题 / 表格 / 单图 / 轮播 / 公式的本机稿，核对试排 HTML 与编辑器预览逐字节一致、1–3 套候选不写正文 / 主题、应用后返回保留筛选与滚动、已加载正文不提示缺失、缺失正文回退样稿，并在英文、390px 和明暗模式下复验标题 / 署名对比度、字体、标题与控件不重叠及正文白底 |
 | 首次加载体积与分块 | [cdp-measure-initial-load.mjs](../scripts/cdp-measure-initial-load.mjs)：`node scripts/cdp-measure-initial-load.mjs <url> [CDP端口] [输出文件]`；同环境记录入口资源、transfer / decoded 字节、FCP / DCL / load、长任务与编辑器可交互耗时，以及模板库首卡片 / 首预览 / 全部卡片时间 |
 | 分块失败与重试 | [cdp-verify-u05-load-failure.mjs](../scripts/cdp-verify-u05-load-failure.mjs)：`node scripts/cdp-verify-u05-load-failure.mjs <url> [CDP端口]`；路由分块被阻断时的可见错误页与重试、当前主题 pack 被阻断时正文不丢且可重试、离线 SPA 导航的错误页与恢复 |
 | 字体实际呈现 | [cdp-verify-u05-fonts.mjs](../scripts/cdp-verify-u05-fonts.mjs)：`node scripts/cdp-verify-u05-fonts.mjs <url> [CDP端口]`；Geist / Noto Sans SC 真实可用、导入主题的 Noto Serif SC 在标题实际生效、已移除的 Zen Kaku 不再有 @font-face |

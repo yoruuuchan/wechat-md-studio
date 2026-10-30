@@ -1,7 +1,16 @@
 import type { BodyRecord, BodyTransaction } from './body-store'
 import type { DocRecord } from './store'
 
-export type LocalDocRecord = DocRecord & { localRevision?: number }
+/** A restore can consume only the local revision observed before it began. */
+export interface LocalRestoreBase {
+  id: string
+  revision: number
+}
+
+// Symbols survive in-memory document spreads, but JSON backups cannot carry a
+// restore permission into a later page. Body/index serializers omit it too.
+export const LOCAL_RESTORE = Symbol('local restore base')
+export type LocalDocRecord = DocRecord & { [LOCAL_RESTORE]?: LocalRestoreBase }
 
 export interface LocalDocChange {
   id: string
@@ -184,6 +193,8 @@ export function planLocalCommit(
     const before = change.before && localDocValue(change.before)
     const after = change.after && localDocValue(change.after)
     const current = row && documentFromBody(row, change.before ?? change.after)
+    const restore = change.after?.[LOCAL_RESTORE]
+    const restoresRevision = restore?.id === change.id && restore.revision === (row?.revision ?? 0)
 
     if (after?.contentLoaded === false) {
       // Read failures and lazy placeholders describe this page, not a new
@@ -208,16 +219,17 @@ export function planLocalCommit(
       continue
     }
 
-    if (before && sameLocalDoc(before, after)) {
+    if (before && sameLocalDoc(before, after) && !restoresRevision) {
       // An unchanged stale snapshot is not a request to overwrite or restore.
       if (current) keep(current)
       else if (row?.removed) result.removed.push(change.id)
       continue
     }
     if (row?.removed || (!row && before && (change.before?.localRevision ?? 0) > 0)) {
-      // A user-initiated restore (undo / bin) or an account-archived row may revive
-      // a tombstoned id; a stale live view with no archive still gets a copy.
-      if (after.recovery?.kind === 'restored' || after.savedAt !== null) {
+      // An explicit restore or fresh cloud read owns only its observed revision.
+      // Archive timestamps and recovery labels are historical metadata, never
+      // permission for a stale page to undo another tab's newer deletion.
+      if (restoresRevision) {
         put(after, row)
         continue
       }

@@ -5,12 +5,14 @@ import { createBodyStore, type BodyRecord, type BodyStore } from './body-store'
 import {
   bodyFromDocument,
   documentFromBody,
+  LOCAL_RESTORE,
   mergeLocalCommit,
   planLocalCommit,
   sameLocalDoc,
   type LocalCommit,
   type LocalDocChange,
   type LocalDocRecord,
+  type LocalRestoreBase,
 } from './local-docs'
 import type { RemoteMcpBinding } from '@contracts/remote-mcp'
 import { t } from './i18n'
@@ -720,6 +722,18 @@ function uniqueDocs(docs: DocRecord[]): LocalDocRecord[] {
   return [...byId.values()]
 }
 
+/** Capture before an explicit restore/cloud request, never after its response. */
+export async function readLocalRestoreBase(id: string): Promise<LocalRestoreBase | undefined> {
+  await saveQueue
+  try {
+    const [row] = await (await bodyStore()).read([id])
+    return { id, revision: row?.revision ?? 0 }
+  } catch (e) {
+    reportFailure('read-failed', t('store.readFailed', { err: describe(e) }))
+    return undefined
+  }
+}
+
 function plannedChanges(
   request: LocalDocRecord[],
   pageBase: LocalDocRecord[],
@@ -730,7 +744,7 @@ function plannedChanges(
 
   for (const doc of request) {
     const before = confirmed.get(doc.id) ?? page.get(doc.id)
-    if (before && sameLocalDoc(before, doc)) continue
+    if (before && sameLocalDoc(before, doc) && !doc[LOCAL_RESTORE]) continue
     changes.push({
       id: doc.id,
       before,

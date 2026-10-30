@@ -4,7 +4,8 @@ import { Toaster, toast } from 'sonner'
 import { trpc } from '@/providers/trpc'
 import { useAuth } from '@/hooks/useAuth'
 import { copyPlain } from '@/lib/clipboard'
-import { loadActiveId, loadDocs, saveActiveId, saveDocs, hasCloudCopy, type DocRecord } from '@/lib/store'
+import { loadActiveId, loadDocs, readLocalRestoreBase, saveActiveId, saveLocalDocs, hasCloudCopy, type DocRecord } from '@/lib/store'
+import { LOCAL_RESTORE, mergeLocalCommit } from '@/lib/local-docs'
 import { UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageToggle } from '@/components/LanguageToggle'
@@ -169,8 +170,10 @@ export default function Drafts() {
   const rewriteLocal = async (fn: (docs: DocRecord[]) => DocRecord[]) => {
     const current = localDocs ?? (await loadDocs()).docs
     const next = fn(current)
-    setLocalDocs(next)
-    await saveDocs(next, loadActiveId())
+    const result = await saveLocalDocs(next, loadActiveId(), current)
+    if (!result.ok) return false
+    setLocalDocs(mergeLocalCommit(next, next, result.commit))
+    return true
   }
   const localTrash = (localDocs ?? []).filter((d) => d.deletedAt)
   const localTrashById = new Map(localTrash.map((d) => [d.id, d]))
@@ -189,8 +192,15 @@ export default function Drafts() {
 
   const restoreBin = async (id: string) => {
     const local = localTrashById.get(id) ?? null
+    const restoreBase = local ? await readLocalRestoreBase(id) : undefined
+    if (local && !restoreBase) {
+      toast.error(t('drafts.restoreFailed'))
+      return
+    }
     if (!isAuthenticated) {
-      if (local) await rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
+      if (local && !(await rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null, [LOCAL_RESTORE]: restoreBase } : d))))) {
+        toast.error(t('drafts.restoreFailed'))
+      }
       return
     }
     if (cloudBinIds.has(id)) {
@@ -208,7 +218,9 @@ export default function Drafts() {
     if (local) {
       // Make the local copy live as well; the next editor merge reconciles its
       // body with the account row (same text merges, a divergence keeps both).
-      await rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null } : d)))
+      if (!(await rewriteLocal((ds) => ds.map((d) => (d.id === id ? { ...d, deletedAt: null, [LOCAL_RESTORE]: restoreBase } : d))))) {
+        toast.error(t('drafts.restoreFailed'))
+      }
     }
   }
   const purgeBin = async (id: string, name: string) => {
@@ -224,7 +236,9 @@ export default function Drafts() {
         return
       }
     }
-    if (local) await rewriteLocal((ds) => ds.filter((d) => d.id !== id))
+    if (local && !(await rewriteLocal((ds) => ds.filter((d) => d.id !== id)))) {
+      toast.error(t('drafts.purgeFailed'))
+    }
   }
 
   const items = useMemo(() => {
