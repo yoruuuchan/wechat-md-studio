@@ -764,6 +764,9 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `index-B3S4qtGE.js`）；本次包已含其提交，未被回退，线上资产名因此是两者合并后的
 > `index-BjfnWPfC.js`。公开仓库随后按普通推送同步（`778f1ab..4195149`，历史未重写）。
 > 未做：README 截图（`docs/images/editor-*.png`）仍是旧工具栏。
+> **2026-10-30 后续**：README / README_EN 与三张截图已重做并随当日提交推送——
+> `editor-akari`、`editor-yoru` 换成本地构建重截的 1584×905（带上「表格」按钮），
+> `typeset-golden.png` 换成当前示例稿文案（1100×1474，1.6 倍截取），`verify:sources` 全过。
 
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 

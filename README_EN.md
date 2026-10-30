@@ -15,7 +15,7 @@ However much AI is involved, the source remains ordinary Markdown: readable, edi
 
 [Theme library](https://wechat.yoru-and-akari.dev/themes) · [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) · [Acknowledgements](https://wechat.yoru-and-akari.dev/references)
 
-Made by Yoru, as a personal project that is continuously used and improved. The interface switches between Chinese and English (Chinese by default, remembered per browser); desktop browsers get three draggable columns, and narrow screens switch between Edit / Preview / Images & settings one pane at a time. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
+Made by Yoru, as a personal project that is continuously used and improved. The interface switches between Chinese and English (Chinese by default, remembered per browser); browsers at 1440px and wider get three draggable columns, and narrower windows switch between Edit / Preview / Images & settings one pane at a time. A five-step tour runs on the first visit and can be replayed from settings. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
 
 | Light · akari | Dark · yoru |
 |:--:|:--:|
@@ -66,13 +66,14 @@ flowchart LR
 
 - **<!-- gen:theme-count -->219 themes<!-- /gen:theme-count -->** with filters for style, complexity, color and source. Favorite templates, trial the current article, or compare up to three candidates side by side. Author, license and provenance are retained.
 - **Article-oriented Markdown**: numbered sections, highlights, pull quotes, quotation boxes, centered text, credits, tables, block equations and Mermaid diagrams.
-- **Images**: upload, compression, automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
-- **Editing and preview**: CodeMirror, a Markdown toolbar, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
+- **Images**: upload, compression (automatic, a 1–5 MB target, or the original file), automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
+- **Editing and preview**: CodeMirror, a Markdown toolbar with per-column and whole-table alignment, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
 - **Storage**: local draft protection, plus the site owner's cloud draft library after login, with synchronization and conflict handling.
-- **Import / export**: import Markdown and DOCX; export Markdown, article HTML, a complete preview page or a full document backup.
-- **Agent REST API**: a separate API and dependency-free Python client for pushing a draft, opening it for human editing and reading it back. This interface accesses the site owner's cloud documents, requires an Agent token, and needs browser login for its editor links. See [Agent API](docs/agent-api.md).
+- **Import / export**: import Markdown, DOCX and full document backups; rich text pasted from a web page or Word is converted to the article dialect. Export Markdown, article HTML, a complete preview page or a full document backup.
+- **Publish check**: before copying an article, exporting article HTML or exporting the full preview page, unfinished equations and diagrams, empty image slots and image URLs on the local machine or a private network are listed as blockers or warnings. A clean article goes straight through.
+- **Agent REST API**: a separate API and dependency-free Python client for pushing a draft, opening it for human editing and reading it back. Writes carry the hash from the read, so a stale version is rejected instead of silently overwritten. This interface accesses the site owner's cloud documents, requires an Agent token, and needs browser login for its editor links. See [Agent API](docs/agent-api.md).
 
-Every theme card renders the same sample article, so comparisons show the theme rather than different content. Switch to the current article to trial it, or put up to three candidates side by side; trying and comparing never edit the article or save a theme. Author, color and license information stay on each card.
+Every theme card renders the same sample article, so comparisons show the theme rather than different content. Switch to the current article to trial it, or put up to three candidates side by side; trying and comparing never edit the article or save a theme. Source project, color and license information stay on each card; the author appears under the card's source details.
 
 ![Theme library with filters and real rendered previews](docs/images/theme-library.png)
 
@@ -129,7 +130,7 @@ The rendering pipeline is `Markdown → semantic AST → Theme → fully inline 
 
 - **Drafts are local by default.** Enabling Remote MCP uploads a temporary copy of that document, valid for 24 hours by default. Only its visitor and token-bearing clients can access it. Revocation deletes it immediately; expiry blocks access immediately and scheduled cleanup removes it. The local draft remains. The owner's cloud library is a separate login-only feature.
 - **Uploaded images are public.** Anyone with an `/api/img/…` URL can view the file. Anonymous uploads have quotas and a default 14-day cleanup period; keeping a reference in a local draft does not guarantee indefinite hosting. Once WeChat has copied an image, the published article uses WeChat's stored version.
-- **Authors and publishers are responsible for content.** The service checks file types and quotas, and does not review article or image content. Illegal, exploitative, infringing or privacy-violating content, malware, scams and bulk file-storage abuse are prohibited. Files can be deleted and further uploads refused.
+- **Authors and publishers are responsible for content.** The service checks file types and quotas, and does not review article or image content. Illegal content, sexual, pornographic or exploitative content involving minors, infringing or privacy-violating content, malware, scams and bulk file-storage abuse are prohibited. Files can be deleted and further uploads refused.
 
 Read the [Terms of use](https://wechat.yoru-and-akari.dev/terms). Rights complaints go through the in-site feedback form ([wechat.yoru-and-akari.dev/feedback](https://wechat.yoru-and-akari.dev/feedback), or the editor sidebar under Settings → Feedback) with the exact URL, evidence of your rights or authorization, and contact details; no receiving address is published on the page — the server forwards the message. The hosted service may change, be limited or go offline; the software is provided without warranty. Self-hosters manage their own storage, domains and terms.
 
