@@ -3,8 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { parseMarkdown } from './parse'
 import { renderDoc } from './render'
 import { goldenTheme } from './themes-core'
+import { readFileSync } from 'node:fs'
 import { renderCardArticle } from './cards-render'
-import { CARD_PAD_BOTTOM, CARD_PAD_TOP, paginateCards, type CardPage } from './cards'
+import {
+  CARD_FONT_SHEETS, CARD_METRICS, CARD_TEMPLATES, CARD_TEMPLATE_FONTS, CARD_TEMPLATE_VARIANTS, CARD_WIDTH, cardMetrics,
+  defaultVariant, isDarkVariant, paginateCards, withTemplate, type CardPage, type CardTemplate,
+} from './cards'
 import { rangeContainsText } from './cards-export'
 
 const sig = { layout: '', proof: '', review: '' }
@@ -23,17 +27,20 @@ function measure(el: HTMLElement): number {
   return children.reduce((n, c) => n + measure(c), 0)
 }
 
-function article(source: string, maxHeight = 80) {
+function article(source: string, maxHeight = 80, template: CardTemplate = 'reed') {
+  const metrics = cardMetrics(template)
   return renderCardArticle(parseMarkdown(source), {
-    source, height: maxHeight + CARD_PAD_TOP + CARD_PAD_BOTTOM,
+    source, height: maxHeight + metrics.padTop + metrics.padBottom, template,
+    background: defaultVariant(template),
     accent: '#4F6CE8', dark: false, sig,
     resolveImage: (s) => s, resolveMath: () => null, resolveDiagram: () => null,
   })
 }
 
-async function paginate(source: string, maxHeight = 80) {
-  return paginateCards(article(source, maxHeight), {
-    height: maxHeight + CARD_PAD_TOP + CARD_PAD_BOTTOM, measure,
+async function paginate(source: string, maxHeight = 80, template: CardTemplate = 'reed') {
+  const metrics = cardMetrics(template)
+  return paginateCards(article(source, maxHeight, template), {
+    height: maxHeight + metrics.padTop + metrics.padBottom, template, measure,
   })
 }
 
@@ -177,7 +184,7 @@ describe('card assets and font slices', () => {
   it('uses the image resolver for single images, carousels and galleries', () => {
     const source = '![单图](img:a)\n\n:::carousel 4:3\n![甲](img:b)\n![乙](img:c)\n:::\n\n:::gallery 2 1:1\n![丙](img:d)\n![丁](img:e)\n:::'
     const root = renderCardArticle(parseMarkdown(source), {
-      source, height: 720, accent: '#4F6CE8', dark: false, sig,
+      source, height: 720, template: 'reed', background: 'paper', accent: '#4F6CE8', dark: false, sig,
       resolveImage: (s) => '/api/img/' + s.slice(4), resolveMath: () => null, resolveDiagram: () => null,
     })
     expect(Array.from(root.querySelectorAll('img')).map((img) => img.getAttribute('src')))
@@ -190,5 +197,93 @@ describe('card assets and font slices', () => {
     expect(rangeContainsText('U+3000-303F, U+FF00-FFEF', '，。')).toBe(true)
     expect(rangeContainsText('U+2????', '𠮷')).toBe(true)
     expect(rangeContainsText('U+4E00-9FFF', 'Reed')).toBe(false)
+  })
+})
+
+describe('card template dimension', () => {
+  it('keeps Reed metrics and gives every template a usable single-column measure', () => {
+    expect(CARD_METRICS.reed).toMatchObject({
+      padX: 40, padTop: 52, padBottom: 76, contentWidth: 460, coverReserve: 156,
+    })
+    for (const template of CARD_TEMPLATES) {
+      const m = CARD_METRICS[template]
+      expect(m.contentWidth + m.padX * 2).toBeLessThanOrEqual(CARD_WIDTH)
+      expect(m.contentWidth).toBeGreaterThan(380)
+      expect(m.padTop + m.padBottom).toBeLessThan(400)
+      expect(m.coverReserve).toBeGreaterThan(100)
+      expect(m.coverTitleSize).toHaveLength(5)
+      expect(m.coverTitleSize.every((size) => size > 20)).toBe(true)
+    }
+  })
+
+  it('declares its own variants and switches to the new first variant', () => {
+    expect(CARD_TEMPLATE_VARIANTS).toEqual({
+      reed: ['paper', 'white', 'grid', 'tint', 'night'],
+      yoru: ['signal', 'lab', 'studio', 'special'],
+      paper: ['editorial', 'analog', 'midnight'],
+      console: ['akari', 'yoru'],
+    })
+    for (const template of CARD_TEMPLATES) {
+      expect(withTemplate({ ratio: '9:16', template: 'reed', background: 'grid' }, template))
+        .toEqual({ ratio: '9:16', template, background: CARD_TEMPLATE_VARIANTS[template][0] })
+    }
+    expect(isDarkVariant('reed', 'night')).toBe(true)
+    expect(isDarkVariant('paper', 'midnight')).toBe(true)
+    expect(isDarkVariant('console', 'yoru')).toBe(true)
+    expect(isDarkVariant('yoru', 'signal')).toBe(false)
+    expect(isDarkVariant('paper', 'editorial')).toBe(false)
+  })
+
+  it('writes template and variant on the measured body and paginates with its own measures', async () => {
+    const source = '一段不短也不长的正文，用来确认模板宽度已经生效。'.repeat(8)
+    for (const template of CARD_TEMPLATES) {
+      const metrics = cardMetrics(template)
+      const root = article(source, 80, template)
+      expect(root.dataset.template).toBe(template)
+      expect(root.dataset.variant).toBe(defaultVariant(template))
+      expect(root.style.width).toBe(`${metrics.contentWidth}px`)
+      const { pages } = await paginate(source, 80, template)
+      const bodies = pages.filter((p) => p.kind === 'body').map((p) => {
+        const holder = document.createElement('div')
+        holder.innerHTML = p.html
+        return holder.firstElementChild as HTMLElement
+      })
+      expect(bodies.length).toBeGreaterThan(0)
+      expect(bodies.every((body) => body.dataset.template === template)).toBe(true)
+      expect(bodies.every((body) => measure(body) <= 80)).toBe(true)
+    }
+  })
+
+  it('declares the webfont faces each template actually renders with', () => {
+    const declared = (family: string, weight: number, style = 'normal') =>
+      CARD_TEMPLATES.some((template) => CARD_TEMPLATE_FONTS[template].some((face) =>
+        face.family === family && face.weights.includes(weight) &&
+        (face.styles ?? ['normal']).includes(style as 'normal' | 'italic')))
+    expect(declared('Noto Serif SC', 400)).toBe(true)
+    expect(declared('Noto Serif SC', 700)).toBe(true)
+    expect(declared('Zhuque Fangsong', 400)).toBe(true)
+    expect(declared('EB Garamond', 400, 'italic')).toBe(true)
+    expect(declared('IBM Plex Sans', 500)).toBe(true)
+    expect(declared('IBM Plex Mono', 400)).toBe(true)
+    expect(declared('Caveat', 400)).toBe(true)
+    expect(declared('Inter', 600)).toBe(true)
+    expect(declared('JetBrains Mono', 400)).toBe(true)
+    expect(declared('Noto Sans SC', 400)).toBe(true)
+    expect(declared('Geist Mono', 700)).toBe(true)
+
+    const css = CARD_FONT_SHEETS.map((path) =>
+      readFileSync(new URL('../../public' + path, import.meta.url), 'utf8')).join('\n')
+    for (const template of CARD_TEMPLATES) {
+      for (const face of CARD_TEMPLATE_FONTS[template]) {
+        for (const weight of face.weights) {
+          for (const style of face.styles ?? ['normal']) {
+            const escaped = face.family.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            expect(css).toMatch(new RegExp(
+              `font-family: '${escaped}';\\s*font-style: ${style};[\\s\\S]*?font-weight: ${weight};`,
+            ))
+          }
+        }
+      }
+    }
   })
 })

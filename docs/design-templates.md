@@ -67,13 +67,20 @@
 
 | 族 | 字重 | 用在 | 来源与授权 |
 |---|---|---|---|
-| Noto Serif SC | 400（新增）、700（已有） | YORU、PAPER 中文 | Fontsource 切片，OFL |
-| 朱雀仿宋 | 400 | YORU 仿宋位 | [TrionesType/zhuque](https://github.com/TrionesType/zhuque)，OFL；按 Noto Serif SC 切片的 unicode-range 自行切片 |
-| Inter | 400、600 | YORU 英文 | Fontsource，OFL |
-| JetBrains Mono | 400 | YORU 代码 | Fontsource，OFL |
-| EB Garamond | 400、400 italic、600 | PAPER 英文 | Fontsource，OFL |
-| IBM Plex Sans / IBM Plex Mono | 400、500 / 400 | PAPER 标签 | Fontsource，OFL |
-| Caveat | 400 | PAPER Analog 手写 | Fontsource，OFL |
+| Noto Serif SC | 400（新增）、700（已有） | YORU、PAPER 中文 | `@fontsource/noto-serif-sc@5.3.1` 切片，OFL |
+| 朱雀仿宋 | 400 | YORU 仿宋位 | [TrionesType/zhuque](https://github.com/TrionesType/zhuque)（官方仓库，release v0.212），OFL；按 Noto Serif SC 切片的 unicode-range 自行切片 |
+| Inter | 400、600 | YORU 英文 | `@fontsource/inter@5.3.0` 的 latin / latin-ext，OFL |
+| JetBrains Mono | 400 | YORU 代码 | `@fontsource/jetbrains-mono@5.3.0` 的 latin / latin-ext，OFL |
+| EB Garamond | 400、400 italic、600 | PAPER 英文 | `@fontsource/eb-garamond@5.3.0` 的 latin / latin-ext，OFL |
+| IBM Plex Sans / IBM Plex Mono | 400、500 / 400 | PAPER 标签 | `@fontsource/ibm-plex-sans@5.3.0` / `@fontsource/ibm-plex-mono@5.3.0` 的 latin / latin-ext，OFL |
+| Caveat | 400 | PAPER Analog 手写 | `@fontsource/caveat@5.3.0` 的 latin / latin-ext，OFL |
 | Geist、Geist Mono、Noto Sans SC | 已有 | Console | 已有 |
 
+新字体文件与 `@font-face` 在 [public/fonts/fonts-templates.css](../public/fonts/fonts-templates.css)，
+朱雀的切片由 [scripts/fonts/slice-by-ranges.py](../scripts/fonts/slice-by-ranges.py) 生成，
+许可副本为 `public/fonts/OFL-*.txt`。分页预载与 PNG 内嵌共用
+[cards.ts](../src/lib/cards.ts) 的 `CARD_TEMPLATE_FONTS`。
+
 卡片导出前必须确认这些字体真的参与了渲染：用 Chrome 报告的实际渲染字体检查，看到对应族名（网页字体）才算数。
+
+导出还必须使用与预览相同的计算字号。`html-to-image` 克隆时会把每个字号改成 `floor(size) - 0.1px`，在 17–18px 的中文正文上足以改变断行；导出器在克隆阶段把模板实际字号补回去，并用 CDP 的 DOM / PNG 对照验证（Reed 的已发布 PNG 基线保留旧行为，单独核对）。

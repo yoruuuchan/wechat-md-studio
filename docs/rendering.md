@@ -187,5 +187,26 @@ Noto 字体按 `unicode-range` 切片，只下载当页所需字符；SIL OFL �
 正文使用各 Theme 的字体栈，微信读者端受系统字体限制；预览 CSS 或字体文件存在不能证明微信端能用该字体。
 当前 `zen` 的 Noto Serif SC 700 由 [fonts-local.css](../public/fonts/fonts-local.css) 和本地 woff2 提供预览字体；
 复制进微信的正文仍靠读者端字体栈，不能把本站预览字体视作微信端保证。
+
+小红书卡片模板另带一组自托管字体，`@font-face` 统一在
+[fonts-templates.css](../public/fonts/fonts-templates.css)：Fontsource 5.3.x 的
+Noto Serif SC 400（101 个中文切片）、Inter 400/600、JetBrains Mono 400、
+EB Garamond 400/400 italic/600、IBM Plex Sans 400/500、IBM Plex Mono 400、Caveat 400。
+朱雀仿宋 400 来自官方仓库 [TrionesType/zhuque](https://github.com/TrionesType/zhuque)
+v0.212 的 `ZhuqueFangsong-Regular.ttf`，由
+[slice-by-ranges.py](../scripts/fonts/slice-by-ranges.py) 按 Noto Serif SC 700 的
+unicode-range 逐片裁成 99 个 woff2（没有字形的片跳过），CSS 在
+[zhuque-fangsong.css](../public/fonts/zhuque-fangsong.css)。许可副本：
+[OFL-NotoSerifSC.txt](../public/fonts/OFL-NotoSerifSC.txt)、
+[OFL-Inter.txt](../public/fonts/OFL-Inter.txt)、
+[OFL-JetBrainsMono.txt](../public/fonts/OFL-JetBrainsMono.txt)、
+[OFL-EBGaramond.txt](../public/fonts/OFL-EBGaramond.txt)、
+[OFL-IBMPlexSans.txt](../public/fonts/OFL-IBMPlexSans.txt)、
+[OFL-IBMPlexMono.txt](../public/fonts/OFL-IBMPlexMono.txt)、
+[OFL-Caveat.txt](../public/fonts/OFL-Caveat.txt)、
+[OFL-ZhuqueFangsong.txt](../public/fonts/OFL-ZhuqueFangsong.txt)。
+卡片分页预载与 PNG 内嵌都读 [cards.ts](../src/lib/cards.ts) 的 `CARD_TEMPLATE_FONTS`，
+两处不会各写一份字体白名单。
+
 主题移植损耗与许可审计见 [THEME-SOURCES](../THEME-SOURCES.md)；借鉴与未采用的机制见
 [References](https://wechat.yoru-and-akari.dev/references) / [credits 数据](../src/lib/credits.ts)。

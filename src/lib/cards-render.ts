@@ -3,7 +3,7 @@ import type { Doc, InlineSeg, ListBlock, SignatureConfig } from './types'
 import type { DiagramResolver, ImageResolver, MathResolver } from './render'
 import { esc } from './theme-kit'
 import { t } from './i18n'
-import { CARD_PAD_BOTTOM, CARD_PAD_TOP, CARD_PAD_X, CARD_WIDTH } from './cards'
+import { cardMetrics, type CardBackground, type CardTemplate } from './cards'
 
 function inline(segs: InlineSeg[]): string {
   return segs.map((seg) => {
@@ -32,6 +32,8 @@ function listHtml(list: ListBlock): string {
 export function renderCardArticle(doc: Doc, options: {
   source: string
   height: number
+  template: CardTemplate
+  background: CardBackground
   accent: string
   dark: boolean
   sig: SignatureConfig
@@ -40,12 +42,15 @@ export function renderCardArticle(doc: Doc, options: {
   resolveDiagram: DiagramResolver
 }): HTMLElement {
   const root = document.createElement('section')
+  const metrics = cardMetrics(options.template)
   root.className = 'xhs-body'
-  root.style.width = `${CARD_WIDTH - CARD_PAD_X * 2}px`
+  root.dataset.template = options.template
+  root.dataset.variant = options.background
+  root.style.width = `${metrics.contentWidth}px`
   root.style.setProperty('--xhs-accent', options.accent)
   root.dataset.night = String(options.dark)
   const lines = options.source.replace(/\r\n?/g, '\n').split('\n')
-  const maxImageHeight = Math.floor((options.height - CARD_PAD_TOP - CARD_PAD_BOTTOM) * 0.72)
+  const maxImageHeight = Math.floor((options.height - metrics.padTop - metrics.padBottom) * 0.72)
   const image = (src: string, alt: string) => `<figure>${src
     ? `<img src="${esc(options.resolveImage(src))}" alt="${esc(alt)}" style="max-height:${maxImageHeight}px">`
     : `<p class="xhs-placeholder">${esc(t('theme.pendingImage'))}</p>`

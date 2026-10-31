@@ -200,7 +200,7 @@ export default function EditorPage() {
   const layoutRef = useRef<Record<string, number>>(initialLayout ?? {})
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
   const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
-  const [cardOptions, setCardOptions] = useState<CardOptions>({ ratio: '3:4', background: 'paper' })
+  const [cardOptions, setCardOptions] = useState<CardOptions>({ ratio: '3:4', template: 'reed', background: 'paper' })
   const [copied, setCopied] = useState(false)
   const [uploadingKey, setUploadingKey] = useState<string | null>(null)
   const [frameTask, setFrameTask] = useState<FrameTask | null>(null)
