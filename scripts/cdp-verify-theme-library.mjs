@@ -411,12 +411,12 @@ await goto(APP, 3000)
 await evaluate(`document.querySelector('[data-theme-switcher]')?.click()`)
 await sleep(1200)
 const quick = await evaluate(`document.querySelectorAll('[data-theme-quick]').length`)
-check('quick switcher stays a small subset of the catalog', quick > 0 && quick <= 28, `entries=${quick}/222`)
+check('quick switcher stays a small subset of the catalog', quick > 0 && quick <= 28, `entries=${quick}/227`)
 const footerText = await evaluate(`(() => {
   const b = [...document.querySelectorAll('button')].find(x => x.textContent.includes('查看全部'))
   return b?.textContent ?? ''
 })()`)
-check('quick switcher footer advertises the full library', footerText.includes('222'), footerText.trim())
+check('quick switcher footer advertises the full library', footerText.includes('227'), footerText.trim())
 const quickPick = await evaluate(`(() => {
   const btn = document.querySelector('[data-theme-quick]')
   const id = btn.getAttribute('data-theme-quick')

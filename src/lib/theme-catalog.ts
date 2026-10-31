@@ -1,6 +1,6 @@
 // 应用侧的主题目录：首屏只带 metadata，不 import 任何渲染实现。
 //
-// - THEME_CATALOG：222 套主题的 id / 名称 / 分类 / 标签 / 来源；
+// - THEME_CATALOG：227 套主题的 id / 名称 / 分类 / 标签 / 来源；
 // - THEME_BY_ID：按 id 取目录条目（顶栏、收藏、来源信息用）；
 // - theme implementation 走 theme-api.ts 的 loadTheme / loadAllThemes。
 //

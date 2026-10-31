@@ -87,7 +87,7 @@ export function renderDoc(
   /**
    * Preserve the existing Theme.listBlock path for genuinely flat lists. A
    * recursive list uses standard semantic tags shared by every theme, keeping
-   * hierarchy valid without requiring 222 theme implementations.
+   * hierarchy valid without requiring 227 theme implementations.
    */
   const renderList = (list: ListBlock, nested = false): string => {
     const flat = !nested && list.items.every((item) =>

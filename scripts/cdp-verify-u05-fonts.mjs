@@ -125,7 +125,7 @@ check(
 
 console.log('\n=== theme serif font ===')
 await navigate(`${APP}/themes`)
-await waitFor(`document.querySelectorAll('[data-theme-card]').length === 222`)
+await waitFor(`document.querySelectorAll('[data-theme-card]').length === 227`)
 // 用 inkpress-crimson：它的 h1/h2/h3 明确写 'Noto Serif SC'。
 const serifCard = 'inkpress-crimson'
 await evaluate(`document.querySelector('[data-theme-card="${serifCard}"]')?.scrollIntoView({ block: 'center' })`)

@@ -49,7 +49,7 @@ parser 只产出语义节点和全稿源位置，不为某套主题做视觉判�
 
 CommonMark 列表会保留两层、三层及更深层级的嵌套，以及有序 / 无序混合、同一条目内的多段文字
 和有序列表起始序号。单层列表继续使用各主题自己的 `listBlock` 样式；出现嵌套时，
-共用一套语义 `ul` / `ol` / `li` 树渲染，避免逐个修改 222 套主题，也不会把子列表拉平。
+共用一套语义 `ul` / `ol` / `li` 树渲染，避免逐个修改 227 套主题，也不会把子列表拉平。
 
 根容器为什么不能用左右内边距或参与布局的边框：微信编辑器会在编辑时**复制或合并外层的 `<section>`**——2026-10-27 在一篇真实草稿里数到同一份 golden 根样式存在 11 份、最深嵌套 3 层，每多一层正文就窄 20px（578 → 558 → 538 → 518），表现就是「正文往下越过某一段之后莫名往里缩」。`max-width` 这类上限是幂等的（657 套在 657 里仍是 657），像素内边距不是。因此横向留白统一折进 `max-width`（上限＝677px 减左右留白），根边框改为不占布局宽度的内嵌 outline，窄屏时正文自然铺满微信给的内容区。
 2026-10-28 在测试号按最坏情况复验：把整篇粘进自己的末尾，块数 16→32、轮播 / 表格 / 代码各变两份，整宽块的边缘仍是同一组、`padding:0 10px` 残留为 0——657 根被复制嵌套时也不会叠出内边距。
@@ -190,6 +190,6 @@ Noto 字体按 `unicode-range` 切片，只下载当页所需字符；SIL OFL �
 当前 `zen` 的 Noto Serif SC 700 由 [fonts-local.css](../public/fonts/fonts-local.css) 和本地 woff2 提供预览字体；
 复制进微信的正文仍靠读者端字体栈，不能把本站预览字体视作微信端保证。
 
-三套设计系统主题（`yoru-type` / `paper-editorial` / `console-akari`）遵循同一条边界：正文不写 `font-family`，完全使用读者手机的系统字体；只有标题、图注、代码等位置写字体栈，缺字体时按栈回落到宋体/黑体/等宽。上游的思源、Geist、EB Garamond 等自托管字体不会随正文进入公众号，预览里看到的字形不等于微信端字形。
+八套设计系统主题（`yoru-type` / `paper-editorial` / `console-akari` / `kunlun-snowline` / `rift-daybreak` / `core-frost` / `aozora-daylight` / `kihon-gin`）遵循同一条边界：正文不加载网页字体。除了 core 霜纸的正文写明系统衬线栈（Songti SC / STSong / SimSun），其余七套的正文不写 `font-family`，完全使用读者手机的系统字体；core 同样不把未加载的 Tinos 或只有 700 的 Noto Serif SC 放进正文。标题、图注、代码等位置才写字体栈，缺字体时按栈回落到宋体/黑体/等宽。上游的思源、Geist、EB Garamond、Instrument Sans、B612 Mono 等自托管字体不会随正文进入公众号，预览里看到的字形不等于微信端字形。
 主题移植损耗与许可审计见 [THEME-SOURCES](../THEME-SOURCES.md)；借鉴与未采用的机制见
 [References](https://wechat.yoru-and-akari.dev/references) / [credits 数据](../src/lib/credits.ts)。

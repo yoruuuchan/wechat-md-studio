@@ -1,6 +1,6 @@
 # 设计系统模板（第二批）
 
-本文接 [设计系统模板](design-templates.md)，原则沿用第一批：结构跟着系统走，不只借色；设计系统是唯一事实来源；卡片与公众号分开想；公众号浅色为主；按载体换算尺度。第一批三套（YORU Content、PAPER、yoru-and-akari Console）已经落成公众号主题；这一批只写剩下六套的设计依据，供后续实现公众号主题和小红书卡片模板使用。本文不改代码，也不把六套系统混成一套。
+本文接 [设计系统模板](design-templates.md)，原则沿用第一批：结构跟着系统走，不只借色；设计系统是唯一事实来源；卡片与公众号分开想；公众号浅色为主；按载体换算尺度。第一批三套（YORU Content、PAPER、yoru-and-akari Console）已经落成公众号主题；这一批写剩下六套的设计依据，其中 KUNLUN、RIFT、core、Aozora、KIHON 已落成公众号主题，Mayonaka 仍供后续实现公众号主题和小红书卡片模板使用。各系统仍按自己的规则处理，不混成一套。
 
 推荐实现顺序：
 
@@ -53,7 +53,17 @@
 - 结构：封面用竖排 eyebrow、大号拉丁标题、日文小副题、底部作者/页码，玻璃托盘只压在渐变上；正文每页只放一块玻璃托盘，图注等宽小字。玻璃用 `rgba(255,255,255,.55)` + 1px 白描边 + `inset 0 1px 0` 高光模拟，避免截图时依赖模糊。抽象 SVG 资产从系统 `assets/` 取，不另画。
 - 图像限制：不做真实照片版；有摄影图的文章换别的模板，不能静默丢图。截图可以放进玻璃框，但标为内容而不是品牌插画。
 
-**公众号主题方案。** id `aozora-daylight`，中文名「青空」，分类「活力」。只做 daylight，不做 yozora。页面 `#F7FAFD`，标题区用 morning 渐变，正文 16px / 1.75；H1 28–32px，H2 22px，标题字体栈 `Bebas Neue / Inter / PingFang SC`；玻璃块只用于引用、图组和重点段，`rgba(255,255,255,.72)` + 1px 白描边 + inset 高光 + 蓝调轻阴影，不使用 `backdrop-filter`；强调色 `#0A84FF`，太阳黄只做 kicker 小点；代码 `#07090E` 深色块；图片 20px 圆角、白描边。微信转深色时渐变会被压暗，玻璃只放在承载块上，页面本身保持浅色。
+**公众号主题方案。** id `aozora-daylight`，中文名「青空」，分类「活力」。只做 daylight，不做 yozora。页面 `#F7FAFD`，标题区用 morning 渐变，正文 16px / 1.75；H1 28–32px，H2 22px，标题字体栈 `Bebas Neue / Inter / PingFang SC`；玻璃块只用于引用和重点段，`rgba(255,255,255,.72)` + 1px 白描边 + inset 高光 + 蓝调轻阴影，不使用 `backdrop-filter`；强调色 `#0A84FF`，太阳黄只做一个 kicker 点或一处高亮；代码 `#07090E` 深色块；图片 20px 圆角、白描边，按普通图片展示、不套玻璃框。微信转深色时渐变会被压暗，玻璃只放在承载块上，页面本身保持浅色。
+
+**公众号主题落地。**
+
+- 主题 `aozora-daylight`（青空）在 `src/lib/themes-design.ts`。根容器 `max-width:677px`，页面平的 `#F7FAFD`，正文 16px / 1.75；正文不写 `font-family`，标题才用 `Bebas Neue → Impact / Arial Narrow → PingFang SC` 栈。
+- 标题与编号：H1 是 morning 渐变（`#EAF5FF → #CFE8FF → #9DD2FF → #FFE980`）的 28px 圆角海报块，1px 白玻璃边 + 顶部内高光 + 蓝调轻阴影；H2 用等宽 `01 / OVERVIEW` kicker + 22px 大标题，不加横线，靠留白与玻璃块分节（上游没有章节号，这是 `PROPOSAL`）。
+- 玻璃只做静态：引用与居中重点段是白 72% 覆在晨空蓝渐变（`#EAF5FF → #CFE8FF → #9DD2FF`）上的 24px 圆角块，1px 白描边 + `inset 0 1px 0` 顶部亮边 + `0 6px 18px rgba(10,68,140,.12)` 蓝调阴影；不用 `backdrop-filter`、外链背景图、滤镜或伪元素。
+- 加粗 700 墨色；高亮是太阳黄 `#FFE34D` 55% 的下半行带，全文只此一种黄色用法；链接 `#006FE0`。代码是 `#07090E` 实色深玻璃、`#F7FAFD` 字、JetBrains Mono 栈 13px、顶部内高光；行内代码用 14px 圆角的浅玻璃。
+- 图片按普通图片展示：20px 圆角、1px 白玻璃描边、蓝调轻阴影，不给照片套玻璃框、不加照片滤镜；图注 11px 等宽、`.16em` 字距。图组沿用同一套图片样式，轮播共用同一套圆角与描边；玻璃只留给引文与重点段。
+- 表格、分隔线、署名用 8% 蓝发丝线与等宽标签；accent 蓝只做编号、链接、图号；没有 emoji、图标式插画、硬 90° 角、纯黑阴影，也不把太阳黄当背景砖。
+- 与设计系统的差异：公众号没有 `backdrop-filter`，玻璃是白 72% 填充 + 顶部内高光；morning 渐变只留在标题海报块，页面本身保持平色；竖排 eyebrow、角落小注与 bento 网格不进正文；yozora 不做，真实照片和完整液体玻璃留给卡片。
 
 ## KIHON 基本
 
@@ -88,6 +98,16 @@
 
 **公众号主题方案。** id `kihon-gin`，中文名「银」，分类「商务」。只做银，不做玄。页面 `#E7E9EB`，正文 15.5px / 1.7，按 677/1920 ≈ 0.353 从视频字号换算；H2 用 `01 / 05` 等宽 kicker + 19–22px 标题；每个承载块 1px `#C8CDD1` 边、10px 圆角、inset 亮暗两段边；引用和代码用凹槽；knurl 分隔用 `repeating-linear-gradient`，不支持时退回 1px 线；accent 只给编号、链接和状态；页面不铺颗粒，承载块最多 5% 颗粒。微信深色模式可能把银灰压暗，保留 1px 上亮边和下暗边，免得整块糊成一片。
 
+**公众号主题落地。**
+
+- 主题 `kihon-gin`（银）在 `src/lib/themes-design.ts`。根容器 `max-width:677px`，银灰 `#E7E9EB` + 约 1.5% 竖向拉丝渐变 + 镜头式 falloff；正文 15.5px / 1.7（44 × 677/1920 ≈ 15.5），中文不套等宽栈，页面不铺颗粒。
+- 标题与编号：H1 是 card 面（10px 圆角、1px `#C8CDD1` 线、两段 chamfer、三层定向阴影），标题 31px（88 × 0.353）700；H2 = 等宽 `01 / kicker` 刻字标签 + 一条两端带 5px tick 的 Rule + 21px 标题；H3 17px，下沿 1px 线。编号不写「第几章」。
+- 承载块分五档：card `#F4F5F6`、plate `#EDEFF1`、well `#DDE0E3` 都保持不透明、1px 线和约 1.5% 拉丝微渐变；引用与代码是 well（内凹三段阴影 + 底部亮唇），表格是 plate，图片放在 card 面（10px 圆角、两段 chamfer，图片本身 6px 圆角、不裁异形）。
+- 加粗 700 墨色；高亮是 `#DCE3EB` 浅金属凹槽 + 1px `#8E979E` 底线，不用黄色荧光笔，也不把烤蓝当底色；链接与编号用烤蓝 `#2B4C6F`（只做状态）。代码用 B612 Mono 13px、无语法高亮。
+- 图注 12px（34 × 0.353）、muted，图号用 B612 Mono tabular；无序列表用系统 `·` 刻度，有序列表两位补零；分隔线是 1px 线加 1px 齿、5px 节距、10px 高的 knurl（渐变不被支持时仍留一条线），表格与正文分隔用 1px 线和 Rule。
+- 页面家具不进正文：不加顶部标签条、底部进度条、帧角刻度、相机饰件，也没有 logo；5% 颗粒只留给卡片，公众号不铺。等宽只给编号、标签、数字和代码。
+- 与设计系统的差异：1080p 视频画布的 88/54/44/34 等字号按 677/1920 换算成 31/19/15.5/12px；9:16 / 16:9 两种原生版式与入场阶梯不进正文；knurl 退回 `repeating-linear-gradient` 的分隔带；玄（kuro）不做。
+
 ## KUNLUN 昆仑
 
 来源：`KUNLUN Design System/README.md`（「VISUAL FOUNDATIONS」「Content fundamentals」「Iconography」「CAVEATS」）、`KUNLUN Design System/SKILL.md`，`tokens/snowline.css`、`tokens/colors.css`、`tokens/typography.css`、`tokens/effects.css`、`tokens/spacing.css`，`proposals/snowline/README.md`、`proposals/snowline/ROLLOUT-NOTES.md`，`components/surfaces/Panel.prompt.md`、`components/terminal/CodeBlock.prompt.md`、`components/terminal/Terminal.prompt.md`，`foundations/brand-hud-ornaments.html`、`foundations/type-hud-labels.html`、`foundations/spacing-chamfer.html`。
@@ -120,6 +140,15 @@
 - 图像：卡片允许图片，但统一冷调、低饱和；不要暖色产品照。
 
 **公众号主题方案。** id `kunlun-snowline`，中文名「雪线」，分类「商务」。只做雪线，不做 void。页面 `#E2E9F2`，正文 15px / 1.7 直接落在台面上，引用/代码/图组才用 `#F7FAFD` 面板；40px 蓝图网格用低透明度背景，`clip-path` 不稳定时改用直角 + L 角标 + 1px 边；H2 = `[ 01 ]` 等宽 cyan kicker + 19–22px 标题；代码用 LCD `#C9D6D8` + `#1C3038` + VT323 栈（回落 Courier New）；标签/数字/代码保持等宽，中文正文回落 PingFang / 微软雅黑；accent 只做信号，glow 最多 6–12px。禁紫、禁圆角卡片、禁弹簧。
+
+**公众号主题落地。**
+
+- 主题 `kunlun-snowline`（雪线）在 `src/lib/themes-design.ts`。根容器 `max-width:677px`，页面 `#E2E9F2` 上铺 40px 低透明蓝图网格；正文 15px / 1.7，中文正文不套等宽栈。
+- 标题与编号：H1 是直角面板，用背景渐变画左上/右下 L 形青色角标，不写 `position` 或 `clip-path`；H2 用 `[ 01 ]` 等宽青色编号、大写字距 kicker 与 Orbitron 标题，章节上沿压 1px 强线。
+- 加粗 700 ink；高亮用 `rgba(0,152,212,.12)` 青色底 + 1px cyan 下边；链接降到 cyan-700。引用是 1px 信号边 + L 角标的 `#F7FAFD` 面板，背光控制在 12px 以内。
+- 代码是 LCD：`#C9D6D8` 液晶底、`#1C3038` 段码墨、VT323、可见扫描线、顶部反光和内凹 bezel，不开深色岛。图注用等宽 11px、`FIG. 01 //` 前缀（有图片地址时）；空图位仍保留「图N 说明」。
+- 表格、图组、分隔线与署名都用 1px 发丝线/强线和等宽标签；accent 只做信号，amber/red/green 不进入正文装饰。没有紫色、圆角卡片、emoji、弹簧或大面积 bloom。
+- 与设计系统的差异：上游全等宽在中文长文里牺牲可读性，公众号只让标签、编号、数字与代码保持等宽；切角用直角 + L 角标兜底；HUD 坐标、四角刻度、ASCII 框这些页面家具不进正文；深色 void 不做。
 
 ## Mayonaka 真夜中
 
@@ -187,6 +216,15 @@
 
 **公众号主题方案。** id `rift-daybreak`，中文名「黎明」，分类「商务」。只做黎明，不做深色。页面 `#EAF1FC`，叠 72px 低透明网格 + 顶部极淡径向光；正文 15.5px / 1.7，H1 30px、H2 22px；标题用静态 chromatic edge（用 sky `#6BB6F0` / royal `#3F5BE6` 做两向偏移文字阴影，透明度压到 40–50%），不做动画；引用/代码/图组用 `rgba(255,255,255,.55)` + 1px `--glass-border` + 顶部内高光模拟玻璃，不用 `backdrop-filter`；代码用 `#DCE7F8` 承载块；标签用 Share Tech Mono 栈回落 Menlo/Consolas；`裂隙` 水印在公众号里省略，避免无信息装饰。禁紫、禁暖图、禁双边框。
 
+**公众号主题落地。**
+
+- 主题 `rift-daybreak`（黎明）在 `src/lib/themes-design.ts`。根容器 677px，`#EAF1FC` + 72px 网格 + 顶部白到冰蓝的径向光；正文 15.5px / 1.7。
+- 标题：H1/H2 用 Space Grotesk 600，`text-shadow` 以 sky/royal 固定 ±1px 偏移、约 45% 透明度做静态 chromatic edge，不跑 7s 动画；H1 是 18px 圆角玻璃面板，H2 用 `01 /` 等宽 kicker + 1px 线。
+- 加粗 600 ink-1；高亮是 royal 14% 玻璃带 + 1px royal 下划线；链接 royal。引用用 `rgba(255,255,255,.55)` + 1px glass 边 + `inset 0 1px 0` 顶部高光，再加四个 L 形角标（背景渐变，无 `position`）；图片/图组用 18px 圆角 + 1px glass 边 + 蓝调轻阴影。
+- 代码与行内代码用 `#DCE7F8` sunken 承载块、1px line、10 / 6px 圆角与顶部内高光；代码块叠 3px 节距扫描线，Share Tech Mono 13px。图片 18px 圆角、1px glass 边、蓝调轻阴影；图注 11px mono、`FIG. 01 //`。
+- 表格放在玻璃托盘里；分隔线 1px line-2；署名用 mono 标签。`裂隙` 水印、cursor 跟随与大屏扫描线都不进正文；禁紫、禁暖图、禁双边框，也不引入系统外青/洋红。
+- 与设计系统的差异：公众号没有 `backdrop-filter`，玻璃是半透明填充 + 顶部内高光；glitch 只留静态双色偏移；深色主题不做，真玻璃与完整 glitch 留给小红书卡片。
+
 ## core
 
 来源：`core Design System/README.md`（「How the aesthetics combine」「Content fundamentals」「Visual foundations」「Borders & shadows」「Layout」「Caveats」）、`core Design System/SKILL.md`，`tokens/colors.css`、`tokens/typography.css`、`tokens/effects.css`、`tokens/spacing.css`、`tokens/nightpool.css`、`tokens/fonts.css`，`components/window/Window.jsx`、`components/window/Window.prompt.md`，`cards/effects-bevel.html`、`cards/effects-shadow.html`、`cards/type-display.html`、`cards/brand-textures.html`，`ui_kits/blog/README.md`、`ui_kits/archive/README.md`、`slides/README.md`。
@@ -219,6 +257,14 @@
 - 图像：1px ink 框、直角、2px 偏移阴影；照片统一过曝/JPEG/VHS 滤镜；不要圆裁。
 
 **公众号主题方案。** id `core-frost`，中文名「霜纸」，分类「活力」。只做 frost，不做 nightpool。页面 `#EAF4F8`，正文 16px / 1.6，Tinos 栈回落 Songti SC / STSong；H1/H2 用 Pixelify Sans 栈（公众号回落 Courier New → PingFang SC），英文标签 lowercase；H1 加一条 bondi `#009DE0` 的标题栏带 + 1px ink 边 + 2px 偏移阴影，**不做假关闭键、不做斜纹、不做绝对定位**（`PROPOSAL`）；每个承载块 1px `#0C1A26` 边、直角、2px 偏移阴影；引用/代码用 sunken bevel；图片 1px ink 框；不用纯白/纯黑。微信深色模式会把 frost 纸压暗，1px 墨边和硬阴影保留，避免所有块糊在一起。
+
+**公众号主题落地。**
+
+- 主题 `core-frost`（霜纸）在 `src/lib/themes-design.ts`。根容器 677px，`#EAF4F8` + 32px 低透明瓷砖网格；正文 16px / 1.6，用 Songti SC / STSong / SimSun 的系统衬线栈，不加载 Tinos。现有 Noto Serif SC 只有 700，放进正文栈会让预览偏重，所以正文栈不依赖它。
+- 标题与编号：H1 是一扇 Window——bondi `#009DE0` 标题栏 + 1px ink 边 + 3px/6px 硬偏移阴影，标题用 Pixelify 栈 lowercase；H2 同样是 Window，标题栏里用小号像素 mono 放 `[ 01 ]` 与 kicker 状态行，标题本身也在标题栏里 lowercase，不再另起正文标题。没有假关闭键、没有斜纹、没有绝对定位。
+- 加粗 700 ink；高亮用 bubblegum 45% 下半行带；引用与代码用 `#DDE4EC` sunken bevel-in（1px ink 边 + 1px 高/低光），引用用衬线斜体，代码用 VT323。图片是 1px ink 直角框 + 2px 偏移硬阴影，图注 VT323 `// 图N`。
+- 表格用 bondi 表头 + 1px ink 网格 + 2px 硬阴影；分隔线 1px dashed ink；署名是 sunken 状态栏；列表用方点 / 十进制。页面不铺纯白、纯黑，也不做暖奶油纸。
+- 与设计系统的差异：上游窗口可以绝对定位、叠放、散落，公众号只能改成纵向叠窗；标题栏不放假关闭键与斜纹，编号放进标题栏而不是另起一行；图片不做 overexposed / JPEG / VHS 滤镜（不能处理用户图）；nightpool 深色不做。
 
 ## 字体与授权
 

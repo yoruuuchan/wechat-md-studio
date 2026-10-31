@@ -8,7 +8,7 @@
 license 字段（实测），上游主题文件已浅克隆核对；标注「推断」的条目是法律判断而非事实记录。
 
 <!-- BEGIN GENERATED: themes-doc-intro — npm run sync:docs -->
-主题库当前共 **222 套**：210 套由 `scripts/themes/import.ts` 从 7 个上游仓库导入、6 套 gzh-design-skill 移植、3 套 yoru-design-systems 移植、3 套自研。
+主题库当前共 **227 套**：210 套由 `scripts/themes/import.ts` 从 7 个上游仓库导入、6 套 gzh-design-skill 移植、8 套 yoru-design-systems 移植、3 套自研。
 导入产物在 `src/lib/themes-imported/*.ts`，提交进仓库，运行时不依赖任何上游仓库。重跑：`npm run import:themes`（上游克隆位置见文末）。
 <!-- END GENERATED: themes-doc-intro -->
 
@@ -25,7 +25,7 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
 | [rotbit/xedit](https://github.com/rotbit/xedit) | MIT | 13 | TS，#nice 选择器 CSS 串 | `LICENSES/xedit/LICENSE` |
 | [caol64/wenyan-core](https://github.com/caol64/wenyan-core) | MIT 7 套 · Apache-2.0 1 套 | 8 | CSS 文件 + TS 注册表 | `LICENSES/wenyan-core/LICENSE` + `LICENSES/typora-upstream/` 7 份 |
 | [isjiamu/gzh-design-skill](https://github.com/isjiamu/gzh-design-skill) | AGPL-3.0-or-later | 6 | Markdown 组件库 | `LICENSES/gzh-design-skill/LICENSE` |
-| [yoruuuchan/yoru-design-systems](https://github.com/yoruuuchan/yoru-design-systems) | MIT | 3 | 设计系统 tokens + HTML/JSX 模板（CSS / 内联样式） | `LICENSES/yoru-design-systems-LICENSE.txt` |
+| [yoruuuchan/yoru-design-systems](https://github.com/yoruuuchan/yoru-design-systems) | MIT | 8 | 设计系统 tokens + HTML/JSX 模板（CSS / 内联样式） | `LICENSES/yoru-design-systems-LICENSE.txt` |
 | 本项目自研 | Project-Original | 3 | 手写主题（theme-kit 语义节点） | — |
 
 审计备注：
@@ -35,17 +35,17 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
 - **huasheng_editor**：上游是 ricocc/rico-md 那 21 套主题的直接来源；我们取上游仓库本身，不取二手拷贝。
 - **wenyan-core**：8 套里 7 套的 CSS 头注释标明各自的 Typora 上游主题与作者（7 个上游仓库实测均为 MIT），第 8 套 wenyan-default 按 wenyan-core 的 Apache-2.0 记录；许可证文本存在 typora-upstream/ 下。
 - **gzh-design-skill**：AGPL-3.0-or-later 有传染性且第 13 条覆盖网络服务：本项目整体因此以 AGPL 提供源码；线上部署与公开仓库对应是履行该义务的方式。
-- **yoru-design-systems**：三套公众号主题按 YORU Content、PAPER（Editorial）与 yoru-and-akari Console（akari）的结构重写为内联 HTML；上游根 LICENSE 为 MIT，副本已留存。
+- **yoru-design-systems**：八套公众号主题按 YORU Content、PAPER（Editorial）、yoru-and-akari Console（akari）、KUNLUN（SNOWLINE）、RIFT（daybreak）、core（frost）、Aozora（daylight）与 KIHON（gin）的结构重写为内联 HTML；上游根 LICENSE 为 MIT，副本已留存。
 <!-- END GENERATED: themes-doc-sources -->
 
 ### 统计（由 `npm run sync:docs` 生成；`npm run verify:sources` 复核一致性）
 
 <!-- BEGIN GENERATED: themes-doc-stats — npm run sync:docs -->
-- 按来源：xiaohu-wechat-format 85 · raphael-publish 30 · md-wechat 28 · inkpress 26 · huasheng_editor 20 · xedit 13 · wenyan-core 8 · gzh-design-skill 6 · 本项目自研 3 · yoru-design-systems 3
-- 按许可证：MIT 210 · AGPL-3.0-or-later 6 · GPL-3.0-only 2 · Apache-2.0 1 · 本项目自研 3
-- 按风格标签（多标签）：文艺复古 80 · 杂志 75 · 治愈 67 · 科技 60 · 商务 44 · 中国风 24 · 学术 22 · 暗色 21 · 卡通 10 · 政务 4 · 运动 2 · 节日 0
-- 按复杂度：简洁 59 · 标准 103 · 复杂 60
-- 按色系：冷色 95 · 暖色 89 · 中性 34 · 多彩 4
+- 按来源：xiaohu-wechat-format 85 · raphael-publish 30 · md-wechat 28 · inkpress 26 · huasheng_editor 20 · xedit 13 · wenyan-core 8 · yoru-design-systems 8 · gzh-design-skill 6 · 本项目自研 3
+- 按许可证：MIT 215 · AGPL-3.0-or-later 6 · GPL-3.0-only 2 · Apache-2.0 1 · 本项目自研 3
+- 按风格标签（多标签）：文艺复古 81 · 杂志 75 · 治愈 68 · 科技 64 · 商务 47 · 中国风 24 · 学术 22 · 暗色 21 · 卡通 11 · 政务 4 · 运动 2 · 节日 0
+- 按复杂度：简洁 59 · 标准 108 · 复杂 60
+- 按色系：冷色 99 · 暖色 89 · 中性 35 · 多彩 4
 <!-- END GENERATED: themes-doc-stats -->
 
 风格标签与复杂度由 `scripts/themes/lib/classify.ts` 从上游描述/标签文本 + 样式度量推导，
@@ -113,11 +113,11 @@ license 字段（实测），上游主题文件已浅克隆核对；标注「推
 仓库根目录 `LICENSE` 为 AGPL-3.0 正文。
 
 <!-- BEGIN GENERATED: themes-doc-compat — npm run sync:docs -->
-[package.json](package.json) 的 `license` 字段与 [README](README.md#license-与来源) 同步声明。222 套主题全部保留，兼容性逐族核对：
+[package.json](package.json) 的 `license` 字段与 [README](README.md#license-与来源) 同步声明。227 套主题全部保留，兼容性逐族核对：
 
 | 上游许可证 | 套数 | 与 AGPL-3.0-or-later 应用的关系 |
 |---|---|---|
-| MIT | 210 | 单向并入，保留版权声明与许可文本即可（已做） |
+| MIT | 215 | 单向并入，保留版权声明与许可文本即可（已做） |
 | AGPL-3.0-or-later | 6 | 同许可证族，保留联名署名（已做） |
 | GPL-3.0-only | 2 | AGPL 第 13 条第二段明文允许与 GPL-3.0 作品组合为单一 AGPL 作品 |
 | Apache-2.0 | 1 | 兼容；保留 LICENSE、标注修改、传递 NOTICE（上游无 NOTICE，此条免） |

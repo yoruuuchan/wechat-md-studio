@@ -339,7 +339,7 @@ for (const theme of THEMES) {
   check('all-themes', `every one of ${THEMES.length} themes renders all 4 cells`, swallowed.length === 0,
     swallowed.slice(0, 5).join(','))
 
-  // 轮播条里的固定像素宽度是窄屏溢出隐患，222 套主题一套都不许有（与微信弹窗无关，见上）
+  // 轮播条里的固定像素宽度是窄屏溢出隐患，227 套主题一套都不许有（与微信弹窗无关，见上）
   const carouselSrc = `:::carousel 4:3 轮播\n![A](img:a.png)\n![B](img:b.png)\n:::\n`
   const withPxWidth = THEMES.filter((t) => {
     const h = renderDoc(parseMarkdown(carouselSrc), t, sig, resolveImg).html

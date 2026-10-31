@@ -230,8 +230,8 @@ editor.readyLabel = 'editor ready (CodeMirror + preview mounted)'
 fs.mkdirSync(path.dirname(OUT), { recursive: true })
 
 // ---------------------------------------------------------------- themes
-// 单独计时：第一张卡片出现、第一张预览渲染、222 张卡片齐。
-// 旧实现进入页面就先算完 222 套预览，第一张卡片会等全部计算；新实现
+// 单独计时：第一张卡片出现、第一张预览渲染、227 张卡片齐。
+// 旧实现进入页面就先算完 227 套预览，第一张卡片会等全部计算；新实现
 // 卡片来自 metadata 目录，预览才按可见区域加载。
 network.clear()
 await send('Network.setCacheDisabled', { cacheDisabled: true }, sessionId)
@@ -249,7 +249,7 @@ for (let i = 0; i < 300; i += 1) {
   const at = Date.now() - themesT0
   if (firstCardMs == null && cards > 0) firstCardMs = at
   if (firstPreviewMs == null && rendered > 0) firstPreviewMs = at
-  if (cards >= 222) {
+  if (cards >= 227) {
     allCardsMs = at
     break
   }
@@ -272,7 +272,7 @@ const themes = {
   firstPreviewMs,
   allCardsMs,
 }
-themes.readyLabel = '222 theme cards mounted'
+themes.readyLabel = '227 theme cards mounted'
 themes.renderedUpfront = await evaluate(`document.querySelectorAll('[data-theme-preview="rendered"]').length`)
 themes.cards = await evaluate(`document.querySelectorAll('[data-theme-card]').length`)
 themes.themeChunks = [...new Set([...network.values()].filter((entry) => /\/(xiaohu|raphael|huasheng|md-wechat|wenyan|xedit|inkpress)-/.test(entry.url)).map((entry) => entry.url.split('/').pop()))]

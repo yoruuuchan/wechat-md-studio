@@ -26,7 +26,7 @@ Made by Yoru, as a personal project that is continuously used and improved. The 
 - **Your document stays yours.** Markdown is the single content source. AI, browser editing, preview, copy and export all work around the same draft.
 - **Bring your own AI.** The public Skill can be given to ChatGPT, Claude, Codex, OpenCode or any other AI that can read text or links. Reed itself does not require a model API for this workflow.
 - **Humans keep the final mile.** AI can draft, organize and revise; you can continue in the real editor to review the wording, reshape sections, handle images, switch themes and decide what actually gets published.
-- **Typesetting is inspectable.** All 222 themes consume the same semantic AST and rendering pipeline, so they can be compared against the same content. Author, license and provenance information stay attached to adapted themes.
+- **Typesetting is inspectable.** All 227 themes consume the same semantic AST and rendering pipeline, so they can be compared against the same content. Author, license and provenance information stay attached to adapted themes.
 - **The output is made for WeChat.** Preview, full-document copy, selection copy and article HTML export share the same renderer and produce fully inline HTML for WeChat Official Accounts.
 
 ## Three ways to work
@@ -64,7 +64,7 @@ flowchart LR
 
 ## Editor and typesetting
 
-- **<!-- gen:theme-count -->222 themes<!-- /gen:theme-count -->** with filters for style, complexity, color and source. Favorite templates, trial the current article, or compare up to three candidates side by side. Author, license and provenance are retained.
+- **<!-- gen:theme-count -->227 themes<!-- /gen:theme-count -->** with filters for style, complexity, color and source. Favorite templates, trial the current article, or compare up to three candidates side by side. Author, license and provenance are retained.
 - **Article-oriented Markdown**: numbered sections, highlights, pull quotes, quotation boxes, centered text, credits, tables, block equations and Mermaid diagrams.
 - **Images**: upload, compression (automatic, a 1–5 MB target, or the original file), automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
 - **Editing and preview**: CodeMirror, a Markdown toolbar with per-column and whole-table alignment, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
@@ -140,7 +140,7 @@ Read the [Terms of use](https://wechat.yoru-and-akari.dev/terms). Rights complai
 The application is licensed under **AGPL-3.0-or-later**; see [LICENSE](https://github.com/yoruuuchan/wechat-md-studio/blob/master/LICENSE).
 
 <!-- BEGIN GENERATED: readme-theme-sources — npm run sync:docs -->
-The library contains **222 themes**: 3 originals and 219 adapted from 9 upstream projects. Authors, licenses and provenance are recorded in shared metadata.
+The library contains **227 themes**: 3 originals and 224 adapted from 9 upstream projects. Authors, licenses and provenance are recorded in shared metadata.
 
 See [THEME-SOURCES](THEME-SOURCES.md) for the audit. Project acknowledgements and adaptation notes come from [credits.ts](src/lib/credits.ts) and appear in [References](https://wechat.yoru-and-akari.dev/references) and [LICENSES/NOTICE](LICENSES/NOTICE.md).
 <!-- END GENERATED: readme-theme-sources -->

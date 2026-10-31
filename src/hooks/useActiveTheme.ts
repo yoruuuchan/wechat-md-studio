@@ -13,7 +13,7 @@ export interface ActiveThemeState {
 
 /**
  * 当前主题的实现。自研/手写主题同步命中；导入主题只加载它所属的那个 pack，
- * 不把 222 套主题的样式代码塞进首屏。
+ * 不把 227 套主题的样式代码塞进首屏。
  *
  * 加载失败时保留 golden 兜底并暴露 error，调用方给出可重试的提示；重试会重新
  * 发起 dynamic import（theme-api 不会缓存 rejected Promise）。

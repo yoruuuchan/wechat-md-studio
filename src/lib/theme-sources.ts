@@ -148,7 +148,7 @@ export const THEME_SOURCES: ThemeSource[] = [
     licenseFiles: ['LICENSES/yoru-design-systems-LICENSE.txt'],
     format: '设计系统 tokens + HTML/JSX 模板（CSS / 内联样式）',
     notes:
-      '三套公众号主题按 YORU Content、PAPER（Editorial）与 yoru-and-akari Console（akari）的结构重写为内联 HTML；上游根 LICENSE 为 MIT，副本已留存。',
+      '八套公众号主题按 YORU Content、PAPER（Editorial）、yoru-and-akari Console（akari）、KUNLUN（SNOWLINE）、RIFT（daybreak）、core（frost）、Aozora（daylight）与 KIHON（gin）的结构重写为内联 HTML；上游根 LICENSE 为 MIT，副本已留存。',
   },
 ]
 

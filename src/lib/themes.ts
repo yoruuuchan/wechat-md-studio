@@ -1,4 +1,4 @@
-// 完整主题注册表：测试、构建期校验与脚本用它拿到全部 222 套主题。
+// 完整主题注册表：测试、构建期校验与脚本用它拿到全部 227 套主题。
 // 应用运行时不直接 import 本文件——首屏只需要当前主题与元数据目录，
 // 走 ./theme-catalog.ts / ./theme-api.ts 的按需加载接口。
 import type { Theme } from './theme-kit'
@@ -8,7 +8,15 @@ import { DESIGN_THEMES } from './themes-design'
 import { IMPORTED_THEMES } from './themes-imported'
 
 export { CORE_THEMES, goldenTheme, minimalTheme, steadyTheme } from './themes-core'
-export { DESIGN_THEMES, consoleAkariTheme, paperEditorialTheme, yoruTypeTheme } from './themes-design'
+export {
+  DESIGN_THEMES,
+  consoleAkariTheme,
+  coreFrostTheme,
+  kunlunSnowlineTheme,
+  paperEditorialTheme,
+  riftDaybreakTheme,
+  yoruTypeTheme,
+} from './themes-design'
 export { BLANK, baseTableBlock, carouselFrame, esc, sanitizeStyle } from './theme-kit'
 export type { CarouselFrame, ParagraphOptions, Theme, ThemeCategory, ThemePalette, ThemeStyles } from './theme-kit'
 export type { ColorFamily, Complexity, StyleTag, ThemeMeta, ThemeOrigin } from './theme-meta'

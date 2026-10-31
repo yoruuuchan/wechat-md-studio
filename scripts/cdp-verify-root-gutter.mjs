@@ -102,7 +102,7 @@ try {
     })
     return { rows, badWidths: rows.filter((row) => !row.stable), overflow: rows.filter((row) => row.overflow) }
   })()`, sessionId)
-  check('all 222 themes keep the same content width at 1/2/3 root nesting', result.badWidths.length === 0, JSON.stringify(result.badWidths.slice(0, 6)))
+  check('all 227 themes keep the same content width at 1/2/3 root nesting', result.badWidths.length === 0, JSON.stringify(result.badWidths.slice(0, 6)))
   check('no theme horizontally overflows a 375px article column', result.overflow.length === 0, JSON.stringify(result.overflow.slice(0, 6)))
 
   for (const id of representative) {

@@ -13,7 +13,7 @@ import {
  * 两边订阅同一份快照，任何一边的改动立即反映到另一边。
  *
  * 已知 id 来自 metadata 目录而不是完整主题注册表，所以首屏不必为了过滤
- * 幽灵收藏去下载 222 套主题实现。
+ * 幽灵收藏去下载 227 套主题实现。
  */
 export function useThemeFavorites() {
   const stored = useSyncExternalStore(subscribeFavorites, favoritesSnapshot, favoritesSnapshot)

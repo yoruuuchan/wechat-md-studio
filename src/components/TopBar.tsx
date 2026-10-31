@@ -76,7 +76,7 @@ export default function TopBar(p: Props) {
   const activeTheme = catalogTheme(p.themeId)
   const { favorites } = useThemeFavorites()
 
-  // 顶栏首屏只读 metadata 目录：名称、分类和主色不需要 222 套主题的样式代码。
+  // 顶栏首屏只读 metadata 目录：名称、分类和主色不需要 227 套主题的样式代码。
   // 首次打开快速切换器时才加载实现并渲染缩略预览；加载结果缓存在 theme-api，
   // 之后开关弹层不再走网络。
   const [quickThemes, setQuickThemes] = useState<Map<string, Theme> | null>(null)
@@ -104,7 +104,7 @@ export default function TopBar(p: Props) {
   )
   const favoriteShown = useMemo(() => favoriteThemes.slice(0, QUICK_FAVORITES), [favoriteThemes])
 
-  // 快速切换器只放每类前几套：222 套每套都要实时渲染缩略图，
+  // 快速切换器只放每类前几套：227 套每套都要实时渲染缩略图，
   // 全塞进来既慢也没法扫；完整浏览在下面的「查看全部模板」。
   // 收藏单独一组置顶、且不再进分类组，同一个主题只出现一次。
   const sections = useMemo(
@@ -126,7 +126,7 @@ export default function TopBar(p: Props) {
   )
 
   // 只渲染弹层里真正出现的缩略图（收藏最多 6 套 + 每类 6 套），
-  // 不是把 222 套全部 renderDoc 一遍。
+  // 不是把 227 套全部 renderDoc 一遍。
   const displayedIds = useMemo(
     () =>
       new Set([

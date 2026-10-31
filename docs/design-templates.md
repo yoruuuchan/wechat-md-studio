@@ -80,13 +80,18 @@
 
 ## 公众号主题
 
-三套设计系统已落成 Reed 的手写主题，实现在 `src/lib/themes-design.ts`，来源登记在 `theme-sources.ts` 的 `yoru-design-systems`（MIT）。公众号版只取各系统的浅色主形态：YORU Content 用 Signal 变体，PAPER 只做 Editorial 浅色纸，Console 只做 akari 浅色。
+八套设计系统已落成 Reed 的手写主题，实现在 `src/lib/themes-design.ts`，来源登记在 `theme-sources.ts` 的 `yoru-design-systems`（MIT）。公众号版只取各系统的浅色主形态：YORU Content 用 Signal 变体，PAPER 只做 Editorial 浅色纸，Console 只做 akari 浅色，KUNLUN 只做 SNOWLINE 雪线，RIFT 只做 daybreak 黎明，core 只做 frost 霜纸，Aozora 只做 daylight 青空，KIHON 只做 gin 银。
 
 | id | 名称 | 上游 | 分类 | 复杂度 / 色系 |
 |---|---|---|---|---|
 | `yoru-type` | 铅字房 | `YORU Content Design System/` | 杂志 | 2 / 冷色 |
 | `paper-editorial` | 纸本 | `PAPER Design System/` | 杂志 | 2 / 暖色 |
 | `console-akari` | 灯 | `yoru-and-akari Console Design System/` | 简约 | 2 / 冷色 |
+| `kunlun-snowline` | 雪线 | `KUNLUN Design System/` | 商务 | 2 / 冷色 |
+| `rift-daybreak` | 黎明 | `RIFT Design System/` | 商务 | 2 / 冷色 |
+| `core-frost` | 霜纸 | `core Design System/` | 活力 | 2 / 冷色 |
+| `aozora-daylight` | 青空 | `Aozora 青空 Design System/` | 活力 | 2 / 冷色 |
+| `kihon-gin` | 银 | `KIHON 基本 Design System/` | 商务 | 2 / 中性 |
 
 ### 铅字房（`yoru-type`）
 
@@ -121,9 +126,9 @@
 
 ### 与设计系统的差异
 
-- **字体到微信端会回落。** 上游的 Noto Serif SC / 思源黑体 / Geist / EB Garamond 等自托管字体不会被公众号加载；主题只在标题写字体栈，正文完全交给读者手机的 PingFang SC / 微软雅黑等系统字体。辨识度靠纸色、线条、编号、圆角与承载块质感，不靠字体本身。
-- **只做浅色主形态。** YORU 的四个变体只取 Signal；PAPER 的 Analog / Midnight 与 Console 的 yoru 深色都不做，避免微信深色模式转换后出现亮块或反色事故。
+- **字体到微信端会回落。** 上游的 Noto Serif SC / 思源黑体 / Geist / EB Garamond 等自托管字体不会被公众号加载；主题不加载网页字体，只在标题、标签、代码或 core 的衬线正文声部写系统字体栈，其余正文交给读者手机的 PingFang SC / 微软雅黑等系统字体。辨识度靠纸色、线条、编号、圆角与承载块质感，不靠字体本身。
+- **只做浅色主形态。** YORU 的四个变体只取 Signal；PAPER 的 Analog / Midnight 与 Console 的 yoru 深色都不做；KUNLUN 只做雪线、RIFT 只做黎明、core 只做霜纸、Aozora 只做 daylight、KIHON 只做银，深色形态（yozora、玄）留给小红书卡片。目的是避免微信深色模式转换后出现亮块或反色事故。
 - **页面家具不进正文。** YORU 的月相报头、汉字页码、直排书脊与封面套印属于小红书卡片/封面结构，公众号主题不复刻；Console 的玻璃、图标、径向光与页面级新拟态也不进正文，只保留承载块的内凹。
-- **结构优先于装饰。** 三套主题都不加角落英文小标签、刻度、读数或假图；空图位沿用「图N + 说明」的占位段。
+- **结构优先于装饰。** 这些主题都不加角落英文小标签、刻度、读数或假图；空图位沿用「图N + 说明」的占位段。
 - **平台红线。** 输出全部内联：没有 `class` / `id` / `<div>` / `<style>` / CSS 变量 / `position` / `float` / `display:grid` / `@media`；所有文字包在 `<span leaf="">` 里，根容器 `max-width` 在 240–677px、不写左右 padding，图片 `max-width:100%;height:auto`；中文标点全角。
-- **小样。** `node scripts/cdp-shoot-design-themes.mjs` 会用 375px 视口、2 倍像素密度渲染三套主题 ×（连续段落短文 + 主题预览稿 + 约 3000 字中文长文），截图与并排索引在 `verify-out/design-themes/`。短文是专门加的：另外两份稿件没有相邻的正文段，看不出纸本的首行缩进。
+- **小样。** `node scripts/cdp-shoot-design-themes.mjs` 会用 375px 视口、2 倍像素密度渲染全部设计系统主题 ×（连续段落短文 + 主题预览稿 + 约 3000 字中文长文），截图与并排索引在 `verify-out/design-themes/`。短文是专门加的：另外两份稿件没有相邻的正文段，看不出纸本的首行缩进。

@@ -1,6 +1,6 @@
 // 小样截图：用 renderDoc 把一篇连续段落短文、主题预览稿与一篇约 3000 字的
-// 中文长文，按 yoru-type / paper-editorial / console-akari 三套主题渲染，放进
-// 375px 宽、2 倍像素密度的手机视口整页截图，再生成并排索引。
+// 中文长文，按 DESIGN_THEMES 里的全部设计系统主题渲染，放进 375px 宽、
+// 2 倍像素密度的手机视口整页截图，再生成并排索引。
 //
 // Run after npm run build (or directly; this bundles src with esbuild):
 //   node scripts/cdp-shoot-design-themes.mjs
@@ -287,6 +287,6 @@ const sections = docs
     return `<section><h2>${esc(doc.label)}</h2><div class="row">${figures}</div></section>`
   })
   .join('\n')
-const index = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>设计系统主题小样</title><style>body{margin:0;padding:32px;background:#eef1f5;color:#1c2433;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}h1{font-size:22px;margin:0 0 8px}p{margin:0 0 28px;color:#5a6577;font-size:13px}section{margin:0 0 36px}h2{font-size:16px;margin:0 0 12px}.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}figure{margin:0;background:#fff;padding:10px;border:1px solid #dbe1ea;border-radius:6px}figcaption{font-size:12px;line-height:1.6;margin:0 0 8px;color:#5a6577}figcaption b{color:#1c2433}code{font-family:Menlo,Consolas,monospace;font-size:11px;color:#6b7793}img{display:block;width:100%;height:auto;border:1px solid #e5e9f0}</style></head><body><h1>设计系统主题小样 · 375px</h1><p>yoru-type / paper-editorial / console-akari × 连续段落短文 / 主题预览稿 / 约 3000 字中文长文；2 倍像素密度截图由 <code>scripts/cdp-shoot-design-themes.mjs</code> 生成。</p>${sections}</body></html>`
+const index = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>设计系统主题小样</title><style>body{margin:0;padding:32px;background:#eef1f5;color:#1c2433;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif}h1{font-size:22px;margin:0 0 8px}p{margin:0 0 28px;color:#5a6577;font-size:13px}section{margin:0 0 36px}h2{font-size:16px;margin:0 0 12px}.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}figure{margin:0;background:#fff;padding:10px;border:1px solid #dbe1ea;border-radius:6px}figcaption{font-size:12px;line-height:1.6;margin:0 0 8px;color:#5a6577}figcaption b{color:#1c2433}code{font-family:Menlo,Consolas,monospace;font-size:11px;color:#6b7793}img{display:block;width:100%;height:auto;border:1px solid #e5e9f0}</style></head><body><h1>设计系统主题小样 · 375px</h1><p>全部 ${DESIGN_THEMES.length} 套设计系统主题（${DESIGN_THEMES.map((theme) => theme.id).join(' / ')}）× 连续段落短文 / 主题预览稿 / 约 3000 字中文长文；2 倍像素密度截图由 <code>scripts/cdp-shoot-design-themes.mjs</code> 生成。</p>${sections}</body></html>`
 fs.writeFileSync(path.join(OUT, 'index.html'), index, 'utf8')
 console.log(`wrote ${path.relative(process.cwd(), path.join(OUT, 'index.html'))} (${shots.length} screenshots)`)

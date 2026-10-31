@@ -27,7 +27,7 @@
 | 界面控件 | Reed `PreviewPane.tsx`、`src/index.css`；Console 的 `preview/buttons.html` | `ya-well` 凹陷承载、`ya-selected` 1.5px 描边、现有按钮与明暗 token |
 
 围绕 Reed 的语义 AST 重写卡片渲染，未引入 mopai 的 marked。原来的公众号 Theme 和 renderer 无需改变。
-卡片只有一套基础版式，文章主题提供主色；不将 222 套公众号模板的视觉全部移植到卡片。
+卡片只有一套基础版式，文章主题提供主色；不将 227 套公众号模板的视觉全部移植到卡片。
 轮播和网格在静态 PNG 中逐图展示，确保每张都可见；原始 Markdown 与公众号多图行为保留。
 代码沿用 Reed 的纯文本呈现，不新增语法高亮依赖。封面用已有的 700 字重；极长标题按实测高度缩小。
 参考项目导出使用 `skipFonts`；Reed 改为明确内嵌网页字体，并对无法读取的图片给出可见提示。

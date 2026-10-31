@@ -305,7 +305,7 @@ await shot('01-editor.png')
 // ------------------------------------------------------------ trial current
 console.log('\n=== current-article trial ===')
 await send('Page.navigate', { url: `${APP}/themes` }, sessionId)
-await waitFor(`document.querySelectorAll('[data-theme-card]').length === 222`)
+await waitFor(`document.querySelectorAll('[data-theme-card]').length === 227`)
 await evaluate(`document.querySelector('[data-trial-current]')?.click()`)
 const dialogOpen = await waitFor(`document.querySelector('[data-slot="dialog-content"]') != null`)
 check('“try current article” opens the comparison dialog', dialogOpen)
@@ -369,8 +369,8 @@ check(
   (await evaluate(`document.querySelectorAll('[data-theme-trial]').length`)) === 3,
 )
 check(
-  'the grid keeps sample previews (no current long article for 222 cards)',
-  (await evaluate(`document.querySelectorAll('[data-theme-preview]').length`)) === 222,
+  'the grid keeps sample previews (no current long article for 227 cards)',
+  (await evaluate(`document.querySelectorAll('[data-theme-preview]').length`)) === 227,
 )
 await shot('03-compare-three.png')
 const unchangedPaper = await evaluate(`JSON.stringify([...document.querySelectorAll('[data-theme-trial]')].map(el => el.innerHTML))`)
@@ -390,7 +390,7 @@ await evaluate(`(() => {
   input.dispatchEvent(new Event('input', { bubbles: true }))
   return true
 })()`)
-const filtered = await waitFor(`document.querySelectorAll('[data-theme-card]').length < 222`, 5000)
+const filtered = await waitFor(`document.querySelectorAll('[data-theme-card]').length < 227`, 5000)
 check('search narrows the library before apply', filtered, `${await evaluate(`document.querySelectorAll('[data-theme-card]').length`)} cards`)
 await evaluate(`window.scrollTo(0, 900)`)
 await sleep(400)
@@ -411,7 +411,7 @@ await evaluate(`(() => {
   window.dispatchEvent(new PopStateEvent('popstate'))
   return true
 })()`)
-const returned = await waitFor(`document.querySelectorAll('[data-theme-card]').length < 222 && document.querySelectorAll('[data-theme-card]').length > 0`, 20000)
+const returned = await waitFor(`document.querySelectorAll('[data-theme-card]').length < 227 && document.querySelectorAll('[data-theme-card]').length > 0`, 20000)
 check('returning restores the filtered result set', returned)
 check(
   'returning restores the search text',
@@ -425,7 +425,7 @@ await shot('04-restored-library.png')
 // A full reload is a new document: filters may start clean, but the body and the
 // applied theme must survive it.
 await send('Page.reload', {}, sessionId)
-await waitFor(`document.querySelectorAll('[data-theme-card]').length === 222`, 20000)
+await waitFor(`document.querySelectorAll('[data-theme-card]').length === 227`, 20000)
 check('a reload keeps the applied theme', (await themeId()) === 'raphael-mint')
 check('a reload keeps the body intact', (await readBody('u06-trial')) === beforeBody)
 
@@ -445,7 +445,7 @@ await evaluate(`(() => {
   return true
 })()`)
 await send('Page.navigate', { url: `${APP}/themes` }, sessionId)
-await waitFor(`document.querySelectorAll('[data-theme-card]').length === 222`)
+await waitFor(`document.querySelectorAll('[data-theme-card]').length === 227`)
 await evaluate(`document.querySelector('[data-trial-current]')?.click()`)
 const reasonShown = await waitFor(`document.querySelector('[data-trial-reason="missing"]') != null`, 15000)
 check('a missing body shows the accurate reason', reasonShown)
