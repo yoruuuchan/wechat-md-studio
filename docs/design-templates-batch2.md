@@ -1,6 +1,6 @@
 # 设计系统模板（第二批）
 
-本文接 [设计系统模板](design-templates.md)，原则沿用第一批：结构跟着系统走，不只借色；设计系统是唯一事实来源；卡片与公众号分开想；公众号浅色为主；按载体换算尺度。第一批三套（YORU Content、PAPER、yoru-and-akari Console）已经落成公众号主题；这一批写剩下六套的设计依据，其中 KUNLUN、RIFT、core、Aozora、KIHON 已落成公众号主题，Mayonaka 仍供后续实现公众号主题和小红书卡片模板使用。各系统仍按自己的规则处理，不混成一套。
+本文接 [设计系统模板](design-templates.md)，原则沿用第一批：结构跟着系统走，不只借色；设计系统是唯一事实来源；卡片与公众号分开想；公众号浅色为主；按载体换算尺度。第一批三套（YORU Content、PAPER、yoru-and-akari Console）已经落成公众号主题；这一批写剩下六套的设计依据，其中 KUNLUN、RIFT、core、Aozora、KIHON 已落成公众号主题，六套的卡片模板也都已落成；Mayonaka 不做公众号主题。各系统仍按自己的规则处理，不混成一套。
 
 推荐实现顺序：
 
@@ -21,6 +21,8 @@
 - **字体分两条路。** 卡片可以把网页字体嵌进 PNG；公众号只能用读者手机里的字体，主题的辨识度靠颜色、线条、间距和结构。所有公众号字体栈都必须有系统字体兜底。
 - **动效不进静态载体。** RIFT 的 glitch、Mayonaka 的扫描线漂移、KIHON 的入场阶梯都只作为静态构图或卡片上的固定纹理，不在公众号或 PNG 里跑动画。
 - **`PROPOSAL` 的含义。** 上游没有写、需要模板自己决定的，标 `PROPOSAL`；实现前可以和 Yoru 再确认，但不影响先做小样。
+
+第二批六套的卡片落地只改卡片层，不改公众号主题。尺寸仍以 540 CSS px 为画布、PNG 两倍导出；1242px 卡片稿按 540/1242 ≈ 0.435 换算，KIHON 的原生 1080×1920 按 0.5 换算。六套都不使用两端刻点分隔线、齿纹带、刻度、读数或角落英文小标签，也不在卡片上印设计系统名或模板名；每张卡只在页脚或状态栏保留一处页码。正文、副标题和小字与它们实际压住的底色（含渐变、颗粒和扫描线）对比度不低于 4.5:1，24px 以上的粗体标题不低于 3:1。
 
 ## Aozora 青空
 
@@ -65,6 +67,14 @@
 - 表格、分隔线、署名用 8% 蓝发丝线与等宽标签；accent 蓝只做编号、链接、图号；没有 emoji、图标式插画、硬 90° 角、纯黑阴影，也不把太阳黄当背景砖。
 - 与设计系统的差异：公众号没有 `backdrop-filter`，玻璃是白 72% 填充 + 顶部内高光；morning 渐变只留在标题海报块，页面本身保持平色；竖排 eyebrow、角落小注与 bento 网格不进正文；yozora 不做，真实照片和完整液体玻璃留给卡片。
 
+**卡片模板落地。**
+
+- 变体 `daylight`（默认晨空渐变）/ `yozora`（夜空蓝），3:4、1:1、9:16 都可用。卡片字体 Inter 400/600、Space Grotesk 500/700、JetBrains Mono 400、Noto Sans SC 400/700；不额外打包 Noto Sans JP。
+- 封面：压在渐变上的 28px 玻璃托盘、大号标题与副题；底部作者与 `01 / 05`。托盘和页脚统一用左右 42px 的边距，去掉原来的竖排 `青空` eyebrow 和字标后仍然居中平衡。玻璃是静态白 55% + 1px 白描边 + 顶部内高光 + 蓝调阴影，不依赖模糊。
+- 正文：每页一块玻璃托盘（20px 圆角），H2 26px + JetBrains Mono `01 / OVERVIEW` 式小 kicker；加粗 700 墨色；高亮是太阳黄 55% 下半行带，全文只此一种黄色用法。daylight 的次级文字提到 `#4A5868`，强调色和链接色用 `#005DB3`，页脚压在晨空底部黄色上仍达到 4.5:1。
+- 引用是白 72% 玻璃块；代码是 `#07090E` 深玻璃 + JetBrains Mono 13px；图片按普通图片展示：20px 圆角、蓝调阴影，不套玻璃框、不加照片滤镜；图注 11px 等宽 `.16em`；表格与分隔线 1px 蓝发丝线；页脚作者与页码。
+- 系统禁止真实照片与 emoji。卡片允许抽象玻璃/水滴/太阳或 UI 截图；摄影稿应换模板，Reed 不会把照片包装成青空品牌插画。
+
 ## KIHON 基本
 
 来源：`KIHON 基本 Design System/README.md`（「The 9th system」「VISUAL FOUNDATIONS」「Type hierarchy」「One tick grid」「Considered and rejected」「Type substitution flags」）、`KIHON 基本 Design System/SKILL.md`，`tokens/colors.css`、`tokens/typography.css`、`tokens/surfaces.css`、`tokens/spacing.css`、`tokens/fonts.css`，`components/type/type.card.html`、`components/frame/frame.card.html`、`components/data/data.card.html`。
@@ -86,7 +96,7 @@
 | 标志性结构 | `README.md`（5 surface levels、lens falloff、knurl、engraved type、frame edges） | 五个不透明层级（well → bg → plate → card → control）；每个面 1px 边框 + 两段 chamfer；页面有镜头式 falloff 和 5% 颗粒；标签是“刻”进金属的（`--engrave`）；数字要大、要等宽、要对齐；帧边缘留空，不放顶部标签条或底部进度条。上游的 knurl 和 Rule 两端刻点不采用：2026-10-31 Yoru 决定公众号和卡片都只用普通 1px 线。只借颜色不算。 |
 | 系统不许出现 | `README.md`（Depth、Color rules、Detail at small sizes、Iconography、Considered and rejected） | 不做 Console 那种软阴影新拟态；不用色相做数据系列；accent 不做装饰；不用大圆角卡片；中文正文不用等宽；不用 emoji 或图标库；不做顶部标签条/底部进度条/相机饰件；没有 logo，字标只用字体排；边框外不加装饰。 |
 
-**字体。** Source Han Sans SC（中文）、Instrument Sans（拉丁/标签）、B612 Mono（数字/编号）。Source Han Sans 现行为 SIL OFL 1.1（1.001 旧版是 Apache 2.0，两者都允许自托管）；Instrument Sans、B612 Mono 均为 SIL OFL 1.1。Reed 已有 Noto Sans SC（与思源黑体同源），建议直接代用，避免再打一套 CJK；需新增 Instrument Sans 400–700 和 B612 Mono 400/700。公众号回落：标题/拉丁 `Instrument Sans → Helvetica / Arial`；中文 `PingFang SC / 微软雅黑`；数字/标签/代码 `B612 Mono → Menlo / Consolas`；中文正文绝不套等宽栈。
+**字体。** Source Han Sans SC（中文）、Instrument Sans（拉丁/标签）、B612 Mono（数字/编号）。Source Han Sans 现行为 SIL OFL 1.1（1.001 旧版是 Apache 2.0，两者都允许自托管）；Instrument Sans、B612 Mono 均为 SIL OFL 1.1。Reed 已有 Noto Sans SC（与思源黑体同源），建议直接代用，避免再打一套 CJK；Instrument Sans 400/500/700 与 B612 Mono 400/700 已落盘。公众号回落：标题/拉丁 `Instrument Sans → Helvetica / Arial`；中文 `PingFang SC / 微软雅黑`；数字/标签/代码 `B612 Mono → Menlo / Consolas`；中文正文绝不套等宽栈。
 
 **卡片模板方案。**
 
@@ -107,6 +117,14 @@
 - 图注 12px（34 × 0.353）、muted，图号用 B612 Mono tabular；无序列表用系统 `·` 圆点，有序列表两位补零；分隔线只用普通 1px `#C8CDD1` 线（2026-10-31 Yoru 决定公众号和卡片都不用两端刻点和齿纹带），表格与正文分隔同样只用 1px 线。
 - 页面家具不进正文：不加顶部标签条、底部进度条、帧角刻度、相机饰件，也没有 logo；5% 颗粒只留给卡片，公众号不铺。等宽只给编号、标签、数字和代码。
 - 与设计系统的差异：1080p 视频画布的 88/54/44/34 等字号按 677/1920 换算成 31/19/15.5/12px；9:16 / 16:9 两种原生版式与入场阶梯不进正文；上游的 Rule 两端刻点和 knurl 齿纹带都不进公众号，只用普通 1px 线（2026-10-31 Yoru 决定公众号和卡片都不用）；玄（kuro）不做。
+
+**卡片模板落地。**
+
+- 变体 `gin`（默认银）/ `kuro`（玄），**只做 9:16**。选中 KIHON 时比例自动切到 9:16，3:4 与 1:1 按钮禁用，并在比例行下给一句提示。卡片字体 Instrument Sans 400/500/700、B612 Mono 400/700、Noto Sans SC 400/700。
+- 封面：card 面的 10px 圆角 + 两段式 chamfer、44–54px 标题、20px 副标题、一条普通 1px 线；没有字标、页眉页脚，只在右下角保留 `01 / 05` 的 B612 Mono 页码。
+- 正文：22px / 1.45 的视频帧尺度；H2 32px + B612 Mono kicker + 普通 1px 线，H3 26px；加粗 700；高亮是 `#DCE3EB` 浅金属凹槽 + 1px `#8E979E` 底线，不用黄色荧光笔。
+- 引用是 well（凹槽渐变 + 1px 线 + 8px 圆角 + 内凹阴影）；代码也是 well + B612 Mono 15px，不开深色终端；图片放在 card 面（1px 线、10px 圆角、两段 chamfer、三层定向阴影），图片本体 6px 圆角；图注 17px；表格 plate；分隔线 1px；列表用 `·` 刻度、有序列表两位补零。
+- 不用系统原有的两端刻点 Rule、knurl 齿纹带、顶部标签条、底部进度条或相机饰件；5% 颗粒和镜头 falloff 只铺页面，不铺每个承载块。
 
 ## KUNLUN 昆仑
 
@@ -129,7 +147,7 @@
 | 标志性结构 | `README.md`（Corners、Backgrounds、Iconography）、`foundations/brand-hud-ornaments.html`、`foundations/spacing-chamfer.html` | 切角表面；40px 蓝图网格 + 扫描线/颗粒；LCD 终端；HUD 四角刻度、准星、坐标、ASCII 框；全大写等宽标签；步进式而不是弹簧式动效。只换 cyan 不算 KUNLUN。 |
 | 系统不许出现 | `SKILL.md`、`README.md`（Color、Corners、Motion）、`proposals/snowline/README.md` | 禁紫（含紫色渐变/高光）；不用圆角卡片；不用 emoji；不用弹簧/回弹；不做大面积渐变背景；浅色主题不做夸张外发光；图像不做暖调；装饰性循环动画只允许状态灯。 |
 
-**字体。** Orbitron（显示）、JetBrains Mono（正文/标签/代码）、VT323（LCD 读数）、Noto Sans SC（中文）。四者均为 SIL OFL 1.1（Orbitron 带 RFN “Orbitron”）；Reed 已有 Noto Sans SC 400/500/700，需新增 Orbitron 500/700/900、JetBrains Mono 400/700、VT323 400。公众号回落：显示 `Orbitron → Arial Black / Impact → PingFang SC`；英文正文/标签 `JetBrains Mono → Menlo / Consolas`；中文 `PingFang SC / 微软雅黑`；LCD `VT323 → Courier New`。中文正文不套等宽栈。
+**字体。** Orbitron（显示）、JetBrains Mono（正文/标签/代码）、VT323（LCD 读数）、Noto Sans SC（中文）。四者均为 SIL OFL 1.1（Orbitron 带 RFN “Orbitron”）；Reed 已有 Noto Sans SC 400/500/700，Orbitron 500/700/900、JetBrains Mono 400/700、VT323 400 已落盘。公众号回落：显示 `Orbitron → Arial Black / Impact → PingFang SC`；英文正文/标签 `JetBrains Mono → Menlo / Consolas`；中文 `PingFang SC / 微软雅黑`；LCD `VT323 → Courier New`。中文正文不套等宽栈。
 
 **卡片模板方案。**
 
@@ -149,6 +167,14 @@
 - 代码是 LCD：`#C9D6D8` 液晶底、`#1C3038` 段码墨、VT323、可见扫描线、顶部反光和内凹 bezel，不开深色岛。图注用等宽 11px、`FIG. 01 //` 前缀（有图片地址时）；空图位仍保留「图N 说明」。
 - 表格、图组、分隔线与署名都用 1px 发丝线/强线和等宽标签；accent 只做信号，amber/red/green 不进入正文装饰。没有紫色、圆角卡片、emoji、弹簧或大面积 bloom。
 - 与设计系统的差异：上游全等宽在中文长文里牺牲可读性，公众号只让标签、编号、数字与代码保持等宽；切角用直角 + L 角标兜底；HUD 坐标、四角刻度、ASCII 框这些页面家具不进正文；深色 void 不做。
+
+**卡片模板落地。**
+
+- 变体 `void`（默认深色）/ `snowline`（浅色），3:4、1:1、9:16 都可用。卡片字体 Orbitron 500/700/900、JetBrains Mono 400/700、VT323 400、Noto Sans SC 400/700。
+- 封面：切角面板、Orbitron 大标题与副标题；底部作者与 `[ 01 / 05 ]`。没有字标、HUD 四角刻度、坐标、ASCII 框或紫色。
+- 正文：页眉只写文章标题和一条普通 1px 头线；页码只在页脚出现，不在页眉重复。每页一块切角内容面板。H2 用 Orbitron + `[ kicker ]` 等宽标签，H3 用等宽；加粗 700 墨色；高亮是 cyan 12% 底 + 1px cyan 下边。
+- 引用是 1px signal 边切角面板；代码在 snowline 是 `#C9D6D8` LCD + `#1C3038` 段码墨 + VT323 扫描线，在 void 是 `#02040A` 终端底。图片 1px 线 + 2px 微圆角，图注 11px 等宽；表格 1px 线；分隔线 1px；页脚作者与 `[ 01 / 05 ]`。snowline 的强调色加深到 `#005F87`，让页码、H2 kicker 和链接在浅底上达到 4.5:1。
+- 切角用真实 `clip-path`（卡片是浏览器截图）；不用圆角卡片、不用大面积 bloom，也不把 cyan 当正文色。
 
 ## Mayonaka 真夜中
 
@@ -183,6 +209,14 @@
 
 **公众号主题方案。** 本批 **不做**。若未来强行做，预留 id `mayonaka-neon`、中文名「真夜中」、分类「活力」，但需要一套 `daylight VHS` 浅色改编（淡紫纸 `#F3EEFF`、深梅墨 `#1C0838`、洋红 `#C4009B`、青 `#007A8A`、2px 像素边和硬阴影，去掉 glow 和扫描线）。这只是 `PROPOSAL`，且会失去“深夜”的身份，不建议进主题库。
 
+**卡片模板落地。**
+
+- 变体 `midnight`（默认深夜 + 扫描线）/ `sunset`（封面专用：`--grad-sunset` + 条纹太阳 + 网格地板）；没有浅色。3:4 为主，9:16 可用。卡片字体 VT323 400、Noto Sans SC 400/700；Press Start 2P、DotGothic16、Major Mono Display 不再用于卡片。
+- 封面：`midnight` 是深夜底 + 扫描线 + 网格地板；`sunset` 追加条纹太阳与洋红渐变，并在下半部压一层从透明到 `rgba(7, 0, 15, .94)` 的暗色渐变，让中文大标题、副题和页脚在洋红/粉色上仍高于对比度门槛。中文大标题用 Noto Sans SC 并加静态洋红/青双向偏移；底部作者与页码。一张卡最多一处主 glow。
+- 正文：每页一块 `#0A1654` 深蓝面板，2px 边框 + `4px 4px 0` 硬像素阴影，直角；H2 Noto Sans SC 700 + VT323 `//` kicker + 2px 青线；长中文正文一律 Noto Sans SC 17px / 1.7，不引入日文字体回退。次级文字提到 `#9A8BC0`，页脚和图注在深蓝面板上达到 4.5:1。
+- 加粗 chrome；高亮是 2px 青下划线，不用柔和荧光带；引用是 2px 洋红边 + 硬阴影；代码 `#03000A` + VT323 + 扫描线；图片方形、2px 边框、洋红暖调；图注 VT323；表格 2px 边框；分隔线 1px；页脚作者与页码。
+- 不做浅色模式、圆角卡片、backdrop blur 或 emoji；同一元素不同时用像素阴影和 glow。
+
 ## RIFT 裂隙
 
 来源：`RIFT Design System/README.md`（「Content fundamentals」「Visual foundations」「Ambient FX」「Iconography」）、`RIFT Design System/SKILL.md`，`tokens/theme-light.css`、`tokens/theme-dark.css`、`tokens/palette.css`、`tokens/typography.css`、`tokens/spacing.css`，`base.css`、`components.css`、`effects.css`，`templates/marketing/Marketing.dc.html`、`templates/console/Console.dc.html`、`cards/surfaces-light.html`、`cards/type-display.html`。
@@ -204,7 +238,7 @@
 | 标志性结构 | `README.md`（the chromatic edge、Glass、Ambient FX）、`effects.css`、`templates/marketing/Marketing.dc.html` | 不是“蓝色玻璃”：是 sky × royal 的 chromatic edge；每块玻璃的 1px 顶部内高光；72px 网格；L 形 `rift-frame`；1px、3px 节距的扫描线；角落淡 `裂隙` 字；状态点。每屏最多一个 L 框、一处扫描线、一个水印。 |
 | 系统不许出现 | `README.md`（Iconography、Borders、Transparency、Animation）、`SKILL.md` | 不用 emoji、不用图标字体；图像不要暖调；文字不放在模糊层后面；disabled 不用 `opacity:.5`，用 ink-3/4；不要双边框或双层内描边；不要系统外青/洋红；不要弹簧/回弹；glitch 不要满屏循环。 |
 
-**字体。** Space Grotesk、Chakra Petch、DM Serif Display、Rajdhani、Share Tech Mono、Shippori Mincho、Zen Kaku Gothic New，全部 SIL OFL 1.1（DM Serif 带 RFN “Source”，Share Tech Mono 带 RFN “Share”）。Reed 已有 Noto Sans SC 可做中文正文，需新增前五个拉丁族；两个日文族按需加。公众号回落：标题 `Space Grotesk → 系统无衬线`；正文/UI `Rajdhani → PingFang SC / 微软雅黑`；标签/日志 `Share Tech Mono → Menlo / Consolas`；斜体 `DM Serif Display → Georgia italic`；中文 `PingFang SC / 微软雅黑`。
+**字体。** Space Grotesk、Chakra Petch、DM Serif Display、Rajdhani、Share Tech Mono、Shippori Mincho、Zen Kaku Gothic New，全部 SIL OFL 1.1（DM Serif 带 RFN “Source”，Share Tech Mono 带 RFN “Share”）。Reed 已有 Noto Sans SC 可做中文正文，前五个拉丁族已落盘；两个日文族按需加。公众号回落：标题 `Space Grotesk → 系统无衬线`；正文/UI `Rajdhani → PingFang SC / 微软雅黑`；标签/日志 `Share Tech Mono → Menlo / Consolas`；斜体 `DM Serif Display → Georgia italic`；中文 `PingFang SC / 微软雅黑`。
 
 **卡片模板方案。**
 
@@ -224,6 +258,14 @@
 - 代码与行内代码用 `#DCE7F8` sunken 承载块、1px line、10 / 6px 圆角与顶部内高光；代码块叠 3px 节距扫描线，Share Tech Mono 13px。图片 18px 圆角、1px glass 边、蓝调轻阴影；图注 11px mono、`FIG. 01 //`。
 - 表格放在玻璃托盘里；分隔线 1px line-2；署名用 mono 标签。`裂隙` 水印、cursor 跟随与大屏扫描线都不进正文；禁紫、禁暖图、禁双边框，也不引入系统外青/洋红。
 - 与设计系统的差异：公众号没有 `backdrop-filter`，玻璃是半透明填充 + 顶部内高光；glitch 只留静态双色偏移；深色主题不做，真玻璃与完整 glitch 留给小红书卡片。
+
+**卡片模板落地。**
+
+- 变体 `dark`（默认）/ `light`（黎明），3:4、1:1、9:16 都可用。卡片字体 Space Grotesk 300–700、DM Serif Display 400 italic、Rajdhani 400–700、Share Tech Mono 400、Noto Sans SC 400/700。
+- 封面：静态 sky × royal 双色偏移标题、DM Serif 斜体副题；底部作者与页码。没有字标、循环 glitch，也没有满屏扫描线。
+- 正文：每页一块玻璃内容面板，左上只有一个 L 形角标；H2 用 Space Grotesk 600 + 静态 chromatic edge + Share Tech Mono kicker；加粗 600；高亮是 royal 14% 带 + 1px royal 下划线。页眉只有文章标题，页码只在页脚。
+- 引用是玻璃面板；代码用 sunken 底 + 1px 线 + 10px 圆角 + 顶部内高光 + 3px 节距扫描线；图片 8px 圆角、1px glass 边、顶部内高光，图注 11px 等宽；表格在玻璃里；分隔线 1px；页脚作者与页码。dark 的次级文字提到 `#8FA0C0`；light 的次级文字 `#4E5C80`、强调色 `#2C46C8`，页眉、页脚、图注和页码在黎明底色上达到 4.5:1。
+- 玻璃是半透明填充 + 内高光，不用 `backdrop-filter`；禁紫、禁暖图、禁双边框。
 
 ## core
 
@@ -266,44 +308,51 @@
 - 表格用 bondi 表头 + 1px ink 网格 + 2px 硬阴影；分隔线 1px dashed ink；署名是 sunken 状态栏；列表用方点 / 十进制。页面不铺纯白、纯黑，也不做暖奶油纸。
 - 与设计系统的差异：上游窗口可以绝对定位、叠放、散落，公众号只能改成纵向叠窗；标题栏不放假关闭键与斜纹，编号放进标题栏而不是另起一行；图片不做 overexposed / JPEG / VHS 滤镜（不能处理用户图）；nightpool 深色不做。
 
+**卡片模板落地。**
+
+- 变体 `frost`（默认浅色）/ `nightpool`（深色），3:4、1:1、9:16 都可用。卡片字体 Pixelify Sans 400–700、VT323 400、Tinos 400/700 + italic、Noto Serif SC 400/700、Noto Sans SC 400/700。
+- 封面是一扇 Window：深 bondi 标题栏（留空，不放 `cover` 占位词）、1px ink 边框、3px/6px 硬偏移阴影、Pixelify / Noto Serif SC 标题、Tinos 斜体副题、底部状态栏。没有假关闭键、没有斜纹、没有圆角。
+- 正文每页也是一扇 Window：标题栏只写小写文章标题，不再放页码；状态栏放作者与页码。H2 用 Pixelify / Noto Serif SC + VT323 `[ kicker ]`；加粗 700；高亮是 bubblegum 45% 下半行带。标题栏用 `#0072A3`（nightpool `#006B9C`）配白字，正文链接 `#006A94`，状态栏与图注同样按 4.5:1 校验。
+- 引用与代码是 sunken bevel-in 面板；代码 VT323；图片 1px ink 直角框 + 2px 偏移硬阴影，图注 VT323；表格深 bondi 表头 + 1px ink 网格；分隔线 1px 虚线；没有纯白/纯黑，也不给用户图套滤镜。
+
 ## 字体与授权
 
-本 worktree 目前实际落盘的字体族只有 Geist（300–700）、Geist Mono（400–600）、Noto Sans SC（400/500/700）、Noto Serif SC（700）。第一批文档里列的 Noto Serif SC 400、朱雀仿宋、Inter、JetBrains Mono、EB Garamond、IBM Plex、Caveat 在本分支还没有对应的字体文件；实现本批卡片前，先和卡片工作线的字体清单合并，避免重复打包。下表的“已有”只指本分支。
+第一批与第二批的字体已随两条工作线落盘：`public/fonts/fonts-templates.css`、`fonts-design.css` 与 `OFL-*.txt` 覆盖下表除标「按需」外的全部族，分页预载与 PNG 内嵌共用 `CARD_TEMPLATE_FONTS`。下表的“Reed 现状”写合并后的实际状态。
 
-OFL 1.1 允许自托管、转换 WOFF2 并随软件再分发；需要随字体附上版权声明和完整 OFL 文本，不能单独售卖字体，修改版不能使用保留字体名（RFN）。Bebas Neue 只使用 Dharma Type 的 OFL 发行版，不把付费/扩展 cut 打进 Reed。**除 MS Sans Serif 外，下表所有字体都能自托管并进 Reed；“Reed 现状”说明它已存在还是需新增。**
+OFL 1.1 允许自托管、转换 WOFF2 并随软件再分发；需要随字体附上版权声明和完整 OFL 文本，不能单独售卖字体，修改版不能使用保留字体名（RFN）。Bebas Neue 只使用 Dharma Type 的 OFL 发行版，不把付费/扩展 cut 打进 Reed。**除 MS Sans Serif 外，下表所有字体都能自托管并进 Reed；“Reed 现状”说明它是否已落盘。**
 
 | 字体 | 用在哪 | 授权 | Reed 现状 | 公众号回落 |
 |---|---|---|---|---|
 | [Noto Sans SC](https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/OFL.txt) / [Source Han Sans SC](https://raw.githubusercontent.com/adobe-fonts/source-han-sans/master/LICENSE.txt) | Aozora 中文代用、KIHON 中文、KUNLUN / RIFT 中文、core chrome | SIL OFL 1.1（RFN “Source”） | Noto Sans SC 400/500/700 已有；不重复打包 Source Han | PingFang SC / 微软雅黑 |
-| [Noto Serif SC](https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/OFL.txt) | core 中文正文 | SIL OFL 1.1 | 700 已有；需补 400 | Songti SC / STSong / serif |
-| [Inter](https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt) | Aozora 拉丁正文 | SIL OFL 1.1 | 需新增（第一批已计划） | Helvetica / Arial |
-| [Bebas Neue](https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/OFL.txt) | Aozora 海报标题 | SIL OFL 1.1 | 需新增 | Impact / Arial Narrow |
+| [Noto Serif SC](https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/OFL.txt) | core 中文正文 | SIL OFL 1.1 | 400/700 已落盘 | Songti SC / STSong / serif |
+| [Inter](https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt) | Aozora 拉丁正文 | SIL OFL 1.1 | 已落盘 | Helvetica / Arial |
+| [Bebas Neue](https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/OFL.txt) | Aozora 海报标题 | SIL OFL 1.1 | 已落盘 | Impact / Arial Narrow |
 | [Fraunces](https://raw.githubusercontent.com/google/fonts/main/ofl/fraunces/OFL.txt) | Aozora 可选衬线 | SIL OFL 1.1 | 按需 | Georgia / Times |
-| [Space Grotesk](https://raw.githubusercontent.com/google/fonts/main/ofl/spacegrotesk/OFL.txt) | Aozora 字标、RIFT 标题 | SIL OFL 1.1 | 需新增 | 系统无衬线 |
-| [JetBrains Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt) | Aozora / KUNLUN 代码与数字 | SIL OFL 1.1 | 需新增（第一批已计划） | Menlo / Consolas |
+| [Space Grotesk](https://raw.githubusercontent.com/google/fonts/main/ofl/spacegrotesk/OFL.txt) | Aozora 字标、RIFT 标题 | SIL OFL 1.1 | 已落盘 | 系统无衬线 |
+| [JetBrains Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt) | Aozora / KUNLUN 代码与数字 | SIL OFL 1.1 | 已落盘 | Menlo / Consolas |
 | [Noto Sans JP](https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/OFL.txt) / [Noto Serif JP](https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/OFL.txt) | Aozora 日文 | SIL OFL 1.1（Noto Sans JP 带 RFN “Source”） | 按需 | Hiragino Sans / Yu Gothic / serif |
-| [Instrument Sans](https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/OFL.txt) | KIHON 拉丁/标签 | SIL OFL 1.1 | 需新增 | Helvetica / Arial |
-| [B612 Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/b612mono/OFL.txt) | KIHON 数字/编号 | SIL OFL 1.1 | 需新增 | Menlo / Consolas |
-| [Orbitron](https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/OFL.txt) | KUNLUN 显示 | SIL OFL 1.1（RFN “Orbitron”） | 需新增 | Arial Black / Impact |
-| [VT323](https://raw.githubusercontent.com/google/fonts/main/ofl/vt323/OFL.txt) | KUNLUN LCD、Mayonaka、core 代码 | SIL OFL 1.1 | 需新增 | Courier New / monospace |
-| [Press Start 2P](https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/OFL.txt) | Mayonaka 显示 | SIL OFL 1.1（RFN） | 需新增 | Courier New / monospace |
-| [DotGothic16](https://raw.githubusercontent.com/google/fonts/main/ofl/dotgothic16/OFL.txt) | Mayonaka 日文/短句 | SIL OFL 1.1 | 需新增 | PingFang SC / Noto Sans SC |
-| [Major Mono Display](https://raw.githubusercontent.com/google/fonts/main/ofl/majormonodisplay/OFL.txt) | Mayonaka 字标 | SIL OFL 1.1 | 按需 | Courier New |
-| [Chakra Petch](https://raw.githubusercontent.com/google/fonts/main/ofl/chakrapetch/OFL.txt) | RIFT 字标 | SIL OFL 1.1 | 需新增 | 系统无衬线 |
-| [DM Serif Display](https://raw.githubusercontent.com/google/fonts/main/ofl/dmserifdisplay/OFL.txt) | RIFT 斜体短句 | SIL OFL 1.1（RFN “Source”） | 需新增 | Georgia italic |
-| [Rajdhani](https://raw.githubusercontent.com/google/fonts/main/ofl/rajdhani/OFL.txt) | RIFT 正文/UI | SIL OFL 1.1 | 需新增 | PingFang SC / Helvetica |
-| [Share Tech Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/sharetechmono/OFL.txt) | RIFT 标签/日志 | SIL OFL 1.1（RFN “Share”） | 需新增 | Menlo / Consolas |
+| [Instrument Sans](https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/OFL.txt) | KIHON 拉丁/标签 | SIL OFL 1.1 | 已落盘 | Helvetica / Arial |
+| [B612 Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/b612mono/OFL.txt) | KIHON 数字/编号 | SIL OFL 1.1 | 已落盘 | Menlo / Consolas |
+| [Orbitron](https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/OFL.txt) | KUNLUN 显示 | SIL OFL 1.1（RFN “Orbitron”） | 已落盘 | Arial Black / Impact |
+| [VT323](https://raw.githubusercontent.com/google/fonts/main/ofl/vt323/OFL.txt) | KUNLUN LCD、Mayonaka、core 代码 | SIL OFL 1.1 | 已落盘 | Courier New / monospace |
+| [Press Start 2P](https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/OFL.txt) | Mayonaka 显示 | SIL OFL 1.1（RFN） | 已落盘 | Courier New / monospace |
+| [DotGothic16](https://raw.githubusercontent.com/google/fonts/main/ofl/dotgothic16/OFL.txt) | Mayonaka 日文/短句 | SIL OFL 1.1 | 已落盘 | PingFang SC / Noto Sans SC |
+| [Major Mono Display](https://raw.githubusercontent.com/google/fonts/main/ofl/majormonodisplay/OFL.txt) | Mayonaka 字标 | SIL OFL 1.1 | 已落盘（未用于卡片） | Courier New |
+| [Chakra Petch](https://raw.githubusercontent.com/google/fonts/main/ofl/chakrapetch/OFL.txt) | RIFT 字标 | SIL OFL 1.1 | 已落盘 | 系统无衬线 |
+| [DM Serif Display](https://raw.githubusercontent.com/google/fonts/main/ofl/dmserifdisplay/OFL.txt) | RIFT 斜体短句 | SIL OFL 1.1（RFN “Source”） | 已落盘 | Georgia italic |
+| [Rajdhani](https://raw.githubusercontent.com/google/fonts/main/ofl/rajdhani/OFL.txt) | RIFT 正文/UI | SIL OFL 1.1 | 已落盘 | PingFang SC / Helvetica |
+| [Share Tech Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/sharetechmono/OFL.txt) | RIFT 标签/日志 | SIL OFL 1.1（RFN “Share”） | 已落盘 | Menlo / Consolas |
 | [Shippori Mincho](https://raw.githubusercontent.com/google/fonts/main/ofl/shipporimincho/OFL.txt) | RIFT 日文显示 | SIL OFL 1.1 | 按需 | Songti SC / Yu Mincho |
 | [Zen Kaku Gothic New](https://raw.githubusercontent.com/google/fonts/main/ofl/zenkakugothicnew/OFL.txt) | RIFT 日文 UI | SIL OFL 1.1 | 按需 | Hiragino Sans / Yu Gothic |
-| [Pixelify Sans](https://raw.githubusercontent.com/google/fonts/main/ofl/pixelifysans/OFL.txt) | core 显示 | SIL OFL 1.1 | 需新增 | Courier New / 系统无衬线 |
-| [Tinos](https://raw.githubusercontent.com/googlefonts/tinos/main/OFL.txt) | core 拉丁正文 | SIL OFL 1.1（旧版 Apache 2.0） | 需新增 | Times New Roman / Songti SC |
+| [Pixelify Sans](https://raw.githubusercontent.com/google/fonts/main/ofl/pixelifysans/OFL.txt) | core 显示 | SIL OFL 1.1 | 已落盘 | Courier New / 系统无衬线 |
+| [Tinos](https://raw.githubusercontent.com/googlefonts/tinos/main/OFL.txt) | core 拉丁正文 | SIL OFL 1.1（旧版 Apache 2.0） | 已落盘 | Times New Roman / Songti SC |
 | [MS Sans Serif](https://learn.microsoft.com/en-us/typography/fonts/font-faq) | core UI chrome | Microsoft 专有 | **不能打包**；只能 `local()`，回落 Tahoma / Segoe UI | Tahoma / Segoe UI |
 
 字体落地时还要做三件事：
 
 - **卡片导出前验证实际字体。** 用 Chrome 报告的实际渲染字体检查，看到对应族名才算数；中文字形不能被日文字体悄悄替换而不自知。
 - **公众号不加载网页字体。** 主题只在标题、标签和代码写字体栈；正文完全交给读者手机。所有“字体辨识度”都要有颜色、线条、间距或结构兜底，不能只靠字体。
-- **补齐字体许可证副本。** `public/fonts/` 现在只有 Geist 和 Noto Sans SC 的 OFL 文本；Noto Serif SC 700 只有字体文件，没有独立 OFL 文本。本批新增字体时要同时落 WOFF2 和许可证，发布前核对字体元数据并补齐副本。
+- **许可证副本随字体落盘。** `public/fonts/OFL-*.txt` 已覆盖下表已落盘的字体；新增字体时要同时落 WOFF2 和 OFL 文本，发布前核对字体元数据与许可副本。
 
 ## 总表
 

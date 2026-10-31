@@ -1,5 +1,5 @@
 // Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt.
-import { CARD_WIDTH } from './cards'
+import { CARD_FONT_SHEETS, CARD_TEMPLATE_FONTS, CARD_WIDTH, type CardTemplate } from './cards'
 import { t } from './i18n'
 
 function blobDataUrl(blob: Blob): Promise<string> {
@@ -72,22 +72,28 @@ async function fontDataUrl(url: string): Promise<string> {
 
 /**
  * html-to-image's skipFonts loses CJK webfonts. Its automatic embedding also
- * fetches hundreds of unused CJK slices. Embed the existing 400/700 faces for
- * the actual glyphs instead, preserving unicode-range and family ordering.
+ * fetches hundreds of unused CJK slices. Embed the faces declared by the
+ * current card template for the actual glyphs instead, preserving
+ * unicode-range and family ordering.
  */
-async function cardFontCss(text: string): Promise<string> {
-  const sheets = ['/fonts/fonts-local.css', '/fonts/noto-sans-sc-local.css']
-  const rules = await Promise.all(sheets.map(async (path) => {
+export async function cardFontCss(text: string, template: CardTemplate = 'reed'): Promise<string> {
+  const declared = CARD_TEMPLATE_FONTS[template]
+  const wanted = (family: string, weight: string, style: string) => declared.some((face) =>
+    face.family === family &&
+    face.weights.includes(Number(weight)) &&
+    (face.styles ?? ['normal']).includes(style as 'normal' | 'italic'),
+  )
+  const rules = await Promise.all(CARD_FONT_SHEETS.map(async (path) => {
     const url = new URL(path, location.href)
     const response = await fetch(url)
     if (!response.ok) throw new Error(`font CSS: HTTP ${response.status}`)
     const css = await response.text()
     return Promise.all([...css.matchAll(/@font-face\s*\{([^}]+)\}/g)].map(async ([rule, body]) => {
       const family = body.match(/font-family:\s*['"]?([^;'"\n]+)/)?.[1].trim()
-      const weight = body.match(/font-weight:\s*([^;]+)/)?.[1].trim()
+      const weight = body.match(/font-weight:\s*([^;]+)/)?.[1].trim() ?? '400'
+      const style = body.match(/font-style:\s*([^;]+)/)?.[1].trim() ?? 'normal'
       const range = body.match(/unicode-range:\s*([^;]+)/)?.[1] ?? ''
-      if (!['Geist', 'Geist Mono', 'Noto Sans SC'].includes(family ?? '') ||
-        !['400', '700'].includes(weight ?? '') || !rangeContainsText(range, text)) return ''
+      if (!family || !wanted(family, weight, style) || !rangeContainsText(range, text)) return ''
       const src = body.match(/url\(([^)]+)\)/)?.[1].replace(/['"]/g, '')
       if (!src) throw new Error('font face has no source')
       const data = await fontDataUrl(new URL(src, url).href)
@@ -97,23 +103,66 @@ async function cardFontCss(text: string): Promise<string> {
   return rules.flat().filter(Boolean).join('\n')
 }
 
+const EXACT_FONT_SIZE = '--xhs-export-font-size'
+
+/**
+ * html-to-image rewrites every font-size to `floor(size) - 0.1px` while it
+ * clones. At 17–18px that 0.6% shave moves CJK line breaks away from the
+ * preview. Mark the frozen cards with their exact computed size; a temporary
+ * setProperty patch below substitutes that value during the clone, after every
+ * other computed property (margins in em, line-height, ...) came from the
+ * untouched original.
+ */
+function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): void {
+  const visit = (source: Element, target: Element) => {
+    const styled = target as HTMLElement | SVGElement
+    styled.style.setProperty(EXACT_FONT_SIZE, getComputedStyle(source).fontSize)
+    const sources = source.children
+    const targets = target.children
+    for (let i = 0; i < sources.length && i < targets.length; i++) visit(sources[i], targets[i])
+  }
+  nodes.forEach((node, index) => visit(node, snapshots[index]))
+}
+
+async function toBlobWithExactFonts(
+  toBlob: (node: HTMLElement, options: Record<string, unknown>) => Promise<Blob | null>,
+  node: HTMLElement,
+  options: Record<string, unknown>,
+): Promise<Blob | null> {
+  const original = CSSStyleDeclaration.prototype.setProperty
+  CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
+    if (name === 'font-size') {
+      const exact = this.getPropertyValue(EXACT_FONT_SIZE)
+      if (exact) return original.call(this, name, exact, priority)
+    }
+    return original.call(this, name, value, priority)
+  }
+  try {
+    return await toBlob(node, options)
+  } finally {
+    CSSStyleDeclaration.prototype.setProperty = original
+  }
+}
+
 /** Freeze the cards, so editing or switching panes during ZIP export is safe. */
-export async function createCardExporter(nodes: HTMLElement[]) {
+export async function createCardExporter(nodes: HTMLElement[], template: CardTemplate = 'reed') {
   const stage = document.createElement('div')
   stage.setAttribute('aria-hidden', 'true')
   stage.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none'
   const snapshots = nodes.map((node) => node.cloneNode(true) as HTMLElement)
   stage.append(...snapshots)
   document.body.append(stage)
+  markExactFontSizes(nodes, snapshots)
   try {
-    const fontEmbedCSS = await cardFontCss(stage.textContent ?? '')
+    const fontEmbedCSS = await cardFontCss(stage.textContent ?? '', template)
     await document.fonts.ready
     const { toBlob } = await import('html-to-image')
     return {
       async shoot(index: number): Promise<Blob> {
         const node = snapshots[index]
         const height = Number.parseInt(node.style.height)
-        const blob = await toBlob(node, { width: CARD_WIDTH, height, pixelRatio: 2, fontEmbedCSS, skipAutoScale: true })
+        const options = { width: CARD_WIDTH, height, pixelRatio: 2, fontEmbedCSS, skipAutoScale: true }
+        const blob = await toBlobWithExactFonts(toBlob, node, options)
         if (!blob) throw new Error(t('cards.exportFailed'))
         return blob
       },

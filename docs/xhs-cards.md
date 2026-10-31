@@ -1,7 +1,7 @@
 # 小红书卡片
 
-在编辑页预览区点击「小红书卡片」，同一份 Markdown 会自动分页。卡片内可选择 3:4、1:1、9:16 和米白纸、纯白、方格本、主色浅底、夜读；每张下方的 PNG 按钮下载单张，「导出全部 ZIP」下载整套。
-比例与背景在本次编辑会话内保留，切换公众号预览或调整窗口大小后继续沿用；刷新页面恢复默认。
+在编辑页预览区点击「小红书卡片」，同一份 Markdown 会自动分页。卡片先选模板：默认、铅字房（YORU Content）、纸本（PAPER）、灯与夜（yoru-and-akari Console）、昆仑（KUNLUN）、裂隙（RIFT）、core（霜纸/夜池）、青空（Aozora）、基本（KIHON）、真夜中（Mayonaka）；每套模板有自己的变体——默认是米白纸、纯白、方格本、主色浅底、夜读，铅字房是 Signal、Lab、Studio、Special，纸本是 Editorial、Analog、Midnight，灯与夜是 Akari、Yoru，昆仑是虚空、雪线，裂隙是深色、黎明，core 是霜纸、夜池，青空是昼、夜空，基本是银、玄，真夜中是午夜、日落。再选 3:4、1:1、9:16；KIHON 只有 9:16，选中它会自动切到 9:16 并禁用另外两种比例（按钮下方给一句提示）。每张下方的 PNG 按钮下载单张，「导出全部 ZIP」下载整套。
+比例、模板与变体在本次编辑会话内保留，切换模板时变体自动换成新模板的第一个，切换公众号预览或调整窗口大小后继续沿用；刷新页面恢复默认。
 
 - 首个一级标题生成封面，紧接着不超过 60 字的段落作为副标题；没有一级标题时直接生成正文卡片。空稿不生成卡片，只有一级标题时生成一张封面。
 - 单独一行 `---` 是卡片的手动分页符。公众号预览、复制、HTML 导出仍按原有分隔线渲染。开头的 YAML front matter 仍由 Reed 的既有解析器处理。
@@ -10,9 +10,9 @@
 - 图片先读取并嵌入，确保分页和 PNG 使用相同的图片。跨域限制、浏览器安全策略或坏链接导致读取失败时，视图列出地址并暂停导出；修好后点击重试。未填图片位以明确的占位文字呈现。
 - 个别无法再拆且高于整页的内容（如巨大表格单元格、单条嵌套列表）会缩小并提示，可拆短源稿来保持正常字号。
 - 背景独立于界面明暗设置。「主色浅底」使用当前文章主题的 `ui.accent`，不可用时使用 Reed 的品牌色 `#4F6CE8`。
-- 中文用现有 Noto Sans SC，英文与数字用现有 Geist，代码用 Geist Mono；PNG 内嵌实际字形所需的网页字体切片，不添加字体文件。批量导出固定点击时的卡片内容。
+- 字体按模板走：默认用 Noto Sans SC / Geist / Geist Mono；铅字房用 Noto Serif SC 正文、朱雀仿宋页码与书脊、Inter 英文、JetBrains Mono 代码；纸本用 Noto Serif SC 中文、EB Garamond 英文、IBM Plex Sans / IBM Plex Mono 标签、Caveat 手写；灯与夜用 Geist / Geist Mono / Noto Sans SC；昆仑用 Orbitron / JetBrains Mono / VT323 / Noto Sans SC；裂隙用 Space Grotesk / DM Serif Display / Rajdhani / Share Tech Mono / Noto Sans SC；core 用 Pixelify Sans / VT323 / Tinos / Noto Serif SC / Noto Sans SC；青空用 Inter / Space Grotesk / JetBrains Mono / Noto Sans SC；基本用 Instrument Sans / B612 Mono / Noto Sans SC；真夜中用 VT323 / Noto Sans SC。分页预载和 PNG 内嵌读同一份 `CARD_TEMPLATE_FONTS` 声明，PNG 只内嵌当前模板实际字形所需的切片。批量导出固定点击时的卡片内容。
 - 导出期间请保持浏览器标签页在前台；Chrome 会暂停后台标签页的图像绘制，回到页面后会继续。
-- 卡片视图打开时继续改稿，卡片留在原处、在后台重新分页，正在看的那张不会跳回封面；新分页完成前导出按钮暂不可用。换比例或换到 / 换出「夜读」会重新排版。
+- 卡片视图打开时继续改稿，卡片留在原处、在后台重新分页，正在看的那张不会跳回封面；新分页完成前导出按钮暂不可用。换比例、换模板、换变体或进入 / 离开深色变体（默认的「夜读」、纸本的「午夜」、灯与夜的「夜」、昆仑的「虚空」、裂隙的「深色」、core 的「夜池」、青空的「夜空」、基本的「玄」、真夜中的两个变体）会重新排版。
 
 ## 参考与取舍
 
@@ -20,14 +20,14 @@
 
 | Reed 版式 | 可定位参考 | 借用内容 |
 |---|---|---|
-| 分页 | `src/cards.ts` | 隐藏容器实测、540px 宽、40/52/76px 页边距、分段与标题跟随 |
-| 封面、页眉页脚 | `src/CardsView.tsx`、`src/styles.css` | 标题字号阶梯、色条、副标题、页码、作者位置 |
-| 正文 | `src/themes.ts` 的基础样式 | 18px 正文、1.8 行距、引用、代码、列表、表格和图片 |
-| 比例、背景、导出 | `src/cards.ts`、`src/CardsView.tsx` | 三种比例、五种背景、1080px PNG、ZIP |
+| 分页 | `src/cards.ts` | 隐藏容器实测、540px 宽、每套模板自己的页边距与正文宽、分段与标题跟随 |
+| 封面、页眉页脚 | `src/CardsView.tsx`、`src/styles.css` | 标题字号阶梯、色条、副标题、页码、作者位置；三套设计系统模板另有报头、书脊、双线、日期戳与胶囊页码 |
+| 正文 | `src/themes.ts` 的基础样式 | 18px 正文、1.8 行距、引用、代码、列表、表格和图片；模板在 `src/components/cards.css` 内按 `[data-template]` 覆写 |
+| 比例、模板、背景、导出 | `src/cards.ts`、`src/CardsView.tsx` | 三种比例、十套模板及其变体、1080px PNG、ZIP；KIHON 固定 9:16 |
 | 界面控件 | Reed `PreviewPane.tsx`、`src/index.css`；Console 的 `preview/buttons.html` | `ya-well` 凹陷承载、`ya-selected` 1.5px 描边、现有按钮与明暗 token |
 
 围绕 Reed 的语义 AST 重写卡片渲染，未引入 mopai 的 marked。原来的公众号 Theme 和 renderer 无需改变。
-卡片只有一套基础版式，文章主题提供主色；不将 227 套公众号模板的视觉全部移植到卡片。
+卡片有十套模板（Reed 默认加九套设计系统），各有自己的变体；默认模板的主色来自当前文章主题，公众号的 227 套主题不会整体移植到卡片上。
 轮播和网格在静态 PNG 中逐图展示，确保每张都可见；原始 Markdown 与公众号多图行为保留。
 代码沿用 Reed 的纯文本呈现，不新增语法高亮依赖。封面用已有的 700 字重；极长标题按实测高度缩小。
 参考项目导出使用 `skipFonts`；Reed 改为明确内嵌网页字体，并对无法读取的图片给出可见提示。
@@ -43,4 +43,15 @@ npm run build
 node scripts/cdp-verify-xhs-cards.mjs 3201 9334
 ```
 
-脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与背景，检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示及字体。
+脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与默认模板背景，并遍历十套模板 × 各自变体的封面 + 前两张正文（KIHON 为 9:16，其余模板为 3:4），检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示、CDP 实际字体与 DOM / PNG 像素对比。六套设计系统模板（昆仑、裂隙、core、青空、基本、真夜中）还会逐个变体检查封面标题、副标题与第 3 页正文：用文字的计算颜色和导出 PNG 中文字包围盒内的中位色算 WCAG 对比度，普通文字不足 4.5:1 或 24px 以上粗体标题不足 3:1 即失败。Reed、YORU、PAPER、Console 是冻结基线，保留原有导出，不参与这项对比度门槛。
+
+每套模板的每个变体都会把封面与前两张正文导出到 `verify-out/templates/<template>-<variant>-01..03.png`，并生成按模板分组的 `verify-out/templates/index.html`；第 3 页的 DOM / PNG 对照图在 `verify-out/templates/dom-vs-png/`。封面除整页像素对比外，还会取标题元素在预览中的包围盒、换算到导出坐标后检查墨色像素，防止标题被压成 0 像素。Reed 的 PNG 与改动前在本机跑出的基线目录逐像素核对（`verify-out/` 不进 git，基线要在动手前先跑一次验收生成）：
+
+```powershell
+pwsh scripts/compare-card-png.ps1 -Baseline verify-out/xhs/<基线目录> -Current verify-out/xhs/<本次目录>
+# 只核对冻结的四套时，跳过本次会变的六套设计系统模板：
+pwsh scripts/compare-card-png.ps1 -Baseline verify-out/xhs/<基线目录> -Current verify-out/xhs/<本次目录> `
+  -Exclude 'template-(kunlun|rift|core|aozora|kihon|mayonaka)-'
+```
+
+封面和正文页都按 `mean < 2`、`bad < 0.025` 比对 DOM 截图与导出 PNG。十套模板在克隆阶段都使用预览的精确计算字号，不再有例外，导出的断行与预览一致。

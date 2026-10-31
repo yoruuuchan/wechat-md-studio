@@ -20,11 +20,35 @@ const origin = `http://127.0.0.1:${port}`
 const rootOutput = path.resolve('verify-out/xhs')
 const output = path.join(rootOutput, new Date().toISOString().replace(/[:.]/g, '-'))
 fs.mkdirSync(output, { recursive: true })
+const templatesDir = path.resolve('verify-out/templates')
+fs.mkdirSync(templatesDir, { recursive: true })
+for (const name of fs.readdirSync(templatesDir)) {
+  if (/\.(png|html)$/.test(name)) fs.unlinkSync(path.join(templatesDir, name))
+}
+const domVsPngDir = path.join(templatesDir, 'dom-vs-png')
+fs.rmSync(domVsPngDir, { recursive: true, force: true })
+fs.mkdirSync(domVsPngDir, { recursive: true })
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'reed-xhs-'))
+const CARD_TEMPLATES = ['reed', 'yoru', 'paper', 'console', 'kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka']
+// The contrast gate covers the six design-system templates. Reed, YORU,
+// PAPER and Console are frozen baselines: their exports must not change.
+const CONTRAST_TEMPLATES = new Set(['kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka'])
+const CARD_VARIANTS = {
+  reed: ['paper', 'white', 'grid', 'tint', 'night'],
+  yoru: ['signal', 'lab', 'studio', 'special'],
+  paper: ['editorial', 'analog', 'midnight'],
+  console: ['akari', 'yoru'],
+  kunlun: ['void', 'snowline'],
+  rift: ['dark', 'light'],
+  core: ['frost', 'nightpool'],
+  aozora: ['daylight', 'yozora'],
+  kihon: ['gin', 'kuro'],
+  mayonaka: ['midnight', 'sunset'],
+}
 const checks = []
 const exceptions = []
 const consoleErrors = []
-const evidence = { output, matrix: [], exports: [], fonts: {}, pixels: [], reference: {} }
+const evidence = { output, matrix: [], templates: [], exports: [], fonts: {}, fontSelections: {}, coverTitles: [], comparisons: [], contrast: [], pixels: [], reference: {} }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const check = (name, passed, detail) => {
   checks.push({ name, passed: Boolean(passed), detail })
@@ -103,6 +127,7 @@ longDoc += '\n\n- 把观点写清楚，再用例子支持。\n- 图片应当帮�
 longDoc += Array.from({ length: 24 }, (_, i) => `| 第${i + 1}次记录 | 沿河散步与街边小店 | ${i + 1} |`).join('\n')
 longDoc += '\n\n```js\n' + Array.from({ length: 42 }, (_, i) => `  const note${i} = "记录 ${i} / Reed";`).join('\n') + '\n```\n\n![竖向色彩示意](img:xhs-tall.png)\n\n---\n\n## 留给下一次出发\n\n每一次记录都是重新认识日常的机会。\n'
 while ((longDoc.match(/[\u3400-\u9fff]/g)?.length ?? 0) < 3000) longDoc += '\n' + prose + '\n'
+
 fs.writeFileSync(path.join(output, 'long-document.md'), longDoc)
 fs.writeFileSync(path.join(output, 'SAMPLE_DOC.md'), SAMPLE_DOC)
 evidence.longDocumentCjk = (longDoc.match(/[\u3400-\u9fff]/g) ?? []).length
@@ -149,6 +174,66 @@ async function shot(name, session = sessionId, clip) {
   fs.writeFileSync(file, Buffer.from(data, 'base64'))
   return file
 }
+const templateFontDeclaration = {
+  reed: [
+    { family: 'Geist', weights: [400, 700] },
+    { family: 'Geist Mono', weights: [400, 700] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  yoru: [
+    { family: 'Noto Serif SC', weights: [400, 700] },
+    { family: 'Zhuque Fangsong', weights: [400] },
+    { family: 'Inter', weights: [400, 600] },
+    { family: 'JetBrains Mono', weights: [400] },
+  ],
+  paper: [
+    { family: 'Noto Serif SC', weights: [400, 700] },
+    { family: 'EB Garamond', weights: [400, 600], styles: ['normal', 'italic'] },
+    { family: 'IBM Plex Sans', weights: [400, 500] },
+    { family: 'IBM Plex Mono', weights: [400] },
+    { family: 'Caveat', weights: [400] },
+  ],
+  console: [
+    { family: 'Geist', weights: [400, 700] },
+    { family: 'Geist Mono', weights: [400, 700] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  kunlun: [
+    { family: 'Orbitron', weights: [500, 700, 900] },
+    { family: 'JetBrains Mono', weights: [400, 700] },
+    { family: 'VT323', weights: [400] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  rift: [
+    { family: 'Space Grotesk', weights: [300, 400, 500, 600, 700] },
+    { family: 'DM Serif Display', weights: [400], styles: ['italic'] },
+    { family: 'Rajdhani', weights: [400, 500, 600, 700] },
+    { family: 'Share Tech Mono', weights: [400] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  core: [
+    { family: 'Pixelify Sans', weights: [400, 500, 600, 700] },
+    { family: 'VT323', weights: [400] },
+    { family: 'Tinos', weights: [400, 700], styles: ['normal', 'italic'] },
+    { family: 'Noto Serif SC', weights: [400, 700] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  aozora: [
+    { family: 'Inter', weights: [400, 600] },
+    { family: 'Space Grotesk', weights: [500, 700] },
+    { family: 'JetBrains Mono', weights: [400] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  kihon: [
+    { family: 'Instrument Sans', weights: [400, 500, 700] },
+    { family: 'B612 Mono', weights: [400, 700] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+  mayonaka: [
+    { family: 'VT323', weights: [400] },
+    { family: 'Noto Sans SC', weights: [400, 700] },
+  ],
+}
 async function nativeCardShot(selector, name, session = sessionId, scale = 1) {
   const box = await evaluate(`(() => {
     const original = document.querySelector(${JSON.stringify(selector)});
@@ -158,8 +243,21 @@ async function nativeCardShot(selector, name, session = sessionId, scale = 1) {
     document.body.append(node); const r = node.getBoundingClientRect();
     return {x:r.x,y:r.y,width:r.width,height:r.height};
   })()`, session)
-  await evaluate('document.fonts.ready.then(() => true)', session)
-  await sleep(100)
+  // A newly cloned page can paint one frame in the fallback face before its
+  // CJK slices are applied. Load the current template's faces for this exact
+  // text, then let two frames settle; otherwise dense body pages silently
+  // compare fallback text against the correctly embedded PNG.
+  await evaluate(`(async () => {
+    const node = document.querySelector('#xhs-acceptance-shot');
+    const text = node?.textContent || '';
+    const faces = ${JSON.stringify(templateFontDeclaration)}[node?.dataset.template] || [];
+    await Promise.all(faces.flatMap((face) => face.weights.flatMap((weight) =>
+      (face.styles || ['normal']).map((style) => document.fonts.load(\`\${style === 'italic' ? 'italic ' : ''}\${weight} 18px "\${face.family}"\`, text)))));
+    await document.fonts.ready;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return true;
+  })()`, session)
+  await sleep(300)
   try { return await shot(name, session, { ...box, scale }) }
   finally { await evaluate(`document.querySelector('#xhs-acceptance-shot')?.remove()`, session) }
 }
@@ -168,7 +266,8 @@ const boundsExpression = `(() => {
   for (const [i, card] of cards.entries()) {
     const c = card.getBoundingClientRect(); const scale = c.width / 540;
     const body = card.querySelector('.xhs-body');
-    if (body && body.getBoundingClientRect().bottom > c.top + (parseFloat(card.style.height) - 76) * scale + .7)
+    const padBottom = parseFloat(getComputedStyle(card).getPropertyValue('--xhs-pad-bottom')) || 76;
+    if (body && body.getBoundingClientRect().bottom > c.top + (parseFloat(card.style.height) - padBottom) * scale + .7)
       bad.push({i,kind:'body-height',height:body.offsetHeight});
     for (const el of card.querySelectorAll('*')) {
       for (const r of el.getClientRects()) {
@@ -199,7 +298,7 @@ async function download(selector, label, extension) {
   throw new Error('download timeout: ' + label)
 }
 const dimensions = (bytes) => ({ width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) })
-async function pixelCompare(domFile, pngFile, label) {
+async function pixelCompare(domFile, pngFile, label, limits = { mean: 2, bad: .025 }) {
   const dom = 'data:image/png;base64,' + fs.readFileSync(domFile).toString('base64')
   const exported = 'data:image/png;base64,' + fs.readFileSync(pngFile).toString('base64')
   const metrics = await evaluate(`(async () => {
@@ -217,8 +316,388 @@ async function pixelCompare(domFile, pngFile, label) {
   fs.writeFileSync(path.join(output, label + '-diff.png'), Buffer.from(metrics.diff.split(',')[1], 'base64'))
   delete metrics.diff
   evidence.pixels.push({ label, ...metrics })
-  check(label + ': DOM/PNG pixel agreement', metrics.meanAbsoluteError < 2 && metrics.differentPixelFraction < .025, metrics)
+  check(label + ': DOM/PNG pixel agreement',
+    metrics.meanAbsoluteError < limits.mean && metrics.differentPixelFraction < limits.bad,
+    { ...metrics, limits })
   return metrics
+}
+
+async function platformFonts(selector, session = sessionId) {
+  const { root } = await send('DOM.getDocument', { depth: 0 }, session)
+  const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector }, session)
+  if (!nodeId) throw new Error('font probe missing: ' + selector)
+  const { fonts } = await send('CSS.getPlatformFontsForNode', { nodeId }, session)
+  return fonts
+}
+
+function allCustom(fonts) {
+  return fonts.length > 0 && fonts.every((font) => font.isCustomFont)
+}
+
+const COVER_TITLE_SELECTORS = {
+  reed: '.xhs-cover h1',
+  yoru: '.xhs-yoru-ink',
+  paper: '.xhs-paper-plate h1',
+  console: '.xhs-console-plate h1',
+  kunlun: '.xhs-kunlun-plate h1',
+  rift: '.xhs-rift-title',
+  core: '.xhs-core-plate h1',
+  aozora: '.xhs-aozora-plate h1',
+  kihon: '.xhs-kihon-plate h1',
+  mayonaka: '.xhs-mnk-plate h1',
+}
+const COVER_SUBTITLE_SELECTORS = {
+  reed: '.xhs-cover-copy > p',
+  yoru: '.xhs-yoru-subtitle',
+  paper: '.xhs-paper-standfirst',
+  console: '.xhs-console-standfirst',
+  kunlun: '.xhs-kunlun-standfirst',
+  rift: '.xhs-rift-standfirst',
+  core: '.xhs-core-standfirst',
+  aozora: '.xhs-aozora-standfirst',
+  kihon: '.xhs-kihon-standfirst',
+  mayonaka: '.xhs-mnk-standfirst',
+}
+const FONT_SHEETS = [
+  '/fonts/fonts-local.css',
+  '/fonts/noto-sans-sc-local.css',
+  '/fonts/fonts-templates.css',
+  '/fonts/fonts-design.css',
+  '/fonts/zhuque-fangsong.css',
+]
+
+/** The face a Chinese page-3 heading is allowed to land on, per template. */
+const HEADING_FACE = {
+  kunlun: /Noto Sans SC|Orbitron/,
+  rift: /Noto Sans SC|Space Grotesk/,
+  core: /Noto Serif SC|Pixelify Sans/,
+  aozora: /Noto Sans SC|Inter/,
+  kihon: /Noto Sans SC|Instrument Sans/,
+  mayonaka: /Noto Sans SC/,
+}
+
+function rangeIntervals(range) {
+  if (!range.trim()) return null
+  return range.split(',').map((part) => {
+    const value = part.trim().replace(/^U\+/i, '')
+    if (value.includes('?')) {
+      return [parseInt(value.replace(/\?/g, '0'), 16), parseInt(value.replace(/\?/g, 'f'), 16)]
+    }
+    const [lo, hi = lo] = value.split('-')
+    return [parseInt(lo, 16), parseInt(hi, 16)]
+  })
+}
+
+function rangesContain(intervals, char) {
+  const code = char.codePointAt(0)
+  return !intervals || intervals.some(([lo, hi]) => code >= lo && code <= hi)
+}
+
+/** Same face selection cardFontCss performs, reported without embedding bytes. */
+function fontSelectionFor(text, template) {
+  const declared = templateFontDeclaration[template]
+  const wanted = (family, weight, style) => declared.some((face) =>
+    face.family === family &&
+    face.weights.includes(Number(weight)) &&
+    (face.styles ?? ['normal']).includes(style),
+  )
+  const chosen = []
+  for (const sheet of FONT_SHEETS) {
+    const css = fs.readFileSync(path.join('public', sheet.replace(/^\//, '')), 'utf8')
+    for (const match of css.matchAll(/@font-face\s*\{([^}]+)\}/g)) {
+      const body = match[1]
+      const family = body.match(/font-family:\s*['"]?([^;'"\n]+)/)?.[1].trim()
+      const weight = body.match(/font-weight:\s*([^;]+)/)?.[1].trim() ?? '400'
+      const style = body.match(/font-style:\s*([^;]+)/)?.[1].trim() ?? 'normal'
+      const range = body.match(/unicode-range:\s*([^;]+)/)?.[1].trim() ?? ''
+      const src = body.match(/url\(([^)]+)\)/)?.[1].replace(/['"]/g, '') ?? ''
+      if (!family || !wanted(family, weight, style)) continue
+      const intervals = rangeIntervals(range)
+      if (!Array.from(text).some((char) => rangesContain(intervals, char))) continue
+      chosen.push({ family, weight, style, range, src: path.basename(src), intervals })
+    }
+  }
+  const families = {}
+  for (const face of chosen) {
+    const entry = families[face.family] ??= { weights: [], styles: [], slices: 0, sample: [] }
+    if (!entry.weights.includes(face.weight)) entry.weights.push(face.weight)
+    if (!entry.styles.includes(face.style)) entry.styles.push(face.style)
+    entry.slices++
+    if (entry.sample.length < 3) entry.sample.push({ src: face.src, range: face.range.slice(0, 110) })
+  }
+  for (const [family, entry] of Object.entries(families)) {
+    const intervals = chosen.filter((face) => face.family === family).map((face) => rangeIntervals(face.range))
+    const uncovered = [...new Set(Array.from(text))].filter((char) => !intervals.some((range) => rangesContain(range, char)))
+    entry.uncovered = uncovered.join('').slice(0, 24)
+    entry.uncoveredCount = uncovered.length
+  }
+  return {
+    families,
+    totalSlices: chosen.length,
+    faces: chosen.map(({ family, weight, intervals }) => ({ family, weight, intervals })),
+  }
+}
+
+/**
+ * The cover title has to leave ink in the exported PNG, at the box the preview
+ * DOM gives it. A fitter that shrinks it to 1px still yields a matching blank
+ * DOM/PNG pair, so compare the title box against the PNG's actual pixels.
+ */
+async function coverTitleInk(template, pngFile, label, height = 1440) {
+  const selector = COVER_TITLE_SELECTORS[template]
+  const probe = await evaluate(`(() => {
+    const card = document.querySelector('[data-card-index="0"]');
+    if (!card) throw new Error('cover card missing');
+    const title = card.querySelector(${JSON.stringify(selector)});
+    if (!title) throw new Error('cover title missing: ' + ${JSON.stringify(selector)});
+    const c = card.getBoundingClientRect();
+    const r = title.getBoundingClientRect();
+    const cs = getComputedStyle(title);
+    const scale = c.width / 540;
+    return {
+      text: (title.textContent || '').trim(),
+      fontSize: parseFloat(cs.fontSize),
+      color: cs.color,
+      opacity: parseFloat(cs.opacity),
+      visibility: cs.visibility,
+      display: cs.display,
+      x: (r.left - c.left) / scale,
+      y: (r.top - c.top) / scale,
+      width: r.width / scale,
+      height: r.height / scale,
+      cardWidth: c.width / scale,
+      cardHeight: c.height / scale,
+    };
+  })()`)
+  const pad = 6
+  const maxW = 1080, maxH = height
+  const rx = Math.max(0, Math.min(maxW, Math.round(probe.x * 2) - pad))
+  const ry = Math.max(0, Math.min(maxH, Math.round(probe.y * 2) - pad))
+  const rw = Math.max(1, Math.min(maxW - rx, Math.round(probe.width * 2) + pad * 2))
+  const rh = Math.max(1, Math.min(maxH - ry, Math.round(probe.height * 2) + pad * 2))
+  const dataUrl = 'data:image/png;base64,' + fs.readFileSync(pngFile).toString('base64')
+  const stats = await evaluate(`(async () => {
+    const img = new Image(); img.src = ${JSON.stringify(dataUrl)}; await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const p = ctx.getImageData(${rx}, ${ry}, ${rw}, ${rh}).data;
+    const border = [[], [], []];
+    const add = (x, y) => { const i = (y * ${rw} + x) * 4; for (let c = 0; c < 3; c++) border[c].push(p[i + c]) };
+    for (let x = 0; x < ${rw}; x++) { add(x, 0); add(x, ${rh} - 1) }
+    for (let y = 1; y < ${rh} - 1; y++) { add(0, y); add(${rw} - 1, y) }
+    const bg = border.map((values) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]);
+    let ink = 0, sum = 0;
+    for (let i = 0; i < p.length; i += 4) {
+      const delta = Math.max(Math.abs(p[i] - bg[0]), Math.abs(p[i + 1] - bg[1]), Math.abs(p[i + 2] - bg[2]));
+      if (delta > 50) ink++;
+      sum += (p[i] + p[i + 1] + p[i + 2]) / 3;
+    }
+    return { ink, area: ${rw} * ${rh}, inkFraction: ink / (${rw} * ${rh}), background: bg, meanLuminance: sum / (${rw} * ${rh}) };
+  })()`)
+  const box = { x: rx, y: ry, width: rw, height: rh }
+  const visible = probe.opacity > 0.5 && probe.visibility === 'visible' && probe.display !== 'none' &&
+    probe.x >= -0.5 && probe.y >= -0.5 && probe.x + probe.width <= probe.cardWidth + 0.5 &&
+    probe.y + probe.height <= probe.cardHeight + 0.5
+  const passed = visible && probe.fontSize >= 12 && stats.ink >= 400 && stats.inkFraction >= 0.015
+  const detail = { ...probe, ...stats, box, visible }
+  evidence.coverTitles.push({ label, template, ...detail })
+  check(label + ': cover title leaves ink in the exported PNG', passed, detail)
+  return passed
+}
+
+function parseCssColor(value) {
+  const match = /rgba?\(([^)]+)\)/.exec(value)
+  if (!match) return null
+  const parts = match[1].split(/[,\s/]+/).filter(Boolean).map(Number)
+  if (parts.length < 3 || parts.slice(0, 3).some((channel) => !Number.isFinite(channel))) return null
+  return { r: parts[0], g: parts[1], b: parts[2], a: Number.isFinite(parts[3]) ? parts[3] : 1 }
+}
+
+function linearChannel(value) {
+  const channel = value / 255
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+}
+
+function relativeLuminance(color) {
+  return 0.2126 * linearChannel(color.r) + 0.7152 * linearChannel(color.g) + 0.0722 * linearChannel(color.b)
+}
+
+function contrastRatio(foreground, background) {
+  const fg = relativeLuminance(foreground)
+  const bg = relativeLuminance(background)
+  return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05)
+}
+
+/**
+ * WCAG contrast against the exported card. The foreground is the computed text
+ * color (composited over the sampled background when it has alpha); the
+ * background is the per-channel median of the text's DOM bounding box in the
+ * PNG, so gradients, paper grain and scanlines are measured as rendered.
+ * Normal text needs 4.5:1; a bold heading at 24px or larger needs 3:1.
+ */
+async function textContrastChecks(template, variant, pageIndex, pngFile, label, roles) {
+  const probes = await evaluate(`(() => {
+    const card = document.querySelector('[data-card-index="${pageIndex}"]');
+    if (!card) throw new Error('card missing for contrast probe');
+    const c = card.getBoundingClientRect();
+    const scale = c.width / 540;
+    return ${JSON.stringify(roles)}.map((role) => {
+      const el = card.querySelector(role.selector);
+      if (!el) return { role: role.role, selector: role.selector, missing: true };
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return {
+        role: role.role,
+        text: (el.textContent || '').trim().slice(0, 48),
+        color: cs.color,
+        fontSize: parseFloat(cs.fontSize),
+        fontWeight: Number.parseInt(cs.fontWeight, 10) || 400,
+        opacity: Number.parseFloat(cs.opacity),
+        display: cs.display,
+        visibility: cs.visibility,
+        box: {
+          x: (r.left - c.left) / scale,
+          y: (r.top - c.top) / scale,
+          width: r.width / scale,
+          height: r.height / scale,
+        },
+      };
+    });
+  })()`)
+  const dataUrl = 'data:image/png;base64,' + fs.readFileSync(pngFile).toString('base64')
+  const samples = await evaluate(`(async () => {
+    const img = new Image(); img.src = ${JSON.stringify(dataUrl)}; await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const medians = [];
+    for (const box of ${JSON.stringify(probes.map((probe) => probe.box))}) {
+      const x = Math.max(0, Math.min(img.naturalWidth - 1, Math.round(box.x * 2)));
+      const y = Math.max(0, Math.min(img.naturalHeight - 1, Math.round(box.y * 2)));
+      const width = Math.max(1, Math.min(img.naturalWidth - x, Math.round(box.width * 2)));
+      const height = Math.max(1, Math.min(img.naturalHeight - y, Math.round(box.height * 2)));
+      const data = ctx.getImageData(x, y, width, height).data;
+      const histograms = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+      const total = data.length / 4;
+      for (let i = 0; i < data.length; i += 4) {
+        histograms[0][data[i]]++;
+        histograms[1][data[i + 1]]++;
+        histograms[2][data[i + 2]]++;
+      }
+      const median = histograms.map((histogram) => {
+        let seen = 0;
+        for (let channel = 0; channel < 256; channel++) {
+          seen += histogram[channel];
+          if (seen >= total / 2) return channel;
+        }
+        return 255;
+      });
+      medians.push({ median, width, height });
+    }
+    return medians;
+  })()`)
+  for (const [index, probe] of probes.entries()) {
+    const threshold = probe.fontSize >= 24 && probe.fontWeight >= 700 ? 3 : 4.5
+    const sample = samples[index]
+    const foreground = probe.missing ? null : parseCssColor(probe.color)
+    let ratio = 0
+    let effective = null
+    if (foreground && sample) {
+      const alpha = Math.max(0, Math.min(1, foreground.a * (Number.isFinite(probe.opacity) ? probe.opacity : 1)))
+      const background = { r: sample.median[0], g: sample.median[1], b: sample.median[2] }
+      effective = {
+        r: foreground.r * alpha + background.r * (1 - alpha),
+        g: foreground.g * alpha + background.g * (1 - alpha),
+        b: foreground.b * alpha + background.b * (1 - alpha),
+      }
+      ratio = contrastRatio(effective, background)
+    }
+    const passed = !probe.missing && probe.display !== 'none' && probe.visibility === 'visible' &&
+      Number.isFinite(ratio) && ratio >= threshold
+    const detail = {
+      text: probe.text ?? '',
+      selector: probe.selector,
+      color: probe.color ?? null,
+      effective: effective ? [effective.r, effective.g, effective.b].map((value) => Math.round(value)) : null,
+      background: sample?.median ?? null,
+      box: sample ? { width: sample.width, height: sample.height } : null,
+      fontSize: probe.fontSize,
+      fontWeight: probe.fontWeight,
+      ratio: Number.isFinite(ratio) ? Math.round(ratio * 100) / 100 : null,
+      threshold,
+      missing: Boolean(probe.missing),
+    }
+    evidence.contrast.push({ label, template, variant, page: pageIndex + 1, role: probe.role, passed, ...detail })
+    check(`${label}: ${probe.role} contrast >= ${threshold}:1`, passed, detail)
+  }
+}
+
+/** Call the built cardFontCss and report only its face metadata, not the bytes. */
+async function exactFontEmbed(text, template) {
+  return evaluate(`(async () => {
+    const url = performance.getEntriesByType('resource').map((entry) => entry.name)
+      .find((name) => /\\/assets\\/cards-export-[^/]+\\.js$/.test(name));
+    if (!url) throw new Error('cards-export chunk is not loaded');
+    const mod = await import(url);
+    if (typeof mod.cardFontCss !== 'function') throw new Error('cardFontCss export missing');
+    const css = await mod.cardFontCss(${JSON.stringify(text)}, ${JSON.stringify(template)});
+    const faces = [...css.matchAll(/@font-face\\s*\\{([^}]+)\\}/g)].map((match) => {
+      const body = match[1];
+      return {
+        family: body.match(/font-family:\\s*['"]?([^;'"\\n]+)/)?.[1].trim(),
+        weight: body.match(/font-weight:\\s*([^;]+)/)?.[1].trim() ?? '400',
+        style: body.match(/font-style:\\s*([^;]+)/)?.[1].trim() ?? 'normal',
+        range: body.match(/unicode-range:\\s*([^;]+)/)?.[1].trim() ?? '',
+      };
+    });
+    const families = {};
+    for (const face of faces) {
+      const entry = families[face.family] ??= { weights: [], styles: [], slices: 0, ranges: [] };
+      if (!entry.weights.includes(face.weight)) entry.weights.push(face.weight);
+      if (!entry.styles.includes(face.style)) entry.styles.push(face.style);
+      entry.slices++;
+      if (entry.ranges.length < 3) entry.ranges.push(face.range.slice(0, 110));
+    }
+    return { url, totalSlices: faces.length, families };
+  })()`)
+}
+
+async function writeDomPngComparison(label, domFile, pngFile, crop) {
+  const dom = 'data:image/png;base64,' + fs.readFileSync(domFile).toString('base64')
+  const exported = 'data:image/png;base64,' + fs.readFileSync(pngFile).toString('base64')
+  const dataUrl = await evaluate(`(async () => {
+    const load = async (src) => { const img = new Image(); img.src = src; await img.decode(); return img };
+    const [a, b] = await Promise.all([load(${JSON.stringify(dom)}), load(${JSON.stringify(exported)})]);
+    const x = ${crop.x}, y = ${crop.y};
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(a, x, y, 600, 300, 0, 0, 600, 300);
+    ctx.drawImage(b, x, y, 600, 300, 600, 0, 600, 300);
+    ctx.fillStyle = '#ff2d55'; ctx.fillRect(598, 0, 4, 300);
+    return canvas.toDataURL('image/png');
+  })()`)
+  const file = path.join(domVsPngDir, label + '-03.png')
+  fs.writeFileSync(file, Buffer.from(dataUrl.split(',')[1], 'base64'))
+  evidence.comparisons.push({ label, file, crop })
+  return file
+}
+
+async function composeComparisonSheet(files) {
+  const urls = files.map((file) => 'data:image/png;base64,' + fs.readFileSync(file).toString('base64'))
+  const dataUrl = await evaluate(`(async () => {
+    const load = async (src) => { const img = new Image(); img.src = src; await img.decode(); return img };
+    const images = await Promise.all(${JSON.stringify(urls)}.map(load));
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 300 * images.length;
+    const ctx = canvas.getContext('2d');
+    images.forEach((img, i) => ctx.drawImage(img, 0, i * 300));
+    return canvas.toDataURL('image/png');
+  })()`)
+  const file = path.join(domVsPngDir, 'all.png')
+  fs.writeFileSync(file, Buffer.from(dataUrl.split(',')[1], 'base64'))
+  return file
 }
 
 try {
@@ -271,19 +750,18 @@ try {
   check('local page renders meaningful UI without an error overlay', await evaluate(`document.body.innerText.length>200 && !document.querySelector('vite-error-overlay')`))
   check('preview switch is available', await evaluate(`!!document.querySelector('[data-preview-mode="cards"]')`))
   check('long Chinese document has about 3000 characters', evidence.longDocumentCjk >= 3000 && evidence.longDocumentCjk <= 3400, evidence.longDocumentCjk)
-  // The editor screenshot changed with the new preview switch. Other README
-  // screenshots retain their existing layout and are left as they are.
+  // Keep acceptance screenshots in verify-out/. README images are edited only
+  // when the interface changes, not as a side effect of this script.
   await shot('editor-akari')
-  fs.copyFileSync(path.join(output, 'editor-akari.png'), 'docs/images/editor-akari.png')
   await evaluate(`localStorage.setItem('mopai.theme.v1','yoru'); document.documentElement.dataset.theme='yoru';document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'`)
   await sleep(450)
   await shot('editor-yoru')
-  fs.copyFileSync(path.join(output, 'editor-yoru.png'), 'docs/images/editor-yoru.png')
 
   for (const [docName, text] of [['sample', SAMPLE_DOC], ['long', longDoc]]) {
     await setMarkdown(text)
     await click('[data-preview-mode="cards"]')
     await cardsReady()
+    await click('[data-card-template="reed"]')
     if (docName === 'long') {
       check('long list keeps every item and continuous numbers across pages', await evaluate(`JSON.stringify([...document.querySelectorAll('.xhs-card ol>li')].map(li=>li.value))===JSON.stringify(Array.from({length:35},(_,i)=>i+7))`))
       check('long table keeps every body row across pages', await evaluate(`document.querySelectorAll('.xhs-card tbody tr').length===24`))
@@ -335,7 +813,336 @@ try {
   }
 
   await setMarkdown(longDoc)
-  await click('[data-preview-mode="cards"]'); await cardsReady()
+  await click('[data-preview-mode="cards"]')
+  await cardsReady()
+  await click('[data-card-template="reed"]')
+  await click('[data-card-ratio="3:4"]')
+  await click('[data-card-bg="paper"]')
+  await click('[data-lang="zh"]')
+  await cardsReady()
+
+  // Template dimension: every variant of the three design-system templates is
+  // exercised on the long document at 3:4. Cover + first two body pages are
+  // exported, checked for size, compared against a 2x DOM capture, and kept as
+  // the small-sample set in verify-out/templates/.
+  const comparisonTargets = new Set([
+    'reed-paper', 'yoru-signal', 'paper-editorial', 'console-akari',
+    'kunlun-void', 'rift-dark', 'core-frost', 'aozora-daylight', 'kihon-gin', 'mayonaka-midnight',
+  ])
+  const comparisonFiles = []
+  for (const template of CARD_TEMPLATES) {
+    await click(`[data-card-template="${template}"]`); await cardsReady()
+    // KIHON only has 9:16; every other template is sampled at 3:4.
+    if (template !== 'kihon') { await click('[data-card-ratio="3:4"]'); await cardsReady() }
+    const expectedHeight = template === 'kihon' ? 1920 : 1440
+    for (const variant of CARD_VARIANTS[template]) {
+      await click(`[data-card-bg="${variant}"]`); await cardsReady()
+      const bounds = await evaluate(boundsExpression)
+      const label = `template-${template}-${variant}`
+      evidence.matrix.push({ label, ...bounds })
+      check(label + ': every card fits', bounds.count > 0 && bounds.bad.length === 0 && !bounds.warning,
+        bounds.bad.length ? bounds.bad : { pages: bounds.count })
+      check(label + ': long document has cover and two body pages', bounds.count >= 3, bounds.count)
+      await shot(label)
+      for (const index of [0, 1, 2]) {
+        const pageLabel = `${label}-p${index + 1}`
+        const file = await download(`[data-card-export="${index}"]`, pageLabel + '-single', '.png')
+        const size = dimensions(fs.readFileSync(file))
+        check(pageLabel + ': PNG size', size.width === 1080 && size.height === expectedHeight, size)
+        const sample = path.join(templatesDir, `${template}-${variant}-${String(index + 1).padStart(2, '0')}.png`)
+        fs.copyFileSync(file, sample)
+        evidence.templates.push({ template, variant, page: index + 1, file: sample })
+        const domShot = await nativeCardShot(`[data-card-index="${index}"]`, pageLabel + '-dom', sessionId, 2)
+        // Every cover and body page uses the same strict limit: the export must
+        // keep the preview's fonts and line breaks exactly.
+        await pixelCompare(domShot, file, pageLabel)
+        if (index === 0) {
+          await coverTitleInk(template, file, pageLabel, expectedHeight)
+          if (CONTRAST_TEMPLATES.has(template)) {
+            await textContrastChecks(template, variant, 0, file, pageLabel, [
+              { role: 'cover title', selector: COVER_TITLE_SELECTORS[template] },
+              { role: 'cover subtitle', selector: COVER_SUBTITLE_SELECTORS[template] },
+            ])
+          }
+        }
+        if (index === 2 && CONTRAST_TEMPLATES.has(template)) {
+          await textContrastChecks(template, variant, 2, file, pageLabel, [
+            { role: 'page 3 body', selector: '.xhs-card-content p' },
+          ])
+        }
+        if (index === 2 && comparisonTargets.has(`${template}-${variant}`)) {
+          const crop = await evaluate(`(() => {
+            const card = document.querySelector('[data-card-index="2"]');
+            const p = card.querySelector('.xhs-card-content p');
+            if (!p) throw new Error('no body paragraph for comparison crop');
+            const c = card.getBoundingClientRect(); const r = p.getBoundingClientRect();
+            const scale = c.width / 540;
+            return {
+              x: Math.max(0, Math.min(480, Math.round((r.left - c.left) * scale * 2) - 12)),
+              y: Math.max(0, Math.min(1140, Math.round((r.top - c.top) * scale * 2) - 12)),
+            };
+          })()`)
+          comparisonFiles.push(await writeDomPngComparison(`${template}-${variant}`, domShot, file, crop))
+        }
+      }
+    }
+  }
+
+  // KIHON's native frame is the point: choosing it moves a 3:4 card to 9:16
+  // and leaves the other two ratio buttons disabled with a visible reason.
+  await click('[data-card-template="reed"]'); await cardsReady()
+  await click('[data-card-ratio="3:4"]'); await cardsReady()
+  await click('[data-card-template="kihon"]'); await cardsReady()
+  const kihonRatios = await evaluate(`(() => {
+    const pressed = document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio;
+    const b34 = document.querySelector('[data-card-ratio="3:4"]');
+    const b11 = document.querySelector('[data-card-ratio="1:1"]');
+    return { pressed, d34: b34?.disabled, d11: b11?.disabled, hint: document.querySelector('[data-card-ratio-hint]')?.textContent || '' };
+  })()`)
+  evidence.kihonRatios = kihonRatios
+  check('kihon: switches to 9:16 and disables the other ratios with a reason',
+    kihonRatios.pressed === '9:16' && kihonRatios.d34 === true && kihonRatios.d11 === true && kihonRatios.hint.length > 0,
+    kihonRatios)
+
+  // Dense body pages: record the fonts Chrome actually used, the faces cardFontCss
+  // would embed for the same glyphs, and a 1:1 DOM/PNG crop of the same text.
+  for (const [template, variant] of [
+    ['reed', 'paper'], ['yoru', 'signal'], ['paper', 'editorial'], ['console', 'akari'],
+    ['kunlun', 'void'], ['rift', 'dark'], ['core', 'frost'], ['aozora', 'daylight'],
+    ['kihon', 'gin'], ['mayonaka', 'midnight'],
+  ]) {
+    await click(`[data-card-template="${template}"]`)
+    await click(`[data-card-bg="${variant}"]`)
+    await click(`[data-card-ratio="${template === 'kihon' ? '9:16' : '3:4'}"]`)
+    await click('[data-lang="zh"]')
+    await cardsReady()
+    const label = `${template}-${variant}`
+    const probe = await evaluate(`(() => {
+      const card = document.querySelectorAll('.xhs-card')[2];
+      if (!card) throw new Error('body page 3 missing');
+      const scope = card.querySelector('.xhs-card-content');
+      const p = scope?.querySelector('p') ?? null;
+      const heading = scope?.querySelector('h2, h3') ?? null;
+      const quote = scope?.querySelector('blockquote') ?? null;
+      if (p) p.dataset.fontProbe = 'p3-p';
+      if (heading) heading.dataset.fontProbe = 'p3-heading';
+      if (quote) quote.dataset.fontProbe = 'p3-quote';
+      const style = (el) => {
+        if (!el) return null;
+        const cs = getComputedStyle(el);
+        return {
+          tag: el.tagName, text: (el.textContent || '').trim().slice(0, 40),
+          fontFamily: cs.fontFamily, fontSize: cs.fontSize, fontWeight: cs.fontWeight,
+          lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing, color: cs.color,
+        };
+      };
+      return { p: style(p), heading: style(heading), quote: style(quote), text: (scope?.textContent || '').trim() };
+    })()`)
+    const fonts = {}
+    for (const kind of ['p', 'heading', 'quote']) {
+      if (probe[kind]) fonts[kind] = await platformFonts(`[data-font-probe="p3-${kind}"]`)
+    }
+    const selection = fontSelectionFor(probe.text, template)
+    const { faces: selectionFaces, ...selectionSummary } = selection
+    let exact = null
+    try {
+      exact = await exactFontEmbed(probe.text, template)
+    } catch (error) {
+      console.log(`[FONT] ${label} p3: exact cardFontCss probe failed: ${error.message}`)
+    }
+    evidence.fontSelections[label] = {
+      p3TextLength: probe.text.length,
+      uniqueChars: new Set(Array.from(probe.text)).size,
+      replica: selectionSummary,
+      exact,
+    }
+    evidence.fonts['p3-' + label] = { computed: { p: probe.p, heading: probe.heading, quote: probe.quote }, platform: fonts }
+    const actualFamilies = [...new Set(Object.values(fonts).flat().map((font) => font.familyName))]
+    // Chrome reports the face's full name ("Noto Serif SC ExtraLight"); the
+    // CSS family is the prefix. Coverage is the union of the faces that
+    // actually rendered, so Latin fallback does not have to cover CJK.
+    const matchFamily = (actual) => Object.keys(selection.families)
+      .find((family) => actual === family || actual.startsWith(family + ' ') || actual.startsWith(family + ' ('))
+    const coverage = actualFamilies.map((family) => ({ family, declared: matchFamily(family) ?? null }))
+    const declaredUsed = [...new Set(coverage.map((entry) => entry.declared).filter(Boolean))]
+    const union = selectionFaces.filter((face) => declaredUsed.includes(face.family))
+    const uncoveredUnion = [...new Set(Array.from(probe.text))]
+      .filter((char) => !union.some((face) => rangesContain(face.intervals, char)))
+    const reported = exact?.families ?? selection.families
+    const embeddedSummary = Object.entries(reported)
+      .map(([family, entry]) => `${family} ${entry.weights.join('/')}: ${entry.slices} slices`)
+      .join('; ')
+    console.log(`[FONT] ${label} p3: ${actualFamilies.join(', ') || 'none'} embedded { ${embeddedSummary} }`)
+    check(label + ': every page-3 rendered glyph is covered by an embedded face',
+      actualFamilies.length > 0 && coverage.every((entry) => entry.declared) && uncoveredUnion.length === 0,
+      { actualFamilies, coverage, uncovered: uncoveredUnion.join('').slice(0, 24), totalSlices: selection.totalSlices })
+    const headingFamilies = (fonts.heading ?? []).map((font) => font.familyName)
+    const headingExpected = HEADING_FACE[template]
+    if (headingExpected && probe.heading) {
+      check(`${label}: page-3 heading uses the designed face`,
+        headingFamilies.length > 0 && headingFamilies.every((family) => /Noto Sans SC|Noto Serif SC|Orbitron|Space Grotesk|Pixelify Sans|Instrument Sans|JetBrains Mono|B612 Mono|VT323|Share Tech Mono/i.test(family)) &&
+        headingFamilies.some((family) => headingExpected.test(family)), headingFamilies)
+    }
+    if (template === 'mayonaka') {
+      const bodyFamilies = (fonts.p ?? []).map((font) => font.familyName)
+      check('mayonaka: Chinese body is Noto Sans SC, never DotGothic16',
+        bodyFamilies.length > 0 && bodyFamilies.every((family) => /^Noto Sans SC\b/.test(family)),
+        bodyFamilies)
+    }
+    if (template === 'kihon') {
+      const bodyFamilies = (fonts.p ?? []).map((font) => font.familyName)
+      check('kihon: Chinese body is Noto Sans SC, not the B612 mono face',
+        bodyFamilies.length > 0 && bodyFamilies.every((family) => /^Noto Sans SC\b/.test(family)),
+        bodyFamilies)
+    }
+  }
+  const comparisonSheet = await composeComparisonSheet(comparisonFiles)
+  evidence.comparisons.sheet = comparisonSheet
+  check('all dense body pages have a 1:1 DOM/PNG comparison sheet',
+    comparisonFiles.length === CARD_TEMPLATES.length && fs.existsSync(comparisonSheet),
+    comparisonFiles.map((file) => path.relative(templatesDir, file)))
+
+  // Fonts are checked on the glyphs that actually render, not on CSS strings.
+  await click('[data-card-template="yoru"]'); await click('[data-card-bg="signal"]'); await cardsReady()
+  const yoruTitleFonts = await platformFonts('[data-card-kind="cover"] .xhs-yoru-ink')
+  evidence.fonts.yoruTitle = yoruTitleFonts
+  check('yoru: cover title is Noto Serif SC webfont',
+    allCustom(yoruTitleFonts) && yoruTitleFonts.some((font) => /Noto Serif SC/i.test(font.familyName)), yoruTitleFonts)
+  const yoruFolioFonts = await platformFonts('[data-card-kind="body"] .xhs-yoru-folio')
+  evidence.fonts.yoruFolio = yoruFolioFonts
+  check('yoru: page number is Zhuque Fangsong webfont',
+    allCustom(yoruFolioFonts) && yoruFolioFonts.some((font) => /Zhuque Fangsong/i.test(font.familyName)), yoruFolioFonts)
+  const yoruSpineFonts = await platformFonts('[data-card-kind="body"] .xhs-yoru-spine span')
+  evidence.fonts.yoruSpine = yoruSpineFonts
+  check('yoru: spine is Zhuque Fangsong webfont',
+    allCustom(yoruSpineFonts) && yoruSpineFonts.some((font) => /Zhuque Fangsong/i.test(font.familyName)), yoruSpineFonts)
+
+  await click('[data-card-template="paper"]'); await click('[data-card-bg="editorial"]'); await cardsReady()
+  await evaluate(`(() => { const el=[...document.querySelectorAll('.xhs-body em')].find((node) => node.textContent === 'Reed'); if (!el) throw new Error('paper latin probe absent'); el.dataset.fontProbe='paper-latin' })()`)
+  const paperLatinFonts = await platformFonts('[data-font-probe="paper-latin"]')
+  evidence.fonts.paperLatin = paperLatinFonts
+  check('paper: English is EB Garamond webfont',
+    allCustom(paperLatinFonts) && paperLatinFonts.some((font) => /EB Garamond/i.test(font.familyName)), paperLatinFonts)
+
+  await click('[data-card-template="console"]'); await click('[data-card-bg="akari"]'); await cardsReady()
+  const consoleTitleFonts = await platformFonts('[data-card-kind="cover"] .xhs-console-plate h1')
+  evidence.fonts.consoleTitle = consoleTitleFonts
+  check('console: Chinese is Noto Sans SC webfont',
+    allCustom(consoleTitleFonts) && consoleTitleFonts.some((font) => /Noto Sans SC/i.test(font.familyName)), consoleTitleFonts)
+
+  // Cover titles and display labels for the six design-system templates.
+  for (const [template, variant, expected, selector] of [
+    ['kunlun', 'void', /Noto Sans SC/i, COVER_TITLE_SELECTORS.kunlun],
+    ['rift', 'dark', /Noto Sans SC/i, COVER_TITLE_SELECTORS.rift],
+    ['core', 'frost', /Noto Serif SC/i, COVER_TITLE_SELECTORS.core],
+    ['aozora', 'daylight', /Noto Sans SC/i, COVER_TITLE_SELECTORS.aozora],
+    ['kihon', 'gin', /Noto Sans SC/i, COVER_TITLE_SELECTORS.kihon],
+    ['mayonaka', 'midnight', /Noto Sans SC/i, COVER_TITLE_SELECTORS.mayonaka],
+  ]) {
+    await click(`[data-card-template="${template}"]`)
+    await click(`[data-card-bg="${variant}"]`)
+    if (template !== 'kihon') await click('[data-card-ratio="3:4"]')
+    await cardsReady()
+    const fonts = await platformFonts(`[data-card-kind="cover"] ${selector}`)
+    evidence.fonts[`${template}CoverTitle`] = fonts
+    check(`${template}: cover title is ${expected.source} webfont`,
+      allCustom(fonts) && fonts.some((font) => expected.test(font.familyName)), fonts)
+    const headingText = await evaluate(`(() => {
+      const card = document.querySelectorAll('.xhs-card')[1];
+      const heading = card?.querySelector('.xhs-body h2, .xhs-body h3');
+      if (!heading) return '';
+      heading.dataset.fontProbe = 'cover-loop-heading';
+      return (heading.textContent || '').trim().slice(0, 24);
+    })()`)
+    if (headingText) {
+      const headingFonts = await platformFonts('[data-font-probe="cover-loop-heading"]')
+      evidence.fonts[`${template}BodyHeading`] = headingFonts
+      check(`${template}: body heading uses the designed face`,
+        headingFonts.length > 0 && headingFonts.every((font) => font.isCustomFont) &&
+        headingFonts.some((font) => HEADING_FACE[template].test(font.familyName)), headingFonts)
+    }
+  }
+
+  // The cards belong to the user: no design-system name is printed on them.
+  // Only the footer/status page number and the actual article text remain.
+  for (const [template, variant] of [
+    ['kunlun', 'void'], ['rift', 'dark'], ['aozora', 'daylight'], ['kihon', 'gin'], ['mayonaka', 'midnight'],
+  ]) {
+    await click(`[data-card-template="${template}"]`)
+    await click(`[data-card-bg="${variant}"]`)
+    if (template !== 'kihon') await click('[data-card-ratio="3:4"]')
+    await cardsReady()
+    const coverText = await evaluate(`document.querySelector('[data-card-kind="cover"]')?.innerText || ''`)
+    check(`${template}: cover has no template or system name`,
+      !/KUNLUN|昆仑|RIFT|裂隙|AOZORA|青空|KIHON|基本|MAYONAKA|真夜中/.test(coverText),
+      coverText.slice(0, 120))
+  }
+  await click('[data-card-template="core"]'); await click('[data-card-bg="frost"]'); await cardsReady()
+  const coreCoverBar = await evaluate(`document.querySelector('[data-card-kind="cover"] .xhs-core-bar')?.innerText || ''`)
+  check('core: cover title bar has no placeholder word', !/cover/i.test(coreCoverBar), coreCoverBar)
+
+  // The header / title bar must not repeat the footer's page number.
+  for (const [template, head, foot] of [
+    ['kunlun', '.xhs-kunlun-head', '.xhs-kunlun-foot'],
+    ['core', '.xhs-core-bar', '.xhs-core-foot'],
+  ]) {
+    await click(`[data-card-template="${template}"]`); await cardsReady()
+    const page3 = await evaluate(`(() => {
+      const card = document.querySelectorAll('.xhs-card')[2];
+      if (!card) return null;
+      return {
+        head: card.querySelector(${JSON.stringify(head)})?.innerText || '',
+        foot: card.querySelector(${JSON.stringify(foot)})?.innerText || '',
+      };
+    })()`)
+    const pageNumber = /\[\s*\d{2}\s*\]|\d{2}\s*\/\s*\d{2}/
+    check(`${template}: page 3 keeps only the footer page number`,
+      page3 !== null && pageNumber.test(page3.foot) && !pageNumber.test(page3.head), page3)
+  }
+
+  await click('[data-card-template="kihon"]'); await click('[data-card-bg="gin"]'); await cardsReady()
+  const kihonFolio = await platformFonts('[data-card-kind="body"] .xhs-kihon-folio')
+  evidence.fonts.kihonFolio = kihonFolio
+  check('kihon: folio uses B612 Mono webfont',
+    allCustom(kihonFolio) && kihonFolio.some((font) => /B612 Mono/i.test(font.familyName)), kihonFolio)
+
+  await click('[data-card-template="mayonaka"]'); await click('[data-card-bg="midnight"]'); await cardsReady()
+  const mnkTitle = await platformFonts(`[data-card-kind="cover"] ${COVER_TITLE_SELECTORS.mayonaka}`)
+  evidence.fonts.mayonakaTitle = mnkTitle
+  check('mayonaka: Chinese cover title uses Noto Sans SC, never DotGothic16',
+    allCustom(mnkTitle) && mnkTitle.some((font) => /Noto Sans SC/i.test(font.familyName)) &&
+    mnkTitle.every((font) => !/DotGothic16/i.test(font.familyName)), mnkTitle)
+
+  // Back to Reed for the remaining behavior checks.
+  await click('[data-card-template="reed"]'); await click('[data-card-bg="paper"]');
+  await click('[data-card-ratio="3:4"]'); await cardsReady()
+
+  const templateGroups = CARD_TEMPLATES.map((template) => ({
+    template,
+    label: {
+      reed: 'Reed · 默认', yoru: 'YORU · 铅字房', paper: 'PAPER · 纸本', console: 'Console · 灯与夜',
+      kunlun: 'KUNLUN · 昆仑', rift: 'RIFT · 裂隙', core: 'core · 霜纸', aozora: 'Aozora · 青空',
+      kihon: 'KIHON · 基本', mayonaka: 'Mayonaka · 真夜中',
+    }[template],
+    shots: evidence.templates.filter((shot) => shot.template === template),
+  }))
+  const sampleIndex = `<!doctype html>
+<meta charset="utf-8">
+<title>Reed card templates — samples</title>
+<style>
+body{margin:0;padding:32px;background:#1b1d22;color:#e8e8e8;font:14px/1.5 system-ui,sans-serif}
+h1{font-size:20px;margin:0 0 8px}p{color:#a1a1aa;margin:0 0 28px}
+section{margin:0 0 40px}h2{font-size:16px;border-bottom:1px solid #3a3d44;padding-bottom:8px}
+.grid{display:flex;flex-wrap:wrap;gap:16px}.shot{width:240px}
+.shot img{width:240px;height:auto;background:#0f1115;border:1px solid #30333a;border-radius:4px}
+.shot figcaption{color:#a1a1aa;font-size:12px;margin-top:6px}code{color:#d4d4d8}
+</style>
+<h1>Reed · 小红书卡片模板小样</h1>
+<p>长文 3:4，导出 1080 × 1440 PNG。每套模板的每个变体：封面、正文第 1 页、正文第 2 页。文件名即 <code>&lt;template&gt;-&lt;variant&gt;-&lt;序号&gt;.png</code>。</p>
+${templateGroups.map((group) => `<section><h2>${group.label}</h2><div class="grid">${group.shots.map((shot) => `<figure class="shot"><img src="${path.basename(shot.file)}" alt="${shot.template}-${shot.variant}-${shot.page}"><figcaption>${shot.template}-${shot.variant}-${String(shot.page).padStart(2, '0')}</figcaption></figure>`).join('')}</div></section>`).join('\n')}
+`
+  fs.writeFileSync(path.join(templatesDir, 'index.html'), sampleIndex)
+
   {
     // Typing with the cards open re-measures behind them: the cards stay on
     // screen and the card being read stays in view.
@@ -384,13 +1191,13 @@ try {
   await shot('empty-document')
 
   await setMarkdown(longDoc)
-  const optionsBeforeResize = await evaluate(`JSON.stringify({ratio:document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio,bg:document.querySelector('[data-card-bg][aria-pressed="true"]')?.dataset.cardBg})`)
+  const optionsBeforeResize = await evaluate(`JSON.stringify({ratio:document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio,bg:document.querySelector('[data-card-bg][aria-pressed="true"]')?.dataset.cardBg,template:document.querySelector('[data-card-template][aria-pressed="true"]')?.dataset.cardTemplate})`)
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: false }, sessionId)
   await waitFor(`!!document.querySelector('[data-pane-tab="preview"]')`)
   await evaluate(`document.querySelector('[data-pane-tab="preview"]').focus()`)
   await press('Enter', 'Enter', 13)
   await cardsReady()
-  check('card ratio and background survive responsive layout changes', await evaluate(`JSON.stringify({ratio:document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio,bg:document.querySelector('[data-card-bg][aria-pressed="true"]')?.dataset.cardBg})===${JSON.stringify(optionsBeforeResize)}`))
+  check('card ratio, template and background survive responsive layout changes', await evaluate(`JSON.stringify({ratio:document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio,bg:document.querySelector('[data-card-bg][aria-pressed="true"]')?.dataset.cardBg,template:document.querySelector('[data-card-template][aria-pressed="true"]')?.dataset.cardTemplate})===${JSON.stringify(optionsBeforeResize)}`))
   for (const lang of ['zh','en']) {
     await evaluate(`document.querySelector('[data-topbar-more]').focus()`)
     await press('Enter', 'Enter', 13)
@@ -409,7 +1216,7 @@ try {
   const comparison = '# 把日常写成值得收藏的卡片\n\n让文字、图片和留白一起讲述。\n\n## 观察与记录\n\n清晨沿着河岸走，把看到的细节写进笔记。**芦苇卡片** *Reed* `2026` ==，。！？==\n\n> 好的排版，让读者知道自己读到了哪里。\n\n1. 写下真实的细节。\n2. 用例子支撑观点。\n3. 留下适合停顿的空白。\n\n```js\nconst notes = ["文字", "图片", "留白"];\n```\n\n| 内容 | 用途 |\n|:--|:--|\n| 标题 | 建立层级 |\n| 图片 | 补充信息 |\n\n![河岸色彩](data:image/png;base64,' + wideImage.toString('base64') + ')\n\n---\n\n## 下一次出发\n\n把生活写下来，再带着新的眼光出发。'
   fs.writeFileSync(path.join(output, 'comparison.md'), comparison)
   await click('[data-lang="zh"]'); await setMarkdown(comparison); await cardsReady()
-  await click('[data-card-ratio="3:4"]'); await click('[data-card-bg="paper"]'); await cardsReady()
+  await click('[data-card-template="reed"]'); await click('[data-card-ratio="3:4"]'); await click('[data-card-bg="paper"]'); await cardsReady()
   const primary = await evaluate(`getComputedStyle(document.querySelector('.xhs-card')).getPropertyValue('--xhs-accent').trim()`)
   const { targetId: refTarget } = await send('Target.createTarget', { url: 'about:blank' })
   const { sessionId: referenceSession } = await send('Target.attachToTarget', { targetId: refTarget, flatten: true })
