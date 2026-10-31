@@ -456,6 +456,9 @@ export const zh = {
 
   // ---- 预览 ----
   'preview.label': '预览 · 所见即所复制',
+  'preview.mode': '预览方式',
+  'preview.wechat': '公众号预览',
+  'preview.cards': '小红书卡片',
   'preview.copiedSelection': '已复制选中内容，可直接粘贴到公众号',
   'preview.warnings': '{n} 条提醒：{first}',
   'preview.clean': '格式检查通过',
@@ -463,6 +466,31 @@ export const zh = {
   'preview.images': '{n} 图',
   'preview.carousels': '{n} 轮播',
   'preview.galleries': '{n} 网格',
+
+  // ---- Xiaohongshu cards ----
+  'cards.ratio': '卡片比例',
+  'cards.background': '卡片背景',
+  'cards.bg.paper': '米白纸',
+  'cards.bg.white': '纯白',
+  'cards.bg.grid': '方格本',
+  'cards.bg.tint': '主色浅底',
+  'cards.bg.night': '夜读',
+  'cards.summary': '共 {n} 张 · 导出尺寸 1080 × {height}',
+  'cards.exportAll': '导出全部 ZIP',
+  'cards.exporting': '正在导出 {n} / {total}',
+  'cards.exported': '已导出 {n} 张卡片',
+  'cards.exportFailed': '卡片导出失败，请重试；若仍失败，请检查图片和字体是否加载完成。',
+  'cards.layoutFailed': '卡片排版失败，请重试。',
+  'cards.filename': '芦苇卡片',
+  'cards.measuring': '正在加载图片和字体、测量分页…',
+  'cards.empty': '写下正文，就会在这里生成卡片。',
+  'cards.hint': '首个一级标题自动生成封面，后面的短段落作为副标题。单独一行 --- 可手动换页。',
+  'cards.imageFailed': '{n} 张图片无法带入 PNG（读取失败、跨域限制或浏览器安全策略）。请换成本站上传的图片，或修好链接后重试；恢复前暂停导出，避免缺图。',
+  'cards.scaled': '{n} 个单独的内容块仍超出一页，已缩小以完整呈现。可拆短该条目或表格单元格来保持字号。',
+  'cards.swipe': '滑动阅读 →',
+  'cards.coverPage': '第 {n} 张 · 封面',
+  'cards.page': '第 {n} 张',
+  'cards.downloadPage': '下载第 {n} 张 PNG',
 
   // ---- 渲染提醒 ----
   'render.warn.imageNoAlt': '图{n} 缺少说明文字（![说明](src)）',

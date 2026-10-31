@@ -464,6 +464,9 @@ export const en: Record<MsgKey, Msg> = {
 
   // ---- preview ----
   'preview.label': 'Preview · exactly what gets copied',
+  'preview.mode': 'preview mode',
+  'preview.wechat': 'WeChat preview',
+  'preview.cards': 'Xiaohongshu cards',
   'preview.copiedSelection': 'Selection copied — paste it into WeChat',
   'preview.warnings': (p) => (Number(p.n) === 1 ? '1 notice: ' : `${p.n} notices: `) + String(p.first),
   'preview.clean': 'Format check passed',
@@ -471,6 +474,31 @@ export const en: Record<MsgKey, Msg> = {
   'preview.images': (p) => (Number(p.n) === 1 ? '1 image' : `${p.n} images`),
   'preview.carousels': (p) => (Number(p.n) === 1 ? '1 carousel' : `${p.n} carousels`),
   'preview.galleries': (p) => (Number(p.n) === 1 ? '1 grid' : `${p.n} grids`),
+
+  // ---- Xiaohongshu cards ----
+  'cards.ratio': 'card ratio',
+  'cards.background': 'card background',
+  'cards.bg.paper': 'paper',
+  'cards.bg.white': 'white',
+  'cards.bg.grid': 'grid',
+  'cards.bg.tint': 'accent tint',
+  'cards.bg.night': 'night',
+  'cards.summary': '{n} cards · export size 1080 × {height}',
+  'cards.exportAll': 'export all ZIP',
+  'cards.exporting': 'exporting {n} / {total}',
+  'cards.exported': 'exported {n} cards',
+  'cards.exportFailed': 'Card export failed. Please retry and check that images and fonts have loaded.',
+  'cards.layoutFailed': 'Card layout failed. Please retry.',
+  'cards.filename': 'Reed-cards',
+  'cards.measuring': 'loading images and fonts, measuring pages…',
+  'cards.empty': 'Start writing to generate cards here.',
+  'cards.hint': 'Your first H1 becomes the cover; a short paragraph after it becomes the subtitle. Put --- on its own line for a page break.',
+  'cards.imageFailed': '{n} images cannot be included in PNG (loading, CORS or browser security restrictions). Upload them to this site or fix their links and retry. Export is paused to prevent missing images.',
+  'cards.scaled': '{n} individual blocks exceed a whole page and have been reduced to keep all their content. Shorten the item or table cell to retain normal text size.',
+  'cards.swipe': 'swipe to read →',
+  'cards.coverPage': 'card {n} · cover',
+  'cards.page': 'card {n}',
+  'cards.downloadPage': 'download card {n} as PNG',
 
   // ---- render notices ----
   'render.warn.imageNoAlt': 'Image {n} has no caption (![caption](src))',

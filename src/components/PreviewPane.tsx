@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef, type ClipboardEvent } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, forwardRef, type ClipboardEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import type { RenderStats } from '@/lib/types'
 import { fillBlockOffsets } from '@/lib/sync-scroll'
@@ -21,13 +21,14 @@ interface Props {
    * page re-anchors scroll sync on it.
    */
   onLayout?: () => void
+  viewSwitch?: ReactNode
 }
 
 // 预览 DOM 即复制 DOM：dangerouslySetInnerHTML 渲染的就是复制出去的同一字符串。
 // 同步滚动因此不能往输出里塞 id/class 锚点（两者都是公众号红线），改成由
 // renderDoc 给出「第 i 个 block 落在第几个顶层子元素」，在这里量像素位置。
 const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
-  { html, stats, width, onWidthChange, blockOffsets, onScroll, onLayout },
+  { html, stats, width, onWidthChange, blockOffsets, onScroll, onLayout, viewSwitch },
   ref,
 ) {
   const { t } = useI18n()
@@ -152,8 +153,8 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
 
   return (
     <div data-onboarding="preview" className="flex h-full flex-col">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-line-1 px-4">
-        <span className="ya-eyebrow">{t('preview.label')}</span>
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line-1 px-4 py-1">
+        {viewSwitch ?? <span className="ya-eyebrow">{t('preview.label')}</span>}
         <div className="flex items-center gap-2">
           {/* 分段选择：凹陷轨道 + 选中项 1.5px primary 描边，不用实心底色 */}
           <div className="flex items-center rounded-xl bg-surface-sunken p-0.5" style={{ boxShadow: 'var(--shadow-inset)' }}>

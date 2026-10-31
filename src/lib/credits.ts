@@ -69,6 +69,48 @@ export const USAGE_HINT: Record<Usage, string> = {
 
 export const CREDITS: Credit[] = [
   {
+    name: 'woodti/mopai',
+    author: 'woodti',
+    repo: 'https://github.com/woodti/mopai',
+    license: 'MIT',
+    licenseFile: 'woodti-mopai-LICENSE.txt',
+    licenseCopyright: 'Copyright (c) 2026 woodti',
+    usage: 'adapted',
+    borrowed: [
+      '小红书卡片的隐藏容器实测分页（src/cards.ts）、封面层级、540px 排版宽度与 2 倍 PNG / ZIP 导出（src/CardsView.tsx），以及背景、页边距、页码和基础元素样式（src/styles.css、src/themes.ts）。适配在 src/lib/cards.ts、cards-render.ts、cards-export.ts 和 src/components/CardsView.tsx、cards.css；沿用 Reed 的语义 AST、图片引用、Noto Sans SC / Geist 自托管字体与 Console 控件。',
+      '长段落按句子拆、长代码按行拆、列表按项拆、表格按行拆并重复表头；列表 value 保留跨页序号。导出改为嵌入实际文字所需的网页字体切片，图片读取失败时暂停导出并显示地址，无法再拆的超高块缩小并明确提醒。',
+    ],
+    declined: [
+      'marked Markdown 解析与独立的主题 / 设置体系。Reed 已有语义 AST 和文章主题，只增加卡片呈现；现有 mopai.* 存储键与 woodti/mopai 无关。',
+      'skipFonts: true 的导出设置。该设置会令 PNG 中的中文丢失网页字体。',
+    ],
+  },
+  {
+    name: 'html-to-image',
+    author: 'W.Y. (bubkoo)',
+    repo: 'https://github.com/bubkoo/html-to-image',
+    license: 'MIT',
+    licenseFile: 'html-to-image-LICENSE.txt',
+    licenseCopyright: 'Copyright (c) 2017-2025 W.Y.',
+    usage: 'ported',
+    borrowed: [
+      '运行时依赖 html-to-image，锁定 1.11.13；仅在卡片导出时按需加载。使用 toBlob 将卡片 DOM 渲染为 1080px 宽 PNG，并传入内嵌 Noto Sans SC / Geist / Geist Mono 的 fontEmbedCSS。',
+    ],
+  },
+  {
+    name: 'JSZip',
+    author: 'Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso',
+    repo: 'https://github.com/Stuk/jszip',
+    license: 'MIT',
+    licenseFile: 'jszip-LICENSE.markdown',
+    licenseCopyright: 'Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso',
+    licenseNote: '包声明为 (MIT OR GPL-3.0-or-later) 双许可；本项目选择 MIT。保留上游 LICENSE.markdown 全文，其中包含两个可选许可。',
+    usage: 'ported',
+    borrowed: [
+      '运行时依赖 jszip，锁定 3.10.2（与已有 mammoth 的传递依赖同版）；仅在全部卡片导出时按需加载，按页码将 PNG 打包 ZIP。',
+    ],
+  },
+  {
     name: 'md-wechat',
     author: '字间排版（laogou717）',
     repo: 'https://github.com/laogou717/md-wechat',

@@ -560,9 +560,11 @@ await caseCopy({
 
 console.log('\n=== K. a selection outside the article keeps the native copy ===')
 await sleep(5500) // let the copy toasts expire so they cannot confuse the check
-await evaluate(`(() => {
-  const el = [...document.querySelectorAll('span')].find((s) => s.textContent.trim() === '预览 · 所见即所复制')
-  if (!el) throw new Error('preview eyebrow not found')
+const outsideText = await evaluate(`(() => {
+  // The preview header now contains the WeChat/cards switch. The statistics
+  // remain selectable UI text outside the article's copy event boundary.
+  const el = document.querySelector('[data-onboarding="preview"] span.tabular-nums')
+  if (!el) throw new Error('preview statistics not found')
   const range = document.createRange()
   range.selectNodeContents(el)
   const sel = window.getSelection()
@@ -588,7 +590,7 @@ await evaluate(`(() => {
   const clip = await readClipboard()
   check('K: the copy event still fired', probe.count > before)
   check('K: the app did not intercept it', probe.last?.prevented === false)
-  check('K: the native copy still reached the clipboard', (clip.text || '').includes('所见即所复制'), JSON.stringify(clip.text))
+  check('K: the native copy still reached the clipboard', (clip.text || '').trim() === outsideText.trim(), JSON.stringify(clip.text))
   const toast = await evaluate(`document.body.innerText.includes('已复制选中内容')`)
   check('K: no selection-copy toast was raised', toast === false)
 }

@@ -4,6 +4,7 @@
 LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07
+- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。
 - **抓取方式**：从本地 shallow clone（`git clone --depth 1`）逐字复制 LICENSE 文件，未经任何修改、截断或重新排版。
 - **结构化数据**：[credits.ts](../src/lib/credits.ts) 是来源与使用性质的统一事实源，[References](https://wechat.yoru-and-akari.dev/references) 直接读它；[README](../README.md) 只保留入口。本文件保存许可证副本、核实时间、commit 与摘要；主题来源另见 [THEME-SOURCES](../THEME-SOURCES.md)。
 
@@ -14,6 +15,9 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 | 副本文件 | 上游仓库 | LICENSE 类型 | LICENSE 里的版权行 | 核对的 commit | md5 |
 |---|---|---|---|---|---|
+| `woodti-mopai-LICENSE.txt` | github.com/woodti/mopai | MIT | `Copyright (c) 2026 woodti` | `0c2b2f8e983727da7c5b2b10fafb540c5ed70893`（2026-10-31 核实） | `bbb1ee83d5221d4efdc7c663f4944749` |
+| `html-to-image-LICENSE.txt` | github.com/bubkoo/html-to-image | MIT | `Copyright (c) 2017-2025 W.Y.` | npm `html-to-image@1.11.13`（2026-10-31 核实） | `3eeb2e7abce2370a4f5e29e4b46e28b0` |
+| `jszip-LICENSE.markdown` | github.com/Stuk/jszip | MIT（双许可择一） | `Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso` | npm `jszip@3.10.2`（2026-10-31 核实） | `28c4d6943c892a3c61ac2aaa5d781861` |
 | `doocs-md-LICENSE.txt` | github.com/doocs/md | **WTFPL**（DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004） | `Copyright (C) 2025 Doocs <admin@doocs.org>` | `a7c17fc`（2026-09-29） | `3bb7c32637627c1ab12bc7cd873b7aa0` |
 | `laogou717-md-wechat-LICENSE.txt` | github.com/laogou717/md-wechat | MIT | `Copyright (c) 2026 字间排版` | `8a21962`（2026-09-02） | `23972954ac1a477e76be78b98dfd25a2` |
 | `alchaincyf-huasheng_editor-LICENSE.txt` | github.com/alchaincyf/huasheng_editor | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `433819c`（2026-10-03） | `402e260d672920057369ceeaf718f6a2` |
@@ -48,7 +52,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 ### 许可传染性结论
 
 <!-- BEGIN GENERATED: notice-license-tally — npm run sync:docs -->
-**八个上游项目全部是宽松许可：MIT × 4、Apache-2.0 × 3、WTFPL v2 × 1。
+**11个上游项目全部是宽松许可：MIT × 7、Apache-2.0 × 3、WTFPL v2 × 1。
 没有任何 GPL / LGPL / AGPL / MPL / SSPL / BUSL 等 copyleft 或 source-available 许可，
 也没有任何项目缺失 LICENSE 文件。**
 <!-- END GENERATED: notice-license-tally -->
@@ -121,10 +125,13 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 <!-- BEGIN GENERATED: notice-credits — npm run sync:docs -->
 ### 许可证核实
 
-2026-10-07 逐个打开上游 LICENSE 文件核对，核对的 commit 与副本 md5 记在 [本文件](NOTICE.md) 第一节；来源与使用性质以 `src/lib/credits.ts` 为准。
+上游 LICENSE 已逐个打开核对，核实日期、commit / 包版本与副本 md5 记在 [本文件](NOTICE.md) 第一节；来源与使用性质以 `src/lib/credits.ts` 为准。
 
 | 上游 | LICENSE | LICENSE 里的版权行 | 副本 |
 |---|---|---|---|
+| [woodti/mopai](https://github.com/woodti/mopai) | MIT | `Copyright (c) 2026 woodti` | `LICENSES/woodti-mopai-LICENSE.txt` |
+| [html-to-image](https://github.com/bubkoo/html-to-image) | MIT | `Copyright (c) 2017-2025 W.Y.` | `LICENSES/html-to-image-LICENSE.txt` |
+| [JSZip](https://github.com/Stuk/jszip) | MIT | `Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso` | `LICENSES/jszip-LICENSE.markdown` |
 | [md-wechat](https://github.com/laogou717/md-wechat) | MIT | `Copyright (c) 2026 字间排版` | `LICENSES/laogou717-md-wechat-LICENSE.txt` |
 | [doocs/md](https://github.com/doocs/md) | WTFPL v2 | `Copyright (C) 2025 Doocs <admin@doocs.org>` | `LICENSES/doocs-md-LICENSE.txt` |
 | [huasheng_editor](https://github.com/alchaincyf/huasheng_editor) | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `LICENSES/alchaincyf-huasheng_editor-LICENSE.txt` |
@@ -134,17 +141,26 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | [wenyan](https://github.com/caol64/wenyan) | Apache-2.0 | `标准 Apache 2.0 附录，未填写具体版权人（package.json author: Lei <caol64@gmail.com>）` | `LICENSES/caol64-wenyan-LICENSE.txt` |
 | [editor（foolgry）](https://github.com/foolgry/editor) | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `LICENSES/foolgry-editor-LICENSE.txt` |
 
-8 个上游全部是宽松许可：MIT × 4、Apache-2.0 × 3、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
+11 个上游全部是宽松许可：MIT × 7、Apache-2.0 × 3、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
 
-3 点需要留意：
+4 点需要留意：
 
-1. **[doocs/md](https://github.com/doocs/md)**：LICENSE 正文是「DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004」，版权行 Copyright (C) 2025 Doocs <admin@doocs.org>。这是极度宽松的类公有领域许可，没有传染性，但 SPDX 标识符不是 MIT，且许可证名称含粗口——本项目的口径是照实写出它的真实名称 WTFPL v2，不做改写。
-2. **[wenyan-core](https://github.com/caol64/wenyan-core)**：Apache-2.0 带专利授权条款和 NOTICE 义务：如果我们将来直接复制它的代码（而不只是借鉴思路），必须在发行物里保留 LICENSE 全文与版权声明，并注明我们改动了哪些文件。LICENSES/ 下的副本就是为这个义务准备的。wenyan、wenyan-core、wenyan-ui 三个仓库的 LICENSE 文件字节完全相同（md5 d229da563da18fe5d58cd95a6467d584），许可一致。
-3. **[editor（foolgry）](https://github.com/foolgry/editor)**：LICENSE 的版权行是「Copyright (c) 2024 花生 (alchaincyf)」，与 alchaincyf/huasheng_editor 的 LICENSE 字节相同——因为本仓库 README 第 13 行明说它 fork 自 huasheng_editor，LICENSE 原样继承。foolgry 自己新增的部分（分享服务、Go 后端、Mermaid、Skill）没有单独的版权行，沿用同一份 MIT 条款。致谢里应当同时点出 fork 关系和原始版权人。
+1. **[JSZip](https://github.com/Stuk/jszip)**：包声明为 (MIT OR GPL-3.0-or-later) 双许可；本项目选择 MIT。保留上游 LICENSE.markdown 全文，其中包含两个可选许可。
+2. **[doocs/md](https://github.com/doocs/md)**：LICENSE 正文是「DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004」，版权行 Copyright (C) 2025 Doocs <admin@doocs.org>。这是极度宽松的类公有领域许可，没有传染性，但 SPDX 标识符不是 MIT，且许可证名称含粗口——本项目的口径是照实写出它的真实名称 WTFPL v2，不做改写。
+3. **[wenyan-core](https://github.com/caol64/wenyan-core)**：Apache-2.0 带专利授权条款和 NOTICE 义务：如果我们将来直接复制它的代码（而不只是借鉴思路），必须在发行物里保留 LICENSE 全文与版权声明，并注明我们改动了哪些文件。LICENSES/ 下的副本就是为这个义务准备的。wenyan、wenyan-core、wenyan-ui 三个仓库的 LICENSE 文件字节完全相同（md5 d229da563da18fe5d58cd95a6467d584），许可一致。
+4. **[editor（foolgry）](https://github.com/foolgry/editor)**：LICENSE 的版权行是「Copyright (c) 2024 花生 (alchaincyf)」，与 alchaincyf/huasheng_editor 的 LICENSE 字节相同——因为本仓库 README 第 13 行明说它 fork 自 huasheng_editor，LICENSE 原样继承。foolgry 自己新增的部分（分享服务、Go 后端、Mermaid、Skill）没有单独的版权行，沿用同一份 MIT 条款。致谢里应当同时点出 fork 关系和原始版权人。
 
 ### 移植（ported）
 
 机制已经落在我们的代码里，实现与上游高度对应。
+
+**[html-to-image](https://github.com/bubkoo/html-to-image)**（MIT，W.Y. (bubkoo)）
+
+- 运行时依赖 html-to-image，锁定 1.11.13；仅在卡片导出时按需加载。使用 toBlob 将卡片 DOM 渲染为 1080px 宽 PNG，并传入内嵌 Noto Sans SC / Geist / Geist Mono 的 fontEmbedCSS。
+
+**[JSZip](https://github.com/Stuk/jszip)**（MIT，Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso）
+
+- 运行时依赖 jszip，锁定 3.10.2（与已有 mammoth 的传递依赖同版）；仅在全部卡片导出时按需加载，按页码将 PNG 打包 ZIP。
 
 **[md-wechat](https://github.com/laogou717/md-wechat)**（MIT，字间排版（laogou717））
 
@@ -172,6 +188,16 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 ### 适配（adapted）
 
 思路已经落地，但围绕我们自己的语义 IR 重写过，不是逐行搬运。
+
+**[woodti/mopai](https://github.com/woodti/mopai)**（MIT，woodti）
+
+- 小红书卡片的隐藏容器实测分页（src/cards.ts）、封面层级、540px 排版宽度与 2 倍 PNG / ZIP 导出（src/CardsView.tsx），以及背景、页边距、页码和基础元素样式（src/styles.css、src/themes.ts）。适配在 src/lib/cards.ts、cards-render.ts、cards-export.ts 和 src/components/CardsView.tsx、cards.css；沿用 Reed 的语义 AST、图片引用、Noto Sans SC / Geist 自托管字体与 Console 控件。
+- 长段落按句子拆、长代码按行拆、列表按项拆、表格按行拆并重复表头；列表 value 保留跨页序号。导出改为嵌入实际文字所需的网页字体切片，图片读取失败时暂停导出并显示地址，无法再拆的超高块缩小并明确提醒。
+
+**没采用**：
+
+- marked Markdown 解析与独立的主题 / 设置体系。Reed 已有语义 AST 和文章主题，只增加卡片呈现；现有 mopai.* 存储键与 woodti/mopai 无关。
+- skipFonts: true 的导出设置。该设置会令 PNG 中的中文丢失网页字体。
 
 **[doocs/md](https://github.com/doocs/md)**（WTFPL，Doocs <admin@doocs.org>）
 

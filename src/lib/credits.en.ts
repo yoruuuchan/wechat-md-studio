@@ -15,6 +15,27 @@ export interface CreditTextEn {
 }
 
 export const CREDITS_EN: Record<string, CreditTextEn> = {
+  'https://github.com/woodti/mopai': {
+    borrowed: [
+      'Hidden-container height measurement and pagination (src/cards.ts), cover hierarchy, 540px layout and 2x PNG / ZIP export (src/CardsView.tsx), plus backgrounds, padding, page numbers and element styles (src/styles.css and src/themes.ts). Adapted in src/lib/cards.ts, cards-render.ts, cards-export.ts and src/components/CardsView.tsx, cards.css, using Reed\'s semantic AST, image references, self-hosted Noto Sans SC / Geist fonts and Console controls.',
+      'Sentence-based paragraph splitting, code lines, list items and table rows with repeated headers. Ordered items retain their value across pages. Exports embed only the webfont slices needed by the actual glyphs; unreadable images pause export with visible URLs, and indivisible oversized blocks are reduced with a notice.',
+    ],
+    declined: [
+      'The marked parser and independent theme / settings system. Reed already has its own semantic AST and article themes; cards add another presentation. Reed\'s existing mopai.* storage keys are unrelated to woodti/mopai.',
+      'The skipFonts: true export option, which loses CJK webfonts in PNG files.',
+    ],
+  },
+  'https://github.com/bubkoo/html-to-image': {
+    borrowed: [
+      'Runtime dependency html-to-image, pinned to 1.11.13 and loaded on demand for card export. Its toBlob API generates 1080px-wide PNGs with explicit fontEmbedCSS for Noto Sans SC, Geist and Geist Mono.',
+    ],
+  },
+  'https://github.com/Stuk/jszip': {
+    licenseNote: 'The package offers (MIT OR GPL-3.0-or-later); this project chooses MIT. The complete upstream LICENSE.markdown is retained, including both alternatives.',
+    borrowed: [
+      'Runtime dependency jszip, pinned to 3.10.2, matching the existing transitive dependency from mammoth. Loaded on demand to pack numbered card PNGs into a ZIP.',
+    ],
+  },
   'https://github.com/laogou717/md-wechat': {
     borrowed: [
       'External links turned into footnotes. WeChat Official Accounts keep only clickable links on the mp.weixin.qq.com domain; every other external link is stripped outright by the editor at paste time, with the text left behind and the URL entirely lost. The link_footnote rule in upstream src/lib/renderer.js:523 swaps link_open for span_open (keeping the link’s visual styling but no longer an <a>), appends a superscript [n] after the link text, and collects the URL into the “References” section at the end of the article; WeChat-internal links are unaffected. We landed this in src/lib/render.ts: an isFootnotable check + createLinkRegistry collection + the theme’s footnotes() output. Because we have our own semantic IR, doing this at the render layer is enough; there is no need to touch markdown-it’s token stream.',

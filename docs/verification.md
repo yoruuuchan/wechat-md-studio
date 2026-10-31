@@ -34,6 +34,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 
 | 改动范围 | 命令 | 覆盖 |
 |---|---|---|
+| 小红书卡片 | `node scripts/cdp-verify-xhs-cards.mjs 3201 9334` | SAMPLE_DOC / 中文长文、三比例 × 五背景的边界、PNG 尺寸与 ZIP 张数、明暗 / 中英界面、图片读取失败、CDP 实际字体与 PNG 像素对比；本地 mock 图床、独立 `data/test-xhs.db`，证据在 `verify-out/xhs/` |
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
 | 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱 |

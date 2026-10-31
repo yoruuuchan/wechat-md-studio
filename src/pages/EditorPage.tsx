@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useDeferredValue, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Toaster, toast } from 'sonner'
 import {
@@ -109,6 +109,9 @@ import {
 } from '@/lib/upload-writeback'
 import { useI18n } from '@/hooks/useI18n'
 import { useIsNarrowEditor } from '@/hooks/use-mobile'
+import type { CardOptions } from '@/lib/cards'
+
+const CardsView = lazy(() => import('@/components/CardsView'))
 
 function plainTextOf(html: string): string {
   const div = document.createElement('div')
@@ -196,6 +199,8 @@ export default function EditorPage() {
   const [initialLayout] = useState(loadLayout)
   const layoutRef = useRef<Record<string, number>>(initialLayout ?? {})
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
+  const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
+  const [cardOptions, setCardOptions] = useState<CardOptions>({ ratio: '3:4', background: 'paper' })
   const [copied, setCopied] = useState(false)
   const [uploadingKey, setUploadingKey] = useState<string | null>(null)
   const [frameTask, setFrameTask] = useState<FrameTask | null>(null)
@@ -453,7 +458,7 @@ export default function EditorPage() {
   }, [activeDoc?.content, viewState, blockInfos])
 
   const { onEditorScroll, onPreviewScroll, onLayoutChange } = useSyncScroll({
-    enabled: settings.syncScroll,
+    enabled: settings.syncScroll && previewMode === 'wechat',
     blocks: parsed.blocks,
     editorRef,
     previewRef,
@@ -1653,7 +1658,23 @@ export default function EditorPage() {
     </div>
   )
 
-  const previewPaneBody = (
+  const viewSwitch = (
+    <div className="ya-well flex gap-0.5 rounded-xl p-0.5" role="group" aria-label={t('preview.mode')}>
+      {(['wechat', 'cards'] as const).map((mode) => (
+        <button key={mode} data-preview-mode={mode} aria-pressed={previewMode === mode}
+          className={`ya-tool h-7 px-2 text-[11px] ${previewMode === mode ? 'ya-selected' : ''}`}
+          onClick={() => setPreviewMode(mode)}>{t(mode === 'wechat' ? 'preview.wechat' : 'preview.cards')}</button>
+      ))}
+    </div>
+  )
+
+  const previewPaneBody = previewMode === 'cards' ? (
+    <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('cards.measuring')}</div>}>
+      <CardsView doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
+        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} viewSwitch={viewSwitch}
+        options={cardOptions} onOptionsChange={setCardOptions} />
+    </Suspense>
+  ) : (
     <PreviewPane
       ref={previewRef}
       html={rendered.html}
@@ -1663,6 +1684,7 @@ export default function EditorPage() {
       onWidthChange={setPreviewWidth}
       onScroll={onPreviewScroll}
       onLayout={onPreviewLayout}
+      viewSwitch={viewSwitch}
     />
   )
 

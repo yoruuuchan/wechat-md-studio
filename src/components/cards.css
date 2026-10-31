@@ -1,0 +1,80 @@
+/* Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt. */
+.xhs-card, .xhs-body {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  line-height: 1.8;
+  letter-spacing: .5px;
+  color: #2b2b2b;
+  --xhs-text: #2b2b2b;
+  --xhs-muted: #6b6b6b;
+  --xhs-line: rgba(0,0,0,.1);
+  --xhs-soft: color-mix(in srgb, var(--xhs-accent) 8%, transparent);
+  --xhs-code-bg: #f6f8fa;
+  --xhs-code-text: #24292e;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  text-align: left;
+  overflow-wrap: anywhere;
+  color-scheme: light;
+}
+.xhs-card[data-night="true"], .xhs-body[data-night="true"] {
+  --xhs-text: #ececec;
+  --xhs-muted: #a1a1aa;
+  --xhs-line: rgba(255,255,255,.16);
+  --xhs-soft: color-mix(in srgb, var(--xhs-accent) 20%, transparent);
+  --xhs-code-bg: #282c34;
+  --xhs-code-text: #abb2bf;
+  color: var(--xhs-text);
+}
+.xhs-card { position: relative; flex: none; }
+.xhs-body { display: flow-root; }
+.xhs-body > :first-child { margin-top: 0 !important; }
+.xhs-body > :last-child { margin-bottom: 0 !important; }
+.xhs-body p { margin: 1em 0; color: var(--xhs-text); }
+.xhs-body h1 { font-size: 1.6em; font-weight: 700; line-height: 1.4; margin: 1.2em 0 1em; text-align: center; }
+.xhs-body h2 { font-size: 1.3em; font-weight: 700; line-height: 1.5; margin: 2em 0 1em; padding-bottom: 6px; border-bottom: 2px solid var(--xhs-accent); }
+.xhs-body h3 { font-size: 1.15em; font-weight: 700; line-height: 1.5; margin: 1.6em 0 .8em; padding-left: 10px; border-left: 4px solid var(--xhs-accent); }
+.xhs-body h2 small { font: inherit; }
+.xhs-body strong { font-weight: 700; color: var(--xhs-accent); }
+.xhs-body em { font-style: italic; }
+.xhs-body del { text-decoration: line-through; color: var(--xhs-muted); }
+.xhs-body mark { background: var(--xhs-soft); color: inherit; }
+.xhs-link { color: var(--xhs-accent); border-bottom: 1px solid var(--xhs-accent); }
+.xhs-body blockquote { margin: 1.4em 0; padding: 12px 16px; border-left: 4px solid var(--xhs-accent); background: var(--xhs-soft); border-radius: 0 6px 6px 0; }
+.xhs-body blockquote p { margin: .3em 0; color: var(--xhs-muted); }
+.xhs-body ul, .xhs-body ol { margin: 1em 0; padding-left: 1.6em; list-style-position: outside; }
+.xhs-body ul { list-style-type: disc; }
+.xhs-body ol { list-style-type: decimal; }
+.xhs-body li { margin: .4em 0; line-height: 1.8; }
+.xhs-body li p { margin: 0; }
+.xhs-body li > ul, .xhs-body li > ol { margin: .3em 0; }
+.xhs-body code { font-family: var(--font-mono); font-size: .88em; padding: 2px 5px; margin: 0 2px; border-radius: 4px; background: var(--xhs-soft); color: var(--xhs-accent); }
+.xhs-body pre { margin: 1.4em 0; padding: 14px 16px; border-radius: 8px; background: var(--xhs-code-bg); font-size: .85em; line-height: 1.65; white-space: pre-wrap; word-break: break-all; }
+.xhs-body pre code { display: block; font-size: inherit; color: var(--xhs-code-text); background: none; padding: 0; margin: 0; white-space: pre-wrap; }
+.xhs-body table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 1.4em 0; font-size: .92em; }
+.xhs-body th, .xhs-body td { padding: 8px 10px; border: 1px solid var(--xhs-line); overflow-wrap: anywhere; }
+.xhs-body th { background: var(--xhs-soft); font-weight: 700; }
+.xhs-body figure { margin: 1.2em 0; }
+.xhs-body img { display: block; width: auto; max-width: 100%; height: auto; object-fit: contain; margin: 0 auto; border-radius: 8px; }
+.xhs-body figcaption { text-align: center; font-size: .85em; color: var(--xhs-muted); margin: .6em 0 0; }
+.xhs-body .xhs-center { text-align: center; }
+.xhs-body .xhs-placeholder, .xhs-body .xhs-signature { color: var(--xhs-muted); font-size: .85em; }
+.xhs-body .xhs-placeholder { padding: 12px; background: var(--xhs-soft); text-align: center; }
+.xhs-body .xhs-math svg { max-width: 100%; }
+.xhs-body hr { margin: 2em 0; border-top: 1px solid var(--xhs-line); }
+.xhs-card-head { position: absolute; top: 22px; left: 40px; right: 40px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--xhs-muted); }
+.xhs-card-head i { flex: none; width: 22px; height: 5px; border-radius: 3px; background: var(--xhs-accent); }
+.xhs-card-head span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.xhs-card-content { position: absolute; top: 52px; left: 40px; width: 460px; }
+.xhs-card-foot { position: absolute; bottom: 26px; left: 40px; right: 40px; display: flex; justify-content: space-between; gap: 16px; font-size: 13px; letter-spacing: 1px; color: var(--xhs-muted); }
+.xhs-card-foot > :first-child, .xhs-cover-foot > :first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 65%; }
+.xhs-cover { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 56px 48px; }
+.xhs-cover-bar { display: block; width: 56px; height: 8px; border-radius: 4px; margin-bottom: 28px; background: var(--xhs-accent); }
+.xhs-cover h1 { margin: 0; font-weight: 700; line-height: 1.3; letter-spacing: 1px; color: var(--xhs-text); }
+.xhs-cover p { margin: 22px 0 0; font-size: 19px; line-height: 1.6; color: var(--xhs-muted); }
+.xhs-cover-foot { position: absolute; left: 48px; right: 48px; bottom: 40px; display: flex; justify-content: space-between; gap: 16px; font-size: 15px; letter-spacing: 1px; color: var(--xhs-muted); }
+.xhs-cover-foot > :last-child { flex: none; color: var(--xhs-accent); }
+.xhs-scale { transform-origin: top left; }
+.xhs-slot { box-shadow: var(--shadow-lifted); border-radius: 6px; }
+.xhs-option { min-height: 28px; height: auto; padding: 5px 8px; line-height: 1.4; }
+@media (pointer: coarse) { .xhs-option { min-height: 44px; } }

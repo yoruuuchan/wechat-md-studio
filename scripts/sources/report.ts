@@ -205,7 +205,7 @@ export function buildNoticeAcknowledgements(): string {
 
   out.push('### 许可证核实', '')
   out.push(
-    '2026-10-07 逐个打开上游 LICENSE 文件核对，核对的 commit 与副本 md5 记在 [本文件](NOTICE.md) 第一节；来源与使用性质以 `src/lib/credits.ts` 为准。',
+    '上游 LICENSE 已逐个打开核对，核实日期、commit / 包版本与副本 md5 记在 [本文件](NOTICE.md) 第一节；来源与使用性质以 `src/lib/credits.ts` 为准。',
     '',
   )
   out.push('| 上游 | LICENSE | LICENSE 里的版权行 | 副本 |')
