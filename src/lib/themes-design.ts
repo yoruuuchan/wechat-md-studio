@@ -1399,17 +1399,17 @@ const KIHON_PLATE_FILL =
   `background-color:${KIHON_PLATE};background-image:linear-gradient(180deg,#F0F2F3 0%,#EDEFF1 100%);`
 const KIHON_WELL_FILL =
   `background-color:${KIHON_WELL};background-image:linear-gradient(180deg,#DADDE0 0%,#DFE2E5 100%);`
-/** 刻字：标签、编号、刻度共用，凹槽下唇接光。 */
+/** 刻字：标签、编号、图号共用，凹槽下唇接光。 */
 const KIHON_ENGRAVE = 'text-shadow:0 1px 0 rgba(255,255,255,.85);'
 
-/** Rule（两端 tick）：一条 1px 线，两端各一个 5px 竖向刻点，共用同一 5px 刻度模数。 */
+/** Rule：一条普通 1px 线；2026-10-31 起不用两端 5px 竖向刻点。 */
 function kihonRule(margin: string): string {
-  return `<section style="margin:${margin};height:5px;background-image:linear-gradient(${KIHON_LINE},${KIHON_LINE}),linear-gradient(${KIHON_INK},${KIHON_INK}),linear-gradient(${KIHON_INK},${KIHON_INK});background-size:100% 1px,1px 5px,1px 5px;background-position:left center,left center,right center;background-repeat:no-repeat;font-size:0;line-height:0;"></section>`
+  return `<section style="margin:${margin};height:1px;background-color:${KIHON_LINE};font-size:0;line-height:0;"></section>`
 }
 
-/** Knurl：1px 齿、5px 节距、10px 高的刻度带；上沿留 1px 线，渐变不被支持时仍有一条分隔。 */
-function kihonKnurl(margin: string): string {
-  return `<section style="margin:${margin};height:10px;border-top:1px solid ${KIHON_LINE};background-image:repeating-linear-gradient(90deg,${KIHON_LINE} 0,${KIHON_LINE} 1px,transparent 1px,transparent 5px);"><span leaf=""><br></span></section>`
+/** Divider：一条普通 1px 线；2026-10-31 起不用齿纹带。 */
+function kihonDivider(margin: string): string {
+  return `<section style="margin:${margin};border-top:1px solid ${KIHON_LINE};"><span leaf=""><br></span></section>`
 }
 
 function kihonSeg(s: InlineSeg): string {
@@ -1479,7 +1479,7 @@ export const kihonGinTheme: Theme & ThemeExtensions = {
       // H1 是一块 card 面：标题 88→31px，Bold 700 对 Light 副题的字重轴只保留标题端。
       return `<section style="margin:0 20px 30px;padding:18px 20px;${KIHON_CARD_FILL}border:1px solid ${KIHON_LINE};border-radius:10px;${KIHON_CARD_SHADOW}">${label}<h1 style="margin:0;font-family:${KIHON_DISPLAY};font-size:31px;line-height:1.12;letter-spacing:-.015em;font-weight:700;color:${KIHON_INK};"><span leaf="">${esc(title)}</span></h1>${kihonRule('12px 0 0')}</section>`
     }
-    // 编号用等宽 `01 / kicker` 标签加一条 Rule，不写「第几章」的汉字。
+    // 编号用等宽 `01 / kicker` 标签加一条普通 1px 线，不写「第几章」的汉字。
     const numText = String(num).padStart(2, '0')
     const label = `<p style="margin:0 0 8px;font-family:${KIHON_MONO};font-size:10.5px;line-height:1.4;letter-spacing:.14em;text-transform:uppercase;text-indent:0;color:${KIHON_ACCENT};${KIHON_ENGRAVE}"><span leaf=""><span style="font-weight:700;">${numText}</span>${kicker ? `<span style="color:${KIHON_MUTED};"> / ${esc(kicker)}</span>` : ''}</span></p>`
     return `<section style="margin:44px 20px 20px;">${label}${kihonRule('0 0 12px')}<h2 style="margin:0;font-family:${KIHON_DISPLAY};font-size:21px;line-height:1.3;letter-spacing:-.015em;font-weight:700;color:${KIHON_INK};"><span leaf="">${esc(title)}</span></h2></section>`
@@ -1534,7 +1534,7 @@ export const kihonGinTheme: Theme & ThemeExtensions = {
   listBlock: (ordered, items, start = 1) => {
     const tag = ordered ? 'ol' : 'ul'
     const startAttr = ordered && start !== 1 ? ` start="${start}"` : ''
-    // 无序列表用系统的 `·` 刻度；有序列表保持两位补零。
+    // 无序列表用系统的 `·` 圆点；有序列表保持两位补零。
     const rows = items
       .map((it) =>
         ordered
@@ -1556,7 +1556,7 @@ export const kihonGinTheme: Theme & ThemeExtensions = {
   codeBlock: (_lang, code) =>
     `<section style="margin:0 20px;padding:14px 16px;${KIHON_WELL_FILL}border:1px solid ${KIHON_LINE};border-radius:8px;${KIHON_WELL_SHADOW}overflow-x:hidden;"><p style="margin:0;font-family:${KIHON_MONO};font-size:13px;line-height:1.7;letter-spacing:0;text-indent:0;color:${KIHON_INK};white-space:pre-wrap;word-wrap:break-word;"><span leaf="">${esc(code)}</span></p></section>`,
 
-  hr: () => kihonKnurl('40px 20px'),
+  hr: () => kihonDivider('40px 20px'),
 
   footnoteRef: (index) =>
     `<span style="font-family:${KIHON_MONO};font-size:10px;line-height:1;color:${KIHON_ACCENT};vertical-align:super;"><span leaf="">[${index}]</span></span>`,

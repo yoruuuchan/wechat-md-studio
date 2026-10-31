@@ -77,36 +77,36 @@
 | 文字墨色层级 | `tokens/colors.css`、`tokens/typography.css` | ink `#16191C`、muted `#5A636B`、faint `#8D969D`；accent gun blue `#2B4C6F`；negative oxide red `#A6402F` 只用于错误。数据只用 `--ramp-1..4`（`#C3CACE / #8E979E / #4E585F / #16191C`），不用色相区分系列。 |
 | 强调色及限制 | `tokens/colors.css`、`README.md`（Color rules） | 烤蓝 `#2B4C6F` 只标状态：selected、active、AFTER、CTA、链接、章节号。它不做数据系列、不做装饰、不做背景。positive 故意等于 accent；negative 才是氧化红。 |
 | 圆角 | `tokens/surfaces.css` | card 10、control 8、chip 6、pill 999。是“金属板”不是“枕头”；卡片不要用 16–24 的大圆角。 |
-| 线条和分隔 | `tokens/surfaces.css`、`README.md`（One tick grid） | 每个面都有 1px `--line #C8CDD1`，强调时换 `--line-strong #16191C`；两段式 chamfer 是“上 1px 亮 + 1px 半亮，下 1px 暗 + 1px 半暗”；knurl 是 1px 齿、5px 节距、10px 高的刻度带。分隔优先用 Rule（两端 tick）和 Knurl，不用彩色横条。 |
-| 标题与编号 | `tokens/typography.css`、`components/type/type.card.html` | title 88px / 1.12 / 700，subtitle 54px / 1.3 / 300；label 30px / 0.14em / 大写；data value 132px B612 Mono、tabular。编号用 `01 / 05` 等宽标签加一条 Rule，前面不加“第几章”的汉字。公众号按 677/1920 ≈ 0.353 换算：正文 15.5px、H2 31px、label 10.5px；卡片按 540/1080 = 0.5 换算。 |
+| 线条和分隔 | `tokens/surfaces.css`、`README.md`（One tick grid） | 每个面都有 1px `--line #C8CDD1`，强调时换 `--line-strong #16191C`；两段式 chamfer 是“上 1px 亮 + 1px 半亮，下 1px 暗 + 1px 半暗”；上游的 knurl 是 1px 齿、5px 节距、10px 高的刻度带，Rule 两端各有一个 5px 竖向刻点。**2026-10-31 Yoru 决定公众号和卡片都不用两端刻点和齿纹带，只用普通 1px 线**；分隔不用彩色横条。 |
+| 标题与编号 | `tokens/typography.css`、`components/type/type.card.html` | title 88px / 1.12 / 700，subtitle 54px / 1.3 / 300；label 30px / 0.14em / 大写；data value 132px B612 Mono、tabular。编号用 `01 / 05` 等宽标签加一条普通 1px 线（2026-10-31 Yoru 决定公众号和卡片都不用两端刻点和齿纹带，只用普通 1px 线），前面不加“第几章”的汉字。公众号按 677/1920 ≈ 0.353 换算：正文 15.5px、H2 31px、label 10.5px；卡片按 540/1080 = 0.5 换算。 |
 | 加粗与高亮 | `tokens/colors.css`、`tokens/surfaces.css` | 加粗 700 墨色；`==高亮==` 用 accent-soft `#DCE3EB` 的浅金属凹槽 + 1px 底线是 `PROPOSAL`；不要用黄色荧光笔，也不要把 accent 当高亮底色。 |
 | 引用 | `tokens/surfaces.css`、`components/frame/frame.card.html` | 引用是 recessed well：`--grad-well`（`#DADDE0 → #DFE2E5`）、1px line、8px 圆角、`--shadow-well` 内凹；不用左侧彩色竖条。系统没有独立引用组件，组合成引用块是 `PROPOSAL`；引文里的强调仍只用 accent 状态色。 |
 | 代码 | `tokens/typography.css`、`tokens/surfaces.css` | B612 Mono，13px；代码块用 well（凹槽）而不是深色终端；无语法高亮，只有墨色层级。系统没有代码组件，这个组合是 `PROPOSAL`；公众号里 well 用 1px 线 + inset 阴影；卡片保留完整凹槽和 8px 圆角。 |
 | 图片与图注 | `tokens/surfaces.css`、`README.md`（Craft on the content itself） | 图片放在 card 面：1px line、10px 圆角、两段式 chamfer、三层定向阴影；图注用 caption 34px（卡片 17px / 公众号 12px），muted；图号用 B612 Mono、tabular。图片本身不倾斜、不裁成异形。 |
-| 标志性结构 | `README.md`（5 surface levels、lens falloff、knurl、engraved type、frame edges） | 五个不透明层级（well → bg → plate → card → control）；每个面 1px 边框 + 两段 chamfer；页面有镜头式 falloff 和 5% 颗粒；标签是“刻”进金属的（`--engrave`）；数字要大、要等宽、要对齐；帧边缘留空，不放顶部标签条或底部进度条。只借颜色不算。 |
+| 标志性结构 | `README.md`（5 surface levels、lens falloff、knurl、engraved type、frame edges） | 五个不透明层级（well → bg → plate → card → control）；每个面 1px 边框 + 两段 chamfer；页面有镜头式 falloff 和 5% 颗粒；标签是“刻”进金属的（`--engrave`）；数字要大、要等宽、要对齐；帧边缘留空，不放顶部标签条或底部进度条。上游的 knurl 和 Rule 两端刻点不采用：2026-10-31 Yoru 决定公众号和卡片都只用普通 1px 线。只借颜色不算。 |
 | 系统不许出现 | `README.md`（Depth、Color rules、Detail at small sizes、Iconography、Considered and rejected） | 不做 Console 那种软阴影新拟态；不用色相做数据系列；accent 不做装饰；不用大圆角卡片；中文正文不用等宽；不用 emoji 或图标库；不做顶部标签条/底部进度条/相机饰件；没有 logo，字标只用字体排；边框外不加装饰。 |
 
-**字体。** Source Han Sans SC（中文）、Instrument Sans（拉丁/标签）、B612 Mono（数字/刻度）。Source Han Sans 现行为 SIL OFL 1.1（1.001 旧版是 Apache 2.0，两者都允许自托管）；Instrument Sans、B612 Mono 均为 SIL OFL 1.1。Reed 已有 Noto Sans SC（与思源黑体同源），建议直接代用，避免再打一套 CJK；需新增 Instrument Sans 400–700 和 B612 Mono 400/700。公众号回落：标题/拉丁 `Instrument Sans → Helvetica / Arial`；中文 `PingFang SC / 微软雅黑`；数字/标签/代码 `B612 Mono → Menlo / Consolas`；中文正文绝不套等宽栈。
+**字体。** Source Han Sans SC（中文）、Instrument Sans（拉丁/标签）、B612 Mono（数字/编号）。Source Han Sans 现行为 SIL OFL 1.1（1.001 旧版是 Apache 2.0，两者都允许自托管）；Instrument Sans、B612 Mono 均为 SIL OFL 1.1。Reed 已有 Noto Sans SC（与思源黑体同源），建议直接代用，避免再打一套 CJK；需新增 Instrument Sans 400–700 和 B612 Mono 400/700。公众号回落：标题/拉丁 `Instrument Sans → Helvetica / Arial`；中文 `PingFang SC / 微软雅黑`；数字/标签/代码 `B612 Mono → Menlo / Consolas`；中文正文绝不套等宽栈。
 
 **卡片模板方案。**
 
 - 变体：`gin`（默认银）和 `kuro`（玄）。只做 9:16，尺寸 540×960；不做 3:4 / 1:1，因为系统原生画布就是 1080×1920，重排到其他比例会破坏“两种原生版式”的规则。Reed 的卡片比例选择器在 KIHON 模板下应禁用另外两种比例，而不是把 9:16 硬塞进 3:4。
 - 需新增字体：Instrument Sans 400–700、B612 Mono 400/700；中文用现有 Noto Sans SC 代 Source Han Sans。
 - 尺寸：`540 / 1080 = 0.5`。标题 88→44px、display 108→54px、正文 44→22px、label 30→15px、caption 34→17px、data value 132→66px；安全区按 9:16 的 7.5% / 6%，内容不贴边。正文 22px 偏大，是有意的视频帧尺度；KIHON 卡片适合短稿、数据卡、步骤卡，不适合 3000 字长文全文分页。
-- 结构：封面用 title / data / before-after / steps 里的原生骨架；正文用 plate/card/well 层级，knurl 只出现在需要“刻度”的位置；页眉页脚默认关闭，页码若要保留，只作为内容区右下角的一个 `01 / 05` 等宽 tick，不做整条 footer（`PROPOSAL`，需要 Yoru 拍板）。
+- 结构：封面用 title / data / before-after / steps 里的原生骨架；正文用 plate/card/well 层级；2026-10-31 Yoru 决定卡片也不用齿纹带和两端刻点，需要分隔时只用普通 1px 线；页眉页脚默认关闭，页码若要保留，只作为内容区右下角的一个 `01 / 05` 等宽编号，不做整条 footer（`PROPOSAL`，需要 Yoru 拍板）。
 - 纹理：卡片用 5%（银）/ 7%（玄）的颗粒和 lens falloff；公众号不用页面颗粒，避免被微信转色后变脏。
 
-**公众号主题方案。** id `kihon-gin`，中文名「银」，分类「商务」。只做银，不做玄。页面 `#E7E9EB`，正文 15.5px / 1.7，按 677/1920 ≈ 0.353 从视频字号换算；H2 用 `01 / 05` 等宽 kicker + 19–22px 标题；每个承载块 1px `#C8CDD1` 边、10px 圆角、inset 亮暗两段边；引用和代码用凹槽；knurl 分隔用 `repeating-linear-gradient`，不支持时退回 1px 线；accent 只给编号、链接和状态；页面不铺颗粒，承载块最多 5% 颗粒。微信深色模式可能把银灰压暗，保留 1px 上亮边和下暗边，免得整块糊成一片。
+**公众号主题方案。** id `kihon-gin`，中文名「银」，分类「商务」。只做银，不做玄。页面 `#E7E9EB`，正文 15.5px / 1.7，按 677/1920 ≈ 0.353 从视频字号换算；H2 用 `01 / 05` 等宽 kicker + 19–22px 标题；每个承载块 1px `#C8CDD1` 边、10px 圆角、inset 亮暗两段边；引用和代码用凹槽；分隔只用普通 1px 线，不用两端刻点和齿纹带（2026-10-31 Yoru 决定公众号和卡片都不用）；accent 只给编号、链接和状态；页面不铺颗粒，承载块最多 5% 颗粒。微信深色模式可能把银灰压暗，保留 1px 上亮边和下暗边，免得整块糊成一片。
 
 **公众号主题落地。**
 
 - 主题 `kihon-gin`（银）在 `src/lib/themes-design.ts`。根容器 `max-width:677px`，银灰 `#E7E9EB` + 约 1.5% 竖向拉丝渐变 + 镜头式 falloff；正文 15.5px / 1.7（44 × 677/1920 ≈ 15.5），中文不套等宽栈，页面不铺颗粒。
-- 标题与编号：H1 是 card 面（10px 圆角、1px `#C8CDD1` 线、两段 chamfer、三层定向阴影），标题 31px（88 × 0.353）700；H2 = 等宽 `01 / kicker` 刻字标签 + 一条两端带 5px tick 的 Rule + 21px 标题；H3 17px，下沿 1px 线。编号不写「第几章」。
+- 标题与编号：H1 是 card 面（10px 圆角、1px `#C8CDD1` 线、两段 chamfer、三层定向阴影），标题 31px（88 × 0.353）700；H2 = 等宽 `01 / kicker` 刻字标签 + 一条普通 1px 线 + 21px 标题（2026-10-31 Yoru 决定公众号和卡片都不用两端刻点和齿纹带，只用普通 1px 线）；H3 17px，下沿 1px 线。编号不写「第几章」。
 - 承载块分五档：card `#F4F5F6`、plate `#EDEFF1`、well `#DDE0E3` 都保持不透明、1px 线和约 1.5% 拉丝微渐变；引用与代码是 well（内凹三段阴影 + 底部亮唇），表格是 plate，图片放在 card 面（10px 圆角、两段 chamfer，图片本身 6px 圆角、不裁异形）。
 - 加粗 700 墨色；高亮是 `#DCE3EB` 浅金属凹槽 + 1px `#8E979E` 底线，不用黄色荧光笔，也不把烤蓝当底色；链接与编号用烤蓝 `#2B4C6F`（只做状态）。代码用 B612 Mono 13px、无语法高亮。
-- 图注 12px（34 × 0.353）、muted，图号用 B612 Mono tabular；无序列表用系统 `·` 刻度，有序列表两位补零；分隔线是 1px 线加 1px 齿、5px 节距、10px 高的 knurl（渐变不被支持时仍留一条线），表格与正文分隔用 1px 线和 Rule。
+- 图注 12px（34 × 0.353）、muted，图号用 B612 Mono tabular；无序列表用系统 `·` 圆点，有序列表两位补零；分隔线只用普通 1px `#C8CDD1` 线（2026-10-31 Yoru 决定公众号和卡片都不用两端刻点和齿纹带），表格与正文分隔同样只用 1px 线。
 - 页面家具不进正文：不加顶部标签条、底部进度条、帧角刻度、相机饰件，也没有 logo；5% 颗粒只留给卡片，公众号不铺。等宽只给编号、标签、数字和代码。
-- 与设计系统的差异：1080p 视频画布的 88/54/44/34 等字号按 677/1920 换算成 31/19/15.5/12px；9:16 / 16:9 两种原生版式与入场阶梯不进正文；knurl 退回 `repeating-linear-gradient` 的分隔带；玄（kuro）不做。
+- 与设计系统的差异：1080p 视频画布的 88/54/44/34 等字号按 677/1920 换算成 31/19/15.5/12px；9:16 / 16:9 两种原生版式与入场阶梯不进正文；上游的 Rule 两端刻点和 knurl 齿纹带都不进公众号，只用普通 1px 线（2026-10-31 Yoru 决定公众号和卡片都不用）；玄（kuro）不做。
 
 ## KUNLUN 昆仑
 
@@ -283,7 +283,7 @@ OFL 1.1 允许自托管、转换 WOFF2 并随软件再分发；需要随字体�
 | [JetBrains Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/OFL.txt) | Aozora / KUNLUN 代码与数字 | SIL OFL 1.1 | 需新增（第一批已计划） | Menlo / Consolas |
 | [Noto Sans JP](https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/OFL.txt) / [Noto Serif JP](https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/OFL.txt) | Aozora 日文 | SIL OFL 1.1（Noto Sans JP 带 RFN “Source”） | 按需 | Hiragino Sans / Yu Gothic / serif |
 | [Instrument Sans](https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/OFL.txt) | KIHON 拉丁/标签 | SIL OFL 1.1 | 需新增 | Helvetica / Arial |
-| [B612 Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/b612mono/OFL.txt) | KIHON 数字/刻度 | SIL OFL 1.1 | 需新增 | Menlo / Consolas |
+| [B612 Mono](https://raw.githubusercontent.com/google/fonts/main/ofl/b612mono/OFL.txt) | KIHON 数字/编号 | SIL OFL 1.1 | 需新增 | Menlo / Consolas |
 | [Orbitron](https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/OFL.txt) | KUNLUN 显示 | SIL OFL 1.1（RFN “Orbitron”） | 需新增 | Arial Black / Impact |
 | [VT323](https://raw.githubusercontent.com/google/fonts/main/ofl/vt323/OFL.txt) | KUNLUN LCD、Mayonaka、core 代码 | SIL OFL 1.1 | 需新增 | Courier New / monospace |
 | [Press Start 2P](https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/OFL.txt) | Mayonaka 显示 | SIL OFL 1.1（RFN） | 需新增 | Courier New / monospace |
