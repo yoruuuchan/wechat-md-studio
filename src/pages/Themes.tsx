@@ -40,7 +40,7 @@ import { useTrialArticle } from '@/hooks/useTrialArticle'
 import { useI18n } from '@/hooks/useI18n'
 
 // 模板库：卡片统一渲染 THEME_PREVIEW_DOC，视觉差异才可比；「试排当前文章」
-// 与对比改用当前稿，但只渲染选中的 1–3 套，不把长稿铺满 219 张卡片。
+// 与对比改用当前稿，但只渲染选中的 1–3 套，不把长稿铺满 222 张卡片。
 //
 // 卡片与筛选只读 metadata 目录，进入页面不下载任何主题实现；卡片滚进视口附近
 // 才开始按来源加载实现并渲染预览，所以首屏与一次访问的下载量都跟实际看到的
@@ -422,7 +422,7 @@ export default function Themes() {
   const [compareOpen, setCompareOpen] = useState(false)
 
   // 当前稿只在用户真的选择「当前文章」或点「试排」时读取；卡片仍用样稿，
-  // 所以长稿不会为 219 张卡片各渲染一遍。
+  // 所以长稿不会为 222 张卡片各渲染一遍。
   const article = useTrialArticle(source)
   const mathRenderer = useMemo(() => createMathRenderer(), [])
   const [math, setMath] = useState<MathSnapshot>(() => mathRenderer.snapshot())

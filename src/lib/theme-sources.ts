@@ -139,6 +139,17 @@ export const THEME_SOURCES: ThemeSource[] = [
     notes:
       'AGPL-3.0-or-later 有传染性且第 13 条覆盖网络服务：本项目整体因此以 AGPL 提供源码；线上部署与公开仓库对应是履行该义务的方式。',
   },
+  {
+    project: 'yoru-design-systems',
+    kind: 'ported',
+    repo: 'https://github.com/yoruuuchan/yoru-design-systems',
+    author: 'Yoru',
+    license: 'MIT',
+    licenseFiles: ['LICENSES/yoru-design-systems-LICENSE.txt'],
+    format: '设计系统 tokens + HTML/JSX 模板（CSS / 内联样式）',
+    notes:
+      '三套公众号主题按 YORU Content、PAPER（Editorial）与 yoru-and-akari Console（akari）的结构重写为内联 HTML；上游根 LICENSE 为 MIT，副本已留存。',
+  },
 ]
 
 export interface SourceTally extends ThemeSource {

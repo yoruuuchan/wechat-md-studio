@@ -87,7 +87,7 @@ export function renderDoc(
   /**
    * Preserve the existing Theme.listBlock path for genuinely flat lists. A
    * recursive list uses standard semantic tags shared by every theme, keeping
-   * hierarchy valid without requiring 219 theme implementations.
+   * hierarchy valid without requiring 222 theme implementations.
    */
   const renderList = (list: ListBlock, nested = false): string => {
     const flat = !nested && list.items.every((item) =>
@@ -111,7 +111,7 @@ export function renderDoc(
         if (part.type === 'list') return renderList(part.list, true)
         chars += countSegs(part.segs)
         warnLinks(part.segs, warnings)
-        return theme.paragraph(renderSegs(theme, part.segs, links))
+        return theme.paragraph(renderSegs(theme, part.segs, links), { first: true })
       }).join('')
       return `<li style="margin:6px 0;">${inner}</li>`
     }).join('')
@@ -124,7 +124,12 @@ export function renderDoc(
       case 'paragraph': {
         chars += countSegs(b.segs)
         warnLinks(b.segs, warnings)
-        parts.push({ html: theme.paragraph(renderSegs(theme, b.segs, links)), block: bi })
+        parts.push({
+          html: theme.paragraph(renderSegs(theme, b.segs, links), {
+            first: bi === 0 || doc.blocks[bi - 1].type !== 'paragraph',
+          }),
+          block: bi,
+        })
         break
       }
       case 'heading': {

@@ -22,8 +22,12 @@ describe('theme catalog', () => {
   })
 
   it('attributes every imported theme to a generated source pack', () => {
+    // 手写移植来源（gzh-design-skill / yoru-design-systems）没有生成 pack，
+    // 它们的实现在 themes-extra.ts / themes-design.ts 里；其余 ported 才应由
+    // themes-imported/ 的 source 指向对应 pack。
+    const handwritten = new Set(['gzh-design-skill', 'yoru-design-systems'])
     for (const entry of THEME_CATALOG) {
-      if (entry.meta.origin.kind === 'ported' && entry.meta.origin.project !== 'gzh-design-skill') {
+      if (entry.meta.origin.kind === 'ported' && !handwritten.has(entry.meta.origin.project)) {
         expect(entry.source, entry.id).toBeTruthy()
       }
     }

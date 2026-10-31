@@ -1,12 +1,13 @@
 // 主题实现的按需加载接口。
 //
-// 首屏只需要当前主题的实现；主题库和顶栏切换器需要全部 219 套。把 pack 的
+// 首屏只需要当前主题的实现；主题库和顶栏切换器需要全部 222 套。把 pack 的
 // dynamic import 集中在这里，调用点拿到的是缓存后的 Promise，重复请求不会
 // 发起第二次下载。失败时从缓存里删掉该来源，重试会真正再请求一次，而不是
 // 把 rejected Promise 一直留在缓存里。
 import type { Theme } from './theme-kit'
 import { CORE_THEMES, goldenTheme } from './themes-core'
 import { EXTRA_THEMES } from './themes-extra'
+import { DESIGN_THEMES } from './themes-design'
 import { IMPORTED_THEME_CATALOG } from './themes-imported/catalog'
 import {
   IMPORTED_SOURCE_ORDER,
@@ -14,7 +15,7 @@ import {
   type ImportedThemeSource,
 } from './themes-imported/loaders'
 
-const LOCAL_THEMES: Theme[] = [...CORE_THEMES, ...EXTRA_THEMES]
+const LOCAL_THEMES: Theme[] = [...CORE_THEMES, ...EXTRA_THEMES, ...DESIGN_THEMES]
 const LOCAL_BY_ID = new Map(LOCAL_THEMES.map((theme) => [theme.id, theme]))
 
 const SOURCE_BY_ID = new Map<string, ImportedThemeSource>()
@@ -74,7 +75,7 @@ export async function loadTheme(id: string): Promise<Theme> {
 
 let allThemesPromise: Promise<Theme[]> | null = null
 
-/** 全部 219 套实现，顺序与完整注册表一致；供主题库和顶栏快速切换器使用。 */
+/** 全部 222 套实现，顺序与完整注册表一致；供主题库和顶栏快速切换器使用。 */
 export function loadAllThemes(): Promise<Theme[]> {
   allThemesPromise ??= Promise.all(IMPORTED_SOURCE_ORDER.map(loadSource))
     .then(() => [

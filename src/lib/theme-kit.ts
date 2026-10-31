@@ -11,6 +11,11 @@ import { t } from './i18n'
 
 export type ThemeCategory = '简约' | '商务' | '杂志' | '活力'
 
+/** 渲染器交给主题的段落上下文；目前只有「是否首段」。 */
+export interface ParagraphOptions {
+  first: boolean
+}
+
 /**
  * 主题契约：语义节点 → 内联样式 HTML。
  * 手写主题与导入主题都实现它；themes.ts 再导出，外部调用点不必改。
@@ -27,7 +32,12 @@ export interface Theme {
   meta: ThemeMeta
   root(inner: string): string
   seg(s: InlineSeg): string
-  paragraph(inner: string): string
+  /**
+   * `options.first` 表示这是文章或章节里的第一段。纸本这类印刷传统要求
+   * 首段不缩进、后续段落首行缩进且段间不空行；不知道上下文实现不了。
+   * 旧主题忽略这个参数，行为不变。
+   */
+  paragraph(inner: string, options?: ParagraphOptions): string
   heading(num: number | null, kicker: string, title: string): string
   subheading(title: string): string
   center(inner: string): string

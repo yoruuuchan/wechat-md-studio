@@ -12,6 +12,7 @@
 
 import { THEMES } from '../../src/lib/themes'
 import { EXTRA_THEMES } from '../../src/lib/themes-extra'
+import { DESIGN_THEMES } from '../../src/lib/themes-design'
 import {
   CREDITS,
   USAGE_HINT,
@@ -140,17 +141,24 @@ export function themeCount(): number {
   return THEMES.length
 }
 
-/** 来源分组：导入（import.ts 生成）、gzh-design-skill 移植（themes-extra）、自研。 */
+/** 来源分组：导入（import.ts 生成）、两个手写移植来源、自研。 */
 function sourceGroups() {
-  const extraIds = new Set(EXTRA_THEMES.map((t) => t.id))
-  const imported = THEMES.filter((t) => !extraIds.has(t.id) && t.meta.origin.kind === 'ported')
+  const handIds = new Set([...EXTRA_THEMES, ...DESIGN_THEMES].map((t) => t.id))
+  const imported = THEMES.filter((t) => !handIds.has(t.id) && t.meta.origin.kind === 'ported')
   const importedProjects = new Set(imported.map((t) => t.meta.origin.project))
+  const portedProjects = new Set(
+    THEMES.filter((t) => t.meta.origin.kind === 'ported').map((t) => t.meta.origin.project),
+  )
   const extraProject = EXTRA_THEMES[0]?.meta.origin.project ?? ''
+  const designProject = DESIGN_THEMES[0]?.meta.origin.project ?? ''
   return {
     imported,
     importedProjects,
+    portedProjects,
     extras: EXTRA_THEMES.length,
     extraProject,
+    design: DESIGN_THEMES.length,
+    designProject,
     originals: THEMES.filter((t) => t.meta.origin.kind === 'original').length,
   }
 }
@@ -174,12 +182,12 @@ export function buildReadmeThemeSources(language: 'zh' | 'en' = 'zh'): string {
   const groups = sourceGroups()
   const upstreamThemes = THEMES.length - groups.originals
   if (language === 'en') return [
-    `The library contains **${THEMES.length} themes**: ${groups.originals} originals and ${upstreamThemes} adapted from ${groups.importedProjects.size + 1} upstream projects. Authors, licenses and provenance are recorded in shared metadata.`,
+    `The library contains **${THEMES.length} themes**: ${groups.originals} originals and ${upstreamThemes} adapted from ${groups.portedProjects.size} upstream projects. Authors, licenses and provenance are recorded in shared metadata.`,
     '',
     'See [THEME-SOURCES](THEME-SOURCES.md) for the audit. Project acknowledgements and adaptation notes come from [credits.ts](src/lib/credits.ts) and appear in [References](https://wechat.yoru-and-akari.dev/references) and [LICENSES/NOTICE](LICENSES/NOTICE.md).',
   ].join('\n')
   return [
-    `主题库共 **${THEMES.length} 套**：${groups.originals} 套自研 + ${groups.importedProjects.size + 1} 个上游项目的 ${upstreamThemes} 套主题，来源与许可维护在统一 metadata 中。`,
+    `主题库共 **${THEMES.length} 套**：${groups.originals} 套自研 + ${groups.portedProjects.size} 个上游项目的 ${upstreamThemes} 套主题，来源与许可维护在统一 metadata 中。`,
     '',
     '主题审计见 [THEME-SOURCES](THEME-SOURCES.md)；工程借鉴、取舍与完整致谢由 [credits.ts](src/lib/credits.ts) 驱动 [References](https://wechat.yoru-and-akari.dev/references) 与 [LICENSES/NOTICE](LICENSES/NOTICE.md)。',
   ].join('\n')
@@ -261,7 +269,7 @@ export function buildThemesDocIntro(): string {
   const importedCount = groups.imported.length
   const originalCount = groups.originals
   return [
-    `主题库当前共 **${THEMES.length} 套**：${importedCount} 套由 \`scripts/themes/import.ts\` 从 ${groups.importedProjects.size} 个上游仓库导入、${groups.extras} 套 ${groups.extraProject} 移植、${originalCount} 套自研。`,
+    `主题库当前共 **${THEMES.length} 套**：${importedCount} 套由 \`scripts/themes/import.ts\` 从 ${groups.importedProjects.size} 个上游仓库导入、${groups.extras} 套 ${groups.extraProject} 移植、${groups.design} 套 ${groups.designProject} 移植、${originalCount} 套自研。`,
     `导入产物在 \`src/lib/themes-imported/*.ts\`，提交进仓库，运行时不依赖任何上游仓库。重跑：\`npm run import:themes\`（上游克隆位置见文末）。`,
   ].join('\n')
 }

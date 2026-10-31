@@ -25,7 +25,7 @@ by Yoru。一个自己持续使用、慢慢完善的个人项目。界面支持�
 - **内容始终掌握在自己手里。** Markdown 是唯一的内容源，AI、网页编辑器、预览、复制和导出都围绕同一份稿件工作。
 - **AI 协作不绑定模型。** 公开 Skill 可以交给 ChatGPT、Claude、Codex、OpenCode 或其他能读文本 / 链接的 AI；网页本身无需配置模型 API。
 - **人保留最后一公里。** AI 适合起稿、整理、改写，人可以在真实页面里继续校对、调结构、处理图片、换主题，再决定最终发布的样子。
-- **排版不是黑盒。** 219 套主题共享同一套语义 AST 和渲染链路，可以直接比较效果；主题作者、License 与移植来源会保留下来。
+- **排版不是黑盒。** 222 套主题共享同一套语义 AST 和渲染链路，可以直接比较效果；主题作者、License 与移植来源会保留下来。
 - **结果就是给微信用的。** 预览、整篇复制、局部复制和正文 HTML 导出共用渲染结果，输出针对微信公众号的全内联 HTML。
 
 ## 三种工作方式
@@ -63,7 +63,7 @@ flowchart LR
 
 ## 编辑器与排版
 
-- **<!-- gen:theme-count -->219 套<!-- /gen:theme-count -->主题**：按风格、复杂度、色系与来源筛选，收藏常用模板，用同一份样稿比较效果；保留作者、License 与移植来源。
+- **<!-- gen:theme-count -->222 套<!-- /gen:theme-count -->主题**：按风格、复杂度、色系与来源筛选，收藏常用模板，用同一份样稿比较效果；保留作者、License 与移植来源。
 - **公众号 Markdown 方言**：章节自动编号、重点标记、金句卡、引文框、居中句、署名、表格、公式和 Mermaid 图表。
 - **图片**：上传、压缩（自动 / 指定 1–5 MB / 原图）、自动 / 手动真实裁切、素材管理；同比例轮播与 2～4 列网格。
 - **编辑与预览**：CodeMirror、Markdown 工具栏（含表格按列 / 整表对齐）、语义格式刷、语法补全、同步滚动、375 / 677 预览；界面支持浅色 / 深色 / 跟随系统。
@@ -139,7 +139,7 @@ PowerShell 用 `Copy-Item .env.example .env` 复制配置，默认打开 `http:/
 项目采用 **AGPL-3.0-or-later**，见 [LICENSE](https://github.com/yoruuuchan/wechat-md-studio/blob/master/LICENSE)。
 
 <!-- BEGIN GENERATED: readme-theme-sources — npm run sync:docs -->
-主题库共 **219 套**：3 套自研 + 8 个上游项目的 216 套主题，来源与许可维护在统一 metadata 中。
+主题库共 **222 套**：3 套自研 + 9 个上游项目的 219 套主题，来源与许可维护在统一 metadata 中。
 
 主题审计见 [THEME-SOURCES](THEME-SOURCES.md)；工程借鉴、取舍与完整致谢由 [credits.ts](src/lib/credits.ts) 驱动 [References](https://wechat.yoru-and-akari.dev/references) 与 [LICENSES/NOTICE](LICENSES/NOTICE.md)。
 <!-- END GENERATED: readme-theme-sources -->

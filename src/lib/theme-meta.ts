@@ -132,7 +132,7 @@ export interface ThemeMeta {
  * 主题目录条目：主题库、顶栏切换器和筛选只需要这些字段。
  *
  * 它和 Theme 的区别只有一个——没有渲染函数。把这份元数据留在首屏包里，
- * 渲染实现按来源动态加载，219 套主题的样式代码就不会跟着首屏一起下载。
+ * 渲染实现按来源动态加载，222 套主题的样式代码就不会跟着首屏一起下载。
  */
 export interface ThemeCatalogEntry {
   id: string
