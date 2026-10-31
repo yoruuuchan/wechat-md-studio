@@ -30,9 +30,8 @@ fs.rmSync(domVsPngDir, { recursive: true, force: true })
 fs.mkdirSync(domVsPngDir, { recursive: true })
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'reed-xhs-'))
 const CARD_TEMPLATES = ['reed', 'yoru', 'paper', 'console', 'kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka']
-// The contrast gate covers the six design-system templates. Reed, YORU,
-// PAPER and Console are frozen baselines: their exports must not change.
-const CONTRAST_TEMPLATES = new Set(['kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka'])
+// Contrast is checked on every cover and every page-3 body page of every
+// template variant, including Reed and the first batch.
 const CARD_VARIANTS = {
   reed: ['paper', 'white', 'grid', 'tint', 'night'],
   yoru: ['signal', 'lab', 'studio', 'special'],
@@ -623,7 +622,7 @@ async function textContrastChecks(template, variant, pageIndex, pngFile, label, 
       color: probe.color ?? null,
       effective: effective ? [effective.r, effective.g, effective.b].map((value) => Math.round(value)) : null,
       background: sample?.median ?? null,
-      box: sample ? { width: sample.width, height: sample.height } : null,
+      box: sample ? { x: Math.round(probe.box.x * 2), y: Math.round(probe.box.y * 2), width: sample.width, height: sample.height } : null,
       fontSize: probe.fontSize,
       fontWeight: probe.fontWeight,
       ratio: Number.isFinite(ratio) ? Math.round(ratio * 100) / 100 : null,
@@ -858,14 +857,12 @@ try {
         await pixelCompare(domShot, file, pageLabel)
         if (index === 0) {
           await coverTitleInk(template, file, pageLabel, expectedHeight)
-          if (CONTRAST_TEMPLATES.has(template)) {
-            await textContrastChecks(template, variant, 0, file, pageLabel, [
-              { role: 'cover title', selector: COVER_TITLE_SELECTORS[template] },
-              { role: 'cover subtitle', selector: COVER_SUBTITLE_SELECTORS[template] },
-            ])
-          }
+          await textContrastChecks(template, variant, 0, file, pageLabel, [
+            { role: 'cover title', selector: COVER_TITLE_SELECTORS[template] },
+            { role: 'cover subtitle', selector: COVER_SUBTITLE_SELECTORS[template] },
+          ])
         }
-        if (index === 2 && CONTRAST_TEMPLATES.has(template)) {
+        if (index === 2) {
           await textContrastChecks(template, variant, 2, file, pageLabel, [
             { role: 'page 3 body', selector: '.xhs-card-content p' },
           ])

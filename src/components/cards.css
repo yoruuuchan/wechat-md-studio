@@ -302,6 +302,7 @@
   line-height: 1.6;
   color: #4A5566;
 }
+.xhs-card[data-template="yoru"] .xhs-yoru-subtitle { color: #636E7E; }
 .xhs-card[data-template="yoru"] .xhs-yoru-cover-foot {
   left: var(--xhs-cover-inset-x);
   right: var(--xhs-cover-inset-x);
@@ -524,6 +525,8 @@
   line-height: 1.38;
   color: var(--xhs-muted);
 }
+.xhs-card[data-template="paper"][data-variant="editorial"] .xhs-paper-standfirst { color: #6B6559; }
+.xhs-card[data-template="paper"][data-variant="analog"] .xhs-paper-standfirst { color: #5E594F; }
 .xhs-card[data-template="paper"] .xhs-paper-cover-foot {
   left: var(--xhs-cover-inset-x);
   right: var(--xhs-cover-inset-x);
@@ -760,6 +763,8 @@
   line-height: 1.5;
   color: var(--xhs-muted);
 }
+.xhs-card[data-template="console"][data-variant="akari"] .xhs-console-standfirst { color: #5E6881; }
+.xhs-card[data-template="console"][data-variant="yoru"] .xhs-console-standfirst { color: #747F98; }
 .xhs-card[data-template="console"] .xhs-console-cover-foot {
   left: var(--xhs-cover-inset-x);
   right: var(--xhs-cover-inset-x);
