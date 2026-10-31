@@ -336,6 +336,24 @@ try {
 
   await setMarkdown(longDoc)
   await click('[data-preview-mode="cards"]'); await cardsReady()
+  {
+    // Typing with the cards open re-measures behind them: the cards stay on
+    // screen and the card being read stays in view.
+    const top = await evaluate(`(() => { const s = document.querySelector('[data-card-scroller]'); s.scrollTop = 1500; return Math.round(s.scrollTop) })()`)
+    let gone = 0
+    for (let k = 0; k < 4; k++) {
+      await evaluate(`(() => { const view = window.__mopaiCodemirror; view.dispatch({ changes: { from: view.state.doc.length, insert: '再' } }); return true })()`)
+      for (let i = 0; i < 4; i++) {
+        await sleep(40)
+        if (!await evaluate(`document.querySelectorAll('.xhs-card').length`)) gone++
+      }
+    }
+    await sleep(250)
+    await cardsReady()
+    const after = await evaluate(`Math.round(document.querySelector('[data-card-scroller]').scrollTop)`)
+    check('typing with the card view open keeps the cards and the reading position', top > 0 && gone === 0 && Math.abs(after - top) <= 2, { top, after, gone })
+    await setMarkdown(longDoc)
+  }
   for (const [kind, tag, text] of [['chinese','strong','芦苇卡片'],['latin','em','Reed'],['numbers','code','2026'],['punctuation','mark','，。！？']]) {
     await evaluate(`(() => {const el=[...document.querySelectorAll('.xhs-body ${tag}')].find(el=>el.textContent===${JSON.stringify(text)});if(!el)throw new Error('font probe absent');el.dataset.fontProbe=${JSON.stringify(kind)}})()`)
     const { root } = await send('DOM.getDocument', { depth: 0 }, sessionId)

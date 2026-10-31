@@ -34,7 +34,7 @@ function background(id: CardBackground, accent: string): CSSProperties {
   }
 }
 
-interface Result { pages: CardPage[]; failedImages: string[]; scaledBlocks: number }
+interface Result { pages: CardPage[]; failedImages: string[]; scaledBlocks: number; height: number; dark: boolean }
 interface Props {
   doc: Doc
   source: string
@@ -52,6 +52,7 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
   const { t, lang } = useI18n()
   const { ratio, background: bg } = options
   const [result, setResult] = useState<Result | null>(null)
+  const [pending, setPending] = useState(true)
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -66,7 +67,11 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
 
   useEffect(() => {
     const controller = new AbortController()
-    setResult(null)
+    // An edit is measured behind the cards on screen, so typing neither blanks
+    // the list nor scrolls back to the cover. A new ratio or night body needs
+    // a fresh layout; until it is ready, exports stay disabled.
+    setResult((old) => (old && old.height === height && old.dark === dark ? old : null))
+    setPending(true)
     setError(false)
     const timer = window.setTimeout(async () => {
       try {
@@ -77,9 +82,15 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
         })
         const failedImages = await prepareCardImages(article, controller.signal)
         const layout = await paginateCards(article, { height, signal: controller.signal })
-        if (!controller.signal.aborted) setResult({ ...layout, failedImages })
+        if (!controller.signal.aborted) {
+          setResult({ ...layout, failedImages, height, dark })
+          setPending(false)
+        }
       } catch {
-        if (!controller.signal.aborted) setError(true)
+        if (!controller.signal.aborted) {
+          setError(true)
+          setPending(false)
+        }
       }
     }, 160)
     return () => { controller.abort(); clearTimeout(timer) }
@@ -98,7 +109,7 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
   }, [result, height])
 
   const exportCards = async (index?: number) => {
-    if (!result?.pages.length || result.failedImages.length || busy) return
+    if (!result?.pages.length || result.failedImages.length || busy || pending) return
     setBusy(true)
     setProgress({ done: 0, total: index === undefined ? result.pages.length : 1 })
     let exporter: Awaited<ReturnType<typeof import('@/lib/cards-export').createCardExporter>> | undefined
@@ -129,9 +140,9 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
   }
 
   const total = result?.pages.length ?? 0
-  const disabled = busy || !total || !!result?.failedImages.length
+  const disabled = busy || pending || !total || !!result?.failedImages.length
   return (
-    <div data-onboarding="preview" data-xhs-view data-ready={result !== null} className="flex h-full min-w-0 flex-col">
+    <div data-onboarding="preview" data-xhs-view data-ready={!pending && !error && result !== null} className="flex h-full min-w-0 flex-col">
       <div className="flex h-11 shrink-0 items-center border-b border-line-1 px-4">{viewSwitch}</div>
       <div className="shrink-0 space-y-2 border-b border-line-1 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
