@@ -189,9 +189,18 @@ Noto 字体按 `unicode-range` 切片，只下载当页所需字符；SIL OFL �
 复制进微信的正文仍靠读者端字体栈，不能把本站预览字体视作微信端保证。
 
 小红书卡片模板另带一组自托管字体，`@font-face` 统一在
-[fonts-templates.css](../public/fonts/fonts-templates.css)：Fontsource 5.3.x 的
-Noto Serif SC 400（101 个中文切片）、Inter 400/600、JetBrains Mono 400、
-EB Garamond 400/400 italic/600、IBM Plex Sans 400/500、IBM Plex Mono 400、Caveat 400。
+[fonts-templates.css](../public/fonts/fonts-templates.css) 与
+[fonts-design.css](../public/fonts/fonts-design.css)：Fontsource 5.3.x 的
+Noto Serif SC 400（101 个中文切片）、Inter 400/600、JetBrains Mono 400/700、
+EB Garamond 400/400 italic/600、IBM Plex Sans 400/500、IBM Plex Mono 400、Caveat 400，
+以及第二批的 Instrument Sans 400/500/700、B612 Mono 400/700、Orbitron 500/700/900、
+VT323 400、Space Grotesk 300–700、Bebas Neue 400、Chakra Petch 500/700、
+DM Serif Display 400 italic、Rajdhani 400–700、Share Tech Mono 400、
+Pixelify Sans 400–700、Tinos 400/700 + italic、Press Start 2P 400、
+DotGothic16 400（124 个日文切片）、Major Mono Display 400。拉丁族只取 `latin` 子集；
+第二批新增的 157 个 woff2 合计约 1.20 MB。模板名和字标移除后，Bebas Neue、
+Chakra Petch、Press Start 2P、DotGothic16、Major Mono Display 仍随字体包保留，
+只是不再由 `CARD_TEMPLATE_FONTS` 预载或内嵌。
 朱雀仿宋 400 来自官方仓库 [TrionesType/zhuque](https://github.com/TrionesType/zhuque)
 v0.212 的 `ZhuqueFangsong-Regular.ttf`，由
 [slice-by-ranges.py](../scripts/fonts/slice-by-ranges.py) 按 Noto Serif SC 700 的
@@ -204,7 +213,22 @@ unicode-range 逐片裁成 99 个 woff2（没有字形的片跳过），CSS 在
 [OFL-IBMPlexSans.txt](../public/fonts/OFL-IBMPlexSans.txt)、
 [OFL-IBMPlexMono.txt](../public/fonts/OFL-IBMPlexMono.txt)、
 [OFL-Caveat.txt](../public/fonts/OFL-Caveat.txt)、
-[OFL-ZhuqueFangsong.txt](../public/fonts/OFL-ZhuqueFangsong.txt)。
+[OFL-ZhuqueFangsong.txt](../public/fonts/OFL-ZhuqueFangsong.txt)、
+[OFL-InstrumentSans.txt](../public/fonts/OFL-InstrumentSans.txt)、
+[OFL-B612Mono.txt](../public/fonts/OFL-B612Mono.txt)、
+[OFL-Orbitron.txt](../public/fonts/OFL-Orbitron.txt)、
+[OFL-VT323.txt](../public/fonts/OFL-VT323.txt)、
+[OFL-SpaceGrotesk.txt](../public/fonts/OFL-SpaceGrotesk.txt)、
+[OFL-BebasNeue.txt](../public/fonts/OFL-BebasNeue.txt)、
+[OFL-ChakraPetch.txt](../public/fonts/OFL-ChakraPetch.txt)、
+[OFL-DMSerifDisplay.txt](../public/fonts/OFL-DMSerifDisplay.txt)、
+[OFL-Rajdhani.txt](../public/fonts/OFL-Rajdhani.txt)、
+[OFL-ShareTechMono.txt](../public/fonts/OFL-ShareTechMono.txt)、
+[OFL-PixelifySans.txt](../public/fonts/OFL-PixelifySans.txt)、
+[OFL-Tinos.txt](../public/fonts/OFL-Tinos.txt)、
+[OFL-PressStart2P.txt](../public/fonts/OFL-PressStart2P.txt)、
+[OFL-DotGothic16.txt](../public/fonts/OFL-DotGothic16.txt)、
+[OFL-MajorMonoDisplay.txt](../public/fonts/OFL-MajorMonoDisplay.txt)。
 卡片分页预载与 PNG 内嵌都读 [cards.ts](../src/lib/cards.ts) 的 `CARD_TEMPLATE_FONTS`，
 两处不会各写一份字体白名单。
 

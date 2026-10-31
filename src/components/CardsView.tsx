@@ -11,7 +11,7 @@ import { safeFilename } from '@/lib/import-export'
 import { renderCardArticle } from '@/lib/cards-render'
 import {
   CARD_RATIOS, CARD_TEMPLATES, CARD_WIDTH, cardAccent, cardMetrics, chinesePageNumber,
-  coverTitleSize, isDarkVariant, paginateCards, templateVariants, withTemplate,
+  coverTitleSize, isDarkVariant, paginateCards, templateRatios, templateVariants, withTemplate,
   type CardBackground, type CardOptions, type CardPage, type CardRatio, type CardTemplate,
 } from '@/lib/cards'
 import { useI18n } from '@/hooks/useI18n'
@@ -28,7 +28,7 @@ function paperGrain(opacity: number): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
-function background(template: CardTemplate, id: CardBackground, accent: string): CSSProperties {
+function background(template: CardTemplate, id: CardBackground, accent: string, kind: CardPage['kind'] = 'body'): CSSProperties {
   if (template === 'reed') {
     switch (id) {
       case 'white': return { background: '#ffffff' }
@@ -52,10 +52,77 @@ function background(template: CardTemplate, id: CardBackground, accent: string):
       ...(grain ? { backgroundImage: grain, backgroundRepeat: 'repeat', backgroundSize: '160px 160px' } : {}),
     }
   }
-  // Console: flat porcelain/midnight with the system's page-level radial wash.
-  return id === 'yoru'
-    ? { background: 'radial-gradient(120% 80% at 80% -10%, rgba(122,149,250,.10), transparent 60%), radial-gradient(90% 70% at 0% 100%, rgba(240,120,48,.06), transparent 55%), #0B1020' }
-    : { background: 'radial-gradient(120% 80% at 80% -10%, rgba(79,108,232,.07), transparent 60%), radial-gradient(90% 70% at 0% 100%, rgba(240,106,32,.05), transparent 55%), #E8ECF3' }
+  if (template === 'console') {
+    // Console: flat porcelain/midnight with the system's page-level radial wash.
+    return id === 'yoru'
+      ? { background: 'radial-gradient(120% 80% at 80% -10%, rgba(122,149,250,.10), transparent 60%), radial-gradient(90% 70% at 0% 100%, rgba(240,120,48,.06), transparent 55%), #0B1020' }
+      : { background: 'radial-gradient(120% 80% at 80% -10%, rgba(79,108,232,.07), transparent 60%), radial-gradient(90% 70% at 0% 100%, rgba(240,106,32,.05), transparent 55%), #E8ECF3' }
+  }
+  if (template === 'kunlun') {
+    const light = id === 'snowline'
+    return {
+      backgroundColor: light ? '#E2E9F2' : '#06080D',
+      backgroundImage: [
+        light ? 'radial-gradient(120% 90% at 50% -10%, rgba(0,152,212,.10), transparent 58%)' : 'radial-gradient(120% 90% at 50% -10%, rgba(0,184,255,.14), transparent 56%)',
+        'linear-gradient(rgba(120,180,255,.06) 1px, transparent 1px)',
+        'linear-gradient(90deg, rgba(120,180,255,.06) 1px, transparent 1px)',
+      ].join(', '),
+      backgroundSize: 'auto, 18px 18px, 18px 18px',
+    }
+  }
+  if (template === 'rift') {
+    const light = id === 'light'
+    return {
+      backgroundColor: light ? '#EAF1FC' : '#050A18',
+      backgroundImage: [
+        light
+          ? 'radial-gradient(125% 90% at 50% -10%, #FFFFFF 0%, #E8F0FD 46%, #D2E0F6 100%)'
+          : 'radial-gradient(125% 90% at 50% -10%, #1A2F58 0%, #0A1633 46%, #050A1C 100%)',
+        'linear-gradient(rgba(34,64,128,.07) 1px, transparent 1px)',
+        'linear-gradient(90deg, rgba(34,64,128,.07) 1px, transparent 1px)',
+      ].join(', '),
+      backgroundSize: 'auto, 32px 32px, 32px 32px',
+    }
+  }
+  if (template === 'core') {
+    const light = id === 'frost'
+    return {
+      backgroundColor: light ? '#EAF4F8' : '#071820',
+      backgroundImage: [
+        light ? 'linear-gradient(rgba(12,26,38,.055) 1px, transparent 1px)' : 'linear-gradient(rgba(65,96,122,.10) 1px, transparent 1px)',
+        light ? 'linear-gradient(90deg, rgba(12,26,38,.055) 1px, transparent 1px)' : 'linear-gradient(90deg, rgba(65,96,122,.10) 1px, transparent 1px)',
+      ].join(', '),
+      backgroundSize: '16px 16px, 16px 16px',
+    }
+  }
+  if (template === 'aozora') {
+    if (id === 'yozora') {
+      return {
+        backgroundColor: '#040B18',
+        backgroundImage: 'radial-gradient(circle at 72% 16%, rgba(244,249,255,.22) 0%, rgba(216,232,248,.10) 9%, transparent 26%), linear-gradient(180deg, #071426 0%, #040B18 60%, #01040C 100%)',
+      }
+    }
+    return { background: 'linear-gradient(180deg, #EAF5FF 0%, #CFE8FF 35%, #9DD2FF 70%, #FFE980 100%)' }
+  }
+  if (template === 'kihon') {
+    const light = id === 'gin'
+    return {
+      backgroundColor: light ? '#E7E9EB' : '#111417',
+      backgroundImage: `radial-gradient(125% 105% at 50% 30%, transparent 42%, ${light ? 'rgba(10,12,14,.065)' : 'rgba(0,0,0,.36)'} 100%), ${paperGrain(light ? .05 : .07)}`,
+      backgroundSize: 'auto, 160px 160px',
+      backgroundRepeat: 'no-repeat, repeat',
+    }
+  }
+  // Mayonaka: midnight for every body page; sunset is the cover-only variant.
+  if (template === 'mayonaka') {
+    if (id === 'sunset' && kind === 'cover') {
+      return { background: 'linear-gradient(180deg, #0A1654 0%, #3A1A8A 30%, #FF2BD6 70%, #FF71CE 100%)' }
+    }
+    return {
+      background: 'repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,.25) 3px, rgba(0,0,0,.25) 4px), linear-gradient(180deg, #07000F 0%, #0A1654 60%, #100225 100%)',
+    }
+  }
+  return { background: '#fbf7ef' }
 }
 
 function MoonPhases() {
@@ -85,6 +152,21 @@ function YoruMasthead({ page, total }: { page: number; total: number }) {
 
 function YoruSpine({ title }: { title: string }) {
   return <div className="xhs-yoru-spine" aria-hidden="true"><span>{title}</span></div>
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** core's Windows title bar: 1px ink frame, lowercase chrome, no fake buttons. */
+function CoreBar({ label }: { label?: string }) {
+  return (
+    <div className="xhs-core-bar">
+      {label ? <span className="xhs-core-bar-label">{label.toLowerCase()}</span> : null}
+    </div>
+  )
+}
+
+function KihonFolio({ page, total }: { page: number; total: number }) {
+  return <div className="xhs-kihon-folio">{pad2(page)} / {pad2(total)}</div>
 }
 
 function paperDate(lang: string): string {
@@ -159,6 +241,93 @@ function Cover({ page, template, variant, articleTitle, author, total, height, l
       </div>
     )
   }
+  if (template === 'kunlun') {
+    return (
+      <div className="xhs-cover xhs-kunlun-cover">
+        <div className="xhs-cover-copy xhs-kunlun-plate">
+          <h1 style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
+          {page.subtitle && <p className="xhs-kunlun-standfirst">{page.subtitle}</p>}
+        </div>
+        <div className="xhs-cover-foot xhs-kunlun-cover-foot">
+          <span>{author}</span>
+          <span>[ {pad2(1)} / {pad2(total)} ]</span>
+        </div>
+      </div>
+    )
+  }
+  if (template === 'rift') {
+    return (
+      <div className="xhs-cover xhs-rift-cover">
+        <div className="xhs-cover-copy xhs-rift-plate">
+          <h1 className="xhs-rift-title" style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
+          {page.subtitle && <p className="xhs-rift-standfirst">{page.subtitle}</p>}
+        </div>
+        <div className="xhs-cover-foot xhs-rift-cover-foot">
+          <span>{author}</span>
+          <span>{pad2(1)} / {pad2(total)}</span>
+        </div>
+      </div>
+    )
+  }
+  if (template === 'core') {
+    return (
+      <div className="xhs-cover xhs-core-cover">
+        <div className="xhs-core-window xhs-core-cover-window">
+          <CoreBar />
+          <div className="xhs-cover-copy xhs-core-plate xhs-cover-copy-constrained">
+            <h1 style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
+            {page.subtitle && <p className="xhs-core-standfirst">{page.subtitle}</p>}
+          </div>
+          <div className="xhs-core-status">
+            <span>{author}</span>
+            <span>{pad2(1)} / {pad2(total)}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (template === 'aozora') {
+    return (
+      <div className="xhs-cover xhs-aozora-cover">
+        <div className="xhs-cover-copy xhs-aozora-plate">
+          <h1 style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
+          {page.subtitle && <p className="xhs-aozora-standfirst">{page.subtitle}</p>}
+        </div>
+        <div className="xhs-cover-foot xhs-aozora-cover-foot">
+          <span>{author}</span>
+          <span>{pad2(1)} / {pad2(total)}</span>
+        </div>
+      </div>
+    )
+  }
+  if (template === 'kihon') {
+    return (
+      <div className="xhs-cover xhs-kihon-cover">
+        <div className="xhs-cover-copy xhs-kihon-plate">
+          <h1 style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
+          {page.subtitle && <p className="xhs-kihon-standfirst">{page.subtitle}</p>}
+          <i className="xhs-kihon-rule" />
+        </div>
+        <KihonFolio page={1} total={total} />
+      </div>
+    )
+  }
+  if (template === 'mayonaka') {
+    return (
+      <div className="xhs-cover xhs-mayonaka-cover">
+        <div className="xhs-mnk-grid" aria-hidden="true" />
+        {variant === 'sunset' && <div className="xhs-mnk-sun" aria-hidden="true" />}
+        <div className="xhs-cover-copy xhs-mnk-plate">
+          <h1 style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
+          {page.subtitle && <p className="xhs-mnk-standfirst">{page.subtitle}</p>}
+        </div>
+        <div className="xhs-cover-foot xhs-mnk-cover-foot">
+          <span>{author}</span>
+          <span>{pad2(1)} / {pad2(total)}</span>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="xhs-cover">
       <div className="xhs-cover-copy">
@@ -221,6 +390,70 @@ function Body({ page, index, template, variant, articleTitle, author, total, t }
       </>
     )
   }
+  if (template === 'kunlun') {
+    return (
+      <>
+        <div className="xhs-kunlun-head"><span>{articleTitle}</span></div>
+        <div className="xhs-card-content xhs-kunlun-content" dangerouslySetInnerHTML={{ __html: page.html }} />
+        <div className="xhs-card-foot xhs-kunlun-foot">
+          <span>{author}</span>
+          <span>[ {pad2(pageNo)} / {pad2(total)} ]</span>
+        </div>
+      </>
+    )
+  }
+  if (template === 'rift') {
+    return (
+      <>
+        <div className="xhs-rift-head"><span>{articleTitle}</span></div>
+        <div className="xhs-card-content xhs-rift-content" dangerouslySetInnerHTML={{ __html: page.html }} />
+        <div className="xhs-card-foot xhs-rift-foot">
+          <span>{author}</span>
+          <span>{pad2(pageNo)} / {pad2(total)}</span>
+        </div>
+      </>
+    )
+  }
+  if (template === 'core') {
+    return (
+      <>
+        <div className="xhs-core-head"><CoreBar label={articleTitle} /></div>
+        <div className="xhs-card-content xhs-core-content" dangerouslySetInnerHTML={{ __html: page.html }} />
+        <div className="xhs-card-foot xhs-core-foot"><span>{author}</span><span>{pad2(pageNo)} / {pad2(total)}</span></div>
+      </>
+    )
+  }
+  if (template === 'aozora') {
+    return (
+      <>
+        <div className="xhs-card-content xhs-aozora-content" dangerouslySetInnerHTML={{ __html: page.html }} />
+        <div className="xhs-card-foot xhs-aozora-foot">
+          <span>{author}</span>
+          <span>{pad2(pageNo)} / {pad2(total)}</span>
+        </div>
+      </>
+    )
+  }
+  if (template === 'kihon') {
+    return (
+      <>
+        <div className="xhs-card-content xhs-kihon-content" dangerouslySetInnerHTML={{ __html: page.html }} />
+        <KihonFolio page={pageNo} total={total} />
+      </>
+    )
+  }
+  if (template === 'mayonaka') {
+    return (
+      <>
+        <div className="xhs-mnk-head"><span>{articleTitle}</span></div>
+        <div className="xhs-card-content xhs-mnk-content" dangerouslySetInnerHTML={{ __html: page.html }} />
+        <div className="xhs-card-foot xhs-mnk-foot">
+          <span>{author}</span>
+          <span>{pad2(pageNo)} / {pad2(total)}</span>
+        </div>
+      </>
+    )
+  }
   return (
     <>
       <div className="xhs-card-head"><i /><span>{articleTitle}</span></div>
@@ -270,6 +503,7 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
   const articleTitle = coverTitle?.type === 'heading' ? coverTitle.title : title
   const author = doc.meta.author || t('app.name')
   const variants = templateVariants(template)
+  const ratios = templateRatios(template)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -314,7 +548,8 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
       // A constrained plate (position:absolute with top/bottom) has a fixed
       // box, so compare the content's scroll height with that box. Reed's copy
       // is in flow, so its own height is the content height.
-      const constrained = getComputedStyle(copy).position === 'absolute'
+      const constrained = getComputedStyle(copy).position === 'absolute' ||
+        copy.classList.contains('xhs-cover-copy-constrained')
       const fits = () => constrained
         ? copy.scrollHeight <= copy.clientHeight + 0.5
         : copy.offsetHeight <= height - metrics.coverReserve + 0.5
@@ -370,7 +605,8 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('cards.ratio')}>
             {(Object.keys(CARD_RATIOS) as CardRatio[]).map((id) => (
-              <button key={id} data-card-ratio={id} aria-pressed={ratio === id} disabled={busy}
+              <button key={id} data-card-ratio={id} aria-pressed={ratio === id} disabled={busy || !ratios.includes(id)}
+                aria-disabled={!ratios.includes(id)}
                 className={`ya-tool xhs-option ${ratio === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange({ ...options, ratio: id })}>{id}</button>
             ))}
           </div>
@@ -378,6 +614,7 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
             <FolderDown size={14} aria-hidden="true" />{busy ? t('cards.exporting', { n: progress.done, total: progress.total }) : t('cards.exportAll')}
           </button>
         </div>
+        {template === 'kihon' && <p data-card-ratio-hint className="text-[11px] text-ink-2">{t('cards.kihonRatio')}</p>}
         <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('cards.background')}>
           {variants.map((id) => (
             <button key={id} data-card-bg={id} aria-pressed={bg === id} disabled={busy}
@@ -415,7 +652,7 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
                       '--xhs-cover-inset-x': `${metrics.coverInsetX}px`,
                       '--xhs-cover-inset-y': `${metrics.coverInsetY}px`,
                       '--xhs-cover-foot-bottom': `${metrics.coverFootBottom}px`,
-                      ...background(template, bg, accent),
+                      ...background(template, bg, accent, page.kind),
                     } as CSSProperties}>
                     {page.kind === 'cover'
                       ? <Cover page={page} template={template} variant={bg} articleTitle={articleTitle} author={author} total={total} height={height} lang={lang} t={t} />

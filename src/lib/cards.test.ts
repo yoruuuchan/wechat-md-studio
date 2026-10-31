@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
 import { renderCardArticle } from './cards-render'
 import {
   CARD_FONT_SHEETS, CARD_METRICS, CARD_TEMPLATES, CARD_TEMPLATE_FONTS, CARD_TEMPLATE_VARIANTS, CARD_WIDTH, cardMetrics,
-  defaultVariant, isDarkVariant, paginateCards, withTemplate, type CardPage, type CardTemplate,
+  defaultVariant, isDarkVariant, paginateCards, templateRatios, withTemplate, type CardPage, type CardTemplate,
 } from './cards'
 import { rangeContainsText } from './cards-export'
 
@@ -222,6 +222,12 @@ describe('card template dimension', () => {
       yoru: ['signal', 'lab', 'studio', 'special'],
       paper: ['editorial', 'analog', 'midnight'],
       console: ['akari', 'yoru'],
+      kunlun: ['void', 'snowline'],
+      rift: ['dark', 'light'],
+      core: ['frost', 'nightpool'],
+      aozora: ['daylight', 'yozora'],
+      kihon: ['gin', 'kuro'],
+      mayonaka: ['midnight', 'sunset'],
     })
     for (const template of CARD_TEMPLATES) {
       expect(withTemplate({ ratio: '9:16', template: 'reed', background: 'grid' }, template))
@@ -232,6 +238,24 @@ describe('card template dimension', () => {
     expect(isDarkVariant('console', 'yoru')).toBe(true)
     expect(isDarkVariant('yoru', 'signal')).toBe(false)
     expect(isDarkVariant('paper', 'editorial')).toBe(false)
+    expect(isDarkVariant('kunlun', 'void')).toBe(true)
+    expect(isDarkVariant('rift', 'dark')).toBe(true)
+    expect(isDarkVariant('core', 'nightpool')).toBe(true)
+    expect(isDarkVariant('aozora', 'yozora')).toBe(true)
+    expect(isDarkVariant('kihon', 'kuro')).toBe(true)
+    expect(isDarkVariant('mayonaka', 'midnight')).toBe(true)
+    expect(isDarkVariant('mayonaka', 'sunset')).toBe(true)
+  })
+
+  it('moves KIHON to its one native portrait frame and rejects the other ratios', () => {
+    expect(templateRatios('kihon')).toEqual(['9:16'])
+    expect(templateRatios('reed')).toEqual(['3:4', '1:1', '9:16'])
+    expect(withTemplate({ ratio: '3:4', template: 'reed', background: 'paper' }, 'kihon'))
+      .toEqual({ ratio: '9:16', template: 'kihon', background: 'gin' })
+    expect(withTemplate({ ratio: '1:1', template: 'reed', background: 'paper' }, 'kihon'))
+      .toEqual({ ratio: '9:16', template: 'kihon', background: 'gin' })
+    expect(withTemplate({ ratio: '3:4', template: 'kihon', background: 'gin' }, 'aozora'))
+      .toEqual({ ratio: '3:4', template: 'aozora', background: 'daylight' })
   })
 
   it('writes template and variant on the measured body and paginates with its own measures', async () => {

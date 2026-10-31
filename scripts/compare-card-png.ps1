@@ -3,17 +3,21 @@
 # Usage:
 #   pwsh scripts/compare-card-png.ps1 `
 #     -Baseline verify-out/xhs/<baseline-run> `
-#     -Current  verify-out/xhs/<new-run>
+#     -Current  verify-out/xhs/<new-run> `
+#     -Exclude 'template-(kunlun|rift|core|aozora|kihon|mayonaka)-'
 #
 # It walks every PNG and ZIP under exports/ in the baseline run, finds the same
 # relative path in the current run, and compares the decoded pixels (RGB, alpha
 # ignored). ZIP entries are compared by archive-relative path and entry name.
 # Reed's baseline export must match exactly; any pixel difference is listed.
+# -Exclude is an optional regex applied to the relative path, used to leave out
+# templates that are expected to change while the frozen exports stay byte-equal.
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)] [string] $Baseline,
   [Parameter(Mandatory)] [string] $Current,
-  [int] $MaxDiffs = 8
+  [int] $MaxDiffs = 8,
+  [string] $Exclude = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,7 +90,10 @@ $compared = 0
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ('reed-card-compare-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temp | Out-Null
 try {
-  $baselineFiles = Get-ChildItem -LiteralPath (Join-Path $baselineRoot 'exports') -Recurse -File | Where-Object { $_.Extension -in '.png', '.zip' }
+  $baselineFiles = Get-ChildItem -LiteralPath (Join-Path $baselineRoot 'exports') -Recurse -File | Where-Object {
+    $_.Extension -in '.png', '.zip' -and
+    (-not $Exclude -or [System.IO.Path]::GetRelativePath($baselineRoot, $_.FullName) -notmatch $Exclude)
+  }
   foreach ($file in $baselineFiles) {
     $relative = [System.IO.Path]::GetRelativePath($baselineRoot, $file.FullName)
     $currentFile = Join-Path $currentRoot $relative

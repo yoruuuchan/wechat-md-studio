@@ -1,6 +1,7 @@
 @import url("/fonts/fonts-local.css");
 @import url("/fonts/noto-sans-sc-local.css");
 @import url("/fonts/fonts-templates.css");
+@import url("/fonts/fonts-design.css");
 
 @tailwind base;
 @tailwind components;
