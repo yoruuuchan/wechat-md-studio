@@ -45,10 +45,10 @@ node scripts/cdp-verify-xhs-cards.mjs 3201 9334
 
 脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与默认模板背景，并遍历四套模板 × 各自变体的 3:4 封面 + 前两张正文，检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示、CDP 实际字体与 DOM / PNG 像素对比。
 
-每套模板的每个变体都会把封面与前两张正文导出到 `verify-out/templates/<template>-<variant>-01..03.png`，并生成按模板分组的 `verify-out/templates/index.html`；第 3 页的 DOM / PNG 对照图在 `verify-out/templates/dom-vs-png/`。封面除整页像素对比外，还会取标题元素在预览中的包围盒、换算到导出坐标后检查墨色像素，防止标题被压成 0 像素。Reed 的 PNG 与基线逐像素核对：
+每套模板的每个变体都会把封面与前两张正文导出到 `verify-out/templates/<template>-<variant>-01..03.png`，并生成按模板分组的 `verify-out/templates/index.html`；第 3 页的 DOM / PNG 对照图在 `verify-out/templates/dom-vs-png/`。封面除整页像素对比外，还会取标题元素在预览中的包围盒、换算到导出坐标后检查墨色像素，防止标题被压成 0 像素。Reed 的 PNG 与改动前在本机跑出的基线目录逐像素核对（`verify-out/` 不进 git，基线要在动手前先跑一次验收生成）：
 
 ```powershell
 pwsh scripts/compare-card-png.ps1 -Baseline verify-out/xhs/<基线目录> -Current verify-out/xhs/<本次目录>
 ```
 
-封面和正文页默认按 `mean < 2`、`bad < 0.025` 比对 DOM 截图与导出 PNG。Reed 第 3 页是唯一例外：已发布基线里有 `html-to-image` 旧的 `-0.1px` 字号，冻结基线不重做的前提下它不可能与 18px 预览逐行一致，因此该页保留稳定包络 `mean < 14`、`bad < 0.13`，并在每次输出里打印实测值。
+封面和正文页都按 `mean < 2`、`bad < 0.025` 比对 DOM 截图与导出 PNG。四套模板在克隆阶段都使用预览的精确计算字号，不再有例外，导出的断行与预览一致。

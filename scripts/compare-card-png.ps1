@@ -2,7 +2,7 @@
 #
 # Usage:
 #   pwsh scripts/compare-card-png.ps1 `
-#     -Baseline verify-out/xhs/2026-10-31T07-09-19-913Z `
+#     -Baseline verify-out/xhs/<baseline-run> `
 #     -Current  verify-out/xhs/<new-run>
 #
 # It walks every PNG and ZIP under exports/ in the baseline run, finds the same

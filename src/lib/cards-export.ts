@@ -152,10 +152,7 @@ export async function createCardExporter(nodes: HTMLElement[], template: CardTem
   const snapshots = nodes.map((node) => node.cloneNode(true) as HTMLElement)
   stage.append(...snapshots)
   document.body.append(stage)
-  // Reed's published PNGs are a frozen byte-for-byte baseline; keep the
-  // exporter's historical -0.1px there until that fixture is deliberately
-  // renewed. The design-system templates use the metrics the preview uses.
-  if (template !== 'reed') markExactFontSizes(nodes, snapshots)
+  markExactFontSizes(nodes, snapshots)
   try {
     const fontEmbedCSS = await cardFontCss(stage.textContent ?? '', template)
     await document.fonts.ready
@@ -165,9 +162,7 @@ export async function createCardExporter(nodes: HTMLElement[], template: CardTem
         const node = snapshots[index]
         const height = Number.parseInt(node.style.height)
         const options = { width: CARD_WIDTH, height, pixelRatio: 2, fontEmbedCSS, skipAutoScale: true }
-        const blob = template === 'reed'
-          ? await toBlob(node, options)
-          : await toBlobWithExactFonts(toBlob, node, options)
+        const blob = await toBlobWithExactFonts(toBlob, node, options)
         if (!blob) throw new Error(t('cards.exportFailed'))
         return blob
       },

@@ -645,17 +645,9 @@ try {
         fs.copyFileSync(file, sample)
         evidence.templates.push({ template, variant, page: index + 1, file: sample })
         const domShot = await nativeCardShot(`[data-card-index="${index}"]`, pageLabel + '-dom', sessionId, 2)
-        // Every cover and body page gets the strict limit: identical fonts and line
-        // breaks must survive the export. Reed's third page is the one exception:
-        // its published baseline was rasterized with html-to-image's historical
-        // -0.1px font size, so keeping that baseline byte-identical means the
-        // DOM's 18px preview and the 17.9px PNG cannot line-break identically.
-        // The measured worst case is mean 12.7 / bad 0.12; 14 / 0.13 is the
-        // stable envelope for that frozen legacy output.
-        const limits = index === 2 && template === 'reed'
-          ? { mean: 14, bad: .13 }
-          : { mean: 2, bad: .025 }
-        await pixelCompare(domShot, file, pageLabel, limits)
+        // Every cover and body page uses the same strict limit: the export must
+        // keep the preview's fonts and line breaks exactly.
+        await pixelCompare(domShot, file, pageLabel)
         if (index === 0) await coverTitleInk(template, file, pageLabel)
         if (index === 2 && comparisonTargets.has(`${template}-${variant}`)) {
           const crop = await evaluate(`(() => {
