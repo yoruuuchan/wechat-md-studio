@@ -768,6 +768,24 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `editor-akari`、`editor-yoru` 换成本地构建重截的 1584×905（带上「表格」按钮），
 > `typeset-golden.png` 换成当前示例稿文案（1100×1474，1.6 倍截取），`verify:sources` 全过。
 
+> 2026-11-02 部署记录（小红书卡片 + 八套设计系统主题上线）：`feat/design-templates`（`67313ed`，
+> 从 master `8ca3634` 快进）合入并推送 master。功能：编辑器新增「小红书卡片」视图，十套模板
+> （默认 / 铅字房 / 纸本 / 灯与夜 / 昆仑 / 裂隙 / core / 青空 / 基本 / 真夜中）与各自变体、
+> 3:4 / 1:1 / 9:16 比例（KIHON 固定 9:16）、单张 PNG / 整包 ZIP 导出；公众号主题新增八套设计系统，
+> 共 227 套。新增依赖 `html-to-image` / `jszip`，主工作区已 `npm ci`。
+> 验证：`check`、2971 项测试、`verify:themes`、`build` 全过；入口 `index-DPovH37K.js`（`jsxDEV`=0）/
+> `index-Djvsg2nl.css`，`dist/boot.js` sha256 `dcba1ae8…`。
+> 部署：包 `mopai-67313ed.tar.gz`（50,363,062 B，sha256 `c4fdaf88…`），13×4 MiB 分块逐块
+> sha256 后 `cat` 重组、整包哈希一致；安装前把上一版 dist 备份到
+> `/opt/mopai/backups/dist-20261102T054522Z-cf23b48c`，`flock` 安装于 **2026-11-02 05:49:37 UTC**。
+> 三重核对全过：线上 `dist/boot.js` sha256 = 本地；`index.html` 资产名本地 = 线上 = 公网
+> （`index-DPovH37K.js` / `index-Djvsg2nl.css`）；`ExecMainStartTimestamp` 即本次重启。
+> `sudo bash /opt/mopai/scripts/verify-all.sh` exit 0（ALL DEPLOYED CHECKS PASSED）。
+> 公网只读冒烟（无头 Chrome/CDP 9391）：页面正常加载；主题库 227/227；卡片视图 10 套模板；
+> KUNLUN 封面大标题可见（46px、位于封面内）；KIHON 自动切 9:16 且其余比例禁用、提示在位；
+> 控制台仅有 HANDOFF 第五节记录的两条 Cloudflare 内联探针 CSP violation，无其他报错。
+> 冒烟为验证封面临时在浏览器内改过稿（未保存、未上传），未对线上数据做任何写入。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
