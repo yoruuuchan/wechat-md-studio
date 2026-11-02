@@ -786,6 +786,24 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 控制台仅有 HANDOFF 第五节记录的两条 Cloudflare 内联探针 CSP violation，无其他报错。
 > 冒烟为验证封面临时在浏览器内改过稿（未保存、未上传），未对线上数据做任何写入。
 
+> 2026-11-02 部署记录（响应式编辑器布局上线）：`feat/responsive-layout`（`fb046ec`，从 master
+> `0273b37` 直接快进）合入并推送 master（origin/master = `fb046ec`）。功能：编辑器按窗口宽度分三档
+> （≥1200 三栏，640–1199 编辑 + 预览两栏、「图片与设置」改为右侧抽屉，<640 手机单面板），并去掉
+> 预览 820px、右栏 520px 的拖动上限。
+> 验证：`check`、2971 项测试、`verify:themes`、`build` 全过（冷跑一条 DOCX 5s 超时，单独复跑与
+> 热跑全量均通过，属已记录的冷跑偶发）；入口 `index-DjFHoBwf.js`（jsxDEV=0）/ `index-BqSt9jeO.css`，
+> `dist/boot.js` sha256 `bfaa6583…`。
+> 部署：包 `mopai-fb046ec.tar.gz`（50,364,377 B，sha256 `7e0585c4…`），13×4 MiB 分块逐块
+> sha256 后 `cat` 重组、整包哈希一致；安装前把上一版 dist 备份到
+> `/opt/mopai/backups/dist-20261102T072106Z-dcba1ae8`，`flock` 安装于 **2026-11-02 07:36:53 UTC**。
+> 三重核对全过：线上 `dist/boot.js` sha256 = 本地；`index.html` 资产名本地 = 线上 = 公网
+> （`index-DjFHoBwf.js` / `index-BqSt9jeO.css`）；`ExecMainStartTimestamp` 即本次重启。
+> `sudo bash /opt/mopai/scripts/verify-all.sh` exit 0（ALL DEPLOYED CHECKS PASSED）。
+> 公网只读冒烟（无头 Chrome/CDP 9391、全新临时 profile）：1536 / 1280 三栏且无横向滚动；768
+> 编辑 + 预览并排、「打开图片与设置」可开右侧抽屉且 Esc 关闭；390 单面板且顶部手机提示在位；
+> 页面正常加载，控制台只有 Cloudflare 内联探针 CSP violation（每次加载一条，本次四次加载共四条），
+> 无其他报错或页面异常。冒烟未保存、未上传、未改线上稿。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
