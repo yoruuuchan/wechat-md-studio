@@ -8,7 +8,12 @@ import { ZOOM_STEPS } from '@/lib/store'
 import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type SignatureConfig } from '@/lib/types'
 import { useI18n } from '@/hooks/useI18n'
 
+export type SidePanelTab = 'materials' | 'titles' | 'settings'
+
 interface Props {
+  /** Selected tab lives in the editor so closing the medium drawer keeps it. */
+  tab: SidePanelTab
+  onTabChange: (tab: SidePanelTab) => void
   materials: MaterialItem[]
   titles: string[]
   cover: string
@@ -152,7 +157,7 @@ export default function SidePanel(p: Props) {
           e.target.value = ''
         }}
       />
-      <Tabs defaultValue="materials" className="flex h-full flex-col">
+      <Tabs value={p.tab} onValueChange={(value) => p.onTabChange(value as SidePanelTab)} className="flex h-full flex-col">
         <div className="border-b border-line-2 px-3 pt-3">
           <TabsList className="h-8 w-full rounded-xl bg-surface-sunken" style={{ boxShadow: 'var(--shadow-inset)' }}>
             <TabsTrigger value="materials" className="flex-1 rounded-lg text-[12px]">{t('panel.tab.materials')}</TabsTrigger>

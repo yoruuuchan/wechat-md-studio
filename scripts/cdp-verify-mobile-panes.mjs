@@ -1,25 +1,28 @@
-// Production-browser acceptance for U03. No production data or credentials.
+// Production-browser acceptance for the responsive editor. No production data
+// or credentials.
 //
-// The narrow editor used to keep all three panes side by side: at 390px they
-// measured roughly 202/116/70px and up to eleven header buttons were pushed
-// past the right edge, the copy button among them. This script proves the fix:
+// The editor now has three placements by window width:
 //
-//   * 320 / 390 / 430 / 768 / 1024px show one pane at a time behind a switcher,
-//     with no page-level horizontal scroll and no clipped or overlapping
-//     control — the copy button and the save status among them;
-//   * 1440 / 1600px keep the three draggable columns, none squeezed below its
-//     minimum, with the article-name group and the save status readable in the
-//     bar;
-//   * switching panes, and rotating the device, keep the same CodeMirror view:
-//     the typed text, the caret and the scroll offset all survive, because the
-//     hidden panes stay mounted and laid out;
-//   * the actions a phone visitor actually needs still complete end to end:
-//     copying into WeChat, importing a Markdown file, and framing/uploading an
-//     image (which is the crop path);
-//   * dialogs open on a narrow screen, sit fully inside the viewport and close;
-//   * both languages and both themes work through the narrow "More" menu, the
-//     pane tabs are touch-sized and keyboard-operable, and a viewport shrink
-//     that stands in for the soft keyboard keeps the article and the layout.
+//   * 1536 / 1280px: the original three draggable columns, no pane squeezed
+//     below its minimum, with the article-name group and the save status
+//     readable in the bar; the preview and sidebar can be dragged past their
+//     old 820 / 520px caps (see cdp-verify-resize.mjs);
+//   * 1100 / 960 / 768 / 700px: editor + preview side by side, the images and
+//     settings column in a right-hand drawer that the compact top bar opens;
+//     the drawer closes with its button, Escape or a click outside, and keeps
+//     its selected tab and uploaded images while closed;
+//   * 320 / 390 / 430px: one pane at a time behind the existing switcher.
+//
+// Every width must show no page-level horizontal scroll and no clipped or
+// overlapping top-bar control. Phone pane switching and rotation keep the typed
+// text, caret and scroll offset because the hidden panes stay mounted. The
+// actions a phone visitor needs still complete end to end: copying into WeChat,
+// importing a Markdown file, and framing/uploading an image. Dialogs fit the
+// viewport, both languages and themes work, and a soft-keyboard-sized viewport
+// keeps the article.
+//
+// Also captures the review screenshots (both preview modes at every required
+// width, plus the open drawer at 768) and an index.html grouping them.
 //
 // Usage: node scripts/cdp-verify-mobile-panes.mjs [appPort=4128] [cdpPort=9728] [outputDir]
 import { spawn } from 'node:child_process'
@@ -154,8 +157,27 @@ async function stop(child) {
 }
 
 // ---------- fixture: a long article so the editor really scrolls ----------
-const longBody = Array.from({ length: 400 }, (_, i) => `第${i + 1}行内容，用来撑出滚动条，方便验证滚动位置。`).join('\\n')
-const fixtureContent = `# U03 A\\n\\nBASE_A\\n\\n${longBody}`
+const longBody = Array.from({ length: 400 }, (_, i) => `第${i + 1}行内容，用来撑出滚动条，方便验证滚动位置。`).join('\n')
+const fixtureContent = `# U03 A\n\nBASE_A\n\n${longBody}`
+// The review screenshots use a short, presentable article instead of the 400
+// scrolling lines the interaction checks need.
+const captureDoc = `# 把日常写成值得收藏的卡片
+
+在中等宽度的窗口里，编辑、预览和图片设置各得其所。
+
+## 写作与排版
+
+- 左边写 Markdown，右边即时看到公众号里的样子
+- 图片与设置收进右侧抽屉，需要时再拉出来
+- 分隔线可以随意拖动，版面跟着手感走
+
+> 好的留白，让读者知道自己读到了哪里。
+
+正文示例：记录真实的颜色、声音和人物，比堆砌形容词更能留下画面。
+
+## 下一次出发
+
+把生活写下来，再带着新的眼光出发。`
 
 try {
   await new Promise((resolve) => worker.listen(workerPort, '127.0.0.1', resolve))
@@ -272,6 +294,14 @@ try {
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk })
   }
   const escape = () => press('Escape', 'Escape', 27)
+// Radix flips data-state before the slide animation finishes; measure the
+// drawer only once its right edge has reached the viewport edge.
+const drawerOpenSettled = () => waitFor(`(() => {
+  const d = document.querySelector('[data-side-drawer]')
+  if (!d || d.dataset.state !== 'open') return false
+  const r = d.getBoundingClientRect()
+  return r.width > 0 && r.left >= -0.5 && r.right <= window.innerWidth + 0.5
+})()`, 'drawer open and settled', 12_000)
   const screenshot = async (name) => {
     await sleep(200)
     const result = await call('Page.captureScreenshot', { format: 'png' })
@@ -322,59 +352,196 @@ try {
     const sr = saveEl ? saveEl.getBoundingClientRect() : null
     const copyEl = document.querySelector('[data-onboarding="copy"]')
     const cr = copyEl ? copyEl.getBoundingClientRect() : null
+    const drawerButton = document.querySelector('[data-open-side-panel]')
+    const dr = drawerButton ? drawerButton.getBoundingClientRect() : null
+    const drawer = document.querySelector('[data-side-drawer]')
+    const drawerState = drawer ? {
+      state: drawer.dataset.state,
+      display: getComputedStyle(drawer).display,
+      visible: getComputedStyle(drawer).display !== 'none' && getComputedStyle(drawer).visibility !== 'hidden',
+      rect: (() => { const r = drawer.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom } })(),
+    } : null
+    const sidebar = document.querySelector('[data-onboarding="sidebar"]')
     const tabs = [...document.querySelectorAll('[data-pane-tab]')].map((el) => { const r = el.getBoundingClientRect(); return { id: el.dataset.paneTab, w: Math.round(r.width), h: Math.round(r.height) } })
     const groups = [...document.querySelector('[data-topbar]').children].map((el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width * 10) / 10, left: r.left, right: r.right } }).filter((g) => g.w > 0)
     return {
       vw,
+      mode: document.querySelector('[data-layout-mode]')?.dataset.layoutMode,
       overflow: document.documentElement.scrollWidth - vw,
       switcher: !!document.querySelector('[data-pane-switcher]'),
+      narrowNote: !!document.querySelector('[data-narrow-note]'),
       paneDivs: document.querySelectorAll('[data-pane]').length,
       visiblePanes: panes.filter((p) => p.visible).map((p) => p.id),
       panesWithBox: panes.filter((p) => p.box).length,
       panels: [...document.querySelectorAll('[data-slot="resizable-panel"]')].map((el) => Math.round(el.getBoundingClientRect().width)),
+      panelIds: [...document.querySelectorAll('[data-slot="resizable-panel"]')].map((el) => el.id),
       handles: document.querySelectorAll('[data-slot="resizable-handle"]').length,
       clipped: buttons.filter((b) => b.left < -0.5 || b.right > vw + 0.5).map((b) => b.text),
       overlaps,
       groups,
       save: sr ? { visible: sr.width > 0, w: Math.round(sr.width) } : null,
       copy: cr ? { visible: cr.width > 0, w: Math.round(cr.width), h: Math.round(cr.height), inside: cr.left >= -0.5 && cr.right <= vw + 0.5 } : null,
+      drawerButton: dr ? { visible: dr.width > 0, inside: dr.left >= -0.5 && dr.right <= vw + 0.5 } : null,
+      drawer: drawerState,
+      sidebar: sidebar ? { visible: sidebar.getBoundingClientRect().width > 0, text: sidebar.innerText.trim() } : null,
       tabs,
       docText: window.__mopaiCodemirror ? window.__mopaiCodemirror.state.doc.toString() : '',
     }
   })()`
 
-  // ---------- 1. narrow widths: one pane, nothing clipped or overlapping ----------
-  for (const width of [320, 390, 430, 768, 1024]) {
+  // ---------- 1. wide (>=1200): the original three columns ----------
+  let wideSidebarText = ''
+  for (const width of [1536, 1280]) {
+    await setWidth(width, 900)
+    const l = await evaluate(layoutProbe)
+    check(`${width}px: wide layout shows editor | preview | sidebar`, l.mode === 'wide' && l.switcher === false && JSON.stringify(l.panelIds) === JSON.stringify(['editor', 'preview', 'sidebar']), JSON.stringify({ mode: l.mode, panels: l.panelIds }))
+    check(`${width}px: three draggable columns with two handles`, l.panels.length === 3 && l.handles === 2, JSON.stringify({ panels: l.panels, handles: l.handles }))
+    check(`${width}px: no column is squeezed below its minimum`, l.panels[0] >= 318 && l.panels[1] >= 378 && l.panels[2] >= 238, JSON.stringify(l.panels))
+    check(`${width}px: no page-level horizontal scroll`, l.overflow <= 0, `overflow=${l.overflow}`)
+    check(`${width}px: every visible bar control is fully on screen`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
+    check(`${width}px: no two bar controls overlap`, l.overlaps.length === 0, l.overlaps.join(', ') || 'none')
+    check(`${width}px: the article-name group still has room in the bar`, l.groups[0].w > 0, JSON.stringify(l.groups))
+    check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
+    check(`${width}px: the copy button is fully on screen`, Boolean(l.copy && l.copy.visible && l.copy.inside), JSON.stringify(l.copy))
+    check(`${width}px: the narrow pane stack and drawer are not rendered`, l.paneDivs === 0 && l.drawer === null, JSON.stringify({ paneDivs: l.paneDivs, drawer: l.drawer }))
+    if (width === 1536) wideSidebarText = l.sidebar?.text || ''
+    await screenshot(`desktop-${width}.png`)
+  }
+
+  // ---------- 2. medium (640–1199): editor + preview, drawer for the rest ----------
+  for (const width of [1100, 960, 768, 700]) {
+    await setWidth(width, 900)
+    const l = await evaluate(layoutProbe)
+    check(`${width}px: medium layout shows editor | preview`, l.mode === 'medium' && l.switcher === false && JSON.stringify(l.panelIds) === JSON.stringify(['editor', 'preview']), JSON.stringify({ mode: l.mode, panels: l.panelIds }))
+    check(`${width}px: two columns with one handle and no sidebar column`, l.panels.length === 2 && l.handles === 1, JSON.stringify({ panels: l.panels, handles: l.handles }))
+    check(`${width}px: panes stay above the 240 / 360px medium minimums`, l.panels[0] >= 238 && l.panels[1] >= 358, JSON.stringify(l.panels))
+    check(`${width}px: no page-level horizontal scroll`, l.overflow <= 0, `overflow=${l.overflow}`)
+    check(`${width}px: every visible bar control is fully on screen`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
+    check(`${width}px: no two bar controls overlap`, l.overlaps.length === 0, l.overlaps.join(', ') || 'none')
+    check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
+    check(`${width}px: the copy button is fully on screen`, Boolean(l.copy && l.copy.visible && l.copy.inside), JSON.stringify(l.copy))
+    check(`${width}px: the drawer button is visible and fully on screen`, Boolean(l.drawerButton && l.drawerButton.visible && l.drawerButton.inside), JSON.stringify(l.drawerButton))
+    check(`${width}px: the drawer starts closed`, l.drawer === null, JSON.stringify(l.drawer))
+    check(`${width}px: the phone switcher and its note are not rendered`, l.paneDivs === 0 && l.switcher === false && l.narrowNote === false, JSON.stringify({ paneDivs: l.paneDivs, switcher: l.switcher, note: l.narrowNote }))
+    await screenshot(`medium-${width}.png`)
+  }
+
+  // ---------- 3. 768px drawer: open, same content as the wide column, all
+  // three close paths, and the selected tab survives close/reopen ----------
+  await setWidth(768, 900)
+  const drawerStart = await evaluate(layoutProbe)
+  check('768px: the drawer starts closed', drawerStart.drawer === null, JSON.stringify(drawerStart.drawer))
+  await click(`document.querySelector('[data-open-side-panel]')`)
+  await drawerOpenSettled()
+  const drawerOpen = await evaluate(`(() => {
+    const d = document.querySelector('[data-side-drawer]')
+    const r = d.getBoundingClientRect()
+    const aside = d.querySelector('[data-onboarding="sidebar"]')
+    return {
+      state: d.dataset.state,
+      visible: getComputedStyle(d).display !== 'none',
+      rect: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width },
+      text: aside ? aside.innerText.trim() : '',
+    }
+  })()`)
+  check(
+    '768px: the drawer is open and fits fully inside the viewport',
+    drawerOpen.visible === true && drawerOpen.rect.left >= -0.5 && drawerOpen.rect.right <= 768.5 && drawerOpen.rect.top >= -0.5 && drawerOpen.rect.bottom <= 900.5,
+    JSON.stringify(drawerOpen.rect),
+  )
+  check('768px: the drawer contains the same right column as the wide layout', drawerOpen.text === wideSidebarText, `${drawerOpen.text.length} vs ${wideSidebarText.length} chars`)
+  await click(`[...document.querySelectorAll('[data-side-drawer] [role=tab]')].find((el) => el.innerText.trim() === '设置')`)
+  await waitFor(`[...document.querySelectorAll('[data-side-drawer] [role=tab][aria-selected=true]')].some((el) => el.innerText.trim() === '设置')`, 'drawer settings tab selected')
+  check('768px: the settings tab renders inside the drawer', await evaluate(`!!document.querySelector('[data-side-drawer] [data-open-remote-mcp]')`))
+  // Close path 1: the built-in close button.
+  await click(`document.querySelector('[data-side-drawer] > button')`)
+  const closedByButton = await waitFor(`!document.querySelector('[data-side-drawer]')`, 'drawer closes with its button').then(() => true).catch(() => false)
+  check('768px: the close button closes the drawer', closedByButton)
+  await click(`document.querySelector('[data-open-side-panel]')`)
+  await drawerOpenSettled()
+  const retained = await evaluate(`(() => {
+    const d = document.querySelector('[data-side-drawer]')
+    return {
+      selected: [...d.querySelectorAll('[role=tab][aria-selected=true]')].map((el) => el.innerText.trim()),
+      settings: !!d.querySelector('[data-open-remote-mcp]'),
+    }
+  })()`)
+  check('768px: closing and reopening keeps the selected tab', retained.selected.includes('设置') && retained.settings === true, JSON.stringify(retained))
+  // Close path 2: Escape.
+  await escape()
+  const closedByEscape = await waitFor(`!document.querySelector('[data-side-drawer]')`, 'drawer closes with Escape').then(() => true).catch(() => false)
+  check('768px: Escape closes the drawer', closedByEscape)
+  // Close path 3: a click outside, on the overlay.
+  await click(`document.querySelector('[data-open-side-panel]')`)
+  await drawerOpenSettled()
+  await call('Input.dispatchMouseEvent', { type: 'mousePressed', x: 40, y: 450, button: 'left', buttons: 1, clickCount: 1 })
+  await call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 40, y: 450, button: 'left', buttons: 0, clickCount: 1 })
+  const closedByOutside = await waitFor(`!document.querySelector('[data-side-drawer]')`, 'drawer closes on outside click').then(() => true).catch(() => false)
+  check('768px: clicking outside closes the drawer', closedByOutside)
+
+  // ---------- 4. 768px card preview keeps the cover title visible ----------
+  await click(`document.querySelector('[data-preview-mode="cards"]')`)
+  await waitFor(`document.querySelector('[data-xhs-view]')?.dataset.ready === 'true' && !!document.querySelector('.xhs-card')`, 'card layout ready', 20_000)
+  const coverTitle = await evaluate(`(() => {
+    const card = document.querySelector('.xhs-card[data-card-index="0"][data-card-kind="cover"]')
+    if (!card) return { error: 'cover card missing' }
+    const title = card.querySelector('h1, .xhs-yoru-title')
+    if (!title) return { error: 'cover title missing' }
+    const c = card.getBoundingClientRect()
+    const r = title.getBoundingClientRect()
+    const cs = getComputedStyle(title)
+    const scroller = card.closest('[data-card-scroller]')
+    const s = scroller.getBoundingClientRect()
+    return {
+      text: (title.textContent || '').trim(),
+      fontSize: parseFloat(cs.fontSize),
+      visibility: cs.visibility,
+      display: cs.display,
+      opacity: parseFloat(cs.opacity),
+      insideCard: r.left >= c.left - 0.5 && r.right <= c.right + 0.5 && r.top >= c.top - 0.5 && r.bottom <= c.bottom + 0.5,
+      insideScroller: r.bottom > s.top + 1 && r.top < s.bottom - 1,
+      width: r.width,
+      height: r.height,
+    }
+  })()`)
+  check(
+    '768px: the card cover headline is visible and inside its card',
+    !coverTitle.error && coverTitle.text.length > 0 && coverTitle.fontSize >= 18 && coverTitle.opacity > 0 && coverTitle.visibility === 'visible' && coverTitle.display !== 'none' && coverTitle.insideCard === true && coverTitle.insideScroller === true,
+    JSON.stringify(coverTitle),
+  )
+  await screenshot('cards-768.png')
+  await click(`document.querySelector('[data-preview-mode="wechat"]')`)
+  await sleep(400)
+
+  // ---------- 5. phone (<640): one pane, nothing clipped or overlapping ----------
+  for (const width of [320, 390, 430]) {
     await setWidth(width)
     const l = await evaluate(layoutProbe)
-    check(`${width}px: a pane switcher is shown and exactly one pane is visible`, l.switcher === true && l.paneDivs === 3 && l.visiblePanes.length === 1, JSON.stringify({ switcher: l.switcher, visible: l.visiblePanes }))
+    check(`${width}px: a pane switcher is shown and exactly one pane is visible`, l.mode === 'phone' && l.switcher === true && l.paneDivs === 3 && l.visiblePanes.length === 1, JSON.stringify({ mode: l.mode, switcher: l.switcher, visible: l.visiblePanes }))
     check(`${width}px: all three panes keep a layout box (so scroll and caret survive)`, l.panesWithBox === 3, `panesWithBox=${l.panesWithBox}`)
     check(`${width}px: no page-level horizontal scroll`, l.overflow <= 0, `overflow=${l.overflow}`)
-    check(`${width}px: no header button is clipped`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
+    check(`${width}px: every visible bar control is fully on screen`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
     check(`${width}px: no two bar controls overlap`, l.overlaps.length === 0, l.overlaps.join(', ') || 'none')
     check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
     check(`${width}px: the copy button is fully on screen`, Boolean(l.copy && l.copy.visible && l.copy.inside), JSON.stringify(l.copy))
     check(`${width}px: pane tabs are touch-sized`, l.tabs.length === 3 && l.tabs.every((t) => t.h >= 28 && t.w >= 48), JSON.stringify(l.tabs))
-    check(`${width}px: the three-column group is not rendered`, l.panels.length === 0 && l.handles === 0, JSON.stringify({ panels: l.panels, handles: l.handles }))
+    check(`${width}px: the three-column group and the medium drawer are not rendered`, l.panels.length === 0 && l.handles === 0 && l.drawer === null, JSON.stringify({ panels: l.panels, handles: l.handles, drawer: l.drawer }))
+    check(`${width}px: the phone-only note is present`, l.narrowNote === true)
     await screenshot(`narrow-${width}.png`)
   }
 
-  // ---------- 2. wide widths: the desktop three columns survive ----------
-  for (const width of [1440, 1600]) {
+  // ---------- 6. exact tier boundaries: 1200 / 1199 and 640 / 639 ----------
+  for (const [width, expected] of [[1200, 'wide'], [1199, 'medium'], [640, 'medium'], [639, 'phone']]) {
     await setWidth(width, 900)
     const l = await evaluate(layoutProbe)
-    check(`${width}px: three draggable columns`, l.switcher === false && l.panels.length === 3 && l.handles === 2, JSON.stringify({ panels: l.panels, handles: l.handles }))
-    check(`${width}px: no column is squeezed below its minimum`, l.panels[0] >= 318 && l.panels[1] >= 378 && l.panels[2] >= 238, JSON.stringify(l.panels))
-    check(`${width}px: no page-level horizontal scroll`, l.overflow <= 0, `overflow=${l.overflow}`)
-    check(`${width}px: no header button is clipped`, l.clipped.length === 0, l.clipped.join(', ') || 'none')
-    check(`${width}px: no two bar controls overlap`, l.overlaps.length === 0, l.overlaps.join(', ') || 'none')
-    check(`${width}px: the article-name group still has room in the bar`, l.groups[0].w > 0, JSON.stringify(l.groups))
-    check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
-    check(`${width}px: the narrow pane stack is not rendered`, l.paneDivs === 0, `paneDivs=${l.paneDivs}`)
-    await screenshot(`desktop-${width}.png`)
+    check(`${width}px: lands in the ${expected} tier`, l.mode === expected, `mode=${l.mode}`)
+    check(`${width}px: no horizontal overflow or clipped bar control at the boundary`, l.overflow <= 0 && l.clipped.length === 0, JSON.stringify({ overflow: l.overflow, clipped: l.clipped }))
+    if (expected === 'wide') check(`${width}px: the boundary still has three columns`, JSON.stringify(l.panelIds) === JSON.stringify(['editor', 'preview', 'sidebar']), JSON.stringify(l.panelIds))
+    if (expected === 'medium') check(`${width}px: the boundary has two columns plus the drawer button`, JSON.stringify(l.panelIds) === JSON.stringify(['editor', 'preview']) && Boolean(l.drawerButton?.visible), JSON.stringify({ panels: l.panelIds, drawer: l.drawerButton }))
+    if (expected === 'phone') check(`${width}px: the boundary has the single-pane switcher`, l.switcher === true && l.visiblePanes.length === 1, JSON.stringify({ switcher: l.switcher, visible: l.visiblePanes }))
   }
 
-  // ---------- 3. switching panes keeps text, caret and scroll ----------
+  // ---------- 7. switching panes keeps text, caret and scroll ----------
   await setWidth(390)
   const before = await evaluate(`(() => {
     const v = window.__mopaiCodemirror
@@ -403,22 +570,31 @@ try {
   check('390px: the caret survived the panel switch', after.sel === before.sel, `${after.sel} vs ${before.sel}`)
   check('390px: the scroll offset survived the panel switch', after.scroll === before.scroll, `${after.scroll} vs ${before.scroll}`)
 
-  // ---------- 4. rotation keeps one mode and the same view ----------
+  // ---------- 8. rotation crosses from phone to medium and keeps the text ----------
   await call('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 1, mobile: false })
-  await sleep(500)
+  await sleep(800)
   const rotated = await evaluate(`(() => ({
+    mode: document.querySelector('[data-layout-mode]')?.dataset.layoutMode,
     switcher: !!document.querySelector('[data-pane-switcher]'),
-    same: window.__mopaiCodemirror === window.__u03View,
+    panels: [...document.querySelectorAll('[data-slot="resizable-panel"]')].map((p) => p.id),
     keeps: window.__mopaiCodemirror.state.doc.toString().includes('U03_MARK'),
     overflow: document.documentElement.scrollWidth - window.innerWidth,
     clipped: [...document.querySelectorAll('header button')].filter((b) => b.getBoundingClientRect().width > 0).filter((b) => { const r = b.getBoundingClientRect(); return r.left < -0.5 || r.right > window.innerWidth + 0.5 }).length,
   }))()`)
-  check('landscape 844x390 stays in the single-pane layout', rotated.switcher === true, JSON.stringify(rotated))
-  check('rotation keeps the same editor view and the typed text', rotated.same === true && rotated.keeps === true, JSON.stringify(rotated))
+  check('landscape 844x390 switches to the medium two-column layout', rotated.mode === 'medium' && rotated.switcher === false && JSON.stringify(rotated.panels) === JSON.stringify(['editor', 'preview']), JSON.stringify(rotated))
+  check('crossing into medium keeps the typed text', rotated.keeps === true, JSON.stringify(rotated))
   check('rotation leaves no horizontal scroll or clipped header button', rotated.overflow <= 0 && rotated.clipped === 0, JSON.stringify(rotated))
   await screenshot('rotated-844x390.png')
+  await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: false })
+  await sleep(800)
+  const portrait = await evaluate(`(() => ({
+    mode: document.querySelector('[data-layout-mode]')?.dataset.layoutMode,
+    switcher: !!document.querySelector('[data-pane-switcher]'),
+    keeps: window.__mopaiCodemirror.state.doc.toString().includes('U03_MARK'),
+  }))()`)
+  check('rotating back to portrait returns to the phone switcher with the text', portrait.mode === 'phone' && portrait.switcher === true && portrait.keeps === true, JSON.stringify(portrait))
 
-  // ---------- 5. growing the window back to desktop rebuilds cleanly ----------
+  // ---------- 9. growing the window back to desktop rebuilds cleanly ----------
   await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false })
   await sleep(600)
   const grew = await evaluate(`(() => ({
@@ -429,7 +605,7 @@ try {
   check('crossing back to desktop keeps the article text', grew.keeps === true && grew.panels === 3, JSON.stringify(grew))
   check('crossing back to desktop leaves no horizontal scroll', grew.overflow <= 0, `overflow=${grew.overflow}`)
 
-  // ---------- 6. the actions a phone visitor needs still complete ----------
+  // ---------- 10. the actions a phone visitor needs still complete ----------
   await setWidth(390)
   await click(`document.querySelector('[data-onboarding="copy"]')`)
   const copied = await waitFor(`navigator.clipboard.readText().then((text) => text.includes('BASE_A'))`, 'copy reached the clipboard', 15_000).then(() => true).catch(() => false)
@@ -478,7 +654,7 @@ try {
   const uploaded = await waitFor(`window.__mopaiCodemirror.state.doc.toString().includes('img:')`, 'cropped image inserted into the article', 25_000).then(() => true).catch(() => false)
   check('390px: cropping and uploading an image completes', uploaded, `button=${uploadLabel}; ref=${await evaluate(`(window.__mopaiCodemirror.state.doc.toString().match(/img:[^)]+/) || ['none'])[0]`)}`)
 
-  // ---------- 7. dialogs open, sit inside the viewport and close ----------
+  // ---------- 11. dialogs open, sit inside the viewport and close ----------
   const dialogOpenClose = async (openExpr, label) => {
     // A dialog that is animating out leaves its overlay over the page for a
     // moment and would swallow the next click; wait for it to be gone first.
@@ -502,7 +678,7 @@ try {
   await waitFor(`document.querySelector('[data-open-remote-mcp]').getBoundingClientRect().height > 0`, 'advanced MCP entry expanded', 12_000)
   await dialogOpenClose(`document.querySelector('[data-open-remote-mcp]')`, 'the single-document MCP dialog')
 
-  // ---------- 8. language and theme through the narrow More menu ----------
+  // ---------- 12. language and theme through the narrow More menu ----------
   await click(`document.querySelector('[data-topbar-more]')`)
   await waitFor(`!!document.querySelector('[role=menu]')`, 'More menu for appearance')
   // The narrow bar keeps only the article name, the save status and the copy
@@ -533,7 +709,7 @@ try {
   await click(`document.querySelector('[role=menu] [data-lang="zh"]')`)
   await escape()
 
-  // ---------- 9. keyboard operation of the switcher ----------
+  // ---------- 13. keyboard operation of the switcher ----------
   await evaluate(`document.querySelector('[data-pane-tab="editor"]').focus()`)
   await press('ArrowRight', 'ArrowRight', 39)
   const afterArrow = await waitFor(`getComputedStyle(document.querySelector('[data-pane="preview"]')).visibility !== 'hidden'`, 'arrow key switched to preview', 8000).then(() => true).catch(() => false)
@@ -544,7 +720,7 @@ try {
   check('390px: Enter activates the focused pane tab', afterEnter)
   await click(`document.querySelector('[data-pane-tab="editor"]')`)
 
-  // ---------- 10. viewport shrink standing in for the soft keyboard ----------
+  // ---------- 14. viewport shrink standing in for the soft keyboard ----------
   // By now the open article is the imported one and it carries an uploaded
   // image, so this also covers "an upload finished and the text is intact".
   const textBeforeShrink = await evaluate(`window.__mopaiCodemirror.state.doc.toString()`)
@@ -566,6 +742,45 @@ try {
   check('a keyboard-sized viewport has no horizontal scroll', shrunk.overflow <= 0, `overflow=${shrunk.overflow}`)
   await screenshot('keyboard-shrunk-390.png')
 
+  // ---------- 15. review screenshots: both previews at every tier width ----------
+  // 390 is the required phone sample; the other widths are the ones the layout
+  // brief names explicitly.
+  const captureWidths = [1536, 1280, 1100, 960, 768, 700, 390]
+  for (const width of captureWidths) {
+    await setWidth(width, width === 390 ? 844 : 900)
+    await evaluate(`(() => {
+      const v = window.__mopaiCodemirror
+      v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: ${JSON.stringify(captureDoc)} } })
+      return true
+    })()`)
+    await sleep(700)
+    if (width < 640) {
+      await click(`document.querySelector('[data-pane-tab="preview"]')`)
+      await waitFor(`getComputedStyle(document.querySelector('[data-pane="preview"]')).visibility !== 'hidden'`, 'phone preview visible for screenshots')
+    }
+    await waitFor(`document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'true'`, 'WeChat preview selected')
+    await evaluate('document.fonts.ready.then(() => true)')
+    await screenshot(`layout-${width}-wechat.png`)
+    await click(`document.querySelector('[data-preview-mode="cards"]')`)
+    await waitFor(`document.querySelector('[data-xhs-view]')?.dataset.ready === 'true' && !!document.querySelector('.xhs-card')`, 'cards ready for screenshot', 20_000)
+    await evaluate('document.fonts.ready.then(() => true)')
+    await sleep(400)
+    await screenshot(`layout-${width}-cards.png`)
+  }
+
+  // The drawer's own review shot, on the required 768px width.
+  await setWidth(768, 900)
+  await evaluate(`(() => {
+    const v = window.__mopaiCodemirror
+    v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: ${JSON.stringify(captureDoc)} } })
+    return true
+  })()`)
+  await sleep(700)
+  await click(`document.querySelector('[data-open-side-panel]')`)
+  await drawerOpenSettled()
+  await sleep(400)
+  await screenshot('layout-768-drawer.png')
+
   check('no page errors along the way', exceptions.length === 0 && consoleErrors.length === 0, { exceptions: exceptions.length, consoleErrors: consoleErrors.slice(0, 3) })
 } catch (error) {
   check('script completed without throwing', false, error.stack || error.message)
@@ -576,9 +791,49 @@ try {
   if (worker.listening) await new Promise((resolve) => worker.close(resolve))
 }
 
+// The review page is plain static HTML next to the screenshots; verify-out/ is
+// ignored, so it never enters the commit.
+function writeReviewIndex() {
+  const widths = [1536, 1280, 1100, 960, 768, 700, 390]
+  const figure = (src, label) => {
+    if (!fs.existsSync(path.join(output, src))) return ''
+    return `<figure><img src="${src}" alt="${label}"><figcaption>${label}</figcaption></figure>`
+  }
+  const sections = widths.map((width) => {
+    const drawer = width === 768 ? figure('layout-768-drawer.png', '768px · 抽屉打开') : ''
+    return `<section><h2>${width}px</h2><div class="pair">
+      ${figure(`layout-${width}-wechat.png`, `${width}px · 公众号预览`)}
+      ${figure(`layout-${width}-cards.png`, `${width}px · 小红书卡片预览`)}
+      ${drawer}
+    </div></section>`
+  }).join('\n')
+  const html = `<!doctype html>
+<html lang="zh">
+<meta charset="utf-8">
+<title>芦苇布局验收截图</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; padding: 32px; background: #f4f1ea; color: #2b2a26; font: 14px/1.5 "Noto Sans SC", system-ui, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p.lead { margin: 0 0 28px; color: #6b675d; }
+  section { margin: 0 0 36px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; align-items: start; }
+  figure { margin: 0; background: #fff; border: 1px solid #ddd6c8; border-radius: 10px; overflow: hidden; }
+  img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 8px 12px; font-size: 12px; color: #6b675d; border-top: 1px solid #eee7da; }
+</style>
+<h1>芦苇 · 响应式编辑器布局</h1>
+<p class="lead">每个宽度各一张公众号预览与小红书卡片预览；768px 另附抽屉打开状态。窗口高度 900px（390px 宽为 844px）。</p>
+${sections}
+</html>`
+  fs.writeFileSync(path.join(output, 'index.html'), html)
+}
+writeReviewIndex()
+
 const failed = checks.filter((c) => !c.passed)
 const summary = {
-  task: 'U03 · narrow editor as a usable single-pane layout',
+  task: 'Responsive editor: wide three columns, medium two columns + drawer, phone single pane',
   checks,
   exceptions: exceptions.length,
   consoleErrors,

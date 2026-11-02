@@ -15,7 +15,7 @@ However much AI is involved, the source remains ordinary Markdown: readable, edi
 
 [Theme library](https://wechat.yoru-and-akari.dev/themes) · [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) · [Acknowledgements](https://wechat.yoru-and-akari.dev/references)
 
-Made by Yoru, as a personal project that is continuously used and improved. The interface switches between Chinese and English (Chinese by default, remembered per browser); browsers at 1440px and wider get three draggable columns, and narrower windows switch between Edit / Preview / Images & settings one pane at a time. A five-step tour runs on the first visit and can be replayed from settings. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
+Made by Yoru, as a personal project that is continuously used and improved. The interface switches between Chinese and English (Chinese by default, remembered per browser); browsers at 1200px and wider get three draggable columns; 640–1199px shows Edit and Preview side by side, with Images & settings in a right-hand drawer; phones switch between Edit / Preview / Images & settings one pane at a time. A five-step tour runs on the first wide-screen visit and can be replayed from settings. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
 
 | Light · akari | Dark · yoru |
 |:--:|:--:|

@@ -3,23 +3,41 @@ import * as React from "react"
 const MOBILE_BREAKPOINT = 768
 
 /**
- * Where the editor stops trying to show three columns at once.
+ * Editor layout thresholds.
  *
- * Two constraints set this, and the top bar is the binding one. The panes carry
- * a minimum of 320 + 380 + 240px plus two handles, so below roughly 950px they
- * squeeze each other into unusable slivers. The top bar needs far more than
- * that: measured from 1280 to 1600, the article-name group only stops pushing
- * the theme switcher around at about 1440, and the save status is not readable
- * at all until roughly 1536. Below that flexbox silently collapses the group
- * rather than reporting an overflow, so the article name and save status simply
- * disappear.
+ * Phone (<640): one pane at a time. This is the only mode where a single column
+ * is all that fits, and it keeps the existing switcher behavior.
  *
- * Switching at 1439 keeps every control readable, and keeps a tablet in one
- * mode through a rotation (portrait 768 and landscape 1024 both stay
- * single-pane), so the panes are never torn down and rebuilt while someone is
- * editing.
+ * Medium (640–1199): editor and preview side by side, with the images/settings
+ * column moved into a drawer. At 640 the two columns' 240 + 360px minimums and
+ * the divider still fit; 1199 keeps a half-screen laptop window out of the
+ * cramped three-column range.
+ *
+ * Wide (>=1200): the original three columns. Their minimums total 940px plus
+ * dividers, so 1200 leaves roughly 260px of slack instead of squeezing every
+ * pane to its floor. The three columns are not tied to the top bar's own
+ * threshold: the bar needs about 1440px to show every action in one row, so
+ * 1200–1439 keeps the compact bar while the panes are already wide.
  */
-const NARROW_EDITOR_MAX = 1439
+export const PHONE_EDITOR_MAX = 639
+export const WIDE_EDITOR_MIN = 1200
+export const COMPACT_BAR_MAX = 1439
+
+export type EditorLayoutMode = "phone" | "medium" | "wide"
+
+export interface EditorLayout {
+  mode: EditorLayoutMode
+  /** The full one-row top bar needs this much room; below it the bar is compact. */
+  compactBar: boolean
+}
+
+function readEditorLayout(): EditorLayout {
+  const width = window.innerWidth
+  return {
+    mode: width <= PHONE_EDITOR_MAX ? "phone" : width < WIDE_EDITOR_MIN ? "medium" : "wide",
+    compactBar: width <= COMPACT_BAR_MAX,
+  }
+}
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
@@ -37,23 +55,28 @@ export function useIsMobile() {
   return !!isMobile
 }
 
-/** True while the editor must show one pane at a time. */
-export function useIsNarrowEditor() {
-  const query = `(max-width: ${NARROW_EDITOR_MAX}px)`
-  // Read the media query during the first render rather than correcting after
-  // mount: starting on the three-column layout would paint one frame of the
-  // squeezed panes on a phone before the effect switched it over.
-  const [narrow, setNarrow] = React.useState<boolean>(() => window.matchMedia(query).matches)
+/**
+ * Where the editor's three panes are placed, plus whether the top bar has room
+ * for all of its actions. Read the media queries during the first render rather
+ * than correcting after mount: starting on the desktop layout would paint one
+ * frame of squeezed panes on a phone before the effect switched it over.
+ */
+export function useEditorLayout(): EditorLayout {
+  const [layout, setLayout] = React.useState<EditorLayout>(readEditorLayout)
 
   React.useEffect(() => {
-    const mql = window.matchMedia(query)
-    const onChange = () => {
-      setNarrow(mql.matches)
+    const queries = [
+      window.matchMedia(`(max-width: ${PHONE_EDITOR_MAX}px)`),
+      window.matchMedia(`(max-width: ${WIDE_EDITOR_MIN - 1}px)`),
+      window.matchMedia(`(max-width: ${COMPACT_BAR_MAX}px)`),
+    ]
+    const onChange = () => setLayout(readEditorLayout())
+    for (const mql of queries) mql.addEventListener("change", onChange)
+    setLayout(readEditorLayout())
+    return () => {
+      for (const mql of queries) mql.removeEventListener("change", onChange)
     }
-    mql.addEventListener('change', onChange)
-    setNarrow(mql.matches)
-    return () => mql.removeEventListener('change', onChange)
-  }, [query])
+  }, [])
 
-  return narrow
+  return layout
 }

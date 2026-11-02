@@ -12,7 +12,7 @@ import TopBar from '@/components/TopBar'
 import EditorPane, { type EditorHandle, type EditorViewState } from '@/components/EditorPane'
 import MarkdownToolbar, { type BrushMode, type ToolbarAction, type ToolbarState } from '@/components/MarkdownToolbar'
 import PreviewPane from '@/components/PreviewPane'
-import SidePanel from '@/components/SidePanel'
+import SidePanel, { type SidePanelTab } from '@/components/SidePanel'
 import RatioPicker from '@/components/RatioPicker'
 import ManualCropper from '@/components/ManualCropper'
 import PublishPreflight, { type PublishAction } from '@/components/PublishPreflight'
@@ -67,6 +67,7 @@ import type { Theme } from '@/lib/theme-kit'
 import { cleanHtml, copyPlain, copyRichText, downloadFile, previewPage } from '@/lib/clipboard'
 import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from '@/lib/store'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import PaneSwitcher, { type EditorPaneId } from '@/components/PaneSwitcher'
 import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { useRemoteMcp } from '@/hooks/useRemoteMcp'
@@ -108,7 +109,7 @@ import {
   type WriteTarget,
 } from '@/lib/upload-writeback'
 import { useI18n } from '@/hooks/useI18n'
-import { useIsNarrowEditor } from '@/hooks/use-mobile'
+import { useEditorLayout } from '@/hooks/use-mobile'
 import type { CardOptions } from '@/lib/cards'
 
 const CardsView = lazy(() => import('@/components/CardsView'))
@@ -181,9 +182,20 @@ interface FrameTask {
 
 export default function EditorPage() {
   const { t } = useI18n()
-  /** Below this the three columns would squeeze, so one pane is shown at a time. */
-  const narrow = useIsNarrowEditor()
+  /**
+   * Three placements by window width: one pane at a time on a phone, editor +
+   * preview with the images/settings drawer in the middle, and the original
+   * three columns on a wide window. The top bar switches separately at 1440.
+   */
+  const { mode, compactBar } = useEditorLayout()
+  const wide = mode === 'wide'
+  const medium = mode === 'medium'
+  const phone = mode === 'phone'
   const [pane, setPane] = useState<EditorPaneId>('editor')
+  /** The images/settings drawer is only part of the medium layout. */
+  const [sideDrawerOpen, setSideDrawerOpen] = useState(false)
+  /** Owned here so closing the drawer does not reset the selected tab. */
+  const [sideTab, setSideTab] = useState<SidePanelTab>('materials')
   const [settings, setSettings] = useState(loadSettings)
   const [panelOpen, setPanelOpen] = useState(true)
   /**
@@ -299,14 +311,14 @@ export default function EditorPage() {
   useEffect(() => applyZoom(settings.zoom), [settings.zoom])
 
   // First visit only: let the panes settle, then auto-start the tour. The tour
-  // points at the three-column furniture (the side panel in particular), so it
-  // never auto-starts while the single-pane layout is up; the settings entry
-  // can still open it by hand.
+  // points at the three-column furniture, so it only auto-starts on the wide
+  // layout; the medium drawer and the phone switcher can still open it from
+  // the settings entry by hand.
   useEffect(() => {
-    if (narrow || hasSeenOnboarding()) return
+    if (!wide || hasSeenOnboarding()) return
     const timer = window.setTimeout(() => setTourRun((n) => (n === 0 ? 1 : n)), 700)
     return () => window.clearTimeout(timer)
-  }, [narrow])
+  }, [wide])
 
   // The article behind an agent's link only exists on the server, so it needs a
   // session. Hand the id to the login page in the URL and let it come back.
@@ -817,7 +829,7 @@ export default function EditorPage() {
     if (location.line !== undefined) {
       editorRef.current?.jumpToLine(location.line)
     }
-    if (narrow) setPane('editor')
+    if (phone) setPane('editor')
   }
 
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
@@ -1690,6 +1702,8 @@ export default function EditorPage() {
 
   const sidebarPaneBody = (
     <SidePanel
+      tab={sideTab}
+      onTabChange={setSideTab}
       materials={materials}
       titles={parsed.meta.titles}
       cover={parsed.meta.cover}
@@ -1719,10 +1733,10 @@ export default function EditorPage() {
   )
 
   return (
-    <div className="ya-page ya-viewport ya-safe-x ya-safe-b flex flex-col overflow-hidden">
+    <div data-layout-mode={mode} className="ya-page ya-viewport ya-safe-x ya-safe-b flex flex-col overflow-hidden">
       <TopBar
         docs={docs}
-        narrow={narrow}
+        narrow={compactBar}
         activeId={activeId}
         docName={activeDoc?.name || ''}
         onRename={(name) => updateActive({ name })}
@@ -1782,6 +1796,8 @@ export default function EditorPage() {
         onOpenReferences={() => navigate('/references')}
         panelOpen={panelOpen}
         onTogglePanel={() => setPanelOpen((v) => !v)}
+        onOpenSidePanel={medium ? () => setSideDrawerOpen(true) : undefined}
+        showPanelToggle={wide && compactBar}
         userName={user?.name || ''}
         onLogin={() => navigate('/login')}
         onLogout={logout}
@@ -1803,14 +1819,14 @@ export default function EditorPage() {
           </div>
         )}
 
-      {/* 窄屏访客的第二条说明：单面板切换怎么用、想要三栏去哪 */}
-      {narrow && (
+      {/* 手机上才需要这条说明：单面板切换怎么用；640px 起就是编辑 + 预览两栏 */}
+      {phone && (
         <div data-narrow-note className="flex shrink-0 items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3">
           {t('editor.narrowNote')}
         </div>
       )}
 
-      {narrow ? (
+      {phone ? (
         <PaneSwitcher pane={pane} onPaneChange={setPane}>
           {/* All three panes stay mounted and laid out; the inactive ones are
               only invisible, so the editor keeps its caret and scroll offset
@@ -1822,41 +1838,62 @@ export default function EditorPage() {
           </div>
         </PaneSwitcher>
       ) : (
-      <ResizablePanelGroup
-        orientation="horizontal"
-        className="min-h-0 flex-1"
-        defaultLayout={initialLayout}
-        onLayoutChange={(layout) => {
-          layoutRef.current = { ...layoutRef.current, ...layout }
-          try {
-            localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRef.current))
-          } catch {
-            // 宽度记不住也不碍事
-          }
-        }}
-      >
-        {/* 左：Markdown 编辑（支持拖图上传） */}
-        <ResizablePanel id="editor" defaultSize="55%" minSize="320px" className="min-w-0">
-          {editorPaneBody}
-        </ResizablePanel>
-
-        <ResizableHandle withHandle />
-
-        {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖） */}
-        <ResizablePanel id="preview" defaultSize="500px" minSize="380px" maxSize="820px" className="min-w-0 border-l border-line-2">
-          {previewPaneBody}
-        </ResizablePanel>
-
-        {/* 右：折叠侧栏 */}
-        {panelOpen && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" maxSize="520px" className="min-w-0">
-              {sidebarPaneBody}
+        <>
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="min-h-0 flex-1"
+            defaultLayout={initialLayout}
+            onLayoutChange={(layout) => {
+              layoutRef.current = { ...layoutRef.current, ...layout }
+              try {
+                localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRef.current))
+              } catch {
+                // 宽度记不住也不碍事
+              }
+            }}
+          >
+            {/* 左：Markdown 编辑（支持拖图上传）。中等档把最小宽度让给预览。 */}
+            <ResizablePanel id="editor" defaultSize={wide ? '55%' : '50%'} minSize={wide ? '320px' : '240px'} className="min-w-0">
+              {editorPaneBody}
             </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+
+            <ResizableHandle withHandle />
+
+            {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖，没有上限） */}
+            <ResizablePanel id="preview" defaultSize={wide ? '500px' : '50%'} minSize={wide ? '380px' : '360px'} className="min-w-0 border-l border-line-2">
+              {previewPaneBody}
+            </ResizablePanel>
+
+            {/* 右：只在宽屏占一栏，且可以一直拖宽；中等档改用下面的抽屉。 */}
+            {wide && panelOpen && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" className="min-w-0">
+                  {sidebarPaneBody}
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+
+          {/* The medium drawer reuses the same SidePanel; its selected tab is
+              owned by the page so closing and reopening keeps it, and uploaded
+              images already live in the page state. */}
+          {medium && (
+            <Sheet open={sideDrawerOpen} onOpenChange={setSideDrawerOpen}>
+              <SheetContent
+                side="right"
+                data-side-drawer
+                className="w-[420px] max-w-[92vw] gap-0 border-line-2 bg-surface-base p-0 pt-10 sm:max-w-[420px]"
+              >
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{t('editor.pane.side')}</SheetTitle>
+                  <SheetDescription>{t('editor.sideDrawerDescription')}</SheetDescription>
+                </SheetHeader>
+                {sidebarPaneBody}
+              </SheetContent>
+            </Sheet>
+          )}
+        </>
       )}
 
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />

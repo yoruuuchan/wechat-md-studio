@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { PanelRightOpen } from 'lucide-react'
 import type { Theme } from '@/lib/theme-kit'
 import { THEME_CATALOG, THEME_COUNT, catalogTheme } from '@/lib/theme-catalog'
 import { loadAllThemes } from '@/lib/theme-api'
@@ -23,7 +24,7 @@ import type { ArticleSaveStatus } from '@/lib/save-status'
 
 interface Props {
   docs: DocRecord[]
-  /** Narrow layout: the bar keeps only the article name and the primary actions. */
+  /** Compact bar (below 1440): only the article name, save state and key actions. */
   narrow: boolean
   activeId: string
   docName: string
@@ -59,6 +60,10 @@ interface Props {
   onOpenReferences: () => void
   panelOpen: boolean
   onTogglePanel: () => void
+  /** Medium layout: images/settings live in a drawer, so the compact bar opens it. */
+  onOpenSidePanel?: () => void
+  /** Wide layout with the compact bar: keep the column collapse control reachable. */
+  showPanelToggle?: boolean
   userName: string
   onLogin: () => void
   onLogout: () => void
@@ -515,6 +520,31 @@ export default function TopBar(p: Props) {
 
       {p.narrow && (
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {p.onOpenSidePanel && (
+            <button
+              data-open-side-panel
+              onClick={p.onOpenSidePanel}
+              title={t('topbar.sidePanelTitle')}
+              aria-label={t('editor.pane.side')}
+              className="ya-btn ya-btn-secondary ya-btn-sm !h-9 !w-9 !p-0"
+            >
+              <PanelRightOpen size={15} aria-hidden="true" />
+            </button>
+          )}
+          {p.showPanelToggle && (
+            <button
+              data-toggle-side-panel
+              onClick={p.onTogglePanel}
+              title={p.panelOpen ? t('topbar.panelCollapse') : t('topbar.panelExpand')}
+              aria-label={p.panelOpen ? t('topbar.panelCollapse') : t('topbar.panelExpand')}
+              className={`ya-btn ya-btn-sm !h-9 !w-9 !p-0 ${p.panelOpen ? 'ya-btn-ghost text-ink-1' : 'ya-btn-secondary'}`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M15 4v16" stroke="currentColor" strokeWidth="1.6" />
+              </svg>
+            </button>
+          )}
           {copyButton}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

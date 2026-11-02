@@ -1,10 +1,13 @@
-// Real-browser verification for the resizable three-column layout:
-//   1. both separators drag and resize their neighbours
-//   2. panel min sizes hold (preview cannot be crushed below 380px)
-//   3. the layout survives a reload (localStorage persistence)
-//   4. the sidebar still collapses and reopens cleanly
+// Real-browser verification for the resizable editor columns:
+//   1. on a wide window both separators drag and resize their neighbours
+//   2. every pane still respects its own minimum, and there is no maximum: the
+//      preview can pass 820px and the sidebar can pass 520px
+//   3. the medium (640–1199) two-column layout uses the lower 240/360 minimums
+//      and has no preview cap either
+//   4. the layout survives a reload (localStorage persistence)
+//   5. the sidebar still collapses and reopens cleanly on a wide window
 //
-// Usage: node scripts/cdp-verify-resize.mjs [appUrl]
+// Usage: node scripts/cdp-verify-resize.mjs [appUrl] [cdpPort]
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,8 +19,8 @@ for (const k of ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'all_
   delete process.env[k]
 }
 
-const APP = process.argv[2] || 'http://127.0.0.1:3200'
-const PORT = 9333
+const APP = process.argv[2] || 'http://127.0.0.1:3261'
+const PORT = Number(process.argv[3] || 9396)
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'mopai-cdp-rz-'))
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 
@@ -110,6 +113,9 @@ const evaluate = async (expression) => {
 const panelWidths = () =>
   evaluate(`[...document.querySelectorAll('[data-slot=resizable-panel]')].map(p => Math.round(p.getBoundingClientRect().width))`)
 
+const panelIds = () =>
+  evaluate(`[...document.querySelectorAll('[data-slot=resizable-panel]')].map(p => p.id)`)
+
 const handleCenters = () =>
   evaluate(`[...document.querySelectorAll('[data-slot=resizable-handle]')].map(h => {
     const r = h.getBoundingClientRect()
@@ -130,21 +136,31 @@ async function drag(handleIndex, dx) {
   await sleep(300)
 }
 
-await send('Page.navigate', { url: APP }, sessionId)
-await sleep(4000)
+async function setWidth(width) {
+  await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId)
+  await send('Page.navigate', { url: APP }, sessionId)
+  await sleep(4000)
+}
+
+// --- wide: 1536px, the width this suite must keep three columns at ----------
+await setWidth(1536)
 
 console.log('\n=== initial layout ===')
 const w0 = await panelWidths()
-console.log('  panel widths:', JSON.stringify(w0))
+const ids0 = await panelIds()
+console.log('  panel widths:', JSON.stringify(w0), 'ids:', JSON.stringify(ids0))
 check('three panels are mounted', Array.isArray(w0) && w0.length === 3, JSON.stringify(w0))
+check('the columns are editor / preview / sidebar', JSON.stringify(ids0) === JSON.stringify(['editor', 'preview', 'sidebar']), JSON.stringify(ids0))
 check('two drag handles exist', (await handleCenters()).length === 2)
 
-console.log('\n=== drag the editor/preview handle 100px to the right ===')
-await drag(0, 100)
+console.log('\n=== drag the editor/preview handle 40px to the right ===')
+// Small enough that the preview stays above its 380px minimum, so this checks
+// the one-to-one drag rather than the clamp.
+await drag(0, 40)
 const w1 = await panelWidths()
 console.log('  widths after:', JSON.stringify(w1))
-check('editor grew by ~100px', Math.abs(w1[0] - (w0[0] + 100)) <= 12, `${w0[0]} -> ${w1[0]}`)
-check('preview shrank by ~100px', Math.abs(w1[1] - (w0[1] - 100)) <= 12, `${w0[1]} -> ${w1[1]}`)
+check('editor grew by ~40px', Math.abs(w1[0] - (w0[0] + 40)) <= 12, `${w0[0]} -> ${w1[0]}`)
+check('preview shrank by ~40px', Math.abs(w1[1] - (w0[1] - 40)) <= 12, `${w0[1]} -> ${w1[1]}`)
 
 console.log('\n=== drag the preview/sidebar handle 60px to the left ===')
 await drag(1, -60)
@@ -152,18 +168,30 @@ const w2 = await panelWidths()
 console.log('  widths after:', JSON.stringify(w2))
 check('sidebar grew by ~60px', Math.abs(w2[2] - (w1[2] + 60)) <= 12, `${w1[2]} -> ${w2[2]}`)
 
-console.log('\n=== drag the preview far past its maximum, then past its minimum ===')
+console.log('\n=== preview keeps growing past the old 820px cap ===')
 // Handle 0 sits between editor and preview: left shrinks the editor (preview
 // grows), right grows it (preview shrinks).
 await drag(0, -2000)
 const wMax = await panelWidths()
 console.log('  after dragging far left:', JSON.stringify(wMax))
-check('preview is clamped at its 820px maximum', wMax[1] >= 810 && wMax[1] <= 822, `preview=${wMax[1]}`)
-check('editor is clamped at its 320px minimum', wMax[0] >= 318 && wMax[0] <= 340, `editor=${wMax[0]}`)
+check('preview is no longer clamped at 820px', wMax[1] > 850, `preview=${wMax[1]}`)
+check('editor still stops at its 320px minimum', wMax[0] >= 318 && wMax[0] <= 340, `editor=${wMax[0]}`)
+
+console.log('\n=== sidebar keeps growing past the old 520px cap ===')
+// Shrink the editor first, then pull preview to its 380px floor: the rest of
+// the 1536px window goes to the sidebar.
+await drag(0, 2000)
+await drag(1, -2000)
+const wSide = await panelWidths()
+console.log('  after dragging sidebar far left:', JSON.stringify(wSide))
+check('sidebar is no longer clamped at 520px', wSide[2] > 560, `sidebar=${wSide[2]}`)
+check('preview still stops at its 380px minimum', wSide[1] >= 378 && wSide[1] <= 400, `preview=${wSide[1]}`)
+
+console.log('\n=== drag the preview back to its minimum ===')
 await drag(0, 2000)
 const w3 = await panelWidths()
-console.log('  after dragging far right:', JSON.stringify(w3))
-check('preview is clamped at its 380px minimum', w3[1] >= 378 && w3[1] <= 400, `preview=${w3[1]}`)
+console.log('  widths after:', JSON.stringify(w3))
+check('preview can be squeezed to its 380px minimum', w3[1] >= 378 && w3[1] <= 400, `preview=${w3[1]}`)
 
 console.log('\n=== layout persists across a reload ===')
 await send('Page.navigate', { url: APP }, sessionId)
@@ -192,11 +220,32 @@ await sleep(500)
 const wReopened = await panelWidths()
 check('sidebar comes back at a usable width', wReopened.length === 3 && wReopened[2] >= 240, JSON.stringify(wReopened))
 
+// --- medium: 900px, two columns with the lower minimums and no cap ----------
+console.log('\n=== medium 900px: two columns, 240/360 minimums ===')
+await send('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId)
+await send('Page.navigate', { url: APP }, sessionId)
+await sleep(4000)
+const m0 = await panelWidths()
+const mids = await panelIds()
+console.log('  panel widths:', JSON.stringify(m0), 'ids:', JSON.stringify(mids))
+check('medium layout has editor + preview only', JSON.stringify(mids) === JSON.stringify(['editor', 'preview']), JSON.stringify(mids))
+check('one drag handle in the medium layout', (await handleCenters()).length === 1)
+check('medium panes start above their 240/360 minimums', m0[0] >= 240 && m0[1] >= 360, JSON.stringify(m0))
+check('the drawer button replaces the third column', await evaluate(`!!document.querySelector('[data-open-side-panel]')`))
+await drag(0, -2000)
+const mLeft = await panelWidths()
+check('medium editor stops at its 240px minimum', mLeft[0] >= 238 && mLeft[0] <= 260, `editor=${mLeft[0]}`)
+check('medium preview grows past 600px (no 820px cap needed at this width)', mLeft[1] > 600, `preview=${mLeft[1]}`)
+await drag(0, 2000)
+const mRight = await panelWidths()
+check('medium preview stops at its 360px minimum', mRight[1] >= 358 && mRight[1] <= 380, `preview=${mRight[1]}`)
+
 console.log('\n=== page errors ===')
 check('no uncaught exceptions in the page', pageErrors.length === 0, pageErrors.join(' | '))
 
 ws.close()
 chrome.kill()
+try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* Chrome may still hold the profile */ }
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${failed.length === 0 ? 'ALL CHECKS PASSED' : `${failed.length} CHECK(S) FAILED`} (${results.length} total)`)

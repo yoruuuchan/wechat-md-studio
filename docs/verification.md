@@ -43,7 +43,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
-| 窄屏单面板编辑器 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 320/390/430/768/1024px 单面板切换、1440/1600px 三栏可拖拽、无横向滚动与被裁切 / 重叠的顶栏控件；切面板与横竖屏后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；窄屏弹窗可开可关、中英文与明暗主题、触控尺寸与键盘切换、软键盘高度的视口收缩 |
+| 响应式编辑器布局 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 1536/1280px 三栏、1100/960/768/700px 编辑 + 预览两栏、320/390/430px 单面板；每档无横向滚动与被裁切 / 重叠的顶栏控件；768px 抽屉可开可关（按钮 / Esc / 点外部）、内容与宽屏右栏一致、关闭再开保留标签页、封面大标题可见；切面板后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；弹窗、中英文、明暗主题、触控与键盘、软键盘视口收缩；按档位截图并生成 index.html |
 | 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；中英文文案 |
 | 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
@@ -76,8 +76,8 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 侧栏单图回填脚本的 mock 图床同样用应用端口 +100（默认 4206），数据库为本工作树的 `data/audit-r06.db`。
 结果与截图写入 `verify-out/single-slot-upload/`；粘贴 / 拖入使用浏览器合成文件事件，覆盖应用处理与写回，不代表原生操作系统交互已验收。
 素材接口失败脚本同样把 mock 图床放在应用端口 +100（默认 4220），数据库为 `data/audit-r20.db`。
-窄屏单面板脚本自带应用、Chrome 与内存 mock 图床（应用端口 +100，默认 4228），数据库在临时目录；
-结果与截图默认写入临时目录，第三个参数可指定保留目录（如 `verify-out/u03-mobile-panes`）。
+响应式布局脚本自带应用、Chrome 与内存 mock 图床（应用端口 +100，默认 4228），数据库在临时目录；
+结果与截图默认写入临时目录，第三个参数可指定保留目录（如 `verify-out/layout`），并在其中生成按宽度分组的 `index.html`。
 浮动视口宽度用 `Emulation.setDeviceMetricsOverride` 的 `mobile:false`，与 `cdp-verify-i18n.mjs` 的 390px 口径一致；
 真机触摸、真实软键盘与横竖屏传感器仍需在设备上复核，脚本只覆盖布局与交互行为。
 公式就绪脚本同样把 mock 图床放在应用端口 +100（默认 4213），数据库为 `data/audit-r13.db`。
@@ -125,7 +125,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 编辑器 / 富文本 / 复制 / 图片粘贴 | [cdp-verify-editor-upgrades.mjs](../scripts/cdp-verify-editor-upgrades.mjs)：`node scripts/cdp-verify-editor-upgrades.mjs <url> <key> 9335` |
 | 工具栏 / 语义格式刷 / 表格对齐 | [cdp-verify-toolbar.mjs](../scripts/cdp-verify-toolbar.mjs)：`node scripts/cdp-verify-toolbar.mjs <url> <key> 9336`；独立本地生产应用，含工具栏「表格」的按列与整表对齐 |
 | 公式与 SVG | [cdp-verify-math.mjs](../scripts/cdp-verify-math.mjs)：`node scripts/cdp-verify-math.mjs <url>`；CDP 固定 9339 |
-| 图片操作 / 重裁 / 清除 | [cdp-verify-image-ops.mjs](../scripts/cdp-verify-image-ops.mjs)：`node scripts/cdp-verify-image-ops.mjs <url> <key>`；CDP 固定 9333；另有 [recrop](../scripts/cdp-verify-recrop.mjs)（轮播/网格 9:16、3:4、1:1 的真实上传像素、单图自由裁切与取消） / [resize](../scripts/cdp-verify-resize.mjs) |
+| 图片操作 / 重裁 / 清除 | [cdp-verify-image-ops.mjs](../scripts/cdp-verify-image-ops.mjs)：`node scripts/cdp-verify-image-ops.mjs <url> <key>`；CDP 固定 9333；另有 [recrop](../scripts/cdp-verify-recrop.mjs)（轮播/网格 9:16、3:4、1:1 的真实上传像素、单图自由裁切与取消） / [resize](../scripts/cdp-verify-resize.mjs)：`node scripts/cdp-verify-resize.mjs <url> [CDP端口]`，1536px 三栏无 820/520 上限、900px 两栏 240/360 下限、拖动与宽度持久化 |
 | 导入导出菜单 | [cdp-verify-io-menus.mjs](../scripts/cdp-verify-io-menus.mjs)：本地 URL 固定 `http://127.0.0.1:3202/`，CDP 固定 9337 |
 | 导入文件类型与真实文件 | [cdp-verify-import-picker.mjs](../scripts/cdp-verify-import-picker.mjs)：`node scripts/cdp-verify-import-picker.mjs <url> [CDP端口]`；连续切换 Markdown / DOCX / JSON 的 chooser `accept`，并通过同一 input 实际导入三种文件、重复选择 Markdown |
 | 大型整包备份 | [cdp-verify-large-backup.mjs](../scripts/cdp-verify-large-backup.mjs)：`node scripts/cdp-verify-large-backup.mjs <url> [CDP端口]`；真实导入 1,000 篇，核对 IndexedDB 正文、刷新恢复，并验证重复 id 不覆盖已有正文 |

@@ -85,6 +85,7 @@ const send = client(ws)
 const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
 const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
 await send('Page.enable', {}, sessionId)
+await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId)
 // A fresh profile would meet the first-run tour on the editor; this suite
 // drives the app as a returning visitor.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: 'try{localStorage.setItem("mopai.onboarding.v1","done")}catch{}' }, sessionId)
@@ -275,6 +276,55 @@ const settleA = await previewTop()
 await sleep(700)
 const settleB = await previewTop()
 check('the preview settles instead of jittering', Math.abs(settleA - settleB) <= 2, `${settleA} -> ${settleB}`)
+
+// ---------------------------------------------------------------------------
+console.log('\n=== medium layout keeps block-mapped scroll sync ===')
+// The 640–1199 layout puts editor and preview side by side without the sidebar
+// column. Both panes stay visible, so the same sync must still work there.
+await send('Emulation.setDeviceMetricsOverride', { width: 960, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId)
+await sleep(800)
+const mediumLayout = await evaluate(`(() => ({
+  panels: [...document.querySelectorAll('[data-slot="resizable-panel"]')].map((p) => p.id),
+  handles: document.querySelectorAll('[data-slot="resizable-handle"]').length,
+  switcher: !!document.querySelector('[data-pane-switcher]'),
+  drawerButton: !!document.querySelector('[data-open-side-panel]'),
+}))()`)
+check(
+  '960px: editor + preview, no sidebar column, no single-pane switcher',
+  JSON.stringify(mediumLayout.panels) === JSON.stringify(['editor', 'preview']) &&
+    mediumLayout.handles === 1 && mediumLayout.switcher === false &&
+    mediumLayout.drawerButton === true,
+  JSON.stringify(mediumLayout),
+)
+const mediumEdMax = await evaluate(`(() => {
+  const v = window.__mopaiCodemirror
+  return v.scrollDOM.scrollHeight - v.scrollDOM.clientHeight
+})()`)
+const mediumPvMax = await evaluate(`(() => {
+  const pv = document.querySelector('div.px-1.py-6').closest('[class*="overflow-y-auto"]')
+  return pv.scrollHeight - pv.clientHeight
+})()`)
+check('960px: both panes really scroll', mediumEdMax > 200 && mediumPvMax > 100, `editor=${mediumEdMax} preview=${mediumPvMax}`)
+await setEditorScroll(0)
+const mediumPvTop = await previewTop()
+check('960px: editor at top keeps the preview at top', mediumPvTop <= 2, `previewTop=${mediumPvTop}`)
+await setEditorScroll(Math.round(mediumEdMax * 0.5))
+const mediumPvMid = await previewTop()
+check(
+  '960px: editor halfway moves the preview with it',
+  mediumPvMid > mediumPvMax * 0.2 && mediumPvMid < mediumPvMax * 0.85,
+  `preview=${mediumPvMid}/${mediumPvMax}`,
+)
+await setPreviewScroll(Math.round(mediumPvMax * 0.8))
+const mediumEdAfterPreview = await editorTopLine()
+const mediumTotalLines = await evaluate(`window.__mopaiCodemirror.state.doc.lines`)
+check(
+  '960px: preview toward the bottom takes the editor with it',
+  mediumEdAfterPreview > mediumTotalLines * 0.3,
+  `editorTopLine=${mediumEdAfterPreview}/${mediumTotalLines}`,
+)
+await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId)
+await sleep(800)
 
 // ---------------------------------------------------------------------------
 console.log('\n=== sync toggle ===')
