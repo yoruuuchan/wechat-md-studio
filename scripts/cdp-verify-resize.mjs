@@ -136,6 +136,30 @@ async function drag(handleIndex, dx) {
   await sleep(300)
 }
 
+// The sidebar collapse control now lives in 更多. Radix opens on pointerdown,
+// so this must be a real pointer event rather than el.click().
+async function clickSelector(selector) {
+  const position = await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (!el) return null;
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const r = el.getBoundingClientRect();
+    return r.width && r.height ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  })()`)
+  if (!position) throw new Error('no visible target: ' + selector)
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...position }, sessionId)
+  await sleep(300)
+}
+
+async function toggleSidebar() {
+  await clickSelector('[data-topbar-more]')
+  for (let i = 0; i < 30 && !(await evaluate(`!!document.querySelector('[data-more-item="panel"]')`)); i++) await sleep(100)
+  await clickSelector('[data-more-item="panel"]')
+  await sleep(600)
+}
+
 async function setWidth(width) {
   await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId)
   await send('Page.navigate', { url: APP }, sessionId)
@@ -201,22 +225,11 @@ console.log('  widths after reload:', JSON.stringify(w4))
 check('panel widths are restored from storage', JSON.stringify(w4) === JSON.stringify(w3), `${w3} vs ${w4}`)
 
 console.log('\n=== sidebar collapses and reopens ===')
-// The collapse toggle lives in the TopBar; find it by its title.
-const toggled = await evaluate(`(() => {
-  const b = [...document.querySelectorAll('header button')].find(x => /侧栏|面板|panel/i.test(x.title || ''))
-  if (!b) return 'not-found:' + [...document.querySelectorAll('header button')].map(x => x.title).join(',')
-  b.click()
-  return 'clicked'
-})()`)
-console.log('  toggle:', toggled)
-await sleep(500)
+// The collapse toggle lives in 更多; the control keeps its title.
+await toggleSidebar()
 const wClosed = await panelWidths()
 check('sidebar panel unmounts when closed', wClosed.length === 2, JSON.stringify(wClosed))
-await evaluate(`(() => {
-  const b = [...document.querySelectorAll('header button')].find(x => /侧栏|面板|panel/i.test(x.title || ''))
-  if (b) b.click()
-})()`)
-await sleep(500)
+await toggleSidebar()
 const wReopened = await panelWidths()
 check('sidebar comes back at a usable width', wReopened.length === 3 && wReopened[2] >= 240, JSON.stringify(wReopened))
 

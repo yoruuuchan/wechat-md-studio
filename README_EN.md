@@ -33,7 +33,7 @@ Made by Yoru, as a personal project that is continuously used and improved. The 
 
 ### 1. Write and typeset it yourself
 
-Markdown is on the left, the live article preview in the middle, and images and settings on the right. Choose a theme, revise the structure, upload and crop images, adjust credits, copy the entire article as rich text, or select a passage in the preview and copy only that part.
+Markdown is on the left, the live article preview in the middle, and the current mode's theme or card template followed by images and settings on the right. The most prominent control in the top bar switches between **WeChat article** and **Xiaohongshu cards**. Choose a theme, revise the structure, upload and crop images, adjust credits, copy the entire article as rich text, or select a passage in the preview and copy only that part.
 
 Routine drafts are stored locally in your browser by default. Editing, typesetting, image uploads, copying and exports work without login. Hosted images are transferred into WeChat when you paste the article; check WeChat's own preview before publishing.
 
@@ -68,7 +68,7 @@ flowchart LR
 - **Article-oriented Markdown**: numbered sections, highlights, pull quotes, quotation boxes, centered text, credits, tables, block equations and Mermaid diagrams.
 - **Images**: upload, compression (automatic, a 1–5 MB target, or the original file), automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
 - **Editing and preview**: CodeMirror, a Markdown toolbar with per-column and whole-table alignment, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
-- **Xiaohongshu cards**: switch beside the article preview to paginate the same Markdown with an automatic cover, three aspect ratios and five backgrounds. Export 1080px-wide PNGs or a ZIP; put `---` on its own line for a manual page break. See [usage and implementation notes](docs/xhs-cards.md).
+- **Xiaohongshu cards**: switch to Xiaohongshu cards from the top-bar mode control; templates, ratios and backgrounds live in the sidebar's **Templates** tab. The same Markdown paginates with an automatic cover, three aspect ratios and five backgrounds. Export 1080px-wide PNGs or a ZIP; put `---` on its own line for a manual page break. See [usage and implementation notes](docs/xhs-cards.md).
 - **Storage**: local draft protection, plus the site owner's cloud draft library after login, with synchronization and conflict handling.
 - **Import / export**: import Markdown, DOCX and full document backups; rich text pasted from a web page or Word is converted to the article dialect. Export Markdown, article HTML, a complete preview page or a full document backup.
 - **Publish check**: before copying an article, exporting article HTML or exporting the full preview page, unfinished equations and diagrams, empty image slots and image URLs on the local machine or a private network are listed as blockers or warnings. A clean article goes straight through.

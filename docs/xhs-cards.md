@@ -1,7 +1,7 @@
 # 小红书卡片
 
-在编辑页预览区点击「小红书卡片」，同一份 Markdown 会自动分页。卡片先选模板：默认、铅字房（YORU Content）、纸本（PAPER）、灯与夜（yoru-and-akari Console）、昆仑（KUNLUN）、裂隙（RIFT）、core（霜纸/夜池）、青空（Aozora）、基本（KIHON）、真夜中（Mayonaka）；每套模板有自己的变体——默认是米白纸、纯白、方格本、主色浅底、夜读，铅字房是 Signal、Lab、Studio、Special，纸本是 Editorial、Analog、Midnight，灯与夜是 Akari、Yoru，昆仑是虚空、雪线，裂隙是深色、黎明，core 是霜纸、夜池，青空是昼、夜空，基本是银、玄，真夜中是午夜、日落。再选 3:4、1:1、9:16；KIHON 只有 9:16，选中它会自动切到 9:16 并禁用另外两种比例（按钮下方给一句提示）。每张下方的 PNG 按钮下载单张，「导出全部 ZIP」下载整套。
-比例、模板与变体在本次编辑会话内保留，切换模板时变体自动换成新模板的第一个，切换公众号预览或调整窗口大小后继续沿用；刷新页面恢复默认。
+在编辑页顶栏的模式入口切到「小红书卡片」，同一份 Markdown 会自动分页。卡片先在右栏「模板」标签里选模板：默认、铅字房（YORU Content）、纸本（PAPER）、灯与夜（yoru-and-akari Console）、昆仑（KUNLUN）、裂隙（RIFT）、core（霜纸/夜池）、青空（Aozora）、基本（KIHON）、真夜中（Mayonaka）；每套模板有自己的变体——默认是米白纸、纯白、方格本、主色浅底、夜读，铅字房是 Signal、Lab、Studio、Special，纸本是 Editorial、Analog、Midnight，灯与夜是 Akari、Yoru，昆仑是虚空、雪线，裂隙是深色、黎明，core 是霜纸、夜池，青空是昼、夜空，基本是银、玄，真夜中是午夜、日落。再选 3:4、1:1、9:16；KIHON 只有 9:16，选中它会自动切到 9:16 并禁用另外两种比例（按钮下方给一句提示）。每张下方的 PNG 按钮下载单张，顶栏的「导出全部 ZIP」下载整套。
+比例、模板与变体在本次编辑会话内保留，切换模板时变体自动换成新模板的第一个，切回公众号文章模式或调整窗口大小后继续沿用；刷新页面恢复默认。
 
 - 首个一级标题生成封面，紧接着不超过 60 字的段落作为副标题；没有一级标题时直接生成正文卡片。空稿不生成卡片，只有一级标题时生成一张封面。
 - 单独一行 `---` 是卡片的手动分页符。公众号预览、复制、HTML 导出仍按原有分隔线渲染。开头的 YAML front matter 仍由 Reed 的既有解析器处理。
@@ -23,8 +23,8 @@
 | 分页 | `src/cards.ts` | 隐藏容器实测、540px 宽、每套模板自己的页边距与正文宽、分段与标题跟随 |
 | 封面、页眉页脚 | `src/CardsView.tsx`、`src/styles.css` | 标题字号阶梯、色条、副标题、页码、作者位置；三套设计系统模板另有报头、书脊、双线、日期戳与胶囊页码 |
 | 正文 | `src/themes.ts` 的基础样式 | 18px 正文、1.8 行距、引用、代码、列表、表格和图片；模板在 `src/components/cards.css` 内按 `[data-template]` 覆写 |
-| 比例、模板、背景、导出 | `src/cards.ts`、`src/CardsView.tsx` | 三种比例、十套模板及其变体、1080px PNG、ZIP；KIHON 固定 9:16 |
-| 界面控件 | Reed `PreviewPane.tsx`、`src/index.css`；Console 的 `preview/buttons.html` | `ya-well` 凹陷承载、`ya-selected` 1.5px 描边、现有按钮与明暗 token |
+| 比例、模板、背景、导出 | `src/cards.ts`、`src/components/CardSettings.tsx`、`src/CardsView.tsx`、`src/components/TopBar.tsx` | 三种比例、十套模板及其变体、1080px PNG、ZIP；KIHON 固定 9:16；控件在右栏「模板」，整套导出在顶栏 |
+| 界面控件 | Reed `SidePanel.tsx`、`TopBar.tsx`、`PreviewPane.tsx`、`src/index.css`；Console 的 `preview/buttons.html` | `ya-well` 凹陷承载、`ya-selected` 1.5px 描边、现有按钮与明暗 token |
 
 围绕 Reed 的语义 AST 重写卡片渲染，未引入 mopai 的 marked。原来的公众号 Theme 和 renderer 无需改变。
 卡片有十套模板（Reed 默认加九套设计系统），各有自己的变体；默认模板的主色来自当前文章主题，公众号的 227 套主题不会整体移植到卡片上。

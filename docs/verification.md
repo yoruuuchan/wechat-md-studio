@@ -34,7 +34,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 
 | 改动范围 | 命令 | 覆盖 |
 |---|---|---|
-| 小红书卡片 | `node scripts/cdp-verify-xhs-cards.mjs 3201 9334` | SAMPLE_DOC / 中文长文、三比例 × 默认模板五背景、十套模板 × 各自变体的封面 + 前两页导出与像素对比（KIHON 固定 9:16，其余 3:4）、六套设计系统模板的封面标题 / 副标题 / 第 3 页正文对比度、KIHON 比例限制、PNG 尺寸与 ZIP 张数、明暗 / 中英界面、图片读取失败、卡片视图下改稿时卡片与阅读位置保持、CDP 实际字体；本地 mock 图床、独立 `data/test-xhs.db`，证据在 `verify-out/xhs/`，模板小样在 `verify-out/templates/` |
+| 小红书卡片 | `node scripts/cdp-verify-xhs-cards.mjs 3201 9334` | SAMPLE_DOC / 中文长文、右栏「模板」里的三比例 × 默认模板五背景、十套模板 × 各自变体的封面 + 前两页导出与像素对比（KIHON 固定 9:16，其余 3:4）、六套设计系统模板的封面标题 / 副标题 / 第 3 页正文对比度、KIHON 比例限制、PNG 尺寸与 ZIP 张数、明暗 / 中英界面、图片读取失败、卡片视图下改稿时卡片与阅读位置保持、CDP 实际字体；本地 mock 图床、独立 `data/test-xhs.db`，证据在 `verify-out/xhs/`，模板小样在 `verify-out/templates/` |
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
 | 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱 |
@@ -43,7 +43,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
-| 响应式编辑器布局 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 1536/1280px 三栏、1100/960/768/700px 编辑 + 预览两栏、320/390/430px 单面板；每档无横向滚动与被裁切 / 重叠的顶栏控件；768px 抽屉可开可关（按钮 / Esc / 点外部）、内容与宽屏右栏一致、关闭再开保留标签页、封面大标题可见；切面板后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；弹窗、中英文、明暗主题、触控与键盘、软键盘视口收缩；按档位截图并生成 index.html |
+| 响应式编辑器布局 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 1536/1280px 三栏、1100/960/768/700px 编辑 + 预览两栏、320/390/430px 单面板；每档无横向滚动与被裁切 / 重叠的顶栏控件；768px 抽屉可开可关（按钮 / Esc / 点外部）、内容与宽屏右栏一致（含模式专属的「主题 / 模板」标签）、关闭再开保留标签页、封面大标题可见；切面板后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；弹窗、中英文、明暗主题、触控与键盘、软键盘视口收缩；按档位截图并生成 index.html |
 | 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；中英文文案 |
 | 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
@@ -117,7 +117,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 分块失败与重试 | [cdp-verify-u05-load-failure.mjs](../scripts/cdp-verify-u05-load-failure.mjs)：`node scripts/cdp-verify-u05-load-failure.mjs <url> [CDP端口]`；路由分块被阻断时的可见错误页与重试、当前主题 pack 被阻断时正文不丢且可重试、离线 SPA 导航的错误页与恢复 |
 | 字体实际呈现 | [cdp-verify-u05-fonts.mjs](../scripts/cdp-verify-u05-fonts.mjs)：`node scripts/cdp-verify-u05-fonts.mjs <url> [CDP端口]`；Geist / Noto Sans SC 真实可用、导入主题的 Noto Serif SC 在标题实际生效、已移除的 Zen Kaku 不再有 @font-face |
 | 嵌套列表层级 / 起始序号 | [cdp-verify-nested-list.mjs](../scripts/cdp-verify-nested-list.mjs)：`node scripts/cdp-verify-nested-list.mjs <url> [CDP端口]` |
-| 界面语言 / 反馈表单 | [cdp-verify-i18n.mjs](../scripts/cdp-verify-i18n.mjs)：`node scripts/cdp-verify-i18n.mjs <url> [CDP端口] [mock邮件端口]`；自起 mock 邮件服务，应用需按脚本头部注释配置 `RESEND_*` 指向它；勿对公网运行 |
+| 界面语言 / 反馈表单 | [cdp-verify-i18n.mjs](../scripts/cdp-verify-i18n.mjs)：`node scripts/cdp-verify-i18n.mjs <url> [CDP端口] [mock邮件端口]`；语言切换已收进顶栏「更多」，脚本从菜单里选；自起 mock 邮件服务，应用需按脚本头部注释配置 `RESEND_*` 指向它；勿对公网运行 |
 | 收藏 / References | [cdp-verify-favorites.mjs](../scripts/cdp-verify-favorites.mjs)：`node scripts/cdp-verify-favorites.mjs <url> [CDP端口]`；无需登录 |
 | 使用规范 /terms 与侧栏入口 | [cdp-verify-terms.mjs](../scripts/cdp-verify-terms.mjs)：`node scripts/cdp-verify-terms.mjs <url> [CDP端口]`；无需登录 |
 | 同步滚动 / 布局变化 | [cdp-verify-scroll-sync.mjs](../scripts/cdp-verify-scroll-sync.mjs)：先读脚本参数；覆盖缩放、换纸、图片变化与往返漂移 |
@@ -125,7 +125,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 编辑器 / 富文本 / 复制 / 图片粘贴 | [cdp-verify-editor-upgrades.mjs](../scripts/cdp-verify-editor-upgrades.mjs)：`node scripts/cdp-verify-editor-upgrades.mjs <url> <key> 9335` |
 | 工具栏 / 语义格式刷 / 表格对齐 | [cdp-verify-toolbar.mjs](../scripts/cdp-verify-toolbar.mjs)：`node scripts/cdp-verify-toolbar.mjs <url> <key> 9336`；独立本地生产应用，含工具栏「表格」的按列与整表对齐 |
 | 公式与 SVG | [cdp-verify-math.mjs](../scripts/cdp-verify-math.mjs)：`node scripts/cdp-verify-math.mjs <url>`；CDP 固定 9339 |
-| 图片操作 / 重裁 / 清除 | [cdp-verify-image-ops.mjs](../scripts/cdp-verify-image-ops.mjs)：`node scripts/cdp-verify-image-ops.mjs <url> <key>`；CDP 固定 9333；另有 [recrop](../scripts/cdp-verify-recrop.mjs)（轮播/网格 9:16、3:4、1:1 的真实上传像素、单图自由裁切与取消） / [resize](../scripts/cdp-verify-resize.mjs)：`node scripts/cdp-verify-resize.mjs <url> [CDP端口]`，1536px 三栏无 820/520 上限、900px 两栏 240/360 下限、拖动与宽度持久化 |
+| 图片操作 / 重裁 / 清除 | [cdp-verify-image-ops.mjs](../scripts/cdp-verify-image-ops.mjs)：`node scripts/cdp-verify-image-ops.mjs <url> <key>`；CDP 固定 9333；另有 [recrop](../scripts/cdp-verify-recrop.mjs)（轮播/网格 9:16、3:4、1:1 的真实上传像素、单图自由裁切与取消） / [resize](../scripts/cdp-verify-resize.mjs)：`node scripts/cdp-verify-resize.mjs <url> [CDP端口]`，1536px 三栏无 820/520 上限、900px 两栏 240/360 下限、拖动与宽度持久化、侧栏折叠开关（已收进「更多」） |
 | 导入导出菜单 | [cdp-verify-io-menus.mjs](../scripts/cdp-verify-io-menus.mjs)：本地 URL 固定 `http://127.0.0.1:3202/`，CDP 固定 9337 |
 | 导入文件类型与真实文件 | [cdp-verify-import-picker.mjs](../scripts/cdp-verify-import-picker.mjs)：`node scripts/cdp-verify-import-picker.mjs <url> [CDP端口]`；连续切换 Markdown / DOCX / JSON 的 chooser `accept`，并通过同一 input 实际导入三种文件、重复选择 Markdown |
 | 大型整包备份 | [cdp-verify-large-backup.mjs](../scripts/cdp-verify-large-backup.mjs)：`node scripts/cdp-verify-large-backup.mjs <url> [CDP端口]`；真实导入 1,000 篇，核对 IndexedDB 正文、刷新恢复，并验证重复 id 不覆盖已有正文 |
@@ -133,11 +133,13 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 预览区局部复制 | [cdp-verify-selection-copy.mjs](../scripts/cdp-verify-selection-copy.mjs)：`node scripts/cdp-verify-selection-copy.mjs <url> [key] [CDP端口]`；默认 `http://127.0.0.1:3205/` 与 9338 |
 | UI 深色模式 | [cdp-verify-dark-theme.mjs](../scripts/cdp-verify-dark-theme.mjs)：`node scripts/cdp-verify-dark-theme.mjs <url> [key] [CDP端口]`；默认同样 3205，CDP 默认 9339，与公式脚本的固定 9339 相同，勿并发 |
 | 首次使用引导 | [cdp-verify-onboarding.mjs](../scripts/cdp-verify-onboarding.mjs)：`node scripts/cdp-verify-onboarding.mjs <url> [CDP端口]`；默认 `http://127.0.0.1:3100`，CDP 默认 9356；无需登录，新浏览器 profile 即首次访客 |
+| 编辑器界面重排（顶栏 / 模式入口 / 右栏） | [cdp-verify-ui-modes.mjs](../scripts/cdp-verify-ui-modes.mjs)：`node scripts/cdp-verify-ui-modes.mjs <url> [CDP端口] [输出目录]`；默认 `http://127.0.0.1:3271`、CDP 9397、输出 `verify-out/ui`，连接已启动的应用，自带 Chrome profile 与下载目录 |
 
 这几个自起无头 Chrome 的脚本只连接已启动的应用，Chrome 路径同样按 Windows 写定。
 `cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；
 折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
-`cdp-verify-dark-theme.mjs` 覆盖 `akari` / `yoru` 两态：`<html>` 上 `data-theme` 与 `.dark` 的同步、shadcn / Tailwind `dark:` 变体生效（侧栏 Tabs 在深色下可读，对比度 ≥ 3:1）并留两主题截图。
+`cdp-verify-dark-theme.mjs` 覆盖 `akari` / `yoru` 两态：`<html>` 上 `data-theme` 与 `.dark` 的同步、shadcn / Tailwind `dark:` 变体生效（侧栏四格 Tabs——主题或模板、图片、稿件信息、设置——在深色下可读，对比度 ≥ 3:1）并留两主题截图。
+`cdp-verify-ui-modes.mjs` 覆盖 1536 / 1280 / 960 / 768 / 640 / 390 六档：顶栏无横向溢出、可见控件不被裁切或重叠，≥960px 稿件名至少容纳八个汉字；顶栏四种模式入口、长图与动效占位不可选；切模式后右栏停在主题或模板；「更多」列出并真实打开草稿箱 / 素材库 / 导入 / 导出 / 外观与语言 / GitHub / 致谢 / 登录，登录后保存状态旁出现一键存草稿；卡片模板 / 比例 / 配色与公众号主题都实时换预览；公众号模式复制到剪贴板、卡片模式生成全套 ZIP；中英文与明暗两套主题下重测顶栏。截图与 `ui-modes.json` 写入输出目录，并生成按宽度分组的 `index.html`。
 `cdp-verify-onboarding.mjs` 覆盖首次使用引导：新 profile 自动出现并逐步命中五个锚点、进度与完成 / 跳过 / 关闭三条退出路径都写入本机状态、刷新与窄屏不再自动出现、设置内「重新查看使用引导」可重开、中英文文案、明暗两主题对比度 ≥ 3:1，以及引导关掉后编辑器输入仍实时进入预览；截图留在临时目录。
 
 ## 微信后台实测

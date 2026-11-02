@@ -149,6 +149,21 @@ check('preview scroller found and overflowing', !!s.preview && s.preview.scroll 
 
 // ---------------------------------------------------------------------------
 console.log('\n=== front matter line offset ===')
+// The image list lives behind the sidebar's 图片 tab now; the first tab is the
+// live theme picker.
+// Radix tabs activate on pointerdown, so this has to be a real pointer event
+// rather than a synthetic click().
+const materialsTabPoint = JSON.parse(await evaluate(`(() => {
+  const el = document.querySelector('[data-onboarding="sidebar"] [data-side-tab="materials"]')
+  if (!el) return JSON.stringify(null)
+  const r = el.getBoundingClientRect()
+  return JSON.stringify({ x: r.x + r.width / 2, y: r.y + r.height / 2 })
+})()`))
+if (materialsTabPoint) {
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...materialsTabPoint }, sessionId)
+  await clickPoint(materialsTabPoint.x, materialsTabPoint.y)
+}
+await sleep(400)
 // The sidebar's "jump to line" used to land on the front matter's closing ---
 // because block line numbers were counted from the body, not the file.
 const offsetOk = await evaluate(`(() => {
@@ -226,7 +241,10 @@ check(
   `editor=${edMid}/${edMax} preview=${pvAtMid}/${pvMax}`,
 )
 
-await setEditorScroll(edMax)
+// CodeMirror estimates block heights and grows its virtual scroll extent as it
+// scrolls, so the max measured before scrolling can be tens of pixels short.
+// Scroll past the end and let the browser clamp to the real bottom.
+await setEditorScroll(1e9)
 const pvAtEnd = await previewTop()
 check('editor at the bottom takes the preview with it', pvAtEnd > pvMax * 0.8, `preview=${pvAtEnd}/${pvMax}`)
 
@@ -235,7 +253,7 @@ console.log('\n=== scroll sync is monotonic ===')
 let monotonic = true
 let prevPv = -1
 for (const frac of [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]) {
-  await setEditorScroll(Math.round(edMax * frac))
+  await setEditorScroll(frac === 1 ? 1e9 : Math.round(edMax * frac))
   const pv = await previewTop()
   if (pv < prevPv - 2) monotonic = false
   prevPv = pv

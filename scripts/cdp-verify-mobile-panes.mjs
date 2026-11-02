@@ -294,6 +294,15 @@ try {
     await call('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk })
   }
   const escape = () => press('Escape', 'Escape', 27)
+  // Wait for the previous Radix menu to finish closing before opening 更多 again;
+  // an exit animation still in the DOM has zero-sized children, which used to
+  // make the next language click report "no visible target".
+  const openMore = async () => {
+    await waitFor(`!document.querySelector('[role=menu]')`, 'previous More menu cleared', 5000).catch(() => {})
+    await click(`document.querySelector('[data-topbar-more]')`)
+    await waitFor(`(() => { const el = document.querySelector('[role=menu] [data-lang]'); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 })()`, 'More menu settled')
+    await sleep(150)
+  }
 // Radix flips data-state before the slide animation finishes; measure the
 // drawer only once its right edge has reached the viewport edge.
 const drawerOpenSettled = () => waitFor(`(() => {
@@ -339,14 +348,19 @@ const drawerOpenSettled = () => waitFor(`(() => {
       box: el.getBoundingClientRect().width > 0,
     }))
     const visibleButtons = [...document.querySelectorAll('[data-topbar] button, [data-topbar] a')].filter((b) => b.getBoundingClientRect().width > 0)
-    const buttons = visibleButtons.map((b) => { const r = b.getBoundingClientRect(); return { text: (b.innerText || b.title || '').trim().slice(0, 22), left: r.left, right: r.right } })
+    const buttons = visibleButtons.map((b) => { const r = b.getBoundingClientRect(); return { text: (b.innerText || b.title || '').trim().slice(0, 22), left: r.left, right: r.right, top: r.top, bottom: r.bottom } })
     // Two controls that overlap are as broken as one pushed off screen; the
     // desktop bar used to let the save-status button slide over the drafts
-    // button when the header ran out of room.
+    // button when the header ran out of room. The phone bar has two rows, so
+    // only boxes that also share vertical space count as an overlap.
     const sorted = [...buttons].sort((a, b) => a.left - b.left)
     const overlaps = []
     for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i - 1].right > sorted[i].left + 0.5) overlaps.push(sorted[i - 1].text + ' x ' + sorted[i].text)
+      if (sorted[i - 1].right > sorted[i].left + 0.5 &&
+          sorted[i - 1].bottom > sorted[i].top + 0.5 &&
+          sorted[i].bottom > sorted[i - 1].top + 0.5) {
+        overlaps.push(sorted[i - 1].text + ' x ' + sorted[i].text)
+      }
     }
     const saveEl = document.querySelector('[data-save-status]')
     const sr = saveEl ? saveEl.getBoundingClientRect() : null
@@ -404,7 +418,12 @@ const drawerOpenSettled = () => waitFor(`(() => {
     check(`${width}px: the save status is visible in the bar`, Boolean(l.save && l.save.visible), JSON.stringify(l.save))
     check(`${width}px: the copy button is fully on screen`, Boolean(l.copy && l.copy.visible && l.copy.inside), JSON.stringify(l.copy))
     check(`${width}px: the narrow pane stack and drawer are not rendered`, l.paneDivs === 0 && l.drawer === null, JSON.stringify({ paneDivs: l.paneDivs, drawer: l.drawer }))
-    if (width === 1536) wideSidebarText = l.sidebar?.text || ''
+    if (width === 1536) {
+      // The first tab is the live theme picker now; let its tiles arrive so
+      // the drawer comparison below sees the same settled text.
+      await waitFor(`!!document.querySelector('[data-theme-quick]')`, 'theme picker settled', 20_000).catch(() => {})
+      wideSidebarText = (await evaluate(layoutProbe)).sidebar?.text || ''
+    }
     await screenshot(`desktop-${width}.png`)
   }
 
@@ -433,6 +452,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
   check('768px: the drawer starts closed', drawerStart.drawer === null, JSON.stringify(drawerStart.drawer))
   await click(`document.querySelector('[data-open-side-panel]')`)
   await drawerOpenSettled()
+  await waitFor(`!!document.querySelector('[data-side-drawer] [data-theme-quick]')`, 'drawer theme picker settled', 20_000).catch(() => {})
   const drawerOpen = await evaluate(`(() => {
     const d = document.querySelector('[data-side-drawer]')
     const r = d.getBoundingClientRect()
@@ -679,8 +699,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
   await dialogOpenClose(`document.querySelector('[data-open-remote-mcp]')`, 'the single-document MCP dialog')
 
   // ---------- 12. language and theme through the narrow More menu ----------
-  await click(`document.querySelector('[data-topbar-more]')`)
-  await waitFor(`!!document.querySelector('[role=menu]')`, 'More menu for appearance')
+  await openMore()
   // The narrow bar keeps only the article name, the save status and the copy
   // button, so the owner sign-in entry moves in here; it still has to be
   // reachable. (The wording itself is asserted by the guest-save-guidance
@@ -704,8 +723,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
   check('390px: switching to the dark theme through the More menu works', dark === true, `dark=${dark}`)
   await screenshot('narrow-en-dark-390.png')
   await escape()
-  await click(`document.querySelector('[data-topbar-more]')`)
-  await waitFor(`!!document.querySelector('[role=menu]')`, 'More menu for language reset')
+  await openMore()
   await click(`document.querySelector('[role=menu] [data-lang="zh"]')`)
   await escape()
 

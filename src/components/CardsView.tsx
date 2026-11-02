@@ -1,6 +1,6 @@
 // Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Download, FolderDown } from 'lucide-react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Doc, SignatureConfig } from '@/lib/types'
 import type { MathSnapshot } from '@/lib/math'
@@ -10,9 +10,9 @@ import { resolveImgSrc } from '@/lib/image'
 import { safeFilename } from '@/lib/import-export'
 import { renderCardArticle } from '@/lib/cards-render'
 import {
-  CARD_RATIOS, CARD_TEMPLATES, CARD_WIDTH, cardAccent, cardMetrics, chinesePageNumber,
-  coverTitleSize, isDarkVariant, paginateCards, templateRatios, templateVariants, withTemplate,
-  type CardBackground, type CardOptions, type CardPage, type CardRatio, type CardTemplate,
+  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, chinesePageNumber,
+  coverTitleSize, isDarkVariant, paginateCards,
+  type CardBackground, type CardOptions, type CardPage, type CardTemplate,
 } from '@/lib/cards'
 import { useI18n } from '@/hooks/useI18n'
 import './cards.css'
@@ -472,6 +472,19 @@ interface Result {
   template: CardTemplate
   background: CardBackground
 }
+export interface CardsStatus {
+  ready: boolean
+  busy: boolean
+  total: number
+  failed: boolean
+  error: boolean
+  progress: { done: number; total: number }
+}
+
+export interface CardsViewHandle {
+  exportAll: () => void
+}
+
 interface Props {
   doc: Doc
   source: string
@@ -480,12 +493,15 @@ interface Props {
   sig: SignatureConfig
   math: MathSnapshot
   resolveDiagram: DiagramResolver
-  viewSwitch: ReactNode
   options: CardOptions
-  onOptionsChange: (options: CardOptions) => void
+  /** Top bar owns the ZIP button; this keeps its disabled/progress state true. */
+  onStatusChange?: (status: CardsStatus) => void
 }
 
-export default function CardsView({ doc, source, title, accent: themeAccent, sig, math, resolveDiagram, viewSwitch, options, onOptionsChange }: Props) {
+const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
+  { doc, source, title, accent: themeAccent, sig, math, resolveDiagram, options, onStatusChange },
+  ref,
+) {
   const { t, lang } = useI18n()
   const { ratio, template, background: bg } = options
   const [result, setResult] = useState<Result | null>(null)
@@ -502,8 +518,6 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
   const coverTitle = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
   const articleTitle = coverTitle?.type === 'heading' ? coverTitle.title : title
   const author = doc.meta.author || t('app.name')
-  const variants = templateVariants(template)
-  const ratios = templateRatios(template)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -591,40 +605,26 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
   }
 
   const total = result?.pages.length ?? 0
-  const disabled = busy || pending || !total || !!result?.failedImages.length
+  const failed = Boolean(result?.failedImages.length)
+  const disabled = busy || pending || !total || failed
+
+  useImperativeHandle(ref, () => ({ exportAll: () => void exportCards() }))
+
+  useEffect(() => {
+    onStatusChange?.({ ready: !disabled, busy, total, failed, error, progress })
+  }, [onStatusChange, disabled, busy, total, failed, error, progress])
+
   return (
     <div data-onboarding="preview" data-xhs-view data-ready={!pending && !error && result !== null} className="flex h-full min-w-0 flex-col">
-      <div className="flex h-11 shrink-0 items-center border-b border-line-1 px-4">{viewSwitch}</div>
-      <div className="shrink-0 space-y-2 border-b border-line-1 p-3">
-        <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('cards.template')}>
-          {CARD_TEMPLATES.map((id) => (
-            <button key={id} data-card-template={id} aria-pressed={template === id} disabled={busy}
-              className={`ya-tool xhs-option ${template === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange(withTemplate(options, id))}>{t(`cards.template.${id}`)}</button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('cards.ratio')}>
-            {(Object.keys(CARD_RATIOS) as CardRatio[]).map((id) => (
-              <button key={id} data-card-ratio={id} aria-pressed={ratio === id} disabled={busy || !ratios.includes(id)}
-                aria-disabled={!ratios.includes(id)}
-                className={`ya-tool xhs-option ${ratio === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange({ ...options, ratio: id })}>{id}</button>
-            ))}
-          </div>
-          <button data-card-export-all className="ya-btn ya-btn-primary ya-btn-sm" disabled={disabled} onClick={() => void exportCards()}>
-            <FolderDown size={14} aria-hidden="true" />{busy ? t('cards.exporting', { n: progress.done, total: progress.total }) : t('cards.exportAll')}
-          </button>
-        </div>
-        {template === 'kihon' && <p data-card-ratio-hint className="text-[11px] text-ink-2">{t('cards.kihonRatio')}</p>}
-        <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('cards.background')}>
-          {variants.map((id) => (
-            <button key={id} data-card-bg={id} aria-pressed={bg === id} disabled={busy}
-              className={`ya-tool xhs-option ${bg === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange({ ...options, background: id })}>{t(`cards.bg.${id}`)}</button>
-          ))}
-        </div>
-        <p className="text-[11px] text-ink-2" aria-live="polite">{t('cards.summary', { n: total, height: height * 2 })}</p>
+      {/* The preview keeps only the card summary; templates, ratios,
+          backgrounds and the ZIP action live in the side panel and top bar. */}
+      <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-line-1 px-4">
+        <span className="ya-eyebrow whitespace-nowrap">{t('preview.cards')}</span>
+        <span data-card-summary className="min-w-0 truncate text-[11px] text-ink-3" aria-live="polite">
+          {pending ? t('cards.measuring') : error ? t('cards.layoutFailed') : t('cards.summary', { n: total, height: height * 2 })}
+        </span>
       </div>
       <div className="ya-well min-h-0 flex-1 overflow-auto rounded-none p-4" data-card-scroller>
-        <p className="mb-4 text-xs text-ink-2">{t('cards.hint')}</p>
         {error && <div className="mb-4 text-sm text-error-700" role="alert">{t('cards.layoutFailed')} <button className="ya-link-btn" onClick={() => setRetry((n) => n + 1)}>{t('common.retry')}</button></div>}
         {!result && !error && <p role="status" className="text-sm text-ink-2">{t('cards.measuring')}</p>}
         {result?.failedImages.length ? <div role="alert" data-card-image-warning className="mb-4 rounded-xl bg-surface-base p-3 text-xs text-error-700">
@@ -673,4 +673,6 @@ export default function CardsView({ doc, source, title, accent: themeAccent, sig
       </div>
     </div>
   )
-}
+})
+
+export default CardsView

@@ -135,6 +135,38 @@ async function clickEl(selector) {
   if (!ok) throw new Error(`no element ${selector}`)
   await sleep(600)
 }
+// Radix opens on pointerdown; open 更多 through real input, then choose a
+// language from the menu and close it again.
+async function realClick(selector) {
+  const position = await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (!el) return null;
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const r = el.getBoundingClientRect();
+    return r.width && r.height ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  })()`)
+  if (!position) throw new Error(`no visible element: ${selector}`)
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...position }, sessionId)
+  await sleep(300)
+}
+async function escapeMenu() {
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
+  await sleep(300)
+}
+async function openMore() {
+  await realClick('[data-topbar-more]')
+  for (let i = 0; i < 40 && !(await evaluate(`!!document.querySelector('[role=menu]')`)); i++) await sleep(100)
+  if (!(await evaluate(`!!document.querySelector('[role=menu]')`))) throw new Error('More menu did not open')
+}
+async function chooseLang(lang) {
+  await openMore()
+  await evaluate(`document.querySelector('[data-lang="${lang}"]').click()`)
+  await sleep(700)
+  await escapeMenu()
+}
 // React-controlled fields need the native setter plus a bubbling input event.
 const FILL = `(selector, value) => {
   const el = document.querySelector(selector)
@@ -155,6 +187,7 @@ function check(name, ok, detail = '') {
 
 // ---------- 中文 is the default ----------
 await goto(APP)
+await openMore()
 const zh = JSON.parse(
   await evaluate(`JSON.stringify({
     lang: document.documentElement.lang,
@@ -165,6 +198,7 @@ const zh = JSON.parse(
     stored: localStorage.getItem('mopai.lang.v1'),
   })`),
 )
+await escapeMenu()
 check('中文 is the default on a fresh profile', zh.lang === 'zh-CN' && zh.brand === '芦苇', JSON.stringify(zh))
 check('the title is the Chinese one', zh.title.includes('芦苇'), zh.title)
 check('the editor renders Chinese copy', zh.copyBtn === true)
@@ -172,7 +206,7 @@ check('the language toggle is present', zh.hasToggle === true)
 check('nothing is stored before the first explicit choice', zh.stored === null, String(zh.stored))
 
 // ---------- switch to English ----------
-await clickEl('[data-lang="en"]')
+await chooseLang('en')
 await sleep(800)
 const en = JSON.parse(
   await evaluate(`JSON.stringify({
@@ -297,7 +331,7 @@ await shot('feedback-success')
 
 // ---------- switching back to 中文 ----------
 await goto(APP)
-await clickEl('[data-lang="zh"]')
+await chooseLang('zh')
 await sleep(600)
 const backZh = await evaluate(`document.documentElement.lang + '|' + localStorage.getItem('mopai.lang.v1')`)
 check('switching back restores 中文 and persists it', backZh === 'zh-CN|zh', backZh)

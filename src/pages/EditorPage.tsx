@@ -111,6 +111,7 @@ import {
 import { useI18n } from '@/hooks/useI18n'
 import { useEditorLayout } from '@/hooks/use-mobile'
 import type { CardOptions } from '@/lib/cards'
+import type { CardsStatus, CardsViewHandle } from '@/components/CardsView'
 
 const CardsView = lazy(() => import('@/components/CardsView'))
 
@@ -187,7 +188,7 @@ export default function EditorPage() {
    * preview with the images/settings drawer in the middle, and the original
    * three columns on a wide window. The top bar switches separately at 1440.
    */
-  const { mode, compactBar } = useEditorLayout()
+  const { mode } = useEditorLayout()
   const wide = mode === 'wide'
   const medium = mode === 'medium'
   const phone = mode === 'phone'
@@ -195,7 +196,7 @@ export default function EditorPage() {
   /** The images/settings drawer is only part of the medium layout. */
   const [sideDrawerOpen, setSideDrawerOpen] = useState(false)
   /** Owned here so closing the drawer does not reset the selected tab. */
-  const [sideTab, setSideTab] = useState<SidePanelTab>('materials')
+  const [sideTab, setSideTab] = useState<SidePanelTab>('theme')
   const [settings, setSettings] = useState(loadSettings)
   const [panelOpen, setPanelOpen] = useState(true)
   /**
@@ -213,6 +214,9 @@ export default function EditorPage() {
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
   const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
   const [cardOptions, setCardOptions] = useState<CardOptions>({ ratio: '3:4', template: 'reed', background: 'paper' })
+  const [cardsStatus, setCardsStatus] = useState<CardsStatus>({
+    ready: false, busy: false, total: 0, failed: false, error: false, progress: { done: 0, total: 0 },
+  })
   const [copied, setCopied] = useState(false)
   const [uploadingKey, setUploadingKey] = useState<string | null>(null)
   const [frameTask, setFrameTask] = useState<FrameTask | null>(null)
@@ -230,6 +234,7 @@ export default function EditorPage() {
   const imageInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<EditorHandle>(null)
   const previewRef = useRef<PreviewScrollHandle>(null)
+  const cardsViewRef = useRef<CardsViewHandle>(null)
   /**
    * Live editor state for the toolbar: the selection, and how deep the undo
    * history is. Reported by EditorPane on every transaction.
@@ -1670,21 +1675,17 @@ export default function EditorPage() {
     </div>
   )
 
-  const viewSwitch = (
-    <div className="ya-well flex gap-0.5 rounded-xl p-0.5" role="group" aria-label={t('preview.mode')}>
-      {(['wechat', 'cards'] as const).map((mode) => (
-        <button key={mode} data-preview-mode={mode} aria-pressed={previewMode === mode}
-          className={`ya-tool h-7 px-2 text-[11px] ${previewMode === mode ? 'ya-selected' : ''}`}
-          onClick={() => setPreviewMode(mode)}>{t(mode === 'wechat' ? 'preview.wechat' : 'preview.cards')}</button>
-      ))}
-    </div>
-  )
+  /** Switching modes takes the right column to that mode's own tab. */
+  const changePreviewMode = useCallback((next: 'wechat' | 'cards') => {
+    setPreviewMode(next)
+    setSideTab(next === 'cards' ? 'card' : 'theme')
+  }, [])
 
   const previewPaneBody = previewMode === 'cards' ? (
     <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('cards.measuring')}</div>}>
-      <CardsView doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
-        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} viewSwitch={viewSwitch}
-        options={cardOptions} onOptionsChange={setCardOptions} />
+      <CardsView ref={cardsViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
+        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram}
+        options={cardOptions} onStatusChange={setCardsStatus} />
     </Suspense>
   ) : (
     <PreviewPane
@@ -1696,7 +1697,7 @@ export default function EditorPage() {
       onWidthChange={setPreviewWidth}
       onScroll={onPreviewScroll}
       onLayout={onPreviewLayout}
-      viewSwitch={viewSwitch}
+      themeName={theme.name}
     />
   )
 
@@ -1704,6 +1705,14 @@ export default function EditorPage() {
     <SidePanel
       tab={sideTab}
       onTabChange={setSideTab}
+      mode={previewMode}
+      themeId={settings.themeId}
+      onTheme={(id) => setSettings((s) => ({ ...s, themeId: id }))}
+      renderPreview={renderThemePreview}
+      onOpenThemes={() => navigate('/themes')}
+      cardOptions={cardOptions}
+      onCardOptionsChange={setCardOptions}
+      cardBusy={cardsStatus.busy}
       materials={materials}
       titles={parsed.meta.titles}
       cover={parsed.meta.cover}
@@ -1736,7 +1745,6 @@ export default function EditorPage() {
     <div data-layout-mode={mode} className="ya-page ya-viewport ya-safe-x ya-safe-b flex flex-col overflow-hidden">
       <TopBar
         docs={docs}
-        narrow={compactBar}
         activeId={activeId}
         docName={activeDoc?.name || ''}
         onRename={(name) => updateActive({ name })}
@@ -1775,10 +1783,6 @@ export default function EditorPage() {
         unsaved={hasUnsavedChanges || neverSaved}
         onOpenDrafts={() => navigate('/drafts')}
         onOpenMaterials={() => navigate('/materials')}
-        themeId={settings.themeId}
-        onTheme={(id) => setSettings((s) => ({ ...s, themeId: id }))}
-        renderPreview={renderThemePreview}
-        onOpenThemes={() => navigate('/themes')}
         copying={copied}
         onCopy={handleCopy}
         onExport={handleExport}
@@ -1797,11 +1801,19 @@ export default function EditorPage() {
         panelOpen={panelOpen}
         onTogglePanel={() => setPanelOpen((v) => !v)}
         onOpenSidePanel={medium ? () => setSideDrawerOpen(true) : undefined}
-        showPanelToggle={wide && compactBar}
         userName={user?.name || ''}
+        signedIn={isAuthenticated}
         onLogin={() => navigate('/login')}
         onLogout={logout}
         remoteConnected={Boolean(activeDoc?.remoteMcp)}
+        mode={previewMode}
+        onModeChange={changePreviewMode}
+        cardsReady={cardsStatus.ready}
+        cardsExporting={cardsStatus.busy}
+        cardsProgress={cardsStatus.progress}
+        onExportAll={() => cardsViewRef.current?.exportAll()}
+        phone={phone}
+        wide={wide}
       />
 
       {/* 本机存储失败不是一次性提示：原因留在页面上，读不出来时可以重试 */}

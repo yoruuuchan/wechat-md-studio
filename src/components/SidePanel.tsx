@@ -7,13 +7,26 @@ import { CREDITS } from '@/lib/credits'
 import { ZOOM_STEPS } from '@/lib/store'
 import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type SignatureConfig } from '@/lib/types'
 import { useI18n } from '@/hooks/useI18n'
+import type { Theme } from '@/lib/theme-kit'
+import type { CardOptions } from '@/lib/cards'
+import ThemeQuickPicker from '@/components/ThemeQuickPicker'
+import CardSettings from '@/components/CardSettings'
 
-export type SidePanelTab = 'materials' | 'titles' | 'settings'
+export type SidePanelTab = 'theme' | 'card' | 'materials' | 'titles' | 'settings'
 
 interface Props {
   /** Selected tab lives in the editor so closing the medium drawer keeps it. */
   tab: SidePanelTab
   onTabChange: (tab: SidePanelTab) => void
+  /** The first tab follows the preview mode: 主题 for articles, 模板 for cards. */
+  mode: 'wechat' | 'cards'
+  themeId: string
+  onTheme: (id: string) => void
+  renderPreview: (theme: Theme) => string
+  onOpenThemes: () => void
+  cardOptions: CardOptions
+  onCardOptionsChange: (options: CardOptions) => void
+  cardBusy: boolean
   materials: MaterialItem[]
   titles: string[]
   cover: string
@@ -160,11 +173,31 @@ export default function SidePanel(p: Props) {
       <Tabs value={p.tab} onValueChange={(value) => p.onTabChange(value as SidePanelTab)} className="flex h-full flex-col">
         <div className="border-b border-line-2 px-3 pt-3">
           <TabsList className="h-8 w-full rounded-xl bg-surface-sunken" style={{ boxShadow: 'var(--shadow-inset)' }}>
-            <TabsTrigger value="materials" className="flex-1 rounded-lg text-[12px]">{t('panel.tab.materials')}</TabsTrigger>
-            <TabsTrigger value="titles" className="flex-1 rounded-lg text-[12px]">{t('panel.tab.titles')}</TabsTrigger>
-            <TabsTrigger value="settings" className="flex-1 rounded-lg text-[12px]">{t('panel.tab.settings')}</TabsTrigger>
+            {p.mode === 'wechat' ? (
+              <TabsTrigger data-side-tab="theme" value="theme" className="min-w-0 flex-1 overflow-hidden rounded-lg px-1.5 text-[12px]"><span className="truncate">{t('panel.tab.theme')}</span></TabsTrigger>
+            ) : (
+              <TabsTrigger data-side-tab="card" value="card" className="min-w-0 flex-1 overflow-hidden rounded-lg px-1.5 text-[12px]"><span className="truncate">{t('panel.tab.cards')}</span></TabsTrigger>
+            )}
+            <TabsTrigger data-side-tab="materials" value="materials" className="min-w-0 flex-1 overflow-hidden rounded-lg px-1.5 text-[12px]"><span className="truncate">{t('panel.tab.materials')}</span></TabsTrigger>
+            <TabsTrigger data-side-tab="titles" value="titles" className="min-w-0 flex-1 overflow-hidden rounded-lg px-1.5 text-[12px]"><span className="truncate">{t('panel.tab.titles')}</span></TabsTrigger>
+            <TabsTrigger data-side-tab="settings" value="settings" className="min-w-0 flex-1 overflow-hidden rounded-lg px-1.5 text-[12px]"><span className="truncate">{t('panel.tab.settings')}</span></TabsTrigger>
           </TabsList>
         </div>
+
+        {p.mode === 'wechat' ? (
+          <TabsContent value="theme" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+            <ThemeQuickPicker
+              themeId={p.themeId}
+              onTheme={p.onTheme}
+              renderPreview={p.renderPreview}
+              onOpenThemes={p.onOpenThemes}
+            />
+          </TabsContent>
+        ) : (
+          <TabsContent value="card" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+            <CardSettings options={p.cardOptions} onOptionsChange={p.onCardOptionsChange} busy={p.cardBusy} />
+          </TabsContent>
+        )}
 
         <TabsContent value="materials" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
           <Label>{t('panel.materials.label')}</Label>

@@ -154,6 +154,30 @@ async function press(key, code, virtualKey) {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKey }, sessionId)
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKey }, sessionId)
 }
+// Language and appearance moved into 更多; open it, choose, then close.
+// Radix opens on pointerdown, so a synthetic el.click() is not enough here.
+async function realClick(selector) {
+  const position = await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (!el) return null;
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const r = el.getBoundingClientRect();
+    return r.width && r.height ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  })()`)
+  if (!position) throw new Error('missing click target: ' + selector)
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...position }, sessionId)
+  await sleep(250)
+}
+async function chooseLang(lang) {
+  await realClick('[data-topbar-more]')
+  await waitFor(`!!document.querySelector('[data-lang="${lang}"]')`)
+  await realClick(`[data-lang="${lang}"]`)
+  await sleep(500)
+  await press('Escape', 'Escape', 27)
+  await sleep(300)
+}
 async function cardsReady(session = sessionId) {
   await waitFor(`document.querySelector('[data-xhs-view]')?.dataset.ready === 'true'`, 45000, session)
   await evaluate('document.fonts.ready.then(() => true)', session)
@@ -766,7 +790,7 @@ try {
       check('long table keeps every body row across pages', await evaluate(`document.querySelectorAll('.xhs-card tbody tr').length===24`))
     }
     for (const lang of ['zh', 'en']) for (const theme of ['akari', 'yoru']) {
-      await click(`[data-lang="${lang}"]`)
+      await chooseLang(lang)
       await evaluate(`localStorage.setItem('mopai.theme.v1',${JSON.stringify(theme)}); document.documentElement.dataset.theme=${JSON.stringify(theme)};document.documentElement.classList.toggle('dark',${theme === 'yoru'});document.documentElement.style.colorScheme=${JSON.stringify(theme === 'yoru' ? 'dark' : 'light')}; window.dispatchEvent(new Event('mopai-theme-change'))`)
       await cardsReady()
       for (const ratio of ['3:4', '1:1', '9:16']) for (const bg of ['paper', 'white', 'grid', 'tint', 'night']) {
@@ -781,7 +805,7 @@ try {
         if (ratio === '3:4' && bg === 'paper') await shot(`${docName}-${lang}-${theme}`)
       }
     }
-    await click('[data-lang="zh"]')
+    await chooseLang('zh')
     for (const ratio of ['3:4', '1:1', '9:16']) {
       await click(`[data-card-ratio="${ratio}"]`); await click('[data-card-bg="paper"]'); await cardsReady()
       const count = await evaluate('document.querySelectorAll(".xhs-card").length')
@@ -817,7 +841,7 @@ try {
   await click('[data-card-template="reed"]')
   await click('[data-card-ratio="3:4"]')
   await click('[data-card-bg="paper"]')
-  await click('[data-lang="zh"]')
+  await chooseLang('zh')
   await cardsReady()
 
   // Template dimension: every variant of the three design-system templates is
@@ -911,7 +935,7 @@ try {
     await click(`[data-card-template="${template}"]`)
     await click(`[data-card-bg="${variant}"]`)
     await click(`[data-card-ratio="${template === 'kihon' ? '9:16' : '3:4'}"]`)
-    await click('[data-lang="zh"]')
+    await chooseLang('zh')
     await cardsReady()
     const label = `${template}-${variant}`
     const probe = await evaluate(`(() => {
@@ -1174,7 +1198,7 @@ ${templateGroups.map((group) => `<section><h2>${group.label}</h2><div class="gri
   await cardsReady()
   check('cross-origin image failure is visible and prevents incomplete exports', await evaluate(`!!document.querySelector('[data-card-image-warning]') && document.querySelector('[data-card-export-all]').disabled`))
   await shot('cors-warning-zh')
-  await click('[data-lang="en"]'); await cardsReady()
+  await chooseLang('en'); await cardsReady()
   check('image warning translates to English', await evaluate(`document.querySelector('[data-card-image-warning]')?.textContent.includes('Export is paused')`))
   await shot('cors-warning-en')
   await setMarkdown('## ' + '一个很长的标题'.repeat(180) + '\n\n| 列 |\n|:--|\n| ' + '无法拆成独立表格行的长单元格。'.repeat(200) + ' |')
@@ -1212,7 +1236,7 @@ ${templateGroups.map((group) => `<section><h2>${group.label}</h2><div class="gri
   // comparison independent of either site's storage or network image hosts.
   const comparison = '# 把日常写成值得收藏的卡片\n\n让文字、图片和留白一起讲述。\n\n## 观察与记录\n\n清晨沿着河岸走，把看到的细节写进笔记。**芦苇卡片** *Reed* `2026` ==，。！？==\n\n> 好的排版，让读者知道自己读到了哪里。\n\n1. 写下真实的细节。\n2. 用例子支撑观点。\n3. 留下适合停顿的空白。\n\n```js\nconst notes = ["文字", "图片", "留白"];\n```\n\n| 内容 | 用途 |\n|:--|:--|\n| 标题 | 建立层级 |\n| 图片 | 补充信息 |\n\n![河岸色彩](data:image/png;base64,' + wideImage.toString('base64') + ')\n\n---\n\n## 下一次出发\n\n把生活写下来，再带着新的眼光出发。'
   fs.writeFileSync(path.join(output, 'comparison.md'), comparison)
-  await click('[data-lang="zh"]'); await setMarkdown(comparison); await cardsReady()
+  await chooseLang('zh'); await setMarkdown(comparison); await cardsReady()
   await click('[data-card-template="reed"]'); await click('[data-card-ratio="3:4"]'); await click('[data-card-bg="paper"]'); await cardsReady()
   const primary = await evaluate(`getComputedStyle(document.querySelector('.xhs-card')).getPropertyValue('--xhs-accent').trim()`)
   const { targetId: refTarget } = await send('Target.createTarget', { url: 'about:blank' })

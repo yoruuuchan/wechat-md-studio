@@ -141,7 +141,7 @@ const measure = `(() => {
     return 'rgb(255, 255, 255)'
   }
   // U03 adds a pane switcher with its own tablist on narrow layouts; the side
-  // panel is the tablist that owns the 图片 / 稿件信息 / 设置 tabs.
+  // panel is the tablist that owns the 主题 / 图片 / 稿件信息 / 设置 tabs.
   const lists = [...document.querySelectorAll('[role=tablist]')]
   const track = lists.find((l) => [...l.querySelectorAll('[role=tab]')].some((x) => x.textContent.trim() === '稿件信息')) ?? lists[0]
   const triggers = track ? [...track.querySelectorAll('[role=tab]')] : []
@@ -179,7 +179,7 @@ const dark = await readTabs()
 console.log(' ', JSON.stringify(dark, null, 1))
 check('yoru: <html> carries data-theme=yoru', dark.dataTheme === 'yoru')
 check('yoru: <html> carries the .dark class', dark.htmlClass.includes('dark'))
-check('yoru: three panel tabs present', dark.triggers.length === 3, JSON.stringify(dark.triggers))
+check('yoru: four panel tabs present (主题 / 图片 / 稿件信息 / 设置)', dark.triggers.length === 4, JSON.stringify(dark.triggers))
 for (const t of dark.inactive) {
   check(`yoru: inactive "${t.label}" readable on the track`, t.contrastVsTrack >= 3, `contrast=${t.contrastVsTrack} color=${t.color}`)
 }

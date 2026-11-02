@@ -49,6 +49,12 @@ interface Props {
    * right edge of the bar past the viewport.
    */
   compact?: boolean
+  /** Signed-in owners get a one-click save next to the status trigger. */
+  signedIn?: boolean
+  saving?: boolean
+  unsaved?: boolean
+  /** Medium and phone: use the one-character quick-save label. */
+  quickCompact?: boolean
 }
 
 /** Existing top-bar styling, with independently proven local and cloud states. */
@@ -83,6 +89,7 @@ export function SaveStatus(p: Props) {
   }
 
   return (
+    <div className="flex min-w-0 items-center gap-1">
     <Popover
       open={open}
       onOpenChange={(next) => {
@@ -155,12 +162,24 @@ export function SaveStatus(p: Props) {
           {status.local === 'error' && <button data-save-retry-local onClick={() => runAndClose(p.onRetryLocal)} disabled={p.retryingLocal} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.retryLocal')}</button>}
           {status.cloud === 'error' && <button data-save-retry-cloud onClick={() => runAndClose(p.onRetryCloud)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.retryCloud')}</button>}
           {status.cloud === 'conflict' && <button data-save-review-conflict onClick={() => runAndClose(p.onOpenConflict)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.reviewConflict')}</button>}
-          {status.cloud === 'unarchived' && <button onClick={p.onSaveDraft} disabled={!p.readable} className="ya-btn ya-btn-secondary ya-btn-sm">{t('topbar.save')}</button>}
+          {p.signedIn && <button data-save-draft onClick={() => runAndClose(p.onSaveDraft)} disabled={!p.readable || p.saving} className="ya-btn ya-btn-secondary ya-btn-sm">{p.saving ? t('topbar.saving') : t('topbar.save')}</button>}
           {status.cloud === 'signed-out' && <button onClick={p.onLogin} className="ya-btn ya-btn-secondary ya-btn-sm">{t('topbar.login')}</button>}
           <button data-save-export onClick={() => p.onExport('markdown')} disabled={!p.readable} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.exportMarkdown')}</button>
           <button data-save-export-bundle onClick={() => p.onExport('bundle')} className="ya-btn ya-btn-secondary ya-btn-sm">{t('saveStatus.exportBundle')}</button>
         </div>
       </PopoverContent>
     </Popover>
+    {p.signedIn && (
+      <button
+        data-save-draft-quick
+        onClick={p.onSaveDraft}
+        disabled={!p.readable || p.saving}
+        title={p.unsaved ? t('topbar.saveTitleUnsaved') : t('topbar.saveTitleSaved')}
+        className="ya-btn ya-btn-secondary ya-btn-sm !h-7 shrink-0 !px-1.5 !text-[10px]"
+      >
+        {p.saving ? '…' : p.quickCompact ? t('topbar.saveQuickShort') : t('topbar.saveQuick')}
+      </button>
+    )}
+    </div>
   )
 }
