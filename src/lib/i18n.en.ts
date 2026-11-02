@@ -538,7 +538,7 @@ export const en: Record<MsgKey, Msg> = {
   'cards.kihonRatio': 'KIHON only has a 9:16 portrait frame, so the ratio switched to 9:16.',
   'cards.pageCount': '{n} pages',
   'cards.summary': '{n} cards · export size 1080 × {height}',
-  'cards.exportAll': 'export all ZIP',
+  'cards.exportAll': 'Export all as ZIP',
   'cards.exporting': 'exporting {n} / {total}',
   'cards.exported': 'exported {n} cards',
   'cards.exportFailed': 'Card export failed. Please retry and check that images and fonts have loaded.',
