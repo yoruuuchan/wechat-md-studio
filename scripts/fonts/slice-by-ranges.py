@@ -7,7 +7,8 @@ unicode-range slices. We reuse those exact ranges, subset the source font to
 each range, skip ranges with no matching glyph, and emit a matching CSS
 fragment. Font files are data only; nothing from the source is executed.
 
-Usage (python must run isolated so no user site-packages leak in):
+Usage (python must run isolated so no user site-packages leak in; if fontTools
+is installed only for the user, set FONTTOOLS_SITE to that site-packages folder):
 
   python -I scripts/fonts/slice-by-ranges.py ^
     --input "%TEMP%\\reed-fonts\\ZhuqueFangsong-Regular.ttf" ^
@@ -29,13 +30,14 @@ safe and byte-stable for the same source and fontTools version.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
 
-FONTTOOLS_SITE = Path(r"C:\Users\15877\AppData\Roaming\Python\Python314\site-packages")
-if FONTTOOLS_SITE.is_dir():
-    sys.path.insert(0, str(FONTTOOLS_SITE))
+# `python -I` skips the user site; FONTTOOLS_SITE can name the directory holding fontTools.
+if os.environ.get("FONTTOOLS_SITE"):
+    sys.path.insert(0, os.environ["FONTTOOLS_SITE"])
 
 from fontTools import subset  # noqa: E402
 from fontTools.ttLib import TTFont  # noqa: E402
