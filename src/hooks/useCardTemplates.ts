@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
+import { useI18n } from '@/hooks/useI18n'
 import {
   activateCardTemplate, deactivateCardTemplate, loadedCardTemplateSummaries,
   parseCardTemplateSource, type CardTemplateSourceRecord,
@@ -116,6 +118,7 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
   const [failures, setFailures] = useState<CardTemplateUploadFailure[]>([])
   const [sync, setSync] = useState<CardTemplateSyncState>('idle')
   const { user, isLoading: authLoading, isFetching: authFetching } = useAuth()
+  const { t } = useI18n()
   const authenticated = Boolean(user)
   const syncing = useRef(false)
 
@@ -164,11 +167,12 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     return () => { alive = false }
   }, [loadPublic])
 
-  /** Upload one local record and align its clock with the server's upload time. */
+  /** Upload one local record and remember the server version it now matches. */
   const pushLocal = useCallback(async (record: CardTemplateSourceRecord): Promise<void> => {
     const meta = await uploadCloudCardTemplate(record)
     if (Number.isFinite(meta.uploadedAt) && meta.uploadedAt > 0) {
       record.updatedAt = meta.uploadedAt
+      record.cloudUploadedAt = meta.uploadedAt
       await saveCardTemplateRecord(record)
     }
   }, [])
@@ -190,6 +194,7 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     if (meta.sha256 !== digest) {
       throw new CardTemplateCloudError(0, 'checksum_mismatch', meta.id)
     }
+    record.cloudUploadedAt = meta.uploadedAt
     await activateCardTemplate(record)
     await saveCardTemplateRecord(record)
     refresh()
@@ -210,27 +215,50 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
           id: record.parsed.manifest.id,
           sha256: await cardTemplateSha256(record.raw),
           updatedAt: record.updatedAt,
+          cloudUploadedAt: record.cloudUploadedAt,
         })
       }
       const records = new Map(local.map((record) => [record.id, record]))
-      const cloudById = new Map(cloud.map((item) => [item.id, item]))
-      for (const action of planCardTemplateSync(candidates, cloud)) {
+      const cloudById = new Map(cloud.items.map((item) => [item.id, item]))
+      let removed = 0
+      for (const action of planCardTemplateSync(candidates, cloud.items, cloud.tombstones)) {
         if (action.kind === 'upload') {
           const record = records.get(action.key)
           if (record) await pushLocal(record)
         } else if (action.kind === 'download') {
           const meta = cloudById.get(action.id)
           if (meta) await installCloudTemplate(meta)
+        } else if (action.kind === 'keep') {
+          // Bytes already match the server; remember which server version this
+          // local copy is, so a later tombstone can tell it apart from a new one.
+          const meta = cloudById.get(action.id)
+          const record = local
+            .filter((item) => item.parsed.manifest.id === action.id)
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+          if (meta && record) {
+            record.cloudUploadedAt = meta.uploadedAt
+            await saveCardTemplateRecord(record)
+          }
+        } else {
+          // Another device deleted this id. Drop every local copy of that
+          // manifest id; the cloud row is already gone, so do not call DELETE.
+          for (const record of records.values()) {
+            if (record.parsed.manifest.id !== action.id) continue
+            deactivateCardTemplate(record.template)
+            await deleteCardTemplateRecord(record.id)
+          }
+          removed += 1
         }
       }
       refresh()
       setSync('synced')
+      if (removed > 0) toast(t('cards.templateRemovedByCloud', { n: removed }))
     } catch (item) {
       setSync(item instanceof CardTemplateCloudError && item.unauthorized ? 'idle' : 'failed')
     } finally {
       syncing.current = false
     }
-  }, [authenticated, installCloudTemplate, pushLocal, refresh])
+  }, [authenticated, installCloudTemplate, pushLocal, refresh, t])
 
   useEffect(() => {
     if (!authenticated || authLoading || authFetching || loading) return

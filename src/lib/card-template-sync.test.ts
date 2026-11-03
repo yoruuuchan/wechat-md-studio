@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { planCardTemplateSync } from './card-template-sync'
 
-const local = (key: string, id: string, sha256: string, updatedAt: number) => ({ key, id, sha256, updatedAt })
+const local = (key: string, id: string, sha256: string, updatedAt: number, cloudUploadedAt?: number) => ({
+  key, id, sha256, updatedAt,
+  ...(cloudUploadedAt === undefined ? {} : { cloudUploadedAt }),
+})
 const cloud = (id: string, sha256: string, uploadedAt: number) => ({ id, sha256, uploadedAt })
+const tombstone = (id: string, deletedAt: number) => ({ id, deletedAt })
 
 describe('card template cloud merge', () => {
   it('pushes local-only templates and pulls cloud-only ones', () => {
@@ -40,5 +44,29 @@ describe('card template cloud merge', () => {
       [local('old', 'a', 'old', 10), local('new', 'a', 'new', 20)],
       [],
     )).toEqual([{ kind: 'upload', id: 'a', key: 'new' }])
+  })
+
+  it('removes a synced copy when another device deleted the id', () => {
+    expect(planCardTemplateSync(
+      [local('local-a', 'a', 'same', 9_000, 1_000)],
+      [],
+      [tombstone('a', 2_000)],
+    )).toEqual([{ kind: 'delete-local', id: 'a', key: 'local-a' }])
+  })
+
+  it('uploads a copy that was never synced after a delete', () => {
+    expect(planCardTemplateSync(
+      [local('local-a', 'a', 'new', 9_000)],
+      [],
+      [tombstone('a', 2_000)],
+    )).toEqual([{ kind: 'upload', id: 'a', key: 'local-a' }])
+  })
+
+  it('uploads a copy confirmed after the tombstone', () => {
+    expect(planCardTemplateSync(
+      [local('local-a', 'a', 'newer', 9_000, 3_000)],
+      [],
+      [tombstone('a', 2_000)],
+    )).toEqual([{ kind: 'upload', id: 'a', key: 'local-a' }])
   })
 })

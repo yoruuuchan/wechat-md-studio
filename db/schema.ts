@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, blob } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, blob, primaryKey } from "drizzle-orm/sqlite-core";
 
 // Upload ledger. Only keys are stored — never URLs, since a key is what the
 // worker turns into a stable public address.
@@ -127,6 +127,23 @@ export const cardTemplates = sqliteTable("card_templates", {
 });
 
 export type CardTemplateRow = typeof cardTemplates.$inferSelect;
+
+/**
+ * Deletion markers for the owner's card templates. A template row is deleted
+ * normally, but another device may still hold a synced copy; without a marker
+ * that copy looks "local-only" and is uploaded again. The tombstone records the
+ * server time of the delete so the other device can remove the copy it already
+ * knows. `(ownerId, id)` is the primary key because tombstones are owner-scoped
+ * just like the templates themselves.
+ */
+export const cardTemplateTombstones = sqliteTable("card_template_tombstones", {
+  ownerId: integer("ownerId").notNull(),
+  id: text("id").notNull(),
+  /** Milliseconds, server clock: the only clock these comparisons may use. */
+  deletedAt: integer("deletedAt").notNull(),
+}, (table) => [primaryKey({ columns: [table.ownerId, table.id] })]);
+
+export type CardTemplateTombstoneRow = typeof cardTemplateTombstones.$inferSelect;
 
 /**
  * Single-owner deployment: the app authenticates with one access key, so there

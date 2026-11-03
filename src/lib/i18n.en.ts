@@ -522,6 +522,7 @@ export const en: Record<MsgKey, Msg> = {
   'cards.templateSyncing': 'Syncing…',
   'cards.templateSyncFailed': 'Sync failed',
   'cards.templateSyncFailedHint': 'The cloud sync failed; templates are still on this device.',
+  'cards.templateRemovedByCloud': (p) => `Removed ${p.n} template${Number(p.n) === 1 ? '' : 's'} deleted on another device`,
   'cards.variantCount': (p) => (p.n === 1 ? '1 background' : `${p.n} backgrounds`),
   'cards.templateRatioHint': '"{name}" only supports {ratios}; the ratio switched automatically.',
   'cards.templateError': 'Template upload failed: {reason}',

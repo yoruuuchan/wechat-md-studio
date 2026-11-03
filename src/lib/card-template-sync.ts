@@ -3,9 +3,15 @@
  *
  * The manifest id is the identity shared by both devices. When the two sides
  * hold different bytes for one id, the later upload wins without a dialog:
- * compare the local record's upload time with the server's `uploadedAt`. A
- * local id missing from the cloud is pushed; a cloud id missing locally is
- * pulled.
+ * compare the local record's upload time with the server's `uploadedAt`.
+ *
+ * A tombstone changes only the "local id missing from the cloud" case. If this
+ * device holds a version the server had confirmed at or before the delete, the
+ * delete came from another device and this copy is removed. A copy that was
+ * never uploaded has no server timestamp and is genuinely new on this device,
+ * so it is uploaded and the server clears the tombstone. All tombstone
+ * comparisons use server timestamps (`cloudUploadedAt` vs `deletedAt`); the
+ * device clock is never compared with the server's.
  */
 export interface LocalCardTemplateCandidate {
   /** Local record id (used to update the same IndexedDB record). */
@@ -14,6 +20,8 @@ export interface LocalCardTemplateCandidate {
   id: string
   sha256: string
   updatedAt: number
+  /** Server `uploadedAt` of the version this record holds, once confirmed. */
+  cloudUploadedAt?: number
 }
 
 export interface CloudCardTemplateCandidate {
@@ -22,14 +30,22 @@ export interface CloudCardTemplateCandidate {
   uploadedAt: number
 }
 
+export interface CardTemplateTombstoneCandidate {
+  id: string
+  /** Server time in milliseconds. */
+  deletedAt: number
+}
+
 export type CardTemplateSyncAction =
   | { kind: 'upload'; id: string; key: string }
   | { kind: 'download'; id: string }
   | { kind: 'keep'; id: string }
+  | { kind: 'delete-local'; id: string; key: string }
 
 export function planCardTemplateSync(
   local: readonly LocalCardTemplateCandidate[],
   cloud: readonly CloudCardTemplateCandidate[],
+  tombstones: readonly CardTemplateTombstoneCandidate[] = [],
 ): CardTemplateSyncAction[] {
   const localById = new Map<string, LocalCardTemplateCandidate>()
   for (const row of local) {
@@ -37,11 +53,17 @@ export function planCardTemplateSync(
     if (!current || row.updatedAt > current.updatedAt) localById.set(row.id, row)
   }
   const cloudById = new Map(cloud.map((row) => [row.id, row]))
+  const tombstoneById = new Map(tombstones.map((row) => [row.id, row]))
   const actions: CardTemplateSyncAction[] = []
 
   for (const [id, row] of localById) {
     const remote = cloudById.get(id)
     if (!remote) {
+      const tombstone = tombstoneById.get(id)
+      if (tombstone && row.cloudUploadedAt !== undefined && row.cloudUploadedAt <= tombstone.deletedAt) {
+        actions.push({ kind: 'delete-local', id, key: row.key })
+        continue
+      }
       actions.push({ kind: 'upload', id, key: row.key })
       continue
     }

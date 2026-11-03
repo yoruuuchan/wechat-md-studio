@@ -16,6 +16,17 @@ export interface CloudCardTemplateMeta {
   uploadedAt: number
 }
 
+export interface CloudCardTemplateTombstone {
+  id: string
+  /** Server time in milliseconds. */
+  deletedAt: number
+}
+
+export interface CloudCardTemplateList {
+  items: CloudCardTemplateMeta[]
+  tombstones: CloudCardTemplateTombstone[]
+}
+
 export class CardTemplateCloudError extends Error {
   readonly status: number
   readonly code: string
@@ -45,11 +56,17 @@ async function failure(response: Response): Promise<CardTemplateCloudError> {
   return new CardTemplateCloudError(response.status, code)
 }
 
-export async function listCloudCardTemplates(signal?: AbortSignal): Promise<CloudCardTemplateMeta[]> {
+export async function listCloudCardTemplates(signal?: AbortSignal): Promise<CloudCardTemplateList> {
   const response = await fetch(BASE, { credentials: 'include', signal })
   if (!response.ok) throw await failure(response)
-  const body = (await response.json()) as { items?: CloudCardTemplateMeta[] }
-  return Array.isArray(body.items) ? body.items : []
+  const body = (await response.json()) as {
+    items?: CloudCardTemplateMeta[]
+    tombstones?: CloudCardTemplateTombstone[]
+  }
+  return {
+    items: Array.isArray(body.items) ? body.items : [],
+    tombstones: Array.isArray(body.tombstones) ? body.tombstones : [],
+  }
 }
 
 export async function uploadCloudCardTemplate(record: CardTemplateSourceRecord, signal?: AbortSignal): Promise<CloudCardTemplateMeta> {

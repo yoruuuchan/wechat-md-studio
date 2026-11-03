@@ -4,8 +4,8 @@ import type { Context } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import type { HttpBindings } from '@hono/node-server'
 import { and, desc, eq } from 'drizzle-orm'
-import { getDb } from './queries/connection'
-import { cardTemplates } from '../db/schema'
+import { getDb, getSqlite } from './queries/connection'
+import { cardTemplates, cardTemplateTombstones } from '../db/schema'
 import { authenticateRequest } from './session'
 
 /**
@@ -35,6 +35,8 @@ export const CARD_TEMPLATE_CLOUD_LIMITS: CardTemplateCloudLimits = {
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 const VERSION_RE = /^[0-9]+(?:\.[0-9A-Za-z-]+){0,3}$/
+/** Keep enough history for a long-lived device without growing without bound. */
+export const CARD_TEMPLATE_TOMBSTONE_LIMIT = 200
 
 export interface CardTemplateCloudMeta {
   id: string
@@ -67,6 +69,24 @@ export function createCardTemplatesRouter(deps: CardTemplateCloudDeps = {}) {
   const limits = { ...CARD_TEMPLATE_CLOUD_LIMITS, ...deps.limits }
   const router = new Hono<{ Bindings: HttpBindings }>()
 
+  /**
+   * Each owner keeps only the newest tombstones. The table is owned by a single
+   * account in practice, but the query stays owner-scoped so the cap cannot be
+   * consumed by another account. Insert order breaks same-millisecond ties.
+   */
+  function pruneTombstones(ownerId: number): void {
+    getSqlite().prepare(`
+      DELETE FROM card_template_tombstones
+      WHERE ownerId = ?
+        AND id NOT IN (
+          SELECT id FROM card_template_tombstones
+          WHERE ownerId = ?
+          ORDER BY deletedAt DESC, rowid DESC
+          LIMIT ?
+        )
+    `).run(ownerId, ownerId, CARD_TEMPLATE_TOMBSTONE_LIMIT)
+  }
+
   async function requireOwner(c: Context<{ Bindings: HttpBindings }>) {
     const user = await authenticateRequest(c.req.raw.headers)
     if (!user) {
@@ -78,6 +98,7 @@ export function createCardTemplatesRouter(deps: CardTemplateCloudDeps = {}) {
   router.get('/', async (c) => {
     const owner = await requireOwner(c)
     if (!owner.user) return owner.response
+    pruneTombstones(owner.user.id)
     const rows = await getDb()
       .select({
         id: cardTemplates.id,
@@ -90,7 +111,12 @@ export function createCardTemplatesRouter(deps: CardTemplateCloudDeps = {}) {
       .from(cardTemplates)
       .where(eq(cardTemplates.ownerId, owner.user.id))
       .orderBy(desc(cardTemplates.uploadedAt))
-    return c.json({ items: rows })
+    const tombstones = await getDb()
+      .select({ id: cardTemplateTombstones.id, deletedAt: cardTemplateTombstones.deletedAt })
+      .from(cardTemplateTombstones)
+      .where(eq(cardTemplateTombstones.ownerId, owner.user.id))
+      .orderBy(desc(cardTemplateTombstones.deletedAt))
+    return c.json({ items: rows, tombstones })
   })
 
   router.post(
@@ -160,6 +186,16 @@ export function createCardTemplatesRouter(deps: CardTemplateCloudDeps = {}) {
         })
       }
 
+      // A successful upload is the user adding the template back. The tombstone
+      // must go, or the device that uploaded it would delete its own copy on the
+      // next sync.
+      await getDb()
+        .delete(cardTemplateTombstones)
+        .where(and(
+          eq(cardTemplateTombstones.ownerId, owner.user.id),
+          eq(cardTemplateTombstones.id, id),
+        ))
+
       const meta: CardTemplateCloudMeta = { id, name, version, sha256, size: bytes.byteLength, uploadedAt }
       return c.json(meta)
     },
@@ -200,6 +236,18 @@ export function createCardTemplatesRouter(deps: CardTemplateCloudDeps = {}) {
       .where(and(eq(cardTemplates.id, id), eq(cardTemplates.ownerId, owner.user.id)))) as unknown as {
       rows?: { changes?: number | bigint }[]
     }
+    // Record the delete even when this account has no row: it may be a stale
+    // device deleting a template that another device already removed. Updating
+    // an existing tombstone makes the newest delete win.
+    const deletedAt = Date.now()
+    await getDb()
+      .insert(cardTemplateTombstones)
+      .values({ ownerId: owner.user.id, id, deletedAt })
+      .onConflictDoUpdate({
+        target: [cardTemplateTombstones.ownerId, cardTemplateTombstones.id],
+        set: { deletedAt },
+      })
+    pruneTombstones(owner.user.id)
     return c.json({ ok: true, deleted: Number(res?.rows?.[0]?.changes ?? 0) > 0 })
   })
 

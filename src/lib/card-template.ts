@@ -42,6 +42,12 @@ export interface CardTemplateSourceRecord {
   name: string
   createdAt: number
   updatedAt: number
+  /**
+   * Server `uploadedAt` of the cloud version this record is known to match.
+   * Absent until an upload, download or merge confirms it. Server time only:
+   * tombstones are compared against this, never against the device clock.
+   */
+  cloudUploadedAt?: number
   raw: ArrayBuffer
   parsed: CardTemplateParsed
 }

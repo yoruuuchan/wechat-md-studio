@@ -160,6 +160,14 @@ function openDatabase(): DatabaseSync {
     );
     CREATE INDEX IF NOT EXISTS card_templates_owner_uploaded
       ON card_templates (ownerId, uploadedAt DESC);
+    CREATE TABLE IF NOT EXISTS card_template_tombstones (
+      ownerId INTEGER NOT NULL,
+      id TEXT NOT NULL,
+      deletedAt INTEGER NOT NULL,
+      PRIMARY KEY (ownerId, id)
+    );
+    CREATE INDEX IF NOT EXISTS card_template_tombstones_owner_deleted
+      ON card_template_tombstones (ownerId, deletedAt DESC);
   `)
 
   // One-off data migrations, recorded so they never run twice.

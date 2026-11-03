@@ -48,6 +48,18 @@ function upload(
   })
 }
 
+interface CloudList {
+  items: { id: string; name: string; sha256: string; size: number; uploadedAt: number; version: string }[]
+  tombstones: { id: string; deletedAt: number }[]
+}
+
+async function listCloud(
+  router: ReturnType<typeof createCardTemplatesRouter>,
+  cookie: string,
+): Promise<CloudList> {
+  return (await (await request(router, '/', { headers: { cookie } })).json()) as CloudList
+}
+
 describe('card template cloud auth', () => {
   it('answers every operation with 401 without a session', async () => {
     const router = createCardTemplatesRouter()
@@ -152,5 +164,63 @@ describe('card template cloud upload / list / download / delete', () => {
     const rows = after.items.filter((item) => item.id === 'replace-me')
     expect(rows).toHaveLength(1)
     expect(rows[0].size).toBe(96)
+  })
+})
+
+describe('card template tombstones', () => {
+  it('writes or refreshes a tombstone when a template is deleted', async () => {
+    const router = createCardTemplatesRouter()
+    const cookie = await cookieFor(200)
+    expect((await upload(router, 'delete-with-marker', archive(), cookie)).status).toBe(200)
+    expect((await request(router, '/delete-with-marker', { method: 'DELETE', headers: { cookie } })).status).toBe(200)
+    const first = await listCloud(router, cookie)
+    expect(first.items).toHaveLength(0)
+    const tombstone = first.tombstones.find((item) => item.id === 'delete-with-marker')
+    expect(tombstone?.deletedAt).toBeGreaterThan(0)
+
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect((await request(router, '/delete-with-marker', { method: 'DELETE', headers: { cookie } })).status).toBe(200)
+    const second = await listCloud(router, cookie)
+    const refreshed = second.tombstones.filter((item) => item.id === 'delete-with-marker')
+    expect(refreshed).toHaveLength(1)
+    expect(refreshed[0].deletedAt).toBeGreaterThanOrEqual(tombstone!.deletedAt)
+  })
+
+  it('returns only the signed-in account’s tombstones', async () => {
+    const router = createCardTemplatesRouter()
+    const owner = await cookieFor(201)
+    const other = await cookieFor(202)
+    await request(router, '/private-marker', { method: 'DELETE', headers: { cookie: owner } })
+
+    const own = await listCloud(router, owner)
+    expect(own.tombstones.map((item) => item.id)).toContain('private-marker')
+    const foreign = await listCloud(router, other)
+    expect(foreign.tombstones).toHaveLength(0)
+  })
+
+  it('clears the same id’s tombstone when the user uploads it again', async () => {
+    const router = createCardTemplatesRouter()
+    const cookie = await cookieFor(203)
+    expect((await upload(router, 'add-back', archive(), cookie)).status).toBe(200)
+    await request(router, '/add-back', { method: 'DELETE', headers: { cookie } })
+    expect((await listCloud(router, cookie)).tombstones.map((item) => item.id)).toContain('add-back')
+
+    expect((await upload(router, 'add-back', archive(64), cookie)).status).toBe(200)
+    const after = await listCloud(router, cookie)
+    expect(after.items.map((item) => item.id)).toEqual(['add-back'])
+    expect(after.tombstones).toHaveLength(0)
+  })
+
+  it('keeps the newest 200 tombstones per owner and drops the oldest', async () => {
+    const router = createCardTemplatesRouter()
+    const cookie = await cookieFor(204)
+    for (let i = 0; i < 201; i++) {
+      const id = `prune-${String(i).padStart(3, '0')}`
+      expect((await request(router, `/${id}`, { method: 'DELETE', headers: { cookie } })).status).toBe(200)
+    }
+    const listed = await listCloud(router, cookie)
+    expect(listed.tombstones).toHaveLength(200)
+    expect(listed.tombstones.map((item) => item.id)).not.toContain('prune-000')
+    expect(listed.tombstones.map((item) => item.id)).toContain('prune-200')
   })
 })

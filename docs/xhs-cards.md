@@ -45,7 +45,7 @@ node scripts/cdp-verify-xhs-cards.mjs 3201 9334
 node scripts/cdp-verify-card-template-upload.mjs 3281 9398
 ```
 
-`cdp-verify-card-template-upload.mjs` 只用仓库里的示例模板（`examples/card-templates/example`，运行时打包成 `.reedcard`），覆盖多文件上传（其中一个坏包被拒绝并逐个提示原因）、选择器、「我的模板」、单张 PNG / 整包 ZIP、预览 DOM 与导出 PNG 像素对比、刷新后仍在、恶意包被拒绝、删除后刷新不再出现；登录状态下还会验证自动上传到云端、全新浏览器 profile 登录后模板自动出现、登录删除两边都消失、访客看不到同步状态。模板格式、slot 与限制见 [卡片模板文件格式](card-template-format.md)。
+`cdp-verify-card-template-upload.mjs` 只用仓库里的示例模板（`examples/card-templates/example`，运行时打包成 `.reedcard`），覆盖多文件上传（其中一个坏包被拒绝并逐个提示原因）、选择器、「我的模板」、单张 PNG / 整包 ZIP、预览 DOM 与导出 PNG 像素对比、刷新后仍在、恶意包被拒绝、删除后刷新不再出现；登录状态下还会验证自动上传到云端、全新浏览器 profile 登录后模板自动出现、登录删除两边都消失、访客看不到同步状态，以及两个独立浏览器 profile 的双设备场景：A 删除后 B 同步只删本机并提示、云端与 A 也都没有，B 重新上传后 A 再次同步能重新拿到。模板格式、slot 与限制见 [卡片模板文件格式](card-template-format.md)。
 
 脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与默认模板的五种背景，并遍历默认模板每个变体的封面 + 前两张正文（3:4），检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示、CDP 实际字体与 DOM / PNG 像素对比。默认模板逐个变体检查封面标题、副标题与第 3 页正文的 WCAG 对比度：用文字的计算颜色和导出 PNG 中文字包围盒内的中位色算对比度，普通文字不足 4.5:1 或 24px 以上粗体标题不足 3:1 即失败。
 

@@ -514,6 +514,7 @@ export const zh = {
   'cards.templateSyncing': '正在同步…',
   'cards.templateSyncFailed': '同步失败',
   'cards.templateSyncFailedHint': '云端同步失败，模板仍在本机。',
+  'cards.templateRemovedByCloud': (p) => `已按其他设备的删除，移除 ${p.n} 个模板`,
   'cards.variantCount': (p) => `${p.n} 种背景`,
   'cards.templateRatioHint': '「{name}」只支持 {ratios}，比例已自动切换。',
   'cards.templateError': '模板上传失败：{reason}',

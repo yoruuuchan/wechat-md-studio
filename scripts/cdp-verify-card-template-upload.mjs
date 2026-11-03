@@ -181,13 +181,13 @@ async function shot(name, session = sessionId) {
   evidence.screenshots.push(file)
   return file
 }
-async function upload(files) {
+async function upload(files, session = sessionId) {
   const list = Array.isArray(files) ? files : [files]
-  const { root } = await send('DOM.getDocument', { depth: -1 }, sessionId)
-  const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: '[data-card-template-file]' }, sessionId)
+  const { root } = await send('DOM.getDocument', { depth: -1 }, session)
+  const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: '[data-card-template-file]' }, session)
   if (!nodeId) throw new Error('template file input missing')
-  const before = await evaluate(`document.querySelectorAll('[data-card-template-item]').length`)
-  await send('DOM.setFileInputFiles', { nodeId, files: list }, sessionId)
+  const before = await evaluate(`document.querySelectorAll('[data-card-template-item]').length`, session)
+  await send('DOM.setFileInputFiles', { nodeId, files: list }, session)
   return before
 }
 const dimensions = (bytes) => ({ width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) })
@@ -265,8 +265,11 @@ async function freshBrowserProfile() {
   return session
 }
 
+async function cloudState(session = sessionId) {
+  return evaluate(`fetch('/api/card-templates', { credentials: 'include' }).then((r) => r.json()).then((b) => ({ items: b.items || [], tombstones: b.tombstones || [] }))`, session)
+}
 async function cloudItems(session = sessionId) {
-  return evaluate(`fetch('/api/card-templates', { credentials: 'include' }).then((r) => r.json()).then((b) => b.items || [])`, session)
+  return (await cloudState(session)).items
 }
 
 async function pixelCompare(domFile, pngFile, label) {
@@ -495,6 +498,99 @@ try {
   await openCards(fresh)
   await waitFor(`!!document.querySelector('[data-card-templates]')`, 45000, fresh)
   check('delete survives a reload', await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 0`, fresh))
+
+  // Two independent browser contexts in the same Chrome: device A is the
+  // `fresh` context above (empty cloud/local), device B gets its own cookies,
+  // localStorage and IndexedDB. Only the repository example template is used.
+  const deviceB = await freshBrowserProfile()
+  await login(deviceB)
+  await send('Page.reload', {}, deviceB)
+  await waitFor('!!window.__mopaiCodemirror', 45000, deviceB)
+  await setDraft(deviceB)
+  await openCards(deviceB)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, deviceB)
+  check('device B starts with no card templates after login',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 0`, deviceB))
+
+  // A adds the example template; B picks it up from the cloud.
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, fresh)
+  await upload(exampleZip, fresh)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 1`, 45000, fresh)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, fresh)
+  const beforeDelete = await cloudState(fresh)
+  check('device A uploads the example template to the cloud',
+    beforeDelete.items.some((item) => item.id === 'example-daylight') &&
+    !beforeDelete.tombstones.some((item) => item.id === 'example-daylight'),
+    { items: beforeDelete.items.map((item) => item.id), tombstones: beforeDelete.tombstones.map((item) => item.id) })
+  await send('Page.reload', {}, deviceB)
+  await waitFor('!!window.__mopaiCodemirror', 45000, deviceB)
+  await setDraft(deviceB)
+  await openCards(deviceB)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 1`, 45000, deviceB)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, deviceB)
+  check('device B downloads the same example template before the delete',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 1`, deviceB))
+  await shot('dual-device-b-synced', deviceB)
+
+  // A deletes it. The cloud row goes away and a tombstone remains.
+  await evaluate(`window.confirm = () => true`, fresh)
+  await click('[data-card-template-delete]', fresh)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 0`, 45000, fresh)
+  const afterDelete = await cloudState(fresh)
+  check('device A delete removes the cloud copy and leaves a tombstone',
+    !afterDelete.items.some((item) => item.id === 'example-daylight') &&
+    afterDelete.tombstones.some((item) => item.id === 'example-daylight'),
+    { items: afterDelete.items.map((item) => item.id), tombstones: afterDelete.tombstones.map((item) => item.id) })
+  await shot('dual-device-a-deleted', fresh)
+
+  // B refreshes: the stale local copy is removed (not re-uploaded) and the
+  // user sees the cross-device deletion notice.
+  await send('Page.reload', {}, deviceB)
+  await waitFor('!!window.__mopaiCodemirror', 45000, deviceB)
+  await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')]
+    .some((el) => (el.textContent || '').includes('已按其他设备的删除，移除 1 个模板'))`, 45000, deviceB)
+  await setDraft(deviceB)
+  await openCards(deviceB)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 0`, 45000, deviceB)
+  const removalToast = await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((el) => el.textContent || '').join(' | ')`, deviceB)
+  check('device B removes the stale copy and shows the deletion notice',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 0`, deviceB) &&
+    removalToast.includes('已按其他设备的删除，移除 1 个模板'), removalToast)
+  check('device B did not resurrect the deleted template in the cloud',
+    !(await cloudItems(deviceB)).some((item) => item.id === 'example-daylight'))
+  await shot('dual-device-b-deleted', deviceB)
+
+  // A refreshes too: nothing comes back.
+  await send('Page.reload', {}, fresh)
+  await waitFor('!!window.__mopaiCodemirror', 45000, fresh)
+  await openCards(fresh)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 0`, 45000, fresh)
+  check('device A stays empty after refreshing',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 0`, fresh))
+
+  // B adds it back. The POST clears the tombstone, and A downloads it again.
+  await upload(exampleZip, deviceB)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 1`, 45000, deviceB)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, deviceB)
+  const afterReupload = await cloudState(deviceB)
+  check('device B upload clears the tombstone and restores the cloud copy',
+    afterReupload.items.some((item) => item.id === 'example-daylight') &&
+    !afterReupload.tombstones.some((item) => item.id === 'example-daylight'),
+    { items: afterReupload.items.map((item) => item.id), tombstones: afterReupload.tombstones.map((item) => item.id) })
+  await send('Page.reload', {}, fresh)
+  await waitFor('!!window.__mopaiCodemirror', 45000, fresh)
+  await setDraft(fresh)
+  await openCards(fresh)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 1`, 45000, fresh)
+  check('device A receives the template uploaded again on device B',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 1`, fresh))
+  await shot('dual-device-a-restored', fresh)
+  evidence.sync.dualDevice = {
+    beforeDelete: beforeDelete.items.map((item) => item.id),
+    afterDelete: afterDelete.items.map((item) => item.id),
+    afterReupload: afterReupload.items.map((item) => item.id),
+  }
+
   check('no uncaught page exceptions', exceptions.length === 0, exceptions.length)
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 5))
   evidence.passed = checks.every((item) => item.passed)
