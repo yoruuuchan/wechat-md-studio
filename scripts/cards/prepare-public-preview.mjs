@@ -1,7 +1,8 @@
 // Pack the nine public card sources for the local preview contact sheet.
-//   node scripts/cards/prepare-public-preview.mjs --out <dir>
+//   node scripts/cards/prepare-public-preview.mjs [--out <dir>]
 //
-// The output is intentionally outside the repository: `packs/` holds the zips
+// The default output lives under the gitignored `verify-out/`; passing `--out`
+// points the contact sheet at a publishable directory. `packs/` holds the zips
 // uploaded through the normal card-template flow and `catalog.json` is the
 // input for capture-card-matrix.mjs --mode uploaded --profile preview.
 import { spawnSync } from 'node:child_process'
@@ -13,7 +14,7 @@ const arg = (name, fallback) => {
   const i = args.indexOf('--' + name)
   return i >= 0 ? args[i + 1] : fallback
 }
-const out = path.resolve(arg('out', 'E:/AgentWorkspace/Projects/reed-next/public-cards-preview'))
+const out = path.resolve(arg('out', 'verify-out/public-cards-preview'))
 const sourceRoot = path.resolve('card-templates/public')
 const packs = path.join(out, 'packs')
 

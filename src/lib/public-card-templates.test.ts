@@ -82,7 +82,10 @@ describe('public card templates', () => {
       expect(record.template).toBe(publicCardTemplateRuntimeId(item.id))
       expect(record.parsed.pages.cover.html).toContain('data-slot="title"')
       expect(record.parsed.pages.body.html).toContain('data-slot="content"')
-      expect(record.parsed.pages.end?.html).toContain('data-slot="brand"')
+      expect(record.parsed.pages.end?.html).toContain('data-slot="author"')
+      expect(record.parsed.pages.end?.html).not.toContain('data-slot="brand"')
+      expect(record.parsed.pages.cover.html).not.toContain('data-slot="brand"')
+      expect(record.parsed.pages.body.html).not.toContain('data-slot="brand"')
       expect(record.parsed.styles).toHaveLength(2)
     }
   })

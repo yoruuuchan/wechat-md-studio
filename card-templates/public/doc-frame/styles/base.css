@@ -258,6 +258,6 @@
 
 .xhs-body sup,
 .xhs-body sub {
-  font-size: 0.72em;
+  font-size: max(12px, 0.72em);
   line-height: 0;
 }

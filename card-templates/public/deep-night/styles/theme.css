@@ -375,13 +375,6 @@
   background: var(--accent);
 }
 
-.deep-info-brand {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 13px;
-  letter-spacing: 0.1em;
-}
-
 .xhs-card[data-card-aspect="1:1"] .deep-end {
   padding: 54px 44px 44px;
 }

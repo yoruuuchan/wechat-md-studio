@@ -376,11 +376,16 @@
 .aurora-end-author {
   position: relative;
   z-index: 2;
+  align-self: stretch;
+  max-width: 100%;
   margin: 24px 0 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .xhs-card[data-card-aspect="1:1"] .aurora-end {

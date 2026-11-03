@@ -26,7 +26,7 @@ const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'reed-public-cards-'))
 const checks = []
 const exceptions = []
 const consoleErrors = []
-const evidence = { output, checks, exports: [], pixels: [], coverTitles: [], contrast: [], templates: [] }
+const evidence = { output, checks, exports: [], pixels: [], coverTitles: [], contrast: [], textSizes: [], templates: [] }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const check = (name, passed, detail) => {
   checks.push({ name, passed: Boolean(passed), detail })
@@ -192,6 +192,35 @@ const boundsExpression = `(() => {
     }
   }
   return {count:cards.length,bad:bad.slice(0,6),warning:!!document.querySelector('[data-card-image-warning]')};
+})()`
+const textSizesExpression = (index) => `(() => {
+  const card = document.querySelector('[data-card-index="${index}"]');
+  if (!card) return { missing: true, count: 0, min: null, small: [] };
+  const frame = card.getBoundingClientRect();
+  const small = []; let count = 0; let min = null;
+  for (const el of card.querySelectorAll('*')) {
+    if (el.closest('[aria-hidden="true"]')) continue;
+    const hasText = [...el.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim());
+    if (!hasText) continue;
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.visibility !== 'visible' || Number.parseFloat(style.opacity) === 0) continue;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) continue;
+    if (rect.right <= frame.left || rect.left >= frame.right || rect.bottom <= frame.top || rect.top >= frame.bottom) continue;
+    const fontSize = Number.parseFloat(style.fontSize);
+    if (!Number.isFinite(fontSize)) continue;
+    count++;
+    min = min === null ? fontSize : Math.min(min, fontSize);
+    if (fontSize < 12 - 0.01) {
+      small.push({
+        tag: el.tagName.toLowerCase(),
+        className: typeof el.className === 'string' ? el.className : '',
+        text: (el.textContent || '').trim().slice(0, 40),
+        fontSize,
+      });
+    }
+  }
+  return { missing: false, count, min, small: small.slice(0, 8) };
 })()`
 async function download(selector, label, extension) {
   await send('Page.bringToFront', {}, sessionId)
@@ -374,6 +403,59 @@ async function textContrastChecks(pageIndex, pngFile, label, roles) {
   }
 }
 
+async function textSizeChecks(label, pageCount) {
+  const pages = [
+    { role: 'cover', index: 0 },
+    { role: 'body', index: 1 },
+    { role: 'end', index: pageCount - 1 },
+  ]
+  const probes = {}
+  for (const page of pages) probes[page.role] = await evaluate(textSizesExpression(page.index))
+  const small = Object.entries(probes).flatMap(([role, probe]) =>
+    probe.small.map((item) => ({ role, ...item })))
+  const missing = Object.entries(probes).filter(([, probe]) => probe.missing).map(([role]) => role)
+  const min = Math.min(...Object.values(probes).map((probe) => probe.min ?? 0))
+  const passed = missing.length === 0 && small.length === 0
+  evidence.textSizes.push({ label, passed, min, missing, small })
+  check(label + ': every visible text node is at least 12px', passed, {
+    pages: pageCount,
+    min: Number.isFinite(min) ? min : null,
+    missing,
+    small,
+  })
+}
+
+async function creditChecks(label, pageCount) {
+  const pages = await evaluate(`(() => {
+    const cards = [...document.querySelectorAll('.xhs-card')];
+    return cards.map((card, index) => {
+      const authors = [...card.querySelectorAll('[data-slot="author"]')].map((element) => ({
+        text: (element.textContent || '').trim(),
+        lines: element.getClientRects().length,
+      }));
+      return {
+        index: index + 1,
+        authors,
+        brands: card.querySelectorAll('[data-slot="brand"]').length,
+      };
+    });
+  })()`)
+  const failures = []
+  for (const page of pages) {
+    if (page.brands) failures.push({ page: page.index, brandSlots: page.brands })
+    if (page.authors.length > 1) failures.push({ page: page.index, authorSlots: page.authors.length })
+    for (const author of page.authors) {
+      if (!author.text) failures.push({ page: page.index, emptyAuthor: true })
+      if (author.lines > 1) failures.push({ page: page.index, authorSplitAcrossLines: author.text })
+    }
+  }
+  const passed = failures.length === 0
+  check(label + ': author appears once per page and never splits', passed, {
+    pages: pageCount,
+    failures,
+  })
+}
+
 try {
   for (let i = 0; i < 100; i++) {
     try { if ((await fetch(origin)).ok) break } catch { /* booting */ }
@@ -477,12 +559,17 @@ try {
         { role: 'body paragraph', selector: '.xhs-body p' },
         { role: 'body heading', selector: '.xhs-body h2' },
       ])
+      await textSizeChecks(`${label} 3:4`, bounds.count)
+      await creditChecks(`${label} 3:4`, bounds.count)
 
       for (const ratio of ['1:1', '9:16']) {
         const size = ratio === '1:1' ? 1080 : 1080
         const height = ratio === '1:1' ? 1080 : 1920
         await click(`[data-card-ratio="${ratio}"]`)
         await cardsReady()
+        const ratioPages = await evaluate(`document.querySelectorAll('.xhs-card').length`)
+        await textSizeChecks(`${label} ${ratio}`, ratioPages)
+        await creditChecks(`${label} ${ratio}`, ratioPages)
         const file = await download('[data-card-export="0"]', `${template.id}-${variant}-${ratio.replace(':', 'x')}-cover`, '.png')
         const dims = dimensions(fs.readFileSync(file))
         check(`${label} ${ratio}: cover export is ${size} wide`, dims.width === size && dims.height === height, dims)

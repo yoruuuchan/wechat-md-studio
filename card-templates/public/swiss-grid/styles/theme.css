@@ -378,15 +378,6 @@
   border-top: 2px solid var(--ink);
 }
 
-.swiss-foot-brand {
-  margin-left: auto;
-  color: var(--muted);
-  font-family: "Geist Mono", "Noto Sans SC", monospace;
-  font-size: 12px;
-  line-height: 1.4;
-  letter-spacing: 0.08em;
-}
-
 .xhs-card[data-card-aspect="1:1"] .swiss-end {
   padding: 52px 44px 42px;
 }
