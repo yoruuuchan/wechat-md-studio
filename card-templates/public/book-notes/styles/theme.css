@@ -64,8 +64,8 @@
   position: absolute;
   z-index: 1;
   top: 0;
-  right: 64px;
-  width: 40px;
+  right: 30px;
+  width: 36px;
   height: 196px;
   background: var(--accent);
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 88%, 0 100%);
@@ -160,8 +160,8 @@
 }
 
 .xhs-card[data-card-aspect="1:1"] .book-ribbon {
-  right: 48px;
-  width: 32px;
+  right: 26px;
+  width: 30px;
   height: 136px;
 }
 
@@ -190,8 +190,8 @@
 }
 
 .xhs-card[data-card-aspect="9:16"] .book-ribbon {
-  right: 82px;
-  width: 44px;
+  right: 34px;
+  width: 40px;
   height: 254px;
 }
 
