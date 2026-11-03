@@ -72,9 +72,7 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
         </div>
         {ratios.length < 3 && (
           <p data-card-ratio-hint className="mt-2 text-[11px] text-ink-2">
-            {template === 'kihon'
-              ? t('cards.kihonRatio')
-              : t('cards.templateRatioHint', { name: templateName, ratios: ratios.join(' / ') })}
+            {t('cards.templateRatioHint', { name: templateName, ratios: ratios.join(' / ') })}
           </p>
         )}
       </div>

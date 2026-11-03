@@ -337,11 +337,11 @@ try {
 
   console.log('\n=== card template / ratio / background in the side panel ===')
   await setMode('cards')
-  await click(`document.querySelector('[data-card-template="console"]')`)
+  await click(`document.querySelector('[data-card-template="reed"]')`)
   await cardsReady()
   await click(`document.querySelector('[data-card-ratio="1:1"]')`)
   await cardsReady()
-  await click(`document.querySelector('[data-card-bg="akari"]')`)
+  await click(`document.querySelector('[data-card-bg="night"]')`)
   await cardsReady()
   const cardOptions = await evaluate(`(() => {
     const card = document.querySelector('.xhs-card');
@@ -351,13 +351,13 @@ try {
       ratio: document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio,
       width: card ? Math.round(card.getBoundingClientRect().width / (260 / 540)) : 0,
       height: card ? Math.round(card.getBoundingClientRect().height / (260 / 540)) : 0,
-      templateButton: document.querySelector('[data-card-template="console"]')?.getAttribute('aria-pressed'),
+      templateButton: document.querySelector('[data-card-template="reed"]')?.getAttribute('aria-pressed'),
     };
   })()`)
   console.log(' ', JSON.stringify(cardOptions))
-  check('card template switch reaches the preview', cardOptions.template === 'console' && cardOptions.templateButton === 'true', cardOptions)
+  check('built-in card template is selected in the preview', cardOptions.template === 'reed' && cardOptions.templateButton === 'true', cardOptions)
   check('card ratio switch reaches the preview (1:1 exports 540x540)', cardOptions.ratio === '1:1' && Math.abs(cardOptions.width - cardOptions.height) <= 2, cardOptions)
-  check('card background switch reaches the preview', cardOptions.variant === 'akari', cardOptions)
+  check('card background switch reaches the preview', cardOptions.variant === 'night', cardOptions)
   await click(`document.querySelector('[data-card-template="reed"]')`)
   await cardsReady()
   await click(`document.querySelector('[data-card-ratio="3:4"]')`)

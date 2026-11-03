@@ -34,21 +34,11 @@ const onlyTemplates = (arg('templates', '') || '').split(',').filter(Boolean)
 const onlyRatios = (arg('ratios', '') || '').split(',').filter(Boolean)
 const catalogPath = arg('catalog', '')
 const catalog = catalogPath ? JSON.parse(fs.readFileSync(catalogPath, 'utf8')) : []
-const probe = arg('probe', '')
 const append = args.includes('--append')
 
-const TEMPLATES = ['reed', 'yoru', 'paper', 'console', 'kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka']
+const TEMPLATES = ['reed']
 const VARIANTS = {
   reed: ['paper', 'white', 'grid', 'tint', 'night'],
-  yoru: ['signal', 'lab', 'studio', 'special'],
-  paper: ['editorial', 'analog', 'midnight'],
-  console: ['akari', 'yoru'],
-  kunlun: ['void', 'snowline'],
-  rift: ['dark', 'light'],
-  core: ['frost', 'nightpool'],
-  aozora: ['daylight', 'yozora'],
-  kihon: ['gin', 'kuro'],
-  mayonaka: ['midnight', 'sunset'],
 }
 const RATIOS = { '3:4': 720, '1:1': 540, '9:16': 960 }
 
@@ -205,7 +195,7 @@ function templateMatrix() {
     id: template,
     runtime: template,
     variants: VARIANTS[template],
-    ratios: (onlyRatios.length ? onlyRatios : (template === 'kihon' ? ['9:16'] : Object.keys(RATIOS))),
+    ratios: (onlyRatios.length ? onlyRatios : Object.keys(RATIOS)),
   }))
 }
 
@@ -320,185 +310,6 @@ try {
     }
   }
 
-  if (probe) {
-    const item = catalog.find((entry) => entry.id === probe)
-    if (!item) throw new Error('unknown probe template: ' + probe)
-    const expression = `(() => {
-      const card = document.querySelector('.xhs-card');
-      const body = card?.querySelector('.xhs-body');
-      const pick = (el) => {
-        if (!el) return null;
-        const s = getComputedStyle(el);
-        const out = {};
-        for (const key of ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','marginTop','marginBottom','paddingTop','paddingBottom','borderTopWidth','borderBottomWidth','color','backgroundColor','backgroundImage','backgroundSize','width','height','display','position','textAlign']) out[key] = s[key];
-        const r = el.getBoundingClientRect();
-        out.rect = [r.x, r.y, r.width, r.height].map((n) => Math.round(n * 100) / 100);
-        return out;
-      };
-      const all = [...(body?.querySelectorAll('*') ?? [])].slice(0, 400).map((el) => ({
-        tag: el.tagName, cls: el.className, height: Math.round(el.getBoundingClientRect().height * 100) / 100,
-        fontSize: getComputedStyle(el).fontSize, lineHeight: getComputedStyle(el).lineHeight,
-        marginTop: getComputedStyle(el).marginTop, marginBottom: getComputedStyle(el).marginBottom,
-        paddingTop: getComputedStyle(el).paddingTop, paddingBottom: getComputedStyle(el).paddingBottom,
-        borderTop: getComputedStyle(el).borderTopWidth, borderBottom: getComputedStyle(el).borderBottomWidth,
-        text: (el.textContent || '').slice(0, 30),
-      }));
-      const hidden = (() => {
-        if (!body) return null;
-        const host = document.createElement('div'); host.className = 'xhs-measure';
-        host.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
-        const clone = body.cloneNode(true); host.append(clone); document.body.append(host);
-        const s = getComputedStyle(clone);
-        const out = { height: clone.getBoundingClientRect().height, fontSize: s.fontSize, lineHeight: s.lineHeight, fontFamily: s.fontFamily, marginTop: s.marginTop, paddingTop: s.paddingTop, pMargin: getComputedStyle(clone.querySelector('p')).marginTop, h2Height: clone.querySelector('h2')?.getBoundingClientRect().height };
-        host.remove(); return out;
-      })();
-      const full = (el) => {
-        if (!el) return null; const s = getComputedStyle(el); const out = {};
-        for (const key of s) out[key] = s.getPropertyValue(key);
-        return out;
-      };
-      const pageOne = document.querySelector('.xhs-card[data-card-index="1"] .xhs-body');
-      const headings = [...document.querySelectorAll('.xhs-body h2')].map((el) => {
-        const s = getComputedStyle(el); return { text: (el.textContent || '').slice(0, 16), fontSize: s.fontSize, lineHeight: s.lineHeight, marginTop: s.marginTop, marginBottom: s.marginBottom, paddingTop: s.paddingTop, paddingBottom: s.paddingBottom, borderTop: s.borderTopWidth, height: Math.round(el.getBoundingClientRect().height * 100) / 100 };
-      });
-      const styleText = [...document.querySelectorAll('style[data-card-template-style]')].map((el) => el.textContent || '').join('\\n');
-      const firstChildRules = [...styleText.matchAll(/[^{}]*:first-child[^{}]*\{[^}]*\}/g)].map((match) => match[0].slice(0, 240));
-      const firstChild = body?.firstElementChild;
-      const firstChildStyle = firstChild ? (() => { const s = getComputedStyle(firstChild); return { tag: firstChild.tagName, marginTop: s.marginTop, marginBottom: s.marginBottom, important: s.getPropertyPriority('margin-top') }; })() : null;
-      const experiment = (() => {
-        if (!body) return null;
-        const host = document.createElement('div'); host.className = 'xhs-measure';
-        host.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
-        const wrap = document.createElement('div'); wrap.className = 'xhs-card'; wrap.dataset.template = body.dataset.template; wrap.dataset.variant = body.dataset.variant; wrap.dataset.night = body.dataset.night;
-        const clone = body.cloneNode(true); wrap.append(clone); host.append(wrap); document.body.append(host);
-        const before = clone.getBoundingClientRect().height;
-        const target = [...document.querySelectorAll('.xhs-body h2')].find((el) => (el.textContent || '').startsWith('第二章'));
-        if (!target) { host.remove(); return { before } }
-        const p = target.nextElementSibling;
-        clone.append(target.cloneNode(true));
-        const withH2 = clone.getBoundingClientRect().height;
-        if (p) clone.append(p.cloneNode(true));
-        const withP = clone.getBoundingClientRect().height;
-        host.remove();
-        return { before, withH2, withP, h2Height: target.getBoundingClientRect().height, pHeight: p?.getBoundingClientRect().height };
-      })();
-      const documentText = [...document.querySelectorAll('.xhs-card .xhs-body')].map((el) => el.textContent || '').join('');
-      let documentHash = 2166136261;
-      for (let i = 0; i < documentText.length; i++) { documentHash ^= documentText.charCodeAt(i); documentHash = Math.imul(documentHash, 16777619) }
-      const experiment2 = (() => {
-        const page2 = document.querySelector('.xhs-card[data-card-index="2"] .xhs-body');
-        const target = [...document.querySelectorAll('.xhs-body h2')].find((el) => (el.textContent || '').startsWith('第二章'));
-        if (!page2 || !target || !target.nextElementSibling) return null;
-        const host = document.createElement('div'); host.className = 'xhs-measure';
-        host.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
-        const clone = page2.cloneNode(true); host.append(clone); document.body.append(host);
-        const before = clone.getBoundingClientRect().height;
-        clone.append(target.cloneNode(true));
-        const withH2 = clone.getBoundingClientRect().height;
-        clone.append(target.nextElementSibling.cloneNode(true));
-        const withP = clone.getBoundingClientRect().height;
-        const h2s = getComputedStyle(clone.querySelector('h2'));
-        host.remove();
-        return { before, withH2, withP, targetMargin: getComputedStyle(target).marginTop, h2Margin: h2s.marginTop };
-      })();
-      const crossMeasure = (() => {
-        if (!body) return null;
-        const raw = body.outerHTML.replace(/data-template="[^"]*"/g, '');
-        const measureAs = (template) => {
-          const host = document.createElement('div'); host.className = 'xhs-measure';
-          host.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
-          const card = document.createElement('div'); card.className = 'xhs-card'; card.dataset.template = template; card.dataset.variant = body.dataset.variant; card.dataset.night = body.dataset.night;
-          card.innerHTML = raw.replace(/^<section/, '<section data-template="' + template + '"');
-          host.append(card); document.body.append(host);
-          const height = card.firstElementChild.getBoundingClientRect().height;
-          host.remove(); return height;
-        };
-        return { builtin: measureAs(${JSON.stringify(item.id)}), custom: measureAs(body.dataset.template) };
-      })();
-      const blockHeights = (() => {
-        const html = window.__lastCardArticle;
-        if (!html) return null;
-        const source = document.createElement('template'); source.innerHTML = html;
-        const blocks = [...source.content.firstElementChild.children].filter((el) => el.tagName !== 'H1' && el.dataset.cardBreak !== '');
-        const variant = ${JSON.stringify(variant)};
-        const measureAs = (template) => blocks.map((block) => {
-          const host = document.createElement('div'); host.className = 'xhs-measure';
-          host.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none';
-          const card = document.createElement('div'); card.className = 'xhs-card'; card.dataset.template = template; card.dataset.variant = variant; card.dataset.night = 'false';
-          const body = document.createElement('section'); body.className = 'xhs-body'; body.dataset.template = template; body.dataset.variant = variant; body.dataset.night = 'false'; body.style.width = '460px'; body.style.setProperty('--xhs-accent', '#4F6CE8');
-          body.append(document.createElement('div')); body.append(block.cloneNode(true)); card.append(body); host.append(card); document.body.append(host);
-          const rect = body.getBoundingClientRect(); const style = getComputedStyle(block);
-          const result = { tag: block.tagName, text: (block.textContent || '').slice(0, 8), h: Math.round(rect.height * 1000) / 1000, mt: style.marginTop, mb: style.marginBottom, fs: style.fontSize, lh: style.lineHeight };
-          host.remove(); return result;
-        });
-        return { builtin: measureAs(${JSON.stringify(item.id)}), custom: measureAs(document.querySelector('.xhs-body').dataset.template) };
-      })();
-      return { count: document.querySelectorAll('.xhs-card').length, blockHeights, pageDebug: window.__pageDebug, cardCalls: window.__cardCalls, measureDebug: window.__measureDebug, lastArticle: window.__lastCardArticle, card: pick(card), body: pick(body), p: pick(body?.querySelector('p')), h2: pick(body?.querySelector('h2')), headings, firstChildStyle, firstChildRules, styleTextLength: styleText.length, styleHasFirstChild: styleText.includes(':first-child'), styleCount: document.querySelectorAll('style').length, headHasTemplateStyle: document.head.innerHTML.includes('data-card-template-style'), styleSample: document.querySelector('style[data-card-template-style]')?.outerHTML.slice(0, 180) || null, crossMeasure, experiment, experiment2, hidden, documentTextLength: documentText.length, documentHash: documentHash >>> 0, pageOne: { htmlLength: pageOne?.innerHTML.length, body: full(pageOne), p: full(pageOne?.querySelector('p')), firstParagraph: pageOne?.querySelector('p')?.textContent }, pages: [...document.querySelectorAll('.xhs-card')].map((el, index) => {
-        const text = el.querySelector('.xhs-body')?.textContent || '';
-        let hash = 2166136261;
-        for (let i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 16777619) }
-        const body = el.querySelector('.xhs-body');
-        const html = (body?.innerHTML || '').replace(/data-template="[^"]*"/g, '');
-        let htmlHash = 2166136261;
-        for (let i = 0; i < html.length; i++) { htmlHash ^= html.charCodeAt(i); htmlHash = Math.imul(htmlHash, 16777619) }
-        return { index, kind: el.dataset.cardKind, textLength: text.length, firstText: text.slice(0, 40), lastText: text.slice(-40), textHash: hash >>> 0, htmlHash: htmlHash >>> 0, tags: [...(body?.children ?? [])].map((child) => child.tagName + (child.className ? '.' + String(child.className).split(' ')[0] : '')).join(','), bodyHeight: body?.offsetHeight, paragraphs: el.querySelectorAll('.xhs-body p').length };
-      }), all };
-    })()`
-    const variants = item.variants
-    const ratios = item.ratios
-    const report = []
-    for (const variant of variants) {
-      for (const ratio of ratios) {
-        const run = async (template) => {
-          await click(`[data-card-template="${template}"]`); await cardsReady()
-          await click(`[data-card-ratio="${ratio}"]`); await cardsReady()
-          await click(`[data-card-bg="${variant}"]`); await cardsReady()
-          return evaluate(expression)
-        }
-        const custom = await run(item.runtime)
-        const customDebug = await evaluate(`window.__measureDebug || null`)
-        await sleep(1000)
-        const afterWait = await evaluate(`document.querySelectorAll('.xhs-card').length`)
-        await click(`[data-card-template="${item.runtime}"]`); await cardsReady()
-        await click(`[data-card-ratio="${ratio}"]`); await cardsReady()
-        await click(`[data-card-bg="${variant}"]`); await cardsReady()
-        const sameClick = await evaluate(`document.querySelectorAll('.xhs-card').length`)
-        const builtin = await run(item.id)
-        const builtinDebug = await evaluate(`window.__measureDebug || null`)
-        const direct = await evaluate(`(async () => {
-          const html = window.__lastCardArticle;
-          const height = ${ratio === '1:1' ? 540 : ratio === '9:16' ? 960 : 720};
-          const make = () => { const t = document.createElement('template'); t.innerHTML = html; return t.content.firstElementChild };
-          if (typeof window.__paginateCardsForTest !== 'function') return null;
-          const count = async (template) => (await window.__paginateCardsForTest(make(), { height, template })).pages.length;
-          return { builtin: await count(${JSON.stringify(item.id)}), custom: await count(${JSON.stringify(item.runtime)}) };
-        })()`)
-        const other = variants.find((entry) => entry !== variant)
-        if (other) {
-          await click(`[data-card-bg="${other}"]`); await cardsReady()
-          await click(`[data-card-bg="${variant}"]`); await cardsReady()
-        }
-        const retried = await evaluate(`document.querySelectorAll('.xhs-card').length`)
-        fs.writeFileSync(path.join(out, `article-${variant}-${ratio.replace(':', 'x')}-builtin.html`), builtin.lastArticle ?? '')
-        fs.writeFileSync(path.join(out, `article-${variant}-${ratio.replace(':', 'x')}-custom.html`), custom.lastArticle ?? '')
-        const diff = []
-        const walk = (a, b, path) => {
-          if (typeof a === 'object' && a && typeof b === 'object' && b) {
-            for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) walk(a[key], b[key], `${path}.${key}`)
-          } else if (a !== b) diff.push({ path, builtin: a, custom: b })
-        }
-        walk(builtin, custom, '')
-        report.push({ template: item.id, variant, ratio, pageCount: [builtin.count, custom.count], afterWait, sameClick, retried, direct, pageDebug: { builtin: builtin.pageDebug, custom: custom.pageDebug }, calls: { builtin: builtin.cardCalls, custom: custom.cardCalls }, debug: { builtin: builtinDebug, custom: customDebug }, diff: diff.slice(0, 80) })
-        console.log(`[probe] ${item.id}/${variant}/${ratio}: pages ${builtin.count}/${custom.count} direct ${JSON.stringify(direct)} wait ${afterWait} same ${sameClick} retry ${retried}, ${diff.length} style differences`)
-        console.log('[probe-style] builtin ' + JSON.stringify({ count: builtin.styleCount, has: builtin.headHasTemplateStyle, len: builtin.styleTextLength, sample: builtin.styleSample }))
-        console.log('[probe-style] custom  ' + JSON.stringify({ count: custom.styleCount, has: custom.headHasTemplateStyle, len: custom.styleTextLength, sample: custom.styleSample }))
-        for (const row of diff.slice(0, 20)) console.log('  ' + row.path + ': ' + JSON.stringify(row.builtin) + ' -> ' + JSON.stringify(row.custom))
-      }
-    }
-    fs.writeFileSync(path.join(out, 'probe.json'), JSON.stringify(report, null, 2))
-    fs.writeFileSync(path.join(out, 'paginate.log'), consoleLogs.join('\n'))
-    throw new Error('probe complete')
-  }
 
   const entries = []
   // Recomputed after upload: a row's runtime id only exists once the package

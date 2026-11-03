@@ -15,6 +15,7 @@ import { warnAboutTokenConfig, warnAboutWeakTokens } from "./lib/agent-auth";
 import { writingSkill } from "./lib/writing-skill";
 import { remoteMcpRouter } from "./remote-mcp-router";
 import { feedbackRouter } from "./feedback-router";
+import { cardTemplatesRouter } from "./card-templates-router";
 import { handleMcpRequest } from "./mcp";
 import { startRemoteMcpCleanup } from "./lib/remote-mcp";
 
@@ -40,6 +41,8 @@ app.all("/api/mcp", handleMcpRequest);
 // In-site feedback: the public form relays to the owner's mailbox through the
 // server (credentials stay server-side; see api/lib/feedback.ts).
 app.route("/api/feedback", feedbackRouter);
+// Owner-only cloud archive for uploaded card templates; same session as docs.
+app.route("/api/card-templates", cardTemplatesRouter);
 
 // Public image read: stable address, redirects to the R2 worker.
 // Copied WeChat HTML references this stable address, so the key space can never

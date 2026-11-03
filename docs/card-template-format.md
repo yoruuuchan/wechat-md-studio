@@ -87,7 +87,7 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 |---|---|
 | `format` / `formatVersion` | 固定为 `reed-card-template` / `1`；版本升级会另行说明。 |
 | `id` | 小写字母、数字、连字符，1–64 字符。只用于显示与记录，不会覆盖内置模板。 |
-| `renderId` | 可选，写到 `data-template` 上供 CSS 匹配的键，默认等于 `id`。从内置模板转出的模板可以保留原键，这样 CSS 可以原样保留 `[data-template="…"]` 选择器，在删除内置模板后仍然自包含。两个模板不要共用同一个 `renderId`。即使共用，引擎的作用域仍按上传实例隔离，两套模板的规则不会互相影响。 |
+| `renderId` | 可选，写到 `data-template` 上供 CSS 匹配的键，默认等于 `id`。不能使用内置模板名（现在只有 `reed`），否则会被拒绝，免得上传包混进内置样式。从原内置模板转出的模板可以保留自己的 `renderId`，CSS 里的 `[data-template="…"]` 选择器会在删除内置模板后继续命中包里自带的那份规则。两个模板不要共用同一个 `renderId`；即使共用，引擎的作用域仍按上传实例隔离，两套模板的规则不会互相影响。 |
 | `name` / `version` / `author` | 选择器与“我的模板”列表里显示的名字、版本与作者。 |
 | `description` | 可选，最多 500 字。 |
 | `ratios` | 支持的比例，取 `3:4`、`1:1`、`9:16` 的非空子集；不在列表里的比例会禁用并提示。 |
@@ -200,7 +200,9 @@ svg g path circle ellipse rect line polyline polygon text tspan defs clippath
 - 不允许 `@import`、`@font-face`、`@namespace`、`@page`、`@property`、`@counter-style`、`@keyframes`、`@layer`、`@scope`；`@media`、`@supports`、`@container` 可以嵌套。
 - 选择器里不允许出现 `body` / `html` / `:root` / `:host` / `::slotted`。
 - 拒绝 `expression()`、`behavior`、`-moz-binding`、`javascript:` / `vbscript:`。
-- `url()` 只允许指向包内文件，加载时替换成 data URL；`url(#本地id)` 可以保留。`http(s):`、`//`、缺失文件都拒绝。
+- 只有 `url()` 可以携带资源地址，而且只能指向包内文件，加载时替换成 data URL；`url(#本地id)` 可以保留。`http(s):`、`//`、缺失文件都拒绝。
+- `image-set()` / `-webkit-image-set()` 一律拒绝，即使里面只是相对路径字符串（浏览器仍会向本站发 GET）。`cross-fade()`、`-webkit-cross-fade()`、`element()` / `-moz-element()`、`paint()`、`src()`、`image()`、`-webkit-canvas()`、`-webkit-named-image()` 等会把字符串当地址的函数也一律拒绝。属性值、`@font-face` 和任何 at-rule 里的出现都算。
+- `position: fixed` / `sticky` / `-webkit-sticky` 一律拒绝，包括 `:scope.xhs-card` 自身和 `@media` 内部；`position: var(--p)` 这类无法证明安全的值也拒绝。卡片外还有一层模板选择不到的 `contain: paint` + `isolation: isolate` 容器，漏网的超大 transform / z-index 不会盖住编辑器。HTML 的 `style` 属性同样不允许。
 - 字体不要写在 CSS 里：用 manifest 的 `fonts`，引擎负责 `FontFace` 和 PNG 内嵌。
 
 建议根节点用变量：
@@ -270,14 +272,15 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 | CSS 文件 | 8 |
 | 字体声明 | 24 |
 
-超限、坏 manifest、路径穿越、zip 炸弹、非白名单扩展名、危险 HTML/CSS 或包外资源都会让上传失败，界面会给出对应的中文 / 英文提示。
+超限、坏 manifest、路径穿越、zip 炸弹、非白名单扩展名、危险 HTML/CSS 或包外资源都会让上传失败，界面会给出对应的中文 / 英文提示。解压是流式的：中央目录声明的大小只用于提前判断，实际字节一边解压一边累计，超过单文件或总上限立刻中止并丢弃，声明 1 KB、实际几百 MB 的 zip 不会先被整块解开。
 
 ## 8. 上传与存储
 
-- 入口：编辑器右栏「模板」→「我的模板」→「上传模板文件」。
+- 入口：编辑器右栏「模板」→「我的模板」→「上传模板文件」。文件选择器支持一次选多个 `.reedcard`，逐个处理，失败的逐个给出原因。
 - 上传的模板与内置模板走同一条分页、封面标题适配、精确字号导出、字体嵌入、单张 PNG 和整包 ZIP 管线。
 - 原始 zip 与解析结果都存在本机 IndexedDB `mopai.card-templates`；刷新页面后仍然在，删除后从本机移除。
-- 内置模板这一轮仍然保留；模板文件只是另一种来源，不与内置模板合并，也不会覆盖它们。
+- 内置模板只剩 Reed 默认模板；模板文件是另一种来源，不与内置模板合并，也不会覆盖它。记住的旧内置模板选择会自动回到 Reed（本机键 `mopai.card-options.v1`）。
+- 登录后，「我的模板」会与站长的云端模板库双向同步：只在本机的上传，只在云端的下载；同一个模板 id 两边内容不同时，上传时间晚的那份赢，不弹窗。下载的包走和本地上传完全相同的解析与安全检查。登录状态下删除会同时删除云端与本机；访客删除只影响这台设备，并会明确提示。云端上限：单包 8 MB、每人最多 30 个、总计 100 MB；服务端不解压 zip，只校验大小与 zip 文件头，下载一律作为 `application/octet-stream` 附件发送并带 `nosniff`。
 - 模板里的设计归上传者所有。上传即表示你有权使用其中的字体、图片与版式。
 
 ## 9. 最小示例

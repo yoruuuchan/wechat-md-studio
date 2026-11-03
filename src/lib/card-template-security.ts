@@ -40,6 +40,83 @@ function store(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }
 
+/**
+ * The runtime JSZipObject exposes `internalStream` / pause / resume, but the
+ * published typings omit them. Keep the narrow shape this module uses.
+ */
+interface StreamingEntry {
+  name: string
+  internalStream(type: 'uint8array'): {
+    on(event: 'data', callback: (chunk: Uint8Array) => void): unknown
+    on(event: 'end', callback: () => void): unknown
+    on(event: 'error', callback: (error: unknown) => void): unknown
+    pause(): unknown
+    resume(): unknown
+  }
+}
+
+/**
+ * Decompress one entry while counting bytes as they arrive.
+ *
+ * The central directory is attacker-controlled: it can claim a 1 KB file while
+ * the deflate stream expands to hundreds of megabytes. JSZip's `async()` would
+ * accumulate all of it before the caller could compare lengths. The streaming
+ * reader pauses the worker on the first chunk past the ceiling, drops what it
+ * has, and rejects, so an oversized entry never materializes in memory.
+ */
+export async function readArchiveEntry(
+  entry: JSZip.JSZipObject,
+  limit: number,
+  onChunk?: (bytes: number) => void,
+): Promise<Uint8Array> {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    let stream: ReturnType<StreamingEntry['internalStream']>
+    try {
+      stream = (entry as unknown as StreamingEntry).internalStream('uint8array')
+    } catch (error) {
+      reject(new CardTemplateError('bad-zip', error instanceof Error ? error.message : String(error)))
+      return
+    }
+    let settled = false
+    let total = 0
+    let chunks: Uint8Array[] = []
+    const fail = (error: unknown): void => {
+      if (settled) return
+      settled = true
+      chunks = []
+      stream.pause()
+      reject(error instanceof CardTemplateError
+        ? error
+        : new CardTemplateError('bad-zip', error instanceof Error ? error.message : String(error)))
+    }
+    stream.on('data', (chunk: Uint8Array) => {
+      if (settled) return
+      total += chunk.byteLength
+      onChunk?.(chunk.byteLength)
+      if (total > limit) {
+        fail(new CardTemplateError('archive-too-large-unpacked', `${entry.name}: ${total} bytes`))
+        return
+      }
+      chunks.push(chunk)
+    })
+    stream.on('error', fail)
+    stream.on('end', () => {
+      if (settled) return
+      settled = true
+      let size = 0
+      for (const chunk of chunks) size += chunk.byteLength
+      const out = new Uint8Array(size)
+      let offset = 0
+      for (const chunk of chunks) {
+        out.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+      resolve(out)
+    })
+    stream.resume()
+  })
+}
+
 /** Read, size-check and path-check a `.reedcard` archive before decompressing. */
 export async function openCardTemplateArchive(data: ArrayBuffer): Promise<CardTemplateArchive> {
   if (data.byteLength > CARD_TEMPLATE_LIMITS.archiveBytes) {
@@ -82,10 +159,9 @@ export async function openCardTemplateArchive(data: ArrayBuffer): Promise<CardTe
   }
   const manifestEntry = zip.file('manifest.json')
   if (!manifestEntry) throw new CardTemplateError('bad-manifest', '缺少 manifest.json')
-  const manifestBytes = await manifestEntry.async('uint8array')
-  if (manifestBytes.byteLength > CARD_TEMPLATE_LIMITS.manifestBytes) {
-    throw new CardTemplateError('bad-manifest', 'manifest.json 过大')
-  }
+  // The declared size is only a cheap early answer; the actual bytes are
+  // enforced below while they stream out.
+  const manifestBytes = await readArchiveEntry(manifestEntry, CARD_TEMPLATE_LIMITS.manifestBytes)
   let manifestJson: unknown
   try {
     manifestJson = JSON.parse(text(manifestBytes, 'manifest.json'))
@@ -106,18 +182,18 @@ export async function openCardTemplateArchive(data: ArrayBuffer): Promise<CardTe
     }
     const path = normalizeTemplatePath(entry.name, 'zip entry')
     if (path === 'manifest.json') continue
-    const bytes = await entry.async('uint8array')
-    actualTotal += bytes.byteLength
-    if (actualTotal > CARD_TEMPLATE_LIMITS.unpackedBytes) {
-      throw new CardTemplateError('archive-too-large-unpacked', String(actualTotal))
-    }
     const ext = extensionOf(path)
     const limit = ext === '.woff2' || ext === '.woff' ? CARD_TEMPLATE_LIMITS.fontBytes
       : ['.png', '.jpg', '.jpeg', '.webp', '.svg'].includes(ext) ? CARD_TEMPLATE_LIMITS.imageBytes
         : ext === '.html' ? CARD_TEMPLATE_LIMITS.pageBytes
           : ext === '.css' ? CARD_TEMPLATE_LIMITS.cssBytes
             : CARD_TEMPLATE_LIMITS.manifestBytes
-    if (bytes.byteLength > limit) throw new CardTemplateError('archive-too-large-unpacked', path)
+    // The remaining archive budget is enforced together with the per-file
+    // ceiling, so the sum of all entries can never exceed the total even when
+    // every central-directory size is a lie.
+    const remaining = CARD_TEMPLATE_LIMITS.unpackedBytes - actualTotal
+    const bytes = await readArchiveEntry(entry, Math.min(limit, remaining))
+    actualTotal += bytes.byteLength
     files.set(path, { path, bytes })
   }
   const manifest = parseCardTemplateManifest(manifestJson, new Set([...files.keys(), 'manifest.json']))
@@ -318,6 +394,29 @@ const BANNED_CSS = [
   /@property\b/i, /@counter-style\b/i, /@keyframes\b/i, /@-webkit-keyframes\b/i,
   /@layer\b/i, /@scope\b/i,
 ]
+
+/**
+ * CSS functions that resolve one or more strings as a URL for the image engine.
+ * `url()` is the only fetch-capable form a template may keep; every other
+ * address-taking function is rejected outright, including relative strings:
+ * `image-set("a.png" 1x)` still makes the browser request this site even though
+ * there is no `url()` and no scheme.
+ */
+const REQUEST_CSS_FUNCTIONS = [
+  'image-set', '-webkit-image-set', 'cross-fade', '-webkit-cross-fade',
+  'element', '-moz-element', 'paint', 'src', 'image', '-webkit-canvas',
+  '-webkit-named-image',
+] as const
+const REQUEST_FUNCTION_RE = new RegExp(
+  `(?:^|[^\\w-])(${REQUEST_CSS_FUNCTIONS.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\s*\\(`,
+  'i',
+)
+const SAFE_POSITIONS = new Set(['static', 'relative', 'absolute', 'inherit', 'initial', 'unset', 'revert', 'revert-layer'])
+
+function bannedCssFunction(value: string): string | null {
+  const match = REQUEST_FUNCTION_RE.exec(value)
+  return match ? match[1] : null
+}
 const BAD_SELECTOR = /(^|[\s>+~,(])(?:body|html)(?=$|[\s>+~,.#:[)])|:root(?![\w-])|:host(?![\w-])|::slotted/i
 const URL_RE = /url\(\s*(['"]?)(.*?)\1\s*\)/gi
 
@@ -378,12 +477,15 @@ function sanitizeStyle(
     if (BANNED_CSS.some((pattern) => pattern.test(value))) {
       throw new CardTemplateError('unsafe-css', `${property}: ${value.slice(0, 80)}`)
     }
-    // image-set("https://…") and a protocol-relative string are URLs to the
-    // CSS engine even without a literal url() wrapper. Only image-set values
-    // are inspected here: an ordinary content string may legitimately contain
-    // `//` as text.
-    if (/image-set\s*\(/i.test(value) && /(?:https?|ftp):\/\/|\/\//i.test(value)) {
-      throw new CardTemplateError('unsafe-url', `${property}: ${value.slice(0, 80)}`)
+    const requestFunction = bannedCssFunction(value)
+    if (requestFunction) {
+      throw new CardTemplateError('unsafe-css', `${property}: ${requestFunction}()`)
+    }
+    // Fixed/sticky leaves the scoped card and can cover the editor even when a
+    // selector is technically inside the scope. The virtual scope root itself
+    // is checked the same way — the base `.xhs-card` rule is not template CSS.
+    if (property === 'position' && !SAFE_POSITIONS.has(value.trim().toLowerCase())) {
+      throw new CardTemplateError('unsafe-css', `${property}: ${value}`)
     }
     const rewritten = rewriteCssValue(value, cssPath, files, assetUrls)
     if (rewritten !== value) style.setProperty(property, rewritten, style.getPropertyPriority(property))
@@ -480,13 +582,15 @@ export function sanitizeTemplateCss(css: string, options: CssSanitizeOptions): s
   for (const pattern of BANNED_CSS) {
     if (pattern.test(css)) throw new CardTemplateError('unsafe-css', `${options.cssPath}: ${pattern}`)
   }
-  // CSSOM can drop an unsupported image-set() before it reaches a declaration
-  // value, so inspect the raw function too; its string form is a URL to the
-  // image engine even without url().
-  for (const match of css.matchAll(/(?:-webkit-)?image-set\s*\(([^)]*)\)/gi)) {
-    if (/(?:https?|ftp):\/\/|\/\//i.test(match[1])) {
-      throw new CardTemplateError('unsafe-url', `${options.cssPath}: image-set`)
-    }
+  // CSSOM can drop an unsupported function before it reaches a declaration
+  // value, so inspect the raw text too. The same applies inside @supports,
+  // @font-face or any other at-rule: every occurrence is checked.
+  const requestFunction = bannedCssFunction(css)
+  if (requestFunction) {
+    throw new CardTemplateError('unsafe-css', `${options.cssPath}: ${requestFunction}()`)
+  }
+  if (/(?:^|[;{\s])position\s*:\s*(?:fixed|sticky|-webkit-sticky)\b/i.test(css)) {
+    throw new CardTemplateError('unsafe-css', `${options.cssPath}: position fixed/sticky`)
   }
   let sheet: CSSStyleSheet
   try {

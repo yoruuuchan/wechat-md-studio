@@ -143,6 +143,25 @@ function openDatabase(): DatabaseSync {
       ON anon_upload_reservations (state, expiresAt);
   `)
 
+  // Owner-only card template archives, synced across the owner's devices. The
+// server stores the original zip and metadata, never the parsed template; the
+// browser runs the same upload validation on download. CREATE IF NOT EXISTS is
+// the whole migration because no earlier release had this table.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS card_templates (
+      id TEXT PRIMARY KEY,
+      ownerId INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      version TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      uploadedAt INTEGER NOT NULL,
+      zip BLOB NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS card_templates_owner_uploaded
+      ON card_templates (ownerId, uploadedAt DESC);
+  `)
+
   // One-off data migrations, recorded so they never run twice.
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (

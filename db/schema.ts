@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, blob } from "drizzle-orm/sqlite-core";
 
 // Upload ledger. Only keys are stored — never URLs, since a key is what the
 // worker turns into a stable public address.
@@ -106,6 +106,27 @@ export const anonUploadReservations = sqliteTable("anon_upload_reservations", {
 });
 
 export type AnonUploadReservation = typeof anonUploadReservations.$inferSelect;
+
+/**
+ * Owner-only card template archive. The server never unpacks it: it records
+ * the manifest identity, version, SHA-256, size and the original zip, and only
+ * checks size plus the zip file header. `id` is the manifest id, which is the
+ * identity both devices share; `ownerId` keeps the single-owner deployment's
+ * row scoping consistent with docs.
+ */
+export const cardTemplates = sqliteTable("card_templates", {
+  id: text("id").primaryKey(),
+  ownerId: integer("ownerId").notNull(),
+  name: text("name").notNull(),
+  version: text("version").notNull(),
+  sha256: text("sha256").notNull(),
+  size: integer("size").notNull(),
+  /** Milliseconds, like Remote MCP leases: ordering needs more than seconds. */
+  uploadedAt: integer("uploadedAt").notNull(),
+  zip: blob("zip", { mode: "buffer" }).notNull(),
+});
+
+export type CardTemplateRow = typeof cardTemplates.$inferSelect;
 
 /**
  * Single-owner deployment: the app authenticates with one access key, so there

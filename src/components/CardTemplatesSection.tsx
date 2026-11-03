@@ -18,6 +18,7 @@ const ERROR_KEYS: Record<CardTemplateErrorCode, MsgKey> = {
   'unsafe-html': 'cards.templateError.unsafeHtml',
   'unsafe-css': 'cards.templateError.unsafeCss',
   'unsafe-url': 'cards.templateError.unsafeUrl',
+  cloud: 'cards.templateError.cloud',
   storage: 'cards.templateError.storage',
   unknown: 'cards.templateError.unknown',
 }
@@ -40,17 +41,29 @@ export default function CardTemplatesSection({ state, selected, onUploaded, onDe
 
   const pick = () => inputRef.current?.click()
 
-  const upload = async (file: File) => {
-    const summary = await state.upload(file)
-    if (summary) {
-      toast.success(t('cards.templateUploaded', { name: summary.name }))
-      onUploaded(summary)
+  const upload = async (files: File[]) => {
+    const result = await state.upload(files)
+    if (result.added.length) onUploaded(result.added[result.added.length - 1])
+    if (result.failed.length) {
+      toast.error(t('cards.templateBatchSummary', { added: result.added.length, failed: result.failed.length }))
+    } else if (result.added.length === 1) {
+      toast.success(t('cards.templateUploaded', { name: result.added[0].name }))
+    } else if (result.added.length > 1) {
+      toast.success(t('cards.templateAddedSummary', { added: result.added.length }))
     }
   }
 
   const remove = (summary: CardTemplateSummary) => {
-    if (!window.confirm(t('cards.templateDeleteConfirm', { name: summary.name }))) return
-    void state.remove(summary.id).then((ok) => { if (ok) onDeleted(summary.template) })
+    const confirmKey: MsgKey = state.authenticated ? 'cards.templateDeleteConfirmCloud' : 'cards.templateDeleteConfirm'
+    if (!window.confirm(t(confirmKey, { name: summary.name }))) return
+    void state.remove(summary.id).then((result) => {
+      if (!result.ok) {
+        toast.error(t('cards.templateError.cloud'))
+        return
+      }
+      onDeleted(summary.template)
+      if (result.localOnly) toast(t('cards.templateDeleteLocal'))
+    })
   }
 
   return (
@@ -59,15 +72,37 @@ export default function CardTemplatesSection({ state, selected, onUploaded, onDe
         <p className="ya-eyebrow">{t('cards.myTemplates')}</p>
         <span className="text-[11px] text-ink-3">{state.templates.length || ''}</span>
       </div>
+      {state.authenticated ? (
+        <div
+          data-card-template-sync={state.sync}
+          className="flex items-center justify-between gap-2 text-[11px] text-ink-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span>{state.sync === 'syncing'
+            ? t('cards.templateSyncing')
+            : state.sync === 'failed' ? t('cards.templateSyncFailed')
+              : state.sync === 'synced' ? t('cards.templateSync') : ''}</span>
+          {state.sync === 'failed' ? (
+            <>
+              <span className="min-w-0 flex-1 truncate text-error-700">{t('cards.templateSyncFailedHint')}</span>
+              <button data-card-template-sync-retry className="ya-link-btn shrink-0" onClick={state.retrySync}>
+                {t('common.retry')}
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       <input
         ref={inputRef}
         data-card-template-file
         type="file"
         accept=".reedcard,.zip,application/zip"
+        multiple
         className="hidden"
         onChange={(event) => {
-          const file = event.target.files?.[0]
-          if (file) void upload(file)
+          const files = Array.from(event.target.files ?? [])
+          if (files.length) void upload(files)
           event.target.value = ''
         }}
       />
@@ -82,7 +117,20 @@ export default function CardTemplatesSection({ state, selected, onUploaded, onDe
       {state.loading ? <p className="text-[11px] text-ink-3">{t('common.loading')}</p> : null}
       {state.error && errorReason ? (
         <div data-card-template-error role="alert" className="rounded-xl bg-surface-sunken p-2.5 text-[11px] leading-relaxed text-error-700">
-          <p>{t('cards.templateError', { reason: errorReason })}</p>
+          {state.failures.length > 0 ? (
+            <ul className="space-y-1">
+              {state.failures.map((failure) => (
+                <li key={failure.file} className="break-all">
+                  {t('cards.templateFailureFile', {
+                    name: failure.file,
+                    reason: t(ERROR_KEYS[failure.error.code]),
+                  })}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>{t('cards.templateError', { reason: errorReason })}</p>
+          )}
           {state.error.detail ? <p className="mt-1 break-all text-ink-3">{state.error.detail}</p> : null}
           <button className="ya-link-btn mt-1" onClick={state.clearError}>{t('common.retry')}</button>
         </div>
@@ -102,7 +150,7 @@ export default function CardTemplatesSection({ state, selected, onUploaded, onDe
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-medium text-ink-1">{summary.name}</p>
                 <p className="truncate text-[10px] text-ink-3">
-                  {summary.author} · v{summary.version} · {summary.variants.length} {t('cards.background')}
+                  {summary.author} · v{summary.version} · {t('cards.variantCount', { n: summary.variants.length })}
                 </p>
               </div>
               <button

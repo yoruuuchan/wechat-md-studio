@@ -9,24 +9,12 @@ export type CardRatio = keyof typeof CARD_RATIOS
  * variants (background ids), metrics and webfont declaration; switching
  * template swaps the background to the first variant of the new template.
  */
-export const CARD_TEMPLATES = [
-  'reed', 'yoru', 'paper', 'console',
-  'kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka',
-] as const
+export const CARD_TEMPLATES = ['reed'] as const
 export type CardTemplate = typeof CARD_TEMPLATES[number]
 export type CardTemplateId = string
 
 export const CARD_TEMPLATE_VARIANTS = {
   reed: ['paper', 'white', 'grid', 'tint', 'night'],
-  yoru: ['signal', 'lab', 'studio', 'special'],
-  paper: ['editorial', 'analog', 'midnight'],
-  console: ['akari', 'yoru'],
-  kunlun: ['void', 'snowline'],
-  rift: ['dark', 'light'],
-  core: ['frost', 'nightpool'],
-  aozora: ['daylight', 'yozora'],
-  kihon: ['gin', 'kuro'],
-  mayonaka: ['midnight', 'sunset'],
 } as const satisfies Record<CardTemplate, readonly string[]>
 
 /** Reed's original background ids, kept for callers that only speak old API. */
@@ -44,12 +32,11 @@ export function defaultVariant(template: CardTemplateId): CardBackground {
 }
 
 /**
- * KIHON only has the 1080×1920 portrait frame. Other templates accept every
- * ratio; switching to KIHON moves a 3:4 / 1:1 card to 9:16 instead of
- * squeezing the native portrait layout into a frame the system does not have.
+ * Reed accepts all three ratios. Uploaded templates always declare their own
+ * set; this is the built-in fallback.
  */
 export function templateRatios(template: CardTemplateId): readonly CardRatio[] {
-  return customCardTemplateRuntime(template)?.ratios ?? (template === 'kihon' ? ['9:16'] : ['3:4', '1:1', '9:16'])
+  return customCardTemplateRuntime(template)?.ratios ?? ['3:4', '1:1', '9:16']
 }
 
 /** Ratio and variant survive a template switch; the variant becomes the new first one. */
@@ -62,34 +49,14 @@ export function withTemplate(options: CardOptions, template: CardTemplateId): Ca
 export function isDarkVariant(template: CardTemplateId, background: CardBackground): boolean {
   const custom = customCardTemplateRuntime(template)
   if (custom) return custom.variants.find((variant) => variant.id === background)?.dark ?? false
-  return (template === 'reed' && background === 'night') ||
-    (template === 'paper' && background === 'midnight') ||
-    (template === 'console' && background === 'yoru') ||
-    (template === 'kunlun' && background === 'void') ||
-    (template === 'rift' && background === 'dark') ||
-    (template === 'core' && background === 'nightpool') ||
-    (template === 'aozora' && background === 'yozora') ||
-    (template === 'kihon' && background === 'kuro') ||
-    template === 'mayonaka'
+  return template === 'reed' && background === 'night'
 }
 
-const TEMPLATE_ACCENTS: Partial<Record<CardTemplate, Partial<Record<CardBackground, string>>>> = {
-  yoru: { signal: '#3186FF', lab: '#00A9BB', studio: '#45C496', special: '#FF6B78' },
-  paper: { editorial: '#B8543A', analog: '#B8543A', midnight: '#D9917A' },
-  console: { akari: '#4F6CE8', yoru: '#7A95FA' },
-  kunlun: { void: '#00B8FF', snowline: '#005F87' },
-  rift: { dark: '#5C7BFF', light: '#2C46C8' },
-  core: { frost: '#009DE0', nightpool: '#2EB2E0' },
-  aozora: { daylight: '#005DB3', yozora: '#339BFF' },
-  kihon: { gin: '#2B4C6F', kuro: '#7BA3CC' },
-  mayonaka: { midnight: '#FF2BD6', sunset: '#FF2BD6' },
-}
-
-/** Reed keeps the article theme's accent; the design systems own their accent. */
+/** Reed keeps the article theme's accent; uploaded templates own their accent. */
 export function cardAccent(template: CardTemplateId, background: CardBackground, fallback: string): string {
   const custom = customCardTemplateRuntime(template)
   if (custom) return custom.variants.find((variant) => variant.id === background)?.accent || fallback
-  return TEMPLATE_ACCENTS[template as CardTemplate]?.[background] ?? fallback
+  return fallback
 }
 
 export interface CardMeasurements {
@@ -121,71 +88,6 @@ export const CARD_METRICS: Record<CardTemplate, CardMeasurements> = {
     coverInsetX: 48, coverInsetY: 56, coverFootBottom: 40, coverReserve: 156,
     coverTitleSize: [56, 48, 42, 36, 30], coverSmallScale: 0.86,
   },
-  // YORU's 1242 canvas: pad 96/104, masthead above the flow, spine eats the
-  // right margin. Scaled by 540/1242 in docs/design-templates.md.
-  yoru: {
-    padX: 42, padTop: 88, padBottom: 54, contentWidth: 424,
-    headerTop: 28, footerBottom: 24,
-    coverInsetX: 42, coverInsetY: 104, coverFootBottom: 38, coverReserve: 230,
-    coverTitleSize: [54, 47, 41, 35, 29], coverSmallScale: 0.86,
-  },
-  // PAPER's 64px page margin at 1242 → 44px at 540; display serif runs larger.
-  paper: {
-    padX: 44, padTop: 74, padBottom: 56, contentWidth: 452,
-    headerTop: 26, footerBottom: 24,
-    coverInsetX: 44, coverInsetY: 84, coverFootBottom: 38, coverReserve: 204,
-    coverTitleSize: [58, 50, 44, 38, 32], coverSmallScale: 0.86,
-  },
-  // Console's 390px design scales up by 1.385; 40px there ≈ 55px here, but the
-  // card canvas needs less edge air than the phone chrome.
-  console: {
-    padX: 40, padTop: 80, padBottom: 60, contentWidth: 460,
-    headerTop: 30, footerBottom: 24,
-    coverInsetX: 44, coverInsetY: 88, coverFootBottom: 36, coverReserve: 210,
-    coverTitleSize: [52, 45, 39, 33, 27], coverSmallScale: 0.86,
-  },
-  // KUNLUN's 1242 card sheet at 540/1242 ≈ 0.435; cut corners round to 5/8/10.
-  kunlun: {
-    padX: 42, padTop: 78, padBottom: 58, contentWidth: 456,
-    headerTop: 26, footerBottom: 24,
-    coverInsetX: 42, coverInsetY: 88, coverFootBottom: 36, coverReserve: 220,
-    coverTitleSize: [46, 42, 38, 34, 29], coverSmallScale: 0.86,
-  },
-  // RIFT's glass cards: 18px radius at 0.435 → 8px, 1px lines stay 1px.
-  rift: {
-    padX: 42, padTop: 80, padBottom: 58, contentWidth: 456,
-    headerTop: 26, footerBottom: 24,
-    coverInsetX: 42, coverInsetY: 86, coverFootBottom: 36, coverReserve: 210,
-    coverTitleSize: [52, 45, 39, 34, 28], coverSmallScale: 0.86,
-  },
-  // core's Window: 1px ink frame + 3px/6px hard offset shadow, sharp corners.
-  core: {
-    padX: 42, padTop: 60, padBottom: 64, contentWidth: 456,
-    headerTop: 28, footerBottom: 24,
-    coverInsetX: 42, coverInsetY: 78, coverFootBottom: 34, coverReserve: 200,
-    coverTitleSize: [56, 49, 43, 37, 31], coverSmallScale: 0.86,
-  },
-  // Aozora poster: 540/1242 ≈ 0.435; cover 54–72px per docs/design-templates.
-  aozora: {
-    padX: 42, padTop: 76, padBottom: 64, contentWidth: 440,
-    headerTop: 26, footerBottom: 24,
-    coverInsetX: 42, coverInsetY: 74, coverFootBottom: 36, coverReserve: 230,
-    coverTitleSize: [64, 56, 48, 40, 33], coverSmallScale: 0.86,
-  },
-  // KIHON is native 540×960 only; 1080 design-px × 0.5 gives 44 title / 22 body.
-  kihon: {
-    padX: 40, padTop: 58, padBottom: 58, contentWidth: 460,
-    headerTop: 0, footerBottom: 28,
-    coverInsetX: 40, coverInsetY: 58, coverFootBottom: 30, coverReserve: 190,
-    coverTitleSize: [54, 48, 44, 38, 33], coverSmallScale: 0.86,
-  },
-  // Mayonaka's 1242 card sheet at 0.435; pixel display starts at 32–56.
-  mayonaka: {
-    padX: 42, padTop: 78, padBottom: 56, contentWidth: 456,
-    headerTop: 26, footerBottom: 24,
-    coverInsetX: 40, coverInsetY: 64, coverFootBottom: 34, coverReserve: 220,
-    coverTitleSize: [56, 50, 44, 38, 32], coverSmallScale: 0.86,
-  },
 }
 
 export function cardMetrics(template: CardTemplateId): CardMeasurements {
@@ -203,59 +105,6 @@ export const CARD_TEMPLATE_FONTS: Record<CardTemplate, readonly CardFontFace[]> 
   reed: [
     { family: 'Geist', weights: [400, 700] },
     { family: 'Geist Mono', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  yoru: [
-    { family: 'Noto Serif SC', weights: [400, 700] },
-    { family: 'Zhuque Fangsong', weights: [400] },
-    { family: 'Inter', weights: [400, 600] },
-    { family: 'JetBrains Mono', weights: [400] },
-  ],
-  paper: [
-    { family: 'Noto Serif SC', weights: [400, 700] },
-    { family: 'EB Garamond', weights: [400, 600], styles: ['normal', 'italic'] },
-    { family: 'IBM Plex Sans', weights: [400, 500] },
-    { family: 'IBM Plex Mono', weights: [400] },
-    { family: 'Caveat', weights: [400] },
-  ],
-  console: [
-    { family: 'Geist', weights: [400, 700] },
-    { family: 'Geist Mono', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  kunlun: [
-    { family: 'Orbitron', weights: [500, 700, 900] },
-    { family: 'JetBrains Mono', weights: [400, 700] },
-    { family: 'VT323', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  rift: [
-    { family: 'Space Grotesk', weights: [300, 400, 500, 600, 700] },
-    { family: 'DM Serif Display', weights: [400], styles: ['italic'] },
-    { family: 'Rajdhani', weights: [400, 500, 600, 700] },
-    { family: 'Share Tech Mono', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  core: [
-    { family: 'Pixelify Sans', weights: [400, 500, 600, 700] },
-    { family: 'VT323', weights: [400] },
-    { family: 'Tinos', weights: [400, 700], styles: ['normal', 'italic'] },
-    { family: 'Noto Serif SC', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  aozora: [
-    { family: 'Inter', weights: [400, 600] },
-    { family: 'Space Grotesk', weights: [500, 700] },
-    { family: 'JetBrains Mono', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  kihon: [
-    { family: 'Instrument Sans', weights: [400, 500, 700] },
-    { family: 'B612 Mono', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  mayonaka: [
-    { family: 'VT323', weights: [400] },
     { family: 'Noto Sans SC', weights: [400, 700] },
   ],
 }
@@ -305,20 +154,37 @@ export function cardTemplateFonts(template: CardTemplateId): readonly CardFontFa
   return customCardTemplateRuntime(template)?.fonts ?? CARD_TEMPLATE_FONTS[template as CardTemplate] ?? []
 }
 
-/** The built-in families a manifest may reference by name. */
-export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = (() => {
-  const rows = new Map<string, { family: string; weights: number[]; styles: ('normal' | 'italic')[] }>()
-  for (const face of Object.values(CARD_TEMPLATE_FONTS).flat()) {
-    const found = rows.get(face.family)
-    if (!found) {
-      rows.set(face.family, { family: face.family, weights: [...face.weights], styles: [...(face.styles ?? ['normal'])] })
-    } else {
-      for (const weight of face.weights) if (!found.weights.includes(weight)) found.weights.push(weight)
-      for (const style of face.styles ?? ['normal']) if (!found.styles.includes(style)) found.styles.push(style)
-    }
-  }
-  return new Map([...rows].map(([family, face]) => [family, face]))
-})()
+/**
+ * The built-in families an uploaded manifest may reference by name.
+ *
+ * This registry is deliberately wider than Reed's own row: packages converted
+ * from the retired design-system cards still reference these families, and the
+ * font files and @font-face sheets stay in the repository. Removing the card
+ * templates must not make those packages fail `font-not-builtin`.
+ */
+export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = new Map<string, CardFontFace>([
+  ['Geist', { family: 'Geist', weights: [400, 700] }],
+  ['Geist Mono', { family: 'Geist Mono', weights: [400, 700] }],
+  ['Noto Sans SC', { family: 'Noto Sans SC', weights: [400, 700] }],
+  ['Noto Serif SC', { family: 'Noto Serif SC', weights: [400, 700] }],
+  ['Zhuque Fangsong', { family: 'Zhuque Fangsong', weights: [400] }],
+  ['Inter', { family: 'Inter', weights: [400, 600] }],
+  ['JetBrains Mono', { family: 'JetBrains Mono', weights: [400, 700] }],
+  ['EB Garamond', { family: 'EB Garamond', weights: [400, 600], styles: ['normal', 'italic'] }],
+  ['IBM Plex Sans', { family: 'IBM Plex Sans', weights: [400, 500] }],
+  ['IBM Plex Mono', { family: 'IBM Plex Mono', weights: [400] }],
+  ['Caveat', { family: 'Caveat', weights: [400] }],
+  ['Orbitron', { family: 'Orbitron', weights: [500, 700, 900] }],
+  ['VT323', { family: 'VT323', weights: [400] }],
+  ['Space Grotesk', { family: 'Space Grotesk', weights: [300, 400, 500, 600, 700] }],
+  ['DM Serif Display', { family: 'DM Serif Display', weights: [400], styles: ['italic'] }],
+  ['Rajdhani', { family: 'Rajdhani', weights: [400, 500, 600, 700] }],
+  ['Share Tech Mono', { family: 'Share Tech Mono', weights: [400] }],
+  ['Pixelify Sans', { family: 'Pixelify Sans', weights: [400, 500, 600, 700] }],
+  ['Tinos', { family: 'Tinos', weights: [400, 700], styles: ['normal', 'italic'] }],
+  ['Instrument Sans', { family: 'Instrument Sans', weights: [400, 500, 700] }],
+  ['B612 Mono', { family: 'B612 Mono', weights: [400, 700] }],
+])
 
 /** The CSS files that declare the faces above. */
 export const CARD_FONT_SHEETS = [

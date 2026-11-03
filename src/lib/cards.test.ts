@@ -6,8 +6,10 @@ import { goldenTheme } from './themes-core'
 import { readFileSync } from 'node:fs'
 import { renderCardArticle } from './cards-render'
 import {
-  CARD_FONT_SHEETS, CARD_METRICS, CARD_TEMPLATES, CARD_TEMPLATE_FONTS, CARD_TEMPLATE_VARIANTS, CARD_WIDTH, cardMetrics,
-  defaultVariant, isDarkVariant, paginateCards, templateRatios, withTemplate, type CardPage, type CardTemplate,
+  BUILTIN_CARD_FONT_FACES, CARD_FONT_SHEETS, CARD_METRICS, CARD_TEMPLATES,
+  CARD_TEMPLATE_VARIANTS, CARD_WIDTH, cardMetrics, defaultVariant, isDarkVariant,
+  paginateCards, registerCardTemplateRuntime, templateRatios, unregisterCardTemplateRuntime,
+  withTemplate, type CardPage, type CardTemplate,
 } from './cards'
 import { rangeContainsText } from './cards-export'
 
@@ -216,46 +218,29 @@ describe('card template dimension', () => {
     }
   })
 
-  it('declares its own variants and switches to the new first variant', () => {
+  it('declares Reed as the only built-in template and keeps its five variants', () => {
+    expect(CARD_TEMPLATES).toEqual(['reed'])
     expect(CARD_TEMPLATE_VARIANTS).toEqual({
       reed: ['paper', 'white', 'grid', 'tint', 'night'],
-      yoru: ['signal', 'lab', 'studio', 'special'],
-      paper: ['editorial', 'analog', 'midnight'],
-      console: ['akari', 'yoru'],
-      kunlun: ['void', 'snowline'],
-      rift: ['dark', 'light'],
-      core: ['frost', 'nightpool'],
-      aozora: ['daylight', 'yozora'],
-      kihon: ['gin', 'kuro'],
-      mayonaka: ['midnight', 'sunset'],
     })
-    for (const template of CARD_TEMPLATES) {
-      expect(withTemplate({ ratio: '9:16', template: 'reed', background: 'grid' }, template))
-        .toEqual({ ratio: '9:16', template, background: CARD_TEMPLATE_VARIANTS[template][0] })
-    }
     expect(isDarkVariant('reed', 'night')).toBe(true)
-    expect(isDarkVariant('paper', 'midnight')).toBe(true)
-    expect(isDarkVariant('console', 'yoru')).toBe(true)
-    expect(isDarkVariant('yoru', 'signal')).toBe(false)
-    expect(isDarkVariant('paper', 'editorial')).toBe(false)
-    expect(isDarkVariant('kunlun', 'void')).toBe(true)
-    expect(isDarkVariant('rift', 'dark')).toBe(true)
-    expect(isDarkVariant('core', 'nightpool')).toBe(true)
-    expect(isDarkVariant('aozora', 'yozora')).toBe(true)
-    expect(isDarkVariant('kihon', 'kuro')).toBe(true)
-    expect(isDarkVariant('mayonaka', 'midnight')).toBe(true)
-    expect(isDarkVariant('mayonaka', 'sunset')).toBe(true)
+    expect(isDarkVariant('reed', 'paper')).toBe(false)
+    // An uploaded runtime still owns its own dark variants.
+    registerCardTemplateRuntime({
+      template: 'custom.night', name: 'Night',
+      variants: [{ id: 'dusk', name: 'Dusk', dark: true }],
+      ratios: ['3:4'], metrics: CARD_METRICS.reed, fonts: [],
+    })
+    expect(isDarkVariant('custom.night', 'dusk')).toBe(true)
+    unregisterCardTemplateRuntime('custom.night')
   })
 
-  it('moves KIHON to its one native portrait frame and rejects the other ratios', () => {
-    expect(templateRatios('kihon')).toEqual(['9:16'])
+  it('keeps the selected ratio when switching to Reed', () => {
     expect(templateRatios('reed')).toEqual(['3:4', '1:1', '9:16'])
-    expect(withTemplate({ ratio: '3:4', template: 'reed', background: 'paper' }, 'kihon'))
-      .toEqual({ ratio: '9:16', template: 'kihon', background: 'gin' })
-    expect(withTemplate({ ratio: '1:1', template: 'reed', background: 'paper' }, 'kihon'))
-      .toEqual({ ratio: '9:16', template: 'kihon', background: 'gin' })
-    expect(withTemplate({ ratio: '3:4', template: 'kihon', background: 'gin' }, 'aozora'))
-      .toEqual({ ratio: '3:4', template: 'aozora', background: 'daylight' })
+    expect(withTemplate({ ratio: '1:1', template: 'reed', background: 'paper' }, 'reed'))
+      .toEqual({ ratio: '1:1', template: 'reed', background: 'paper' })
+    expect(withTemplate({ ratio: '9:16', template: 'reed', background: 'grid' }, 'reed'))
+      .toEqual({ ratio: '9:16', template: 'reed', background: 'paper' })
   })
 
   it('writes template and variant on the measured body and paginates with its own measures', async () => {
@@ -267,47 +252,42 @@ describe('card template dimension', () => {
       expect(root.dataset.variant).toBe(defaultVariant(template))
       expect(root.style.width).toBe(`${metrics.contentWidth}px`)
       const { pages } = await paginate(source, 80, template)
-      const bodies = pages.filter((p) => p.kind === 'body').map((p) => {
+      const pageBodies = pages.filter((p) => p.kind === 'body').map((p) => {
         const holder = document.createElement('div')
         holder.innerHTML = p.html
         return holder.firstElementChild as HTMLElement
       })
-      expect(bodies.length).toBeGreaterThan(0)
-      expect(bodies.every((body) => body.dataset.template === template)).toBe(true)
-      expect(bodies.every((body) => measure(body) <= 80)).toBe(true)
+      expect(pageBodies.length).toBeGreaterThan(0)
+      expect(pageBodies.every((body) => body.dataset.template === template)).toBe(true)
+      expect(pageBodies.every((body) => measure(body) <= 80)).toBe(true)
     }
   })
 
-  it('declares the webfont faces each template actually renders with', () => {
-    const declared = (family: string, weight: number, style = 'normal') =>
-      CARD_TEMPLATES.some((template) => CARD_TEMPLATE_FONTS[template].some((face) =>
-        face.family === family && face.weights.includes(weight) &&
-        (face.styles ?? ['normal']).includes(style as 'normal' | 'italic')))
-    expect(declared('Noto Serif SC', 400)).toBe(true)
-    expect(declared('Noto Serif SC', 700)).toBe(true)
-    expect(declared('Zhuque Fangsong', 400)).toBe(true)
-    expect(declared('EB Garamond', 400, 'italic')).toBe(true)
-    expect(declared('IBM Plex Sans', 500)).toBe(true)
-    expect(declared('IBM Plex Mono', 400)).toBe(true)
-    expect(declared('Caveat', 400)).toBe(true)
-    expect(declared('Inter', 600)).toBe(true)
-    expect(declared('JetBrains Mono', 400)).toBe(true)
-    expect(declared('Noto Sans SC', 400)).toBe(true)
-    expect(declared('Geist Mono', 700)).toBe(true)
-
-    const css = CARD_FONT_SHEETS.map((path) =>
-      readFileSync(new URL('../../public' + path, import.meta.url), 'utf8')).join('\n')
-    for (const template of CARD_TEMPLATES) {
-      for (const face of CARD_TEMPLATE_FONTS[template]) {
-        for (const weight of face.weights) {
-          for (const style of face.styles ?? ['normal']) {
-            const escaped = face.family.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            expect(css).toMatch(new RegExp(
-              `font-family: '${escaped}';\\s*font-style: ${style};[\\s\\S]*?font-weight: ${weight};`,
-            ))
-          }
-        }
-      }
+  it('keeps every packaged font family available to uploaded manifests', () => {
+    // These families are no longer built-in card rows, but the converted
+    // packages reference them by name and their files stay in public/fonts.
+    const expected: [string, number, 'normal' | 'italic'][] = [
+      ['Noto Serif SC', 400, 'normal'], ['Noto Serif SC', 700, 'normal'],
+      ['Zhuque Fangsong', 400, 'normal'], ['EB Garamond', 400, 'italic'],
+      ['IBM Plex Sans', 500, 'normal'], ['IBM Plex Mono', 400, 'normal'],
+      ['Caveat', 400, 'normal'], ['Inter', 600, 'normal'], ['JetBrains Mono', 400, 'normal'],
+      ['Noto Sans SC', 400, 'normal'], ['Geist Mono', 700, 'normal'],
+      ['Orbitron', 900, 'normal'], ['VT323', 400, 'normal'], ['Space Grotesk', 300, 'normal'],
+      ['DM Serif Display', 400, 'italic'], ['Rajdhani', 700, 'normal'], ['Share Tech Mono', 400, 'normal'],
+      ['Pixelify Sans', 600, 'normal'], ['Tinos', 700, 'italic'], ['Instrument Sans', 500, 'normal'],
+      ['B612 Mono', 700, 'normal'],
+    ]
+    const css = CARD_FONT_SHEETS.map((sheet) =>
+      readFileSync(new URL('../../public' + sheet, import.meta.url), 'utf8')).join('\n')
+    for (const [family, weight, style] of expected) {
+      const face = BUILTIN_CARD_FONT_FACES.get(family)
+      expect(face, family).toBeDefined()
+      expect(face!.weights).toContain(weight)
+      expect(face!.styles ?? ['normal']).toContain(style)
+      const escaped = family.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      expect(css).toMatch(new RegExp(
+        `font-family: '${escaped}';\\s*font-style: ${style};[\\s\\S]*?font-weight: ${weight};`,
+      ))
     }
   })
 })

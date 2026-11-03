@@ -29,20 +29,11 @@ const domVsPngDir = path.join(templatesDir, 'dom-vs-png')
 fs.rmSync(domVsPngDir, { recursive: true, force: true })
 fs.mkdirSync(domVsPngDir, { recursive: true })
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'reed-xhs-'))
-const CARD_TEMPLATES = ['reed', 'yoru', 'paper', 'console', 'kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka']
-// Contrast is checked on every cover and every page-3 body page of every
-// template variant, including Reed and the first batch.
+const CARD_TEMPLATES = ['reed']
+// Contrast is checked on every cover and every page-3 body page of the default
+// template variants.
 const CARD_VARIANTS = {
   reed: ['paper', 'white', 'grid', 'tint', 'night'],
-  yoru: ['signal', 'lab', 'studio', 'special'],
-  paper: ['editorial', 'analog', 'midnight'],
-  console: ['akari', 'yoru'],
-  kunlun: ['void', 'snowline'],
-  rift: ['dark', 'light'],
-  core: ['frost', 'nightpool'],
-  aozora: ['daylight', 'yozora'],
-  kihon: ['gin', 'kuro'],
-  mayonaka: ['midnight', 'sunset'],
 }
 const checks = []
 const exceptions = []
@@ -203,59 +194,6 @@ const templateFontDeclaration = {
     { family: 'Geist Mono', weights: [400, 700] },
     { family: 'Noto Sans SC', weights: [400, 700] },
   ],
-  yoru: [
-    { family: 'Noto Serif SC', weights: [400, 700] },
-    { family: 'Zhuque Fangsong', weights: [400] },
-    { family: 'Inter', weights: [400, 600] },
-    { family: 'JetBrains Mono', weights: [400] },
-  ],
-  paper: [
-    { family: 'Noto Serif SC', weights: [400, 700] },
-    { family: 'EB Garamond', weights: [400, 600], styles: ['normal', 'italic'] },
-    { family: 'IBM Plex Sans', weights: [400, 500] },
-    { family: 'IBM Plex Mono', weights: [400] },
-    { family: 'Caveat', weights: [400] },
-  ],
-  console: [
-    { family: 'Geist', weights: [400, 700] },
-    { family: 'Geist Mono', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  kunlun: [
-    { family: 'Orbitron', weights: [500, 700, 900] },
-    { family: 'JetBrains Mono', weights: [400, 700] },
-    { family: 'VT323', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  rift: [
-    { family: 'Space Grotesk', weights: [300, 400, 500, 600, 700] },
-    { family: 'DM Serif Display', weights: [400], styles: ['italic'] },
-    { family: 'Rajdhani', weights: [400, 500, 600, 700] },
-    { family: 'Share Tech Mono', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  core: [
-    { family: 'Pixelify Sans', weights: [400, 500, 600, 700] },
-    { family: 'VT323', weights: [400] },
-    { family: 'Tinos', weights: [400, 700], styles: ['normal', 'italic'] },
-    { family: 'Noto Serif SC', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  aozora: [
-    { family: 'Inter', weights: [400, 600] },
-    { family: 'Space Grotesk', weights: [500, 700] },
-    { family: 'JetBrains Mono', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  kihon: [
-    { family: 'Instrument Sans', weights: [400, 500, 700] },
-    { family: 'B612 Mono', weights: [400, 700] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
-  mayonaka: [
-    { family: 'VT323', weights: [400] },
-    { family: 'Noto Sans SC', weights: [400, 700] },
-  ],
 }
 async function nativeCardShot(selector, name, session = sessionId, scale = 1) {
   const box = await evaluate(`(() => {
@@ -359,27 +297,9 @@ function allCustom(fonts) {
 
 const COVER_TITLE_SELECTORS = {
   reed: '.xhs-cover h1',
-  yoru: '.xhs-yoru-ink',
-  paper: '.xhs-paper-plate h1',
-  console: '.xhs-console-plate h1',
-  kunlun: '.xhs-kunlun-plate h1',
-  rift: '.xhs-rift-title',
-  core: '.xhs-core-plate h1',
-  aozora: '.xhs-aozora-plate h1',
-  kihon: '.xhs-kihon-plate h1',
-  mayonaka: '.xhs-mnk-plate h1',
 }
 const COVER_SUBTITLE_SELECTORS = {
   reed: '.xhs-cover-copy > p',
-  yoru: '.xhs-yoru-subtitle',
-  paper: '.xhs-paper-standfirst',
-  console: '.xhs-console-standfirst',
-  kunlun: '.xhs-kunlun-standfirst',
-  rift: '.xhs-rift-standfirst',
-  core: '.xhs-core-standfirst',
-  aozora: '.xhs-aozora-standfirst',
-  kihon: '.xhs-kihon-standfirst',
-  mayonaka: '.xhs-mnk-standfirst',
 }
 const FONT_SHEETS = [
   '/fonts/fonts-local.css',
@@ -388,16 +308,6 @@ const FONT_SHEETS = [
   '/fonts/fonts-design.css',
   '/fonts/zhuque-fangsong.css',
 ]
-
-/** The face a Chinese page-3 heading is allowed to land on, per template. */
-const HEADING_FACE = {
-  kunlun: /Noto Sans SC|Orbitron/,
-  rift: /Noto Sans SC|Space Grotesk/,
-  core: /Noto Serif SC|Pixelify Sans/,
-  aozora: /Noto Sans SC|Inter/,
-  kihon: /Noto Sans SC|Instrument Sans/,
-  mayonaka: /Noto Sans SC/,
-}
 
 function rangeIntervals(range) {
   if (!range.trim()) return null
@@ -844,20 +754,16 @@ try {
   await chooseLang('zh')
   await cardsReady()
 
-  // Template dimension: every variant of the three design-system templates is
-  // exercised on the long document at 3:4. Cover + first two body pages are
-  // exported, checked for size, compared against a 2x DOM capture, and kept as
-  // the small-sample set in verify-out/templates/.
-  const comparisonTargets = new Set([
-    'reed-paper', 'yoru-signal', 'paper-editorial', 'console-akari',
-    'kunlun-void', 'rift-dark', 'core-frost', 'aozora-daylight', 'kihon-gin', 'mayonaka-midnight',
-  ])
+  // Template dimension: every variant of the default template is exercised on the
+  // long document at 3:4. Cover + first two body pages are exported, checked for
+  // size, compared against a 2x DOM capture, and kept as the small-sample set in
+  // verify-out/templates/.
+  const comparisonTargets = new Set(['reed-paper'])
   const comparisonFiles = []
   for (const template of CARD_TEMPLATES) {
     await click(`[data-card-template="${template}"]`); await cardsReady()
-    // KIHON only has 9:16; every other template is sampled at 3:4.
-    if (template !== 'kihon') { await click('[data-card-ratio="3:4"]'); await cardsReady() }
-    const expectedHeight = template === 'kihon' ? 1920 : 1440
+    await click('[data-card-ratio="3:4"]'); await cardsReady()
+    const expectedHeight = 1440
     for (const variant of CARD_VARIANTS[template]) {
       await click(`[data-card-bg="${variant}"]`); await cardsReady()
       const bounds = await evaluate(boundsExpression)
@@ -909,32 +815,14 @@ try {
     }
   }
 
-  // KIHON's native frame is the point: choosing it moves a 3:4 card to 9:16
-  // and leaves the other two ratio buttons disabled with a visible reason.
-  await click('[data-card-template="reed"]'); await cardsReady()
-  await click('[data-card-ratio="3:4"]'); await cardsReady()
-  await click('[data-card-template="kihon"]'); await cardsReady()
-  const kihonRatios = await evaluate(`(() => {
-    const pressed = document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio;
-    const b34 = document.querySelector('[data-card-ratio="3:4"]');
-    const b11 = document.querySelector('[data-card-ratio="1:1"]');
-    return { pressed, d34: b34?.disabled, d11: b11?.disabled, hint: document.querySelector('[data-card-ratio-hint]')?.textContent || '' };
-  })()`)
-  evidence.kihonRatios = kihonRatios
-  check('kihon: switches to 9:16 and disables the other ratios with a reason',
-    kihonRatios.pressed === '9:16' && kihonRatios.d34 === true && kihonRatios.d11 === true && kihonRatios.hint.length > 0,
-    kihonRatios)
-
   // Dense body pages: record the fonts Chrome actually used, the faces cardFontCss
   // would embed for the same glyphs, and a 1:1 DOM/PNG crop of the same text.
   for (const [template, variant] of [
-    ['reed', 'paper'], ['yoru', 'signal'], ['paper', 'editorial'], ['console', 'akari'],
-    ['kunlun', 'void'], ['rift', 'dark'], ['core', 'frost'], ['aozora', 'daylight'],
-    ['kihon', 'gin'], ['mayonaka', 'midnight'],
+    ['reed', 'paper'],
   ]) {
     await click(`[data-card-template="${template}"]`)
     await click(`[data-card-bg="${variant}"]`)
-    await click(`[data-card-ratio="${template === 'kihon' ? '9:16' : '3:4'}"]`)
+    await click('[data-card-ratio="3:4"]')
     await chooseLang('zh')
     await cardsReady()
     const label = `${template}-${variant}`
@@ -997,25 +885,6 @@ try {
     check(label + ': every page-3 rendered glyph is covered by an embedded face',
       actualFamilies.length > 0 && coverage.every((entry) => entry.declared) && uncoveredUnion.length === 0,
       { actualFamilies, coverage, uncovered: uncoveredUnion.join('').slice(0, 24), totalSlices: selection.totalSlices })
-    const headingFamilies = (fonts.heading ?? []).map((font) => font.familyName)
-    const headingExpected = HEADING_FACE[template]
-    if (headingExpected && probe.heading) {
-      check(`${label}: page-3 heading uses the designed face`,
-        headingFamilies.length > 0 && headingFamilies.every((family) => /Noto Sans SC|Noto Serif SC|Orbitron|Space Grotesk|Pixelify Sans|Instrument Sans|JetBrains Mono|B612 Mono|VT323|Share Tech Mono/i.test(family)) &&
-        headingFamilies.some((family) => headingExpected.test(family)), headingFamilies)
-    }
-    if (template === 'mayonaka') {
-      const bodyFamilies = (fonts.p ?? []).map((font) => font.familyName)
-      check('mayonaka: Chinese body is Noto Sans SC, never DotGothic16',
-        bodyFamilies.length > 0 && bodyFamilies.every((family) => /^Noto Sans SC\b/.test(family)),
-        bodyFamilies)
-    }
-    if (template === 'kihon') {
-      const bodyFamilies = (fonts.p ?? []).map((font) => font.familyName)
-      check('kihon: Chinese body is Noto Sans SC, not the B612 mono face',
-        bodyFamilies.length > 0 && bodyFamilies.every((family) => /^Noto Sans SC\b/.test(family)),
-        bodyFamilies)
-    }
   }
   const comparisonSheet = await composeComparisonSheet(comparisonFiles)
   evidence.comparisons.sheet = comparisonSheet
@@ -1023,128 +892,13 @@ try {
     comparisonFiles.length === CARD_TEMPLATES.length && fs.existsSync(comparisonSheet),
     comparisonFiles.map((file) => path.relative(templatesDir, file)))
 
-  // Fonts are checked on the glyphs that actually render, not on CSS strings.
-  await click('[data-card-template="yoru"]'); await click('[data-card-bg="signal"]'); await cardsReady()
-  const yoruTitleFonts = await platformFonts('[data-card-kind="cover"] .xhs-yoru-ink')
-  evidence.fonts.yoruTitle = yoruTitleFonts
-  check('yoru: cover title is Noto Serif SC webfont',
-    allCustom(yoruTitleFonts) && yoruTitleFonts.some((font) => /Noto Serif SC/i.test(font.familyName)), yoruTitleFonts)
-  const yoruFolioFonts = await platformFonts('[data-card-kind="body"] .xhs-yoru-folio')
-  evidence.fonts.yoruFolio = yoruFolioFonts
-  check('yoru: page number is Zhuque Fangsong webfont',
-    allCustom(yoruFolioFonts) && yoruFolioFonts.some((font) => /Zhuque Fangsong/i.test(font.familyName)), yoruFolioFonts)
-  const yoruSpineFonts = await platformFonts('[data-card-kind="body"] .xhs-yoru-spine span')
-  evidence.fonts.yoruSpine = yoruSpineFonts
-  check('yoru: spine is Zhuque Fangsong webfont',
-    allCustom(yoruSpineFonts) && yoruSpineFonts.some((font) => /Zhuque Fangsong/i.test(font.familyName)), yoruSpineFonts)
-
-  await click('[data-card-template="paper"]'); await click('[data-card-bg="editorial"]'); await cardsReady()
-  await evaluate(`(() => { const el=[...document.querySelectorAll('.xhs-body em')].find((node) => node.textContent === 'Reed'); if (!el) throw new Error('paper latin probe absent'); el.dataset.fontProbe='paper-latin' })()`)
-  const paperLatinFonts = await platformFonts('[data-font-probe="paper-latin"]')
-  evidence.fonts.paperLatin = paperLatinFonts
-  check('paper: English is EB Garamond webfont',
-    allCustom(paperLatinFonts) && paperLatinFonts.some((font) => /EB Garamond/i.test(font.familyName)), paperLatinFonts)
-
-  await click('[data-card-template="console"]'); await click('[data-card-bg="akari"]'); await cardsReady()
-  const consoleTitleFonts = await platformFonts('[data-card-kind="cover"] .xhs-console-plate h1')
-  evidence.fonts.consoleTitle = consoleTitleFonts
-  check('console: Chinese is Noto Sans SC webfont',
-    allCustom(consoleTitleFonts) && consoleTitleFonts.some((font) => /Noto Sans SC/i.test(font.familyName)), consoleTitleFonts)
-
-  // Cover titles and display labels for the six design-system templates.
-  for (const [template, variant, expected, selector] of [
-    ['kunlun', 'void', /Noto Sans SC/i, COVER_TITLE_SELECTORS.kunlun],
-    ['rift', 'dark', /Noto Sans SC/i, COVER_TITLE_SELECTORS.rift],
-    ['core', 'frost', /Noto Serif SC/i, COVER_TITLE_SELECTORS.core],
-    ['aozora', 'daylight', /Noto Sans SC/i, COVER_TITLE_SELECTORS.aozora],
-    ['kihon', 'gin', /Noto Sans SC/i, COVER_TITLE_SELECTORS.kihon],
-    ['mayonaka', 'midnight', /Noto Sans SC/i, COVER_TITLE_SELECTORS.mayonaka],
-  ]) {
-    await click(`[data-card-template="${template}"]`)
-    await click(`[data-card-bg="${variant}"]`)
-    if (template !== 'kihon') await click('[data-card-ratio="3:4"]')
-    await cardsReady()
-    const fonts = await platformFonts(`[data-card-kind="cover"] ${selector}`)
-    evidence.fonts[`${template}CoverTitle`] = fonts
-    check(`${template}: cover title is ${expected.source} webfont`,
-      allCustom(fonts) && fonts.some((font) => expected.test(font.familyName)), fonts)
-    const headingText = await evaluate(`(() => {
-      const card = document.querySelectorAll('.xhs-card')[1];
-      const heading = card?.querySelector('.xhs-body h2, .xhs-body h3');
-      if (!heading) return '';
-      heading.dataset.fontProbe = 'cover-loop-heading';
-      return (heading.textContent || '').trim().slice(0, 24);
-    })()`)
-    if (headingText) {
-      const headingFonts = await platformFonts('[data-font-probe="cover-loop-heading"]')
-      evidence.fonts[`${template}BodyHeading`] = headingFonts
-      check(`${template}: body heading uses the designed face`,
-        headingFonts.length > 0 && headingFonts.every((font) => font.isCustomFont) &&
-        headingFonts.some((font) => HEADING_FACE[template].test(font.familyName)), headingFonts)
-    }
-  }
-
-  // The cards belong to the user: no design-system name is printed on them.
-  // Only the footer/status page number and the actual article text remain.
-  for (const [template, variant] of [
-    ['kunlun', 'void'], ['rift', 'dark'], ['aozora', 'daylight'], ['kihon', 'gin'], ['mayonaka', 'midnight'],
-  ]) {
-    await click(`[data-card-template="${template}"]`)
-    await click(`[data-card-bg="${variant}"]`)
-    if (template !== 'kihon') await click('[data-card-ratio="3:4"]')
-    await cardsReady()
-    const coverText = await evaluate(`document.querySelector('[data-card-kind="cover"]')?.innerText || ''`)
-    check(`${template}: cover has no template or system name`,
-      !/KUNLUN|昆仑|RIFT|裂隙|AOZORA|青空|KIHON|基本|MAYONAKA|真夜中/.test(coverText),
-      coverText.slice(0, 120))
-  }
-  await click('[data-card-template="core"]'); await click('[data-card-bg="frost"]'); await cardsReady()
-  const coreCoverBar = await evaluate(`document.querySelector('[data-card-kind="cover"] .xhs-core-bar')?.innerText || ''`)
-  check('core: cover title bar has no placeholder word', !/cover/i.test(coreCoverBar), coreCoverBar)
-
-  // The header / title bar must not repeat the footer's page number.
-  for (const [template, head, foot] of [
-    ['kunlun', '.xhs-kunlun-head', '.xhs-kunlun-foot'],
-    ['core', '.xhs-core-bar', '.xhs-core-foot'],
-  ]) {
-    await click(`[data-card-template="${template}"]`); await cardsReady()
-    const page3 = await evaluate(`(() => {
-      const card = document.querySelectorAll('.xhs-card')[2];
-      if (!card) return null;
-      return {
-        head: card.querySelector(${JSON.stringify(head)})?.innerText || '',
-        foot: card.querySelector(${JSON.stringify(foot)})?.innerText || '',
-      };
-    })()`)
-    const pageNumber = /\[\s*\d{2}\s*\]|\d{2}\s*\/\s*\d{2}/
-    check(`${template}: page 3 keeps only the footer page number`,
-      page3 !== null && pageNumber.test(page3.foot) && !pageNumber.test(page3.head), page3)
-  }
-
-  await click('[data-card-template="kihon"]'); await click('[data-card-bg="gin"]'); await cardsReady()
-  const kihonFolio = await platformFonts('[data-card-kind="body"] .xhs-kihon-folio')
-  evidence.fonts.kihonFolio = kihonFolio
-  check('kihon: folio uses B612 Mono webfont',
-    allCustom(kihonFolio) && kihonFolio.some((font) => /B612 Mono/i.test(font.familyName)), kihonFolio)
-
-  await click('[data-card-template="mayonaka"]'); await click('[data-card-bg="midnight"]'); await cardsReady()
-  const mnkTitle = await platformFonts(`[data-card-kind="cover"] ${COVER_TITLE_SELECTORS.mayonaka}`)
-  evidence.fonts.mayonakaTitle = mnkTitle
-  check('mayonaka: Chinese cover title uses Noto Sans SC, never DotGothic16',
-    allCustom(mnkTitle) && mnkTitle.some((font) => /Noto Sans SC/i.test(font.familyName)) &&
-    mnkTitle.every((font) => !/DotGothic16/i.test(font.familyName)), mnkTitle)
-
   // Back to Reed for the remaining behavior checks.
   await click('[data-card-template="reed"]'); await click('[data-card-bg="paper"]');
   await click('[data-card-ratio="3:4"]'); await cardsReady()
 
   const templateGroups = CARD_TEMPLATES.map((template) => ({
     template,
-    label: {
-      reed: 'Reed · 默认', yoru: 'YORU · 铅字房', paper: 'PAPER · 纸本', console: 'Console · 灯与夜',
-      kunlun: 'KUNLUN · 昆仑', rift: 'RIFT · 裂隙', core: 'core · 霜纸', aozora: 'Aozora · 青空',
-      kihon: 'KIHON · 基本', mayonaka: 'Mayonaka · 真夜中',
-    }[template],
+    label: { reed: 'Reed · 默认' }[template],
     shots: evidence.templates.filter((shot) => shot.template === template),
   }))
   const sampleIndex = `<!doctype html>

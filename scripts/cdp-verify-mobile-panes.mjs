@@ -505,7 +505,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
   const coverTitle = await evaluate(`(() => {
     const card = document.querySelector('.xhs-card[data-card-index="0"][data-card-kind="cover"]')
     if (!card) return { error: 'cover card missing' }
-    const title = card.querySelector('h1, .xhs-yoru-title')
+    const title = card.querySelector('h1')
     if (!title) return { error: 'cover title missing' }
     const c = card.getBoundingClientRect()
     const r = title.getBoundingClientRect()

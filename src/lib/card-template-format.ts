@@ -8,7 +8,7 @@
  * is checked before a single byte reaches the DOM.
  */
 import {
-  BUILTIN_CARD_FONT_FACES, CARD_RATIOS, CARD_WIDTH,
+  BUILTIN_CARD_FONT_FACES, CARD_RATIOS, CARD_TEMPLATES, CARD_WIDTH,
   type CardFontFace, type CardMeasurements, type CardRatio,
 } from './cards'
 
@@ -107,6 +107,7 @@ export type CardTemplateErrorCode =
   | 'unsafe-html'
   | 'unsafe-css'
   | 'unsafe-url'
+  | 'cloud'
   | 'storage'
   | 'unknown'
 
@@ -346,6 +347,12 @@ export function parseCardTemplateManifest(
   if (!ID_RE.test(id)) bad('id 只能用小写字母、数字和连字符')
   const renderId = m.renderId === undefined ? id : text(m.renderId, 'renderId', 64)
   if (!ID_RE.test(renderId)) bad('renderId 只能用小写字母、数字和连字符')
+  // A package must not borrow the built-in template's CSS key: that would mix
+  // uploaded content into the built-in design and make the built-in rule set
+  // depend on a file the user can replace.
+  if ((CARD_TEMPLATES as readonly string[]).includes(renderId)) {
+    bad(`renderId 不能使用内置模板名 ${renderId}`)
+  }
   const version = text(m.version, 'version', 40)
   if (!VERSION_RE.test(version)) bad('version 必须是 1.0.0 这样的版本号')
   if (!Array.isArray(m.ratios) || !m.ratios.length) bad('ratios 至少要有一种比例')

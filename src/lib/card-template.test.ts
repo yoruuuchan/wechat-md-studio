@@ -7,7 +7,7 @@ import {
   CARD_TEMPLATE_LIMITS, CardTemplateError, parseCardTemplateManifest,
 } from './card-template-format'
 import {
-  openCardTemplateArchive, sanitizeTemplateCss, sanitizeTemplateHtml,
+  openCardTemplateArchive, readArchiveEntry, sanitizeTemplateCss, sanitizeTemplateHtml,
 } from './card-template-security'
 import {
   activateCardTemplate, deactivateCardTemplate, fragmentHtml,
@@ -73,6 +73,21 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
   }
 }
 
+/** Rewrite one central-directory uncompressed size without touching the data. */
+function patchDeclaredSize(bytes: Uint8Array, name: string, size: number): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const decoder = new TextDecoder()
+  for (let i = 0; i + 46 <= bytes.length; i++) {
+    if (view.getUint32(i, true) !== 0x02014b50) continue
+    const nameLength = view.getUint16(i + 28, true)
+    const entryName = decoder.decode(bytes.subarray(i + 46, i + 46 + nameLength))
+    if (entryName !== name) continue
+    view.setUint32(i + 24, size, true)
+    return
+  }
+  throw new Error('central directory entry not found: ' + name)
+}
+
 afterEach(() => {
   document.body.replaceChildren()
   for (const style of Array.from(document.head.querySelectorAll('style[data-card-template-style]'))) style.remove()
@@ -114,6 +129,8 @@ describe('card template manifest', () => {
       { fonts: [{ source: 'builtin', family: 'Noto Sans SC', weights: [900] }] },
       { pages: { cover: '../cover.html', body: 'pages/body.html' } },
       { styles: [] },
+      { renderId: 'reed' },
+      { id: 'reed', renderId: undefined },
       { unexpected: true },
     ]) {
       expect(() => parseCardTemplateManifest(manifest(patch), files), JSON.stringify(patch)).toThrow(CardTemplateError)
@@ -146,6 +163,38 @@ describe('archive checks', () => {
     const many: Record<string, string> = { 'manifest.json': '{}' }
     for (let i = 0; i < CARD_TEMPLATE_LIMITS.files; i++) many[`f${i}.txt`] = 'x'
     expect(await codeOf(openCardTemplateArchive(await zipFiles(many)))).toBe('too-many-files')
+  })
+
+  it('stops an entry whose central-directory size is a lie', async () => {
+    // 24 MB of zeros compresses to a few KB. The central directory claims 1 KB,
+    // exactly what the old pre-check trusted; the actual stream is 24,000 times
+    // larger. The reader must stop near the 512 KB page ceiling, not inflate it.
+    const bomb = new JSZip()
+    bomb.file('bomb.html', new Uint8Array(24 * 1024 * 1024))
+    const bytes = await bomb.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    patchDeclaredSize(bytes, 'bomb.html', 1024)
+    const loaded = await JSZip.loadAsync(bytes)
+    const entry = loaded.file('bomb.html')!
+    expect((entry as unknown as { _data: { uncompressedSize: number } })._data.uncompressedSize).toBe(1024)
+
+    let emitted = 0
+    const code = await codeOf(readArchiveEntry(entry, CARD_TEMPLATE_LIMITS.pageBytes, (n) => { emitted += n }))
+    expect(code).toBe('archive-too-large-unpacked')
+    // One 16 KB JSZip chunk may arrive after the ceiling, never the whole file.
+    expect(emitted).toBeLessThanOrEqual(CARD_TEMPLATE_LIMITS.pageBytes + 16 * 1024)
+  })
+
+  it('rejects a complete template that carries the lying entry', async () => {
+    const zip = await zipFiles({
+      'manifest.json': JSON.stringify(manifest()),
+      'pages/cover.html': cover,
+      'pages/body.html': body,
+      'styles/template.css': 'p { margin: 0; }',
+      'bomb.html': new Uint8Array(24 * 1024 * 1024),
+    })
+    // A typed-array view over the same buffer, so the patch reaches the archive.
+    patchDeclaredSize(new Uint8Array(zip), 'bomb.html', 1024)
+    expect(await codeOf(openCardTemplateArchive(zip))).toBe('archive-too-large-unpacked')
   })
 
   it('rejects a non-whitelisted extension', async () => {
@@ -227,6 +276,38 @@ describe('CSS whitelist and scoping', () => {
     ]) {
       expect(() => css(source), source).toThrow(CardTemplateError)
     }
+  })
+
+  it('rejects every CSS function that turns a string into a request', () => {
+    // Relative strings are the point: no scheme, no url(), still a GET.
+    const names = ['image-set', '-webkit-image-set', 'cross-fade', '-webkit-cross-fade', 'element', '-moz-element', 'paint', 'src', 'image', '-webkit-canvas', '-webkit-named-image']
+    for (const name of names) {
+      for (const value of [`"assets/dot.png" 1x`, 'url("assets/dot.png") 1x', '"a.png"']) {
+        const source = name.includes('canvas') || name.includes('named-image')
+          ? `.a { background: ${name}("probe") }`
+          : `.a { background: ${name}(${value}) }`
+        expect(() => css(source), source).toThrow(CardTemplateError)
+      }
+    }
+    // They are just as forbidden inside at-rules.
+    expect(() => css('@supports (background: image-set("a.png" 1x)) { .a { color: red; } }')).toThrow(CardTemplateError)
+    expect(() => css('@media screen { .a { background: paint(probe); } }')).toThrow(CardTemplateError)
+    expect(() => css('@font-face { font-family: X; src: src("font.woff2"); }')).toThrow(CardTemplateError)
+  })
+
+  it('rejects fixed and sticky positioning, including the virtual scope root', () => {
+    for (const source of [
+      '.a { position: fixed; }',
+      '.a { position: sticky; }',
+      '.a { position: -webkit-sticky; }',
+      ':scope.xhs-card { position: fixed; }',
+      '@media screen { .a { position: fixed; } }',
+      '.a { --p: fixed; position: var(--p); }',
+      '.a { position: var(--p, fixed); }',
+    ]) {
+      expect(() => css(source), source).toThrow(CardTemplateError)
+    }
+    expect(() => css('.a { position: absolute; top: 0; }')).not.toThrow()
   })
 
   it('rewrites package asset URLs to data URLs and rejects missing assets', () => {
