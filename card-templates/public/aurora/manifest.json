@@ -5,7 +5,7 @@
   "name": "Aurora · 柔光极光",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 aura-gradient.json（MIT）。只用 CSS 渐变和柔焦色块做出的弥散光背景，正文落在半透明纸片上，适合生活与创意记录。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 aura-gradient.json（MIT）。满版 CSS 弥散色场托住一张大圆角磨砂卡，标题压在卡内；正文整页落进浅底面板，引用和清单各有气口；结尾只留一个装着文章题的居中胶囊。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -23,12 +23,11 @@
     "coverInsetY": 64,
     "coverFootBottom": 38,
     "coverReserve": 180,
-    "coverTitleSize": [60, 52, 45, 39, 33],
+    "coverTitleSize": [76, 68, 60, 52, 44],
     "coverSmallScale": 0.84
   },
   "fonts": [
     { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
-    { "source": "builtin", "family": "Space Grotesk", "weights": [400, 700] },
     { "source": "builtin", "family": "Geist Mono", "weights": [400] }
   ],
   "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },

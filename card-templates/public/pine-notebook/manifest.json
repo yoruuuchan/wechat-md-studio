@@ -5,7 +5,7 @@
   "name": "Pine Notebook · 雾松笔记",
   "version": "1.0.0",
   "author": "Reed · 改编自 Haodong Cui/md2card（MIT）",
-  "description": "改编自 Haodong Cui/md2card 的 notebook.css（MIT）。松绿与雾白的分层纸面、圆角标题标记和安静的自然阅读节奏。",
+  "description": "改编自 Haodong Cui/md2card 的 notebook.css（MIT）。活页本：左侧一列打孔、浅松绿封面、标题写在纸页上；正文是横线本，行距与横线对齐，引用带绿色「摘录」标签；结尾简单署名落在横线上。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -13,17 +13,17 @@
     { "id": "dusk", "name": "松夜", "dark": true, "tokens": { "accent": "#8FC9AD", "text": "#E8F1EB", "muted": "#B6C9BD" } }
   ],
   "metrics": {
-    "padX": 46,
+    "padX": 70,
     "padTop": 94,
     "padBottom": 70,
-    "contentWidth": 448,
+    "contentWidth": 400,
     "headerTop": 28,
     "footerBottom": 26,
     "coverInsetX": 46,
     "coverInsetY": 64,
     "coverFootBottom": 38,
     "coverReserve": 184,
-    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverTitleSize": [64, 58, 52, 46, 40],
     "coverSmallScale": 0.84
   },
   "fonts": [

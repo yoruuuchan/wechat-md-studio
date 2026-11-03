@@ -5,7 +5,7 @@
   "name": "Book Notes · 书页摘录",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 elegant-book.json（MIT）。暖白纸色、衬线正文和书脊式装订线的阅读笔记版式，适合摘录、书评与长文。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 elegant-book.json（MIT）。书的扉页：布书脊、居中衬线标题、CSS 小花饰和书签丝带；正文首行缩进两字、宽行距，引文作摘录；结尾把标题与作者收进一条长书签。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -23,13 +23,12 @@
     "coverInsetY": 74,
     "coverFootBottom": 42,
     "coverReserve": 196,
-    "coverTitleSize": [60, 53, 46, 40, 34],
+    "coverTitleSize": [68, 62, 55, 48, 42],
     "coverSmallScale": 0.84
   },
   "fonts": [
-    { "source": "builtin", "family": "Zhuque Fangsong", "weights": [400] },
-    { "source": "builtin", "family": "Noto Sans SC", "weights": [400] },
-    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+    { "source": "builtin", "family": "Noto Serif SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Zhuque Fangsong", "weights": [400] }
   ],
   "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
   "styles": ["styles/base.css", "styles/theme.css"]

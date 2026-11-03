@@ -1,290 +1,418 @@
 .xhs-card {
-  --paper: #f9fafb;
+  --paper: #f4f5f7;
   --ink: #111827;
-  --title-ink: #0f172a;
+  --title-ink: #0d1522;
   --body-ink: #1f2937;
-  --muted: #4b5563;
-  --line: #d6dde8;
-  --accent: #2457c5;
-  --soft: #eef2f8;
-  --cover-wash:
-    linear-gradient(90deg, #f4f6fa 0 31%, #ffffff 31% 100%),
-    linear-gradient(180deg, #ffffff, #f8fafc);
-  --display: "Inter", "Noto Sans SC", sans-serif;
+  --muted: #556171;
+  --line: #c8ced8;
+  --accent: var(--xhs-accent, #2457c5);
+  --accent-ink: #1f49a7;
+  --soft: #e8edf7;
+  --code-bg: #e9edf3;
+  --code-block-bg: #eceff4;
+  --table-head: #e8edf7;
+  --display: "Inter", "Noto Sans SC", "PingFang SC", sans-serif;
   --body-font: "Noto Sans SC", "PingFang SC", sans-serif;
-  --quote-bg: #eef3fb;
-  --quote-ink: #26364e;
-  --code-bg: #e9eef6;
-  --code-ink: #1e4fae;
-  --mark-bg: #dbe6fb;
-  --table-head: #eaf0f9;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .xhs-card[data-variant="ink"] {
-  --paper: #111722;
+  --paper: #121820;
   --ink: #e8eef8;
-  --title-ink: #f5f8fd;
-  --body-ink: #d8e2f0;
-  --muted: #b3bfd2;
-  --line: #2d384a;
-  --accent: #8fafff;
-  --soft: #18202d;
-  --cover-wash:
-    linear-gradient(90deg, #151d2a 0 31%, #101620 31% 100%),
-    linear-gradient(180deg, #121925, #0e141e);
-  --quote-bg: #172231;
-  --quote-ink: #dfe8f6;
-  --code-bg: #1e2a3a;
-  --code-ink: #b9ceff;
-  --mark-bg: #34496b;
-  --table-head: #192231;
+  --title-ink: #f4f7ff;
+  --body-ink: #dbe3ef;
+  --muted: #aeb9c9;
+  --line: #354255;
+  --accent-ink: #a9c4ff;
+  --soft: #1a2431;
+  --code-bg: #1b2532;
+  --code-block-bg: #151f2b;
+  --table-head: #1b2634;
 }
 
-.cover-wash {
-  background: var(--cover-wash);
-}
-
-.cover-shape {
-  display: block;
-  top: calc(var(--xhs-cover-inset-y) + 62px);
-  right: var(--xhs-cover-inset-x);
-  width: 76px;
-  height: 76px;
-  border: 1px solid var(--line);
-  background: var(--paper);
-}
-
-.cover-shape::after {
-  content: "";
+/* Cover: a document first page. Full-width header, title block, and a small
+   information table at the foot. The header number reads as a document code. */
+.doc-cover {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  width: 22px;
-  height: 22px;
-  background: var(--accent);
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 52px 44px 38px;
 }
 
-.cover-top {
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
+.doc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 0 12px;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.doc-head-field {
   color: var(--muted);
-  font-family: "Geist Mono", "Noto Sans SC", monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.18em;
 }
 
-.cover-index {
-  min-width: 26px;
-  min-height: 20px;
-  padding: 0 6px;
-  background: var(--accent);
-  color: var(--paper);
-  font-size: 10px;
+.doc-head-no {
+  color: var(--accent-ink);
+  font-family: "Geist Mono", "Inter", monospace;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.doc-titlebox {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 170px;
+}
+
+.doc-titlebox h1 {
+  max-width: 100%;
+  margin: 0;
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.14;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.doc-titlebox .cover-subtitle {
+  max-width: 90%;
+  margin: 0;
+  padding: 4px 0 4px 14px;
+  border-left: 4px solid var(--accent);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.72;
+  letter-spacing: 0.01em;
+}
+
+.doc-metatable {
+  width: 100%;
+  margin-top: auto;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.doc-metatable th,
+.doc-metatable td {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.doc-metatable th {
+  width: 94px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.14em;
+}
+
+.doc-metatable td {
+  color: var(--title-ink);
+  font-size: 15px;
+  line-height: 1.5;
   letter-spacing: 0.02em;
 }
 
-.cover-date {
-  font-size: 9px;
+.xhs-card[data-card-aspect="1:1"] .doc-cover {
+  padding: 38px 34px 28px;
 }
 
-.cover-copy {
-  gap: 16px;
-  padding: 32px 0 26px;
+.xhs-card[data-card-aspect="1:1"] .doc-titlebox {
+  gap: 14px;
+  margin-top: 60px;
 }
 
-.cover-copy h1 {
-  max-width: 96%;
-  font-family: var(--display);
-  font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: -0.032em;
+.xhs-card[data-card-aspect="1:1"] .doc-titlebox h1 {
+  font-size: 43px;
+  line-height: 1.1;
 }
 
-.xhs-cover .cover-subtitle {
-  max-width: 80%;
-  padding-left: 12px;
-  border-left: 3px solid var(--accent);
-  color: var(--muted);
+.xhs-card[data-card-aspect="1:1"] .doc-titlebox .cover-subtitle {
   font-size: 14px;
-  line-height: 1.75;
+  line-height: 1.6;
 }
 
-.cover-foot {
-  padding-top: 11px;
-  border-top: 1px solid var(--line);
-  font-family: "Geist Mono", "Noto Sans SC", monospace;
-  font-size: 9px;
-  letter-spacing: 0.06em;
+.xhs-card[data-card-aspect="1:1"] .doc-metatable th,
+.xhs-card[data-card-aspect="1:1"] .doc-metatable td {
+  padding: 7px 0;
 }
 
-.page-head {
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
+.xhs-card[data-card-aspect="9:16"] .doc-cover {
+  padding: 68px 46px 58px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .doc-titlebox {
+  margin-top: 200px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .doc-titlebox h1 {
+  font-size: 56px;
+}
+
+/* Body: numbered sections behind an outline rule. Tables get their full grid
+   rather than the horizontal-only rule used by the magazine template. */
+.doc-bodypage {
+  position: absolute;
+  inset: 0;
+}
+
+.doc-pagebar {
+  position: absolute;
+  z-index: 2;
+  top: 32px;
+  left: 40px;
+  right: 40px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 9px;
+  border-bottom: 2px solid var(--ink);
   color: var(--muted);
-  font-family: "Inter", "Noto Sans SC", sans-serif;
-  font-size: 9px;
+  line-height: 1.4;
+}
+
+.doc-pagebar-field {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+
+.doc-pagebar-no {
+  color: var(--accent-ink);
+  font-family: "Geist Mono", "Inter", monospace;
+  font-size: 16px;
   letter-spacing: 0.06em;
 }
 
-.page-head-title {
-  max-width: 72%;
-  font-weight: 600;
-}
-
-.page-head-no {
-  padding: 2px 6px;
-  border: 1px solid var(--line);
-  color: var(--accent);
-  font-size: 8px;
-}
-
-.page-content {
-  padding-top: 5px;
-}
-
-.page-foot {
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-  font-family: "Inter", "Noto Sans SC", sans-serif;
-  font-size: 9px;
+.doc-content {
+  position: absolute;
+  z-index: 1;
+  top: var(--xhs-pad-top);
+  left: var(--xhs-pad-x);
+  width: var(--xhs-content-w);
 }
 
 .xhs-body {
+  padding-left: 34px;
+  border-left: 2px solid var(--line);
+  color: var(--body-ink);
+  font-family: var(--body-font);
+  font-size: 16px;
+  line-height: 1.82;
+}
+
+.xhs-body p {
+  margin: 0.74em 0;
   font-size: 16px;
   line-height: 1.82;
 }
 
 .xhs-body h2 {
-  margin-top: 1.55em;
-  padding: 0.36em 0 0.34em 11px;
-  border-left: 4px solid var(--accent);
-  background: linear-gradient(90deg, var(--quote-bg), transparent 88%);
-  font-family: "Inter", "Noto Sans SC", sans-serif;
-  font-size: 1.2em;
+  margin: 1.6em 0 0.65em;
+  padding-bottom: 0.36em;
+  border-bottom: 1px solid var(--line);
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 1.4em;
+  font-weight: 700;
   line-height: 1.4;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+}
+
+.xhs-body h2::before {
+  content: attr(data-card-number) ".";
+  margin-right: 0.4em;
+  color: var(--accent-ink);
+  font-family: "Inter", "Geist Mono", sans-serif;
+  font-weight: 600;
+}
+
+.xhs-body h2 small {
+  display: block;
+  margin-bottom: 0.25em;
+  color: var(--muted);
+  font-family: "Geist Mono", "Noto Sans SC", monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
 }
 
 .xhs-body h3 {
-  color: var(--accent);
-  font-family: "Inter", "Noto Sans SC", sans-serif;
+  margin: 1.35em 0 0.5em;
+  color: var(--title-ink);
+  font-family: var(--display);
   font-size: 1.06em;
-  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+.xhs-body h3::before {
+  content: attr(data-card-number);
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--soft);
+  color: var(--accent-ink);
+  font-family: "Geist Mono", "Inter", monospace;
+  font-size: 12px;
+  font-weight: 400;
+  vertical-align: 0.14em;
 }
 
 .xhs-body strong {
-  color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
 }
 
 .xhs-body blockquote {
-  padding: 13px 16px;
+  margin: 1.25em 0;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
   border-left: 4px solid var(--accent);
-  background: var(--quote-bg);
-  border-radius: 0 6px 6px 0;
+  background: var(--soft);
 }
 
 .xhs-body blockquote p {
-  color: var(--quote-ink);
-  font-size: 0.97em;
+  color: var(--body-ink);
+  font-size: 15px;
+  line-height: 1.76;
 }
 
 .xhs-body ul,
 .xhs-body ol {
   margin: 1em 0;
-  padding-left: 1.7em;
+  padding-left: 1.5em;
 }
 
 .xhs-body li {
-  line-height: 1.72;
+  margin: 0.34em 0;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .xhs-body li::marker {
-  color: var(--accent);
-  font-weight: 700;
+  color: var(--accent-ink);
+  font-family: "Geist Mono", "Noto Sans SC", monospace;
+}
+
+.xhs-body th,
+.xhs-body td {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  font-size: 0.88em;
 }
 
 .xhs-body th {
   background: var(--table-head);
   color: var(--title-ink);
-  font-family: "Inter", "Noto Sans SC", sans-serif;
-  font-size: 0.9em;
-  font-weight: 600;
-}
-
-.xhs-body th,
-.xhs-body td {
-  border-color: var(--line);
-  padding: 8px 9px;
+  font-family: var(--display);
 }
 
 .xhs-body pre {
   border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--soft);
-}
-
-.xhs-body code {
+  border-left: 4px solid var(--accent);
   border-radius: 3px;
-  font-size: 0.84em;
+  background: var(--code-block-bg);
 }
 
-.xhs-body hr {
-  border-top: 1px solid var(--line);
-}
-
-.end-page {
-  padding-left: 50px;
-  padding-right: 50px;
-  background: linear-gradient(180deg, var(--paper), var(--soft));
-}
-
-.end-page::before {
-  content: "";
+/* End: a bordered signature table; the closing page has no separate folio. */
+.doc-end {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 7px;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 74px 52px 62px;
+}
+
+.doc-end-mark {
+  width: 94px;
+  height: 8px;
+  margin-bottom: 30px;
   background: var(--accent);
 }
 
-.end-shape {
-  top: 38px;
-  right: 40px;
-  width: 58px;
-  height: 58px;
+.doc-sign {
+  width: 100%;
+  max-width: 432px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.doc-sign th,
+.doc-sign td {
+  padding: 14px 13px;
   border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
 }
 
-.end-shape::after {
-  content: "";
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 16px;
-  height: 16px;
-  background: var(--accent);
+.doc-sign th {
+  width: 88px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0.12em;
 }
 
-.end-kicker {
-  width: 32px;
-  height: 4px;
-  margin-bottom: 28px;
+.doc-sign td {
+  color: var(--body-ink);
+  font-size: 15px;
+  line-height: 1.65;
+  letter-spacing: 0.01em;
 }
 
-.end-title {
-  font-family: "Inter", "Noto Sans SC", sans-serif;
-  font-size: 44px;
-  letter-spacing: -0.03em;
+.doc-sign tr:first-child td {
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.55;
 }
 
-.end-article {
-  max-width: 80%;
-  font-size: 14px;
+.xhs-card[data-card-aspect="1:1"] .doc-end {
+  padding: 48px 42px 40px;
 }
 
-.end-meta {
-  margin-top: 46px;
-  border-top: 1px solid var(--line);
-  font-family: "Inter", "Noto Sans SC", sans-serif;
+.xhs-card[data-card-aspect="1:1"] .doc-end-mark {
+  margin-bottom: 20px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .doc-sign th,
+.xhs-card[data-card-aspect="1:1"] .doc-sign td {
+  padding: 10px 10px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .doc-sign tr:first-child td {
+  font-size: 15px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .doc-end {
+  padding: 118px 54px 92px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .doc-sign th,
+.xhs-card[data-card-aspect="9:16"] .doc-sign td {
+  padding: 18px 14px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .doc-sign tr:first-child td {
+  font-size: 21px;
 }

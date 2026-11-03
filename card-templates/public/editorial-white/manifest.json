@@ -5,7 +5,7 @@
   "name": "Editorial White · 纸页杂志",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 minimalist-magazine.json（MIT）。纸页杂志的社论气质：衬线大标题、宽留白和一条酒红色细线。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 minimalist-magazine.json（MIT）。杂志封面式社论：上下双细线夹住衬线大标题，副题当导语；正文首段放大成导语，引文居中排成大号引语，结尾以文章题作引、落「— 作者」。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -22,13 +22,13 @@
     "coverInsetY": 72,
     "coverFootBottom": 40,
     "coverReserve": 190,
-    "coverTitleSize": [62, 54, 48, 41, 35],
+    "coverTitleSize": [74, 68, 60, 52, 44],
     "coverSmallScale": 0.84
   },
   "fonts": [
     { "source": "builtin", "family": "Noto Serif SC", "weights": [400, 700] },
-    { "source": "builtin", "family": "Noto Sans SC", "weights": [400] },
-    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+    { "source": "builtin", "family": "EB Garamond", "weights": [400, 600] },
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400] }
   ],
   "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
   "styles": ["styles/base.css", "styles/theme.css"]

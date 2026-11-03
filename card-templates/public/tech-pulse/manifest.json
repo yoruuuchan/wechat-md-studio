@@ -5,7 +5,7 @@
   "name": "Tech Pulse · 科技脉冲",
   "version": "1.0.0",
   "author": "Reed · 改编自 uhhc/md2card（MIT）",
-  "description": "改编自 uhhc/md2card 的 tech-pulse.ts（MIT）。深蓝到青灰的渐变、克制的技术网格和半透明信息块，适合 AI、产品与工程笔记。",
+  "description": "改编自 uhhc/md2card 的 tech-pulse.ts（MIT）。深蓝到青的渐变封面被一条内联 SVG 折线脉冲横穿，标题大而粗；正文用青色的重点色块、方块列表和数据块，结尾让脉冲线再出现一次。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -22,7 +22,7 @@
     "coverInsetY": 64,
     "coverFootBottom": 36,
     "coverReserve": 186,
-    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverTitleSize": [70, 64, 58, 50, 42],
     "coverSmallScale": 0.84
   },
   "fonts": [

@@ -1,16 +1,16 @@
-<div class="xhs-cover">
-  <div class="cover-wash" aria-hidden="true"></div>
-  <div class="cover-shape" aria-hidden="true"></div>
-  <div class="cover-top">
-    <span class="cover-index" data-slot="page-number" data-format="plain"></span>
-    <span class="cover-date" data-slot="date"></span>
-  </div>
-  <div class="cover-copy" data-fit-box>
+<div class="xhs-cover doc-cover">
+  <header class="doc-head">
+    <span class="doc-head-field">文档编号</span>
+    <span class="doc-head-no" data-slot="page-number" data-format="pad2"></span>
+  </header>
+  <div class="doc-titlebox" data-fit-box>
     <h1 data-slot="title" data-fit-cover-title></h1>
     <p class="cover-subtitle" data-slot="subtitle"></p>
   </div>
-  <div class="cover-foot">
-    <span data-slot="author"></span>
-    <span data-slot="brand"></span>
-  </div>
+  <table class="doc-metatable">
+    <tbody>
+      <tr><th>作者</th><td data-slot="author"></td></tr>
+      <tr><th>页数</th><td data-slot="page-count" data-format="plain"></td></tr>
+    </tbody>
+  </table>
 </div>

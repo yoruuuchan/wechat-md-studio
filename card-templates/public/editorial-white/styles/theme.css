@@ -1,151 +1,239 @@
 .xhs-card {
-  --paper: #ffffff;
-  --ink: #181818;
-  --title-ink: #141414;
-  --body-ink: #242424;
-  --muted: #5a5a5a;
-  --line: #d4d1ca;
-  --accent: #8b2434;
-  --soft: #f4f1ec;
+  --paper: #fbf8f2;
+  --ink: #1b1916;
+  --title-ink: #151310;
+  --body-ink: #26231f;
+  --muted: #615b52;
+  --line: #cdc5b8;
+  --accent: var(--xhs-accent, #8b2434);
+  --soft: #f0ebe2;
   --display: "Noto Serif SC", "Songti SC", serif;
   --body-font: "Noto Serif SC", "Songti SC", serif;
-  --quote-bg: transparent;
-  --quote-ink: #343434;
-  --code-bg: #f0ece6;
-  --code-ink: #7d1e2d;
-  --mark-bg: #efe1c4;
-  --table-head: #f2eee8;
+  --code-bg: #eee8de;
+  --code-block-bg: #f1ece3;
+  --table-head: transparent;
+  background: var(--paper);
+  color: var(--ink);
 }
 
-.cover-wash {
-  background:
-    linear-gradient(90deg, transparent 0 96%, #f6f2ec 96% 100%),
-    linear-gradient(180deg, #ffffff 0%, #fbfaf7 76%, #ffffff 100%);
+/* Cover: a magazine masthead built from two double rules, a deck above the
+   title, and no furniture in the corners. */
+.editorial-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 74px 52px 44px;
 }
 
-.cover-shape {
-  display: block;
-  top: calc(var(--xhs-cover-inset-y) + 72px);
-  right: var(--xhs-cover-inset-x);
-  width: 46px;
-  height: 5px;
-  background: var(--accent);
+.editorial-rule {
+  position: absolute;
+  left: 52px;
+  right: 52px;
+  height: 0;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
 }
 
-.cover-top {
-  padding-bottom: 13px;
-  border-bottom: 4px double var(--line);
-  font-size: 10px;
+.editorial-rule-top {
+  top: 54px;
 }
 
-.cover-index {
-  color: var(--accent);
-  font-family: "Noto Serif SC", serif;
-  font-size: 13px;
+.editorial-rule-bottom {
+  bottom: 40px;
+}
+
+.editorial-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 54px;
+}
+
+.editorial-copy h1 {
+  max-width: 458px;
+  margin: 0;
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.editorial-copy .cover-subtitle {
+  max-width: 82%;
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.8;
   letter-spacing: 0.02em;
 }
 
-.cover-date {
-  font-family: "Noto Sans SC", sans-serif;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-}
-
-.cover-copy {
-  gap: 22px;
-  padding: 34px 0 30px;
-}
-
-.cover-copy h1 {
-  max-width: 94%;
-  font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: -0.025em;
-}
-
-.xhs-cover .cover-subtitle {
-  max-width: 82%;
-  padding-top: 15px;
-  border-top: 1px solid var(--line);
+.editorial-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: auto;
+  padding-bottom: 20px;
   color: var(--muted);
-  font-family: "Noto Sans SC", sans-serif;
-  font-size: 14px;
-  line-height: 1.8;
 }
 
-.cover-foot {
-  padding-top: 13px;
-  border-top: 1px solid var(--line);
-  font-family: "Noto Sans SC", sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.1em;
+.editorial-foot-label {
+  color: var(--accent);
+  font-family: "EB Garamond", "Noto Serif SC", serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
 }
 
-.page-head {
-  color: var(--muted);
-  font-family: "Noto Sans SC", sans-serif;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-}
-
-.page-head::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -9px;
-  height: 4px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
-.page-head-title {
-  max-width: 72%;
-  font-family: "Noto Serif SC", serif;
+.editorial-foot span:last-child {
+  min-width: 0;
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 15px;
+  line-height: 1.4;
   letter-spacing: 0.04em;
 }
 
-.page-head-no {
-  font-family: "Noto Sans SC", sans-serif;
-  letter-spacing: 0.1em;
+.xhs-card[data-card-aspect="1:1"] .editorial-cover {
+  padding: 48px 44px 34px;
 }
 
-.page-content {
-  padding-top: 7px;
+.xhs-card[data-card-aspect="1:1"] .editorial-rule {
+  left: 44px;
+  right: 44px;
 }
 
-.page-foot {
+.xhs-card[data-card-aspect="1:1"] .editorial-rule-top {
+  top: 36px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-rule-bottom {
+  bottom: 28px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-copy {
+  gap: 16px;
+  margin-top: 30px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-copy h1 {
+  font-size: 45px;
+  line-height: 1.06;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-copy .cover-subtitle {
   padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-family: "Noto Sans SC", sans-serif;
-  font-size: 10px;
-  letter-spacing: 0.3px;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-cover {
+  padding: 108px 58px 62px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-rule {
+  left: 58px;
+  right: 58px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-rule-top {
+  top: 80px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-rule-bottom {
+  bottom: 58px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-copy {
+  margin-top: 208px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-copy h1 {
+  font-size: 60px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-copy .cover-subtitle {
+  max-width: 72%;
+  font-size: 18px;
+}
+
+/* Body: a wide serif page whose opening paragraph acts as the standfirst;
+   the folio sits alone at the foot rather than in a header corner. */
+.editorial-bodypage {
+  position: absolute;
+  inset: 0;
+}
+
+.editorial-content {
+  position: absolute;
+  z-index: 1;
+  top: var(--xhs-pad-top);
+  left: var(--xhs-pad-x);
+  width: var(--xhs-content-w);
 }
 
 .xhs-body {
-  font-size: 17px;
-  line-height: 1.94;
-  letter-spacing: 0.025em;
+  color: var(--body-ink);
+  font-family: var(--body-font);
+  font-size: 16px;
+  line-height: 1.96;
+  letter-spacing: 0.012em;
+}
+
+.xhs-body > p:first-of-type {
+  margin: 0 0 1.05em;
+  color: var(--title-ink);
+  font-size: 21px;
+  line-height: 1.75;
+  letter-spacing: 0.005em;
 }
 
 .xhs-body p {
-  margin: 0.95em 0;
+  margin: 0.72em 0;
 }
 
 .xhs-body h2 {
-  margin-top: 1.65em;
-  padding-bottom: 0.38em;
-  border-bottom: 1px solid var(--line);
-  font-size: 1.34em;
+  margin: 1.85em 0 0.85em;
+  font-family: var(--display);
+  font-size: 1.62em;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.xhs-body h2::before {
+  content: "";
+  display: block;
+  width: 42px;
+  height: 2px;
+  margin-bottom: 14px;
+  background: var(--accent);
+}
+
+.xhs-body h2 small {
+  display: block;
+  margin-bottom: 0.4em;
+  color: var(--accent);
+  font-family: "EB Garamond", "Noto Serif SC", serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
 }
 
 .xhs-body h3 {
+  margin-top: 1.5em;
   color: var(--accent);
-  font-size: 1.08em;
-  font-weight: 400;
-  letter-spacing: 0.07em;
+  font-family: var(--display);
+  font-size: 1.14em;
+  line-height: 1.5;
 }
 
 .xhs-body strong {
@@ -154,98 +242,157 @@
 }
 
 .xhs-body blockquote {
-  margin: 1.8em 0;
-  padding: 20px 12px;
+  margin: 1.7em 0;
+  padding: 16px 4px;
+  border: 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  border-left: 0;
   text-align: center;
 }
 
 .xhs-body blockquote p {
-  color: var(--quote-ink);
-  font-family: "Noto Serif SC", serif;
-  font-size: 1.05em;
-  font-style: italic;
-  line-height: 1.85;
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 1.42em;
+  font-weight: 400;
+  line-height: 1.62;
+  text-align: center;
+  letter-spacing: 0.01em;
 }
 
-.xhs-body blockquote p::before,
-.xhs-body blockquote p::after {
-  color: var(--accent);
-  font-family: "Noto Serif SC", serif;
-  font-size: 1.4em;
-  line-height: 0;
+.xhs-body ul,
+.xhs-body ol {
+  margin: 1.1em 0;
+  padding-left: 1.4em;
 }
 
-.xhs-body blockquote p::before {
-  content: "「";
-  margin-right: 3px;
-}
-
-.xhs-body blockquote p::after {
-  content: "」";
-  margin-left: 3px;
-}
-
-.xhs-body ul {
-  list-style-type: square;
+.xhs-body li {
+  margin: 0.4em 0;
+  line-height: 1.8;
 }
 
 .xhs-body li::marker {
   color: var(--accent);
+  font-family: "EB Garamond", "Noto Serif SC", serif;
+}
+
+.xhs-body th,
+.xhs-body td {
+  padding: 10px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
 }
 
 .xhs-body th {
-  border-top: 2px solid var(--ink);
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  font-family: "Noto Serif SC", serif;
+  border-bottom: 2px solid var(--ink);
+  font-family: var(--display);
+  font-size: 0.95em;
+  font-weight: 700;
+}
+
+.xhs-body td {
   font-size: 0.94em;
+}
+
+.xhs-body hr {
+  width: 84px;
+  margin: 2em auto;
+  border-top: 1px solid var(--accent);
 }
 
 .xhs-body pre {
   border: 0;
-  border-left: 2px solid var(--accent);
+  border-left: 3px solid var(--accent);
   border-radius: 0;
-  background: var(--soft);
+  background: var(--code-block-bg);
 }
 
-.end-page {
-  padding-left: 58px;
-  padding-right: 58px;
+.editorial-pageno {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-family: "EB Garamond", "Noto Serif SC", serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  transform: translateX(-50%);
 }
 
-.end-shape {
-  top: 10%;
-  bottom: 10%;
-  left: 24px;
-  width: 1px;
-  background: linear-gradient(180deg, transparent, var(--line) 18%, var(--line) 82%, transparent);
+.editorial-pageno::before,
+.editorial-pageno::after {
+  content: "";
+  width: 22px;
+  height: 1px;
+  background: var(--line);
 }
 
-.end-kicker {
-  width: 38px;
-  height: 2px;
-  margin-bottom: 34px;
+/* End: the article title becomes a pull quote with an attribution. */
+.editorial-end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 90px 58px 74px;
+  text-align: center;
 }
 
-.end-title {
-  font-family: "Noto Serif SC", serif;
-  font-size: 50px;
-  letter-spacing: 0.01em;
+.editorial-end-rule {
+  width: 100%;
+  height: 0;
+  margin-bottom: 42px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
 }
 
-.end-article {
-  max-width: 74%;
-  font-family: "Noto Serif SC", serif;
-  font-size: 15px;
-  line-height: 1.9;
+.editorial-end-rule-low {
+  margin-top: 42px;
+  margin-bottom: 0;
 }
 
-.end-meta {
-  margin-top: 58px;
-  border-top: 4px double var(--line);
-  padding-top: 14px;
-  font-family: "Noto Sans SC", sans-serif;
+.editorial-end-quote {
+  max-width: 430px;
+  margin: 0 auto;
+  color: var(--title-ink);
+  font-family: var(--display);
+  font-size: 33px;
+  font-weight: 400;
+  line-height: 1.62;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.editorial-end-author {
+  margin: 30px 0 0;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: 0.08em;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-end {
+  padding: 58px 48px 48px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-end-rule {
+  margin-bottom: 26px;
+}
+
+.xhs-card[data-card-aspect="1:1"] .editorial-end-quote {
+  font-size: 27px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-end {
+  padding: 140px 62px 106px;
+}
+
+.xhs-card[data-card-aspect="9:16"] .editorial-end-quote {
+  font-size: 38px;
 }

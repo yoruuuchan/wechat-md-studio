@@ -60,14 +60,20 @@ export function renderCardArticle(doc: Doc, options: {
     ? `<img src="${esc(options.resolveImage(src))}" alt="${esc(alt)}" style="max-height:${maxImageHeight}px">`
     : `<p class="xhs-placeholder">${esc(t('theme.pendingImage'))}</p>`
   }${alt ? `<figcaption>${esc(alt)}</figcaption>` : ''}</figure>`
+  // Numbered headings are useful to templates that print a section index. The
+  // attributes are presentation-only and do not affect the parsed docs.
+  let headingNumber = 0
+  let subheadingNumber = 0
   root.innerHTML = doc.blocks.map((block) => {
     switch (block.type) {
       case 'paragraph': return `<p>${inline(block.segs)}</p>`
       case 'heading': {
         const tag = block.numbered ? 'h2' : 'h1'
-        return `<${tag}>${block.kicker ? `<small>${esc(block.kicker)} · </small>` : ''}${esc(block.title)}</${tag}>`
+        const number = block.numbered ? ` data-card-number="${++headingNumber}"` : ''
+        if (block.numbered) subheadingNumber = 0
+        return `<${tag}${number}>${block.kicker ? `<small>${esc(block.kicker)} · </small>` : ''}${esc(block.title)}</${tag}>`
       }
-      case 'subheading': return `<h3>${esc(block.title)}</h3>`
+      case 'subheading': return `<h3 data-card-number="${headingNumber}.${++subheadingNumber}">${esc(block.title)}</h3>`
       case 'center': return `<p class="xhs-center">${inline(block.segs)}</p>`
       case 'quoteCard': return `<blockquote><p>${inline(block.segs)}</p></blockquote>`
       case 'quoteBox': return `<blockquote>${block.paras.map((p) => `<p>${inline(p)}</p>`).join('')}</blockquote>`

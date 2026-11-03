@@ -5,7 +5,7 @@
   "name": "Fresh Notes · 清爽手帐",
   "version": "1.0.0",
   "author": "Reed · 改编自 uhhc/md2card（MIT）",
-  "description": "改编自 uhhc/md2card 的 fresh-notes.ts（MIT）。薄荷底、圆角便签和轻盈的清单排版，手帐感来自留白、色块与字距，不依赖贴纸素材。",
+  "description": "改编自 uhhc/md2card 的 fresh-notes.ts（MIT）。点阵纸上的手帐：标题写在略微倾斜、贴着半透明胶带的便签上；正文 h2 是标签贴，无序清单画成勾选框，引用是另一张便签；结尾是一张胶带便签。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -23,12 +23,11 @@
     "coverInsetY": 62,
     "coverFootBottom": 38,
     "coverReserve": 180,
-    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverTitleSize": [62, 56, 50, 45, 38],
     "coverSmallScale": 0.84
   },
   "fonts": [
     { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
-    { "source": "builtin", "family": "Caveat", "weights": [400] },
     { "source": "builtin", "family": "Geist Mono", "weights": [400] }
   ],
   "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },

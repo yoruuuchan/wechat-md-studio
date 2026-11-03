@@ -5,7 +5,7 @@
   "name": "Doc Frame · 文档结构",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 pro-doc.json（MIT）。技术文档的清晰框架：编号标题、细边表格、蓝灰强调和可扫读的信息层级。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 pro-doc.json（MIT）。技术文档首页：顶部文档表头带编号，底部作者 / 页数信息表；正文用 1. 与 1.1 分级标题、完整边框表格和左侧大纲线；结尾是带边框的签名表。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -23,7 +23,7 @@
     "coverInsetY": 62,
     "coverFootBottom": 34,
     "coverReserve": 184,
-    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverTitleSize": [66, 60, 54, 47, 40],
     "coverSmallScale": 0.84
   },
   "fonts": [

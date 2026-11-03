@@ -280,7 +280,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
             <div key={i} style={{ width: PREVIEW_WIDTH }}>
               <div className="xhs-slot" style={{ width: PREVIEW_WIDTH, height: height * PREVIEW_SCALE }}>
                 <div className="xhs-scale" style={{ transform: `scale(${PREVIEW_SCALE})` }}>
-                  <div className="xhs-card" data-card-index={i} data-card-kind={page.kind} data-template={custom?.renderId ?? template} data-variant={bg} data-night={dark}
+                  <div className="xhs-card" data-card-index={i} data-card-kind={page.kind} data-template={custom?.renderId ?? template} data-variant={bg} data-night={dark} data-card-aspect={ratio}
                     {...(custom ? { 'data-card-template-source': custom.template } : {})}
                     ref={(el) => { cardsRef.current[i] = el }}
                     {...(customHtml !== null ? { dangerouslySetInnerHTML: { __html: customHtml } } : {})}

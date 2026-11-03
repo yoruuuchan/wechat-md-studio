@@ -5,7 +5,7 @@
   "name": "Swiss Grid · 瑞士秩序",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 swiss-studio.json（MIT）。瑞士平面风格的秩序感：严格左对齐、粗细分明的无衬线标题、橙色方形强调与克制的灰白页面。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 swiss-studio.json（MIT）。严格瑞士网格：超大粗标题压在左下，橙色模块占住右上网格，细体大号 01 当图形；正文左栏用大号章号配右栏阅读，结尾一条粗线收束。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [
@@ -23,7 +23,7 @@
     "coverInsetY": 58,
     "coverFootBottom": 34,
     "coverReserve": 176,
-    "coverTitleSize": [62, 54, 47, 40, 34],
+    "coverTitleSize": [70, 64, 57, 50, 42],
     "coverSmallScale": 0.84
   },
   "fonts": [

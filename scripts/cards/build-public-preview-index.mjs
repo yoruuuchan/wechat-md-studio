@@ -47,6 +47,20 @@ function manifestDirFor(item) {
 
 const manifestDirs = catalog.map(manifestDirFor)
 
+const SHEETS = [
+  ['cover', '封面 · 3:4'],
+  ['body', '正文 · 3:4'],
+  ['end', '结尾 · 3:4'],
+]
+const sheetFigures = SHEETS.map(([role, label]) => {
+  const relative = `sheets/grayscale-${role}.png`
+  if (!fs.existsSync(path.resolve(path.dirname(outPath), relative))) return ''
+  return `<figure class="sheet"><a href="${relative}" target="_blank" rel="noopener"><img src="${relative}" alt="九套模板灰度总览：${html(label)}" loading="lazy" /></a><figcaption>${html(label)} · 去掉颜色后并排检查结构差异</figcaption></figure>`
+}).join('')
+const sheetSection = sheetFigures
+  ? `<section class="sheets"><header><p class="ordinal">灰度</p><h2>灰度总览</h2><p>同一变体的九张 3:4 页面去掉颜色并排。若两套只剩文字内容不同，版式就还没有独立。</p></header><div class="sheet-grid">${sheetFigures}</div></section>`
+  : ''
+
 const rows = catalog.map((item, index) => {
   const manifest = manifestDirs[index] ? JSON.parse(fs.readFileSync(manifestDirs[index], 'utf8')) : { variants: [] }
   const source = SOURCES[item.id] ?? { file: '上游文件', repo: '未知', license: 'MIT' }
@@ -63,7 +77,7 @@ const rows = catalog.map((item, index) => {
     <header>
       <p class="ordinal">${String(index + 1).padStart(2, '0')}</p>
       <h2>${html(item.name)}</h2>
-      <p class="source">参考源：<strong>${html(source.repo)}</strong> · ${html(source.file)}<br />许可：${html(source.license)}，保留上游版权与许可；仅借用配色、字体思路、间距与版式，成品重新实现。</p>
+      <p class="source">参考源：<strong>${html(source.repo)}</strong> · ${html(source.file)}<br />许可：${html(source.license)}，保留上游版权与许可；参考其版式方向重画，成品重新实现。</p>
     </header>
     <div class="variants">${variants}</div>
   </article>`
@@ -83,8 +97,19 @@ const page = `<!doctype html>
   .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding-bottom: 30px; border-bottom: 2px solid var(--ink); }
   h1 { margin: 0; font: 700 44px/1.08 "Noto Serif SC", "Songti SC", serif; letter-spacing: -0.03em; }
   .lede { max-width: 720px; margin: 14px 0 0; color: var(--muted); font-size: 14px; }
+  .intro-link { display: inline-block; margin-top: 14px; color: var(--accent); font-size: 13px; text-decoration: none; border-bottom: 1px solid var(--accent); }
+  .intro-link:hover { color: var(--ink); border-color: var(--ink); }
   .count { color: var(--accent); font: 700 56px/1 "Geist Mono", monospace; letter-spacing: -0.05em; }
   .count small { display: block; color: var(--muted); font: 400 12px/1.4 "Noto Sans SC", sans-serif; letter-spacing: 0; text-align: right; }
+  .sheets { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 34px; padding: 30px 0 36px; border-bottom: 1px solid var(--line); }
+  .sheets header { align-self: start; }
+  .sheets header h2 { margin: 8px 0 10px; }
+  .sheets header p:last-child { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+  .sheet-grid { display: flex; flex-direction: column; gap: 20px; }
+  .sheet { margin: 0; }
+  .sheet a { display: block; line-height: 0; }
+  .sheet img { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
+  .sheet figcaption { margin-top: 7px; color: var(--muted); font-size: 10px; }
   .row { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 36px; padding: 34px 0 38px; border-bottom: 1px solid var(--line); }
   .row header { position: sticky; top: 20px; align-self: start; }
   .ordinal { margin: 0; color: var(--accent); font: 400 12px/1 "Geist Mono", monospace; letter-spacing: 0.16em; }
@@ -103,18 +128,20 @@ const page = `<!doctype html>
   .shot img:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(50, 42, 30, 0.14); }
   .shot figcaption { margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.3; }
   footer { padding-top: 26px; color: var(--muted); font-size: 11px; }
-  @media (max-width: 900px) { .row { grid-template-columns: 1fr; gap: 18px; } .row header { position: static; } .intro { grid-template-columns: 1fr; } .count { text-align: left; } }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; gap: 18px; } .row header { position: static; } .intro { grid-template-columns: 1fr; } .count { text-align: left; } .sheets { grid-template-columns: 1fr; gap: 18px; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <section class="intro">
     <div>
-      <h1>公用卡片模板 · 九套效果图</h1>
-      <p class="lede">同一份固定测试稿、三种比例的真实 PNG 导出。每套覆盖封面 / 正文 / 结尾，点图片看原图。这些成品只借用上游的配色、字体搭配、间距与版式思路，封面照片、贴纸和图标都没有带过来。</p>
+      <h1>公用卡片模板 · 第二版九套效果图</h1>
+      <p class="lede">同一份固定测试稿、三种比例的真实 PNG 导出。每套都有自己的封面 / 正文 / 结尾结构与版式动作，点图片看原图。参考源只用于版式方向，封面照片、贴纸和图标都没有带过来。</p>
+      <a class="intro-link" href="v1/index.html">← 对照第一版（同一骨架换颜色）</a>
     </div>
     <div class="count">${catalog.length}<small>套 · 每套 1–2 个变体</small></div>
   </section>
+  ${sheetSection}
   ${rows}
   <footer>生成自 card-templates/public/ 源文件与上传链路实际导出的 PNG；图片路径相对本页，不需要联网。</footer>
 </div>
