@@ -31,6 +31,8 @@ example.reedcard
 node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/example.reedcard
 ```
 
+仓库里的公用模板也可以当范例：九套源文件在 [`card-templates/public/`](../card-templates/public/)，每套都有 `manifest.json`、`pages/` 和 `styles/`；`npm run pack:public-cards` 会把它们打成 `.reedcard` 放到 `public/card-templates/`。这些包在应用里只通过和用户上传完全相同的解析、安全检查与激活路径加载。
+
 ## 2. manifest.json
 
 ```json

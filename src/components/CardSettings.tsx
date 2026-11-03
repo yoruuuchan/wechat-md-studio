@@ -12,6 +12,7 @@ import type { CardTemplateSummary } from '@/lib/card-template-format'
 import type { MsgKey } from '@/lib/i18n'
 import { useI18n } from '@/hooks/useI18n'
 import CardTemplatesSection from '@/components/CardTemplatesSection'
+import { PUBLIC_CARD_TEMPLATES, publicCardTemplateFor, publicCardTemplateRuntimeId } from '@/lib/public-card-templates'
 
 interface Props {
   options: CardOptions
@@ -34,9 +35,14 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
   const variants = templateVariants(template)
   const ratios = templateRatios(template)
   const custom = templates.templates.find((item) => item.template === template)
-  const variantName = (id: string) => custom?.variants.find((variant) => variant.id === id)?.name ??
+  const publicTemplate = templates.publicTemplates.find((item) => item.template === template)
+  const publicMeta = publicCardTemplateFor(template)
+  const variantName = (id: string) => publicTemplate?.variants.find((variant) => variant.id === id)?.name ??
+    custom?.variants.find((variant) => variant.id === id)?.name ??
     (isBuiltinCardTemplate(template) ? t(`cards.bg.${id}` as MsgKey) : id)
-  const templateName = custom?.name ?? (isBuiltinCardTemplate(template) ? t(`cards.template.${template}` as MsgKey) : template)
+  const templateName = publicTemplate?.name ?? publicMeta?.name ??
+    custom?.name ?? (isBuiltinCardTemplate(template) ? t(`cards.template.${template}` as MsgKey) : template)
+  const loadedPublic = new Set(templates.publicTemplates.map((item) => item.template))
 
   return (
     <div data-card-settings className="space-y-4">
@@ -47,6 +53,20 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
             <button key={id} data-card-template={id} aria-pressed={template === id} disabled={busy}
               className={`ya-tool xhs-option ${template === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange(withTemplate(options, id))}>{t(`cards.template.${id}` as MsgKey)}</button>
           ))}
+          {PUBLIC_CARD_TEMPLATES.map((item) => {
+            const runtime = publicCardTemplateRuntimeId(item.id)
+            const ready = loadedPublic.has(runtime)
+            return (
+              <button key={runtime} data-card-template={runtime} data-card-template-public={item.id}
+                aria-pressed={template === runtime} disabled={busy || !ready}
+                title={ready ? item.reference : t('cards.publicTemplatesLoading')}
+                className={`ya-tool xhs-option ${template === runtime ? 'ya-selected' : ''}`}
+                onClick={() => onOptionsChange(withTemplate(options, runtime))}>
+                {item.name}
+                <span className="ml-1 rounded bg-brand-100 px-1 text-[9px] font-medium text-brand">{t('cards.templatePublic')}</span>
+              </button>
+            )
+          })}
           {templates.templates.map((item) => (
             <button key={item.template} data-card-template={item.template} data-card-template-custom="true"
               aria-pressed={template === item.template} disabled={busy}
@@ -57,6 +77,16 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
             </button>
           ))}
         </div>
+        {templates.publicLoading ? (
+          <p data-public-card-loading className="mt-2 text-[11px] text-ink-3" role="status">
+            {t('cards.publicTemplatesLoading')}
+          </p>
+        ) : null}
+        {templates.publicError ? (
+          <p data-public-card-error className="mt-2 text-[11px] text-error-700" role="status">
+            {t('cards.publicTemplatesFailed')}
+          </p>
+        ) : null}
       </div>
 
       <CardTemplatesSection state={templates} selected={template} onUploaded={onTemplateUploaded} onDeleted={onTemplateDeleted} />

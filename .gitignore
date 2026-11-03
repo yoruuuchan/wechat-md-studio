@@ -14,6 +14,9 @@ data/
 # theme verification output
 verify-out/
 
+# generated public card-template archives
+public/card-templates/
+
 # worker local secrets
 mopai-worker/.dev.vars
 mopai-worker/node_modules/

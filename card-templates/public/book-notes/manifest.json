@@ -27,7 +27,7 @@
     "coverSmallScale": 0.84
   },
   "fonts": [
-    { "source": "builtin", "family": "Noto Serif SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Zhuque Fangsong", "weights": [400] },
     { "source": "builtin", "family": "Noto Sans SC", "weights": [400] },
     { "source": "builtin", "family": "Geist Mono", "weights": [400] }
   ],

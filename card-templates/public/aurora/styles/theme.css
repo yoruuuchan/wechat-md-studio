@@ -105,7 +105,7 @@
   letter-spacing: -0.02em;
 }
 
-.cover-subtitle {
+.xhs-cover .cover-subtitle {
   max-width: 100%;
   color: var(--muted);
   font-family: "Noto Sans SC", sans-serif;

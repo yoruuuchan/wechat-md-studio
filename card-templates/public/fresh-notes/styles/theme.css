@@ -106,7 +106,7 @@
   letter-spacing: -0.015em;
 }
 
-.cover-subtitle {
+.xhs-cover .cover-subtitle {
   max-width: 100%;
   color: var(--muted);
   font-size: 14px;

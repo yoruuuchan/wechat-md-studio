@@ -4,7 +4,7 @@
 LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07
-- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。2026-11-03 增加 DOMPurify 3.4.17，按双许可择一 Apache-2.0，与 AGPL-3.0-or-later 兼容。
+- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。2026-11-03 增加 DOMPurify 3.4.17，按双许可择一 Apache-2.0，与 AGPL-3.0-or-later 兼容。2026-11-04 增加九套公用卡片模板的三个上游（XHS-TextCard、uhhc/md2card、haodongcui/md2card，均 MIT），XHS-TextCard 的 NOTICE 一并保留。
 - **抓取方式**：从本地 shallow clone（`git clone --depth 1`）逐字复制 LICENSE 文件，未经任何修改、截断或重新排版。
 - **结构化数据**：[credits.ts](../src/lib/credits.ts) 是来源与使用性质的统一事实源，[References](https://wechat.yoru-and-akari.dev/references) 直接读它；[README](../README.md) 只保留入口。本文件保存许可证副本、核实时间、commit 与摘要；主题来源另见 [THEME-SOURCES](../THEME-SOURCES.md)。
 
@@ -27,6 +27,10 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | `caol64-wenyan-ui-LICENSE.txt` | github.com/caol64/wenyan-ui | Apache-2.0 | 同上（package.json `author`: `Lei <caol64@gmail.com>`） | `d5426c5`（2026-04-28） | `d229da563da18fe5d58cd95a6467d584` |
 | `caol64-wenyan-LICENSE.txt` | github.com/caol64/wenyan | Apache-2.0 | 同上 | `eeb8d4f`（2026-04-29） | `d229da563da18fe5d58cd95a6467d584` |
 | `foolgry-editor-LICENSE.txt` | github.com/foolgry/editor | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `ab95fbe`（2026-09-15） | `402e260d672920057369ceeaf718f6a2` |
+| `geekfoxcharlie-XHS-TextCard-LICENSE.txt` | github.com/geekfoxcharlie/XHS-TextCard | MIT | `Copyright (c) 2026 geekfoxcharlie` | GitHub `main` 原始文件（2026-11-04 下载） | `fb73776dc386813eda06f529e3579891` |
+| `geekfoxcharlie-XHS-TextCard-NOTICE.txt` | github.com/geekfoxcharlie/XHS-TextCard | 上游 NOTICE（随 MIT 一起保留） | 版权与项目归属见文件正文 | 同上（2026-11-04 下载） | `2f00cab755d8215e470f4edcff6d55ef` |
+| `uhhc-md2card-LICENSE.txt` | github.com/uhhc/md2card | MIT | `Copyright (c) 2026 uhhc` | GitHub `master` 原始文件（2026-11-04 下载） | `22dbb0479ee96e2e6578b3f41d5f6b74` |
+| `haodongcui-md2card-LICENSE.txt` | github.com/haodongcui/md2card | MIT | `Copyright (c) 2026 Haodong Cui` | GitHub `main` 原始文件（2026-11-04 下载） | `59e3fee7a861aaf53771a80810866201` |
 
 ### 三点需要特别说明
 
@@ -50,10 +54,15 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
    （而不只是像现在这样借鉴思路后自己重写），必须在发行物里保留 LICENSE 全文和版权声明，
    并说明我们改动了哪些文件。本目录的副本就是为履行这个义务准备的。
 
+4. **XHS-TextCard 的 NOTICE 另行保留。** 九套公用卡片模板中的六套参考其 JSON 配置，但没有复制
+   封面 jpg、示例照片、贴纸或图标，也没有复制 Canvas / 渲染代码；按 MIT 保留 LICENSE 原文，并保留
+   上游 NOTICE 中对项目与官方托管版的说明。uhhc/md2card 与 haodongcui/md2card 同样只借配色、
+   字体搭配、间距和版式思路，成品在 `card-templates/public/` 按 Reed 的 slot 结构重写。
+
 ### 许可传染性结论
 
 <!-- BEGIN GENERATED: notice-license-tally — npm run sync:docs -->
-**11个上游项目全部是宽松许可：MIT × 7、Apache-2.0 × 3、WTFPL v2 × 1。
+**15个上游项目全部是宽松许可：MIT × 10、Apache-2.0 × 4、WTFPL v2 × 1。
 没有任何 GPL / LGPL / AGPL / MPL / SSPL / BUSL 等 copyleft 或 source-available 许可，
 也没有任何项目缺失 LICENSE 文件。**
 <!-- END GENERATED: notice-license-tally -->
@@ -81,6 +90,9 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | caol64/wenyan-core | 适配 | MathJax SVG 公式（`mathjax-full` + `liteAdaptor` + `fontCache:'none'`，让 SVG 自带 path）已落在 `src/lib/math.ts`，配置路线与上游 `mathjaxParser.ts` 一致，公众号端行为 2026-10-07 实粘验证过。上游的微信 HTML 清洗规则实测下来不必要（MathJax 原样输出就能存活），已记为未采用。 |
 | caol64/wenyan-ui | 参考 | 「注入点」而不是继承的宿主/UI 边界划法（`setContext`/`getContext` 对 + 网页版降级默认值）。 |
 | caol64/wenyan | 参考 | 宿主侧一次性接线写法（`setHooks.ts` 集中注册 Swift 桥实现）。 |
+| XHS-TextCard | 适配 | 六套公用卡片模板（Swiss Grid / Editorial White / Book Notes / Aurora / Deep Night / Doc Frame）参考 JSON 的配色、字体搭配、间距和版式；成品按 Reed 的封面 / 正文 / 结尾 slot 重写，不带 jpg、照片、贴纸和图标。 |
+| md2card（uhhc） | 适配 | Tech Pulse 与 Fresh Notes 两套公用模板参考主题对象的配色、字体配对与卡片间距，在 `card-templates/public/` 重写。 |
+| md2card（Haodong Cui） | 适配 | Pine Notebook / 雾松笔记参考 notebook.css 的色阶、层级间距和圆角标记，在 `card-templates/public/` 重写。 |
 | foolgry/editor | 适配 | Agent→Web 接入。Skill 工程写法（`.env` 约定、幂等 `set-token`、「不预检直接调、报错再配」、报错自带自助入口、全局同步时排除 `.env`）已落在 `skills/wechat-typesetter/`；令牌模型（只存摘要、软吊销、校验失败不降级为匿名、401 带 hint）已落在 `api/lib/agent-auth.ts` + `api/agent-router.ts`。乐观锁我们从「比对 updatedAt」改成内容 sha256，理由记在 `credits.ts` 的 declined 里。 |
 
 分类以 `src/lib/credits.ts` 的 `usage` 字段为准；本表是它的人读版本，两边不一致时改数据文件。
@@ -132,6 +144,10 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 |---|---|---|---|
 | [woodti/mopai](https://github.com/woodti/mopai) | MIT | `Copyright (c) 2026 woodti` | `LICENSES/woodti-mopai-LICENSE.txt` |
 | [html-to-image](https://github.com/bubkoo/html-to-image) | MIT | `Copyright (c) 2017-2025 W.Y.` | `LICENSES/html-to-image-LICENSE.txt` |
+| [DOMPurify](https://github.com/cure53/DOMPurify) | Apache-2.0 | `Cure53 and DOMPurify contributors` | `LICENSES/dompurify-LICENSE.txt` |
+| [XHS-TextCard](https://github.com/geekfoxcharlie/XHS-TextCard) | MIT | `Copyright (c) 2026 geekfoxcharlie` | `LICENSES/geekfoxcharlie-XHS-TextCard-LICENSE.txt` |
+| [md2card（uhhc）](https://github.com/uhhc/md2card) | MIT | `Copyright (c) 2026 uhhc` | `LICENSES/uhhc-md2card-LICENSE.txt` |
+| [md2card（Haodong Cui）](https://github.com/haodongcui/md2card) | MIT | `Copyright (c) 2026 Haodong Cui` | `LICENSES/haodongcui-md2card-LICENSE.txt` |
 | [JSZip](https://github.com/Stuk/jszip) | MIT | `Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso` | `LICENSES/jszip-LICENSE.markdown` |
 | [md-wechat](https://github.com/laogou717/md-wechat) | MIT | `Copyright (c) 2026 字间排版` | `LICENSES/laogou717-md-wechat-LICENSE.txt` |
 | [doocs/md](https://github.com/doocs/md) | WTFPL v2 | `Copyright (C) 2025 Doocs <admin@doocs.org>` | `LICENSES/doocs-md-LICENSE.txt` |
@@ -142,14 +158,16 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | [wenyan](https://github.com/caol64/wenyan) | Apache-2.0 | `标准 Apache 2.0 附录，未填写具体版权人（package.json author: Lei <caol64@gmail.com>）` | `LICENSES/caol64-wenyan-LICENSE.txt` |
 | [editor（foolgry）](https://github.com/foolgry/editor) | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `LICENSES/foolgry-editor-LICENSE.txt` |
 
-11 个上游全部是宽松许可：MIT × 7、Apache-2.0 × 3、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
+15 个上游全部是宽松许可：MIT × 10、Apache-2.0 × 4、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
 
-4 点需要留意：
+6 点需要留意：
 
-1. **[JSZip](https://github.com/Stuk/jszip)**：包声明为 (MIT OR GPL-3.0-or-later) 双许可；本项目选择 MIT。保留上游 LICENSE.markdown 全文，其中包含两个可选许可。
-2. **[doocs/md](https://github.com/doocs/md)**：LICENSE 正文是「DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004」，版权行 Copyright (C) 2025 Doocs <admin@doocs.org>。这是极度宽松的类公有领域许可，没有传染性，但 SPDX 标识符不是 MIT，且许可证名称含粗口——本项目的口径是照实写出它的真实名称 WTFPL v2，不做改写。
-3. **[wenyan-core](https://github.com/caol64/wenyan-core)**：Apache-2.0 带专利授权条款和 NOTICE 义务：如果我们将来直接复制它的代码（而不只是借鉴思路），必须在发行物里保留 LICENSE 全文与版权声明，并注明我们改动了哪些文件。LICENSES/ 下的副本就是为这个义务准备的。wenyan、wenyan-core、wenyan-ui 三个仓库的 LICENSE 文件字节完全相同（md5 d229da563da18fe5d58cd95a6467d584），许可一致。
-4. **[editor（foolgry）](https://github.com/foolgry/editor)**：LICENSE 的版权行是「Copyright (c) 2024 花生 (alchaincyf)」，与 alchaincyf/huasheng_editor 的 LICENSE 字节相同——因为本仓库 README 第 13 行明说它 fork 自 huasheng_editor，LICENSE 原样继承。foolgry 自己新增的部分（分享服务、Go 后端、Mermaid、Skill）没有单独的版权行，沿用同一份 MIT 条款。致谢里应当同时点出 fork 关系和原始版权人。
+1. **[DOMPurify](https://github.com/cure53/DOMPurify)**：包声明为 (MPL-2.0 OR Apache-2.0) 双许可；本项目选择 Apache-2.0，与 AGPL-3.0-or-later 兼容，并按 Apache-2.0 保留许可证全文。
+2. **[XHS-TextCard](https://github.com/geekfoxcharlie/XHS-TextCard)**：同时保留上游 NOTICE（LICENSES/geekfoxcharlie-XHS-TextCard-NOTICE.txt）：修改再分发时保留许可与合理署名。
+3. **[JSZip](https://github.com/Stuk/jszip)**：包声明为 (MIT OR GPL-3.0-or-later) 双许可；本项目选择 MIT。保留上游 LICENSE.markdown 全文，其中包含两个可选许可。
+4. **[doocs/md](https://github.com/doocs/md)**：LICENSE 正文是「DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004」，版权行 Copyright (C) 2025 Doocs <admin@doocs.org>。这是极度宽松的类公有领域许可，没有传染性，但 SPDX 标识符不是 MIT，且许可证名称含粗口——本项目的口径是照实写出它的真实名称 WTFPL v2，不做改写。
+5. **[wenyan-core](https://github.com/caol64/wenyan-core)**：Apache-2.0 带专利授权条款和 NOTICE 义务：如果我们将来直接复制它的代码（而不只是借鉴思路），必须在发行物里保留 LICENSE 全文与版权声明，并注明我们改动了哪些文件。LICENSES/ 下的副本就是为这个义务准备的。wenyan、wenyan-core、wenyan-ui 三个仓库的 LICENSE 文件字节完全相同（md5 d229da563da18fe5d58cd95a6467d584），许可一致。
+6. **[editor（foolgry）](https://github.com/foolgry/editor)**：LICENSE 的版权行是「Copyright (c) 2024 花生 (alchaincyf)」，与 alchaincyf/huasheng_editor 的 LICENSE 字节相同——因为本仓库 README 第 13 行明说它 fork 自 huasheng_editor，LICENSE 原样继承。foolgry 自己新增的部分（分享服务、Go 后端、Mermaid、Skill）没有单独的版权行，沿用同一份 MIT 条款。致谢里应当同时点出 fork 关系和原始版权人。
 
 ### 移植（ported）
 
@@ -158,6 +176,10 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 **[html-to-image](https://github.com/bubkoo/html-to-image)**（MIT，W.Y. (bubkoo)）
 
 - 运行时依赖 html-to-image，锁定 1.11.13；仅在卡片导出时按需加载。使用 toBlob 将卡片 DOM 渲染为 1080px 宽 PNG，并传入内嵌 Noto Sans SC / Geist / Geist Mono 的 fontEmbedCSS。
+
+**[DOMPurify](https://github.com/cure53/DOMPurify)**（Apache-2.0，Cure53 and contributors）
+
+- 运行时依赖 dompurify 3.4.17，用于上传的卡片模板 HTML 白名单过滤；模板里的 script、事件属性、iframe / form / foreignObject 与外部 URL 都在进入 DOM 前被拒绝。
 
 **[JSZip](https://github.com/Stuk/jszip)**（MIT，Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso）
 
@@ -199,6 +221,31 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - marked Markdown 解析与独立的主题 / 设置体系。Reed 已有语义 AST 和文章主题，只增加卡片呈现；现有 mopai.* 存储键与 woodti/mopai 无关。
 - skipFonts: true 的导出设置。该设置会令 PNG 中的中文丢失网页字体。
+
+**[XHS-TextCard](https://github.com/geekfoxcharlie/XHS-TextCard)**（MIT，geekfoxcharlie）
+
+- 六套公用卡片模板（Swiss Grid / Editorial White / Book Notes / Aurora / Deep Night / Doc Frame）参考 templates/swiss-studio.json、minimalist-magazine.json、elegant-book.json、aura-gradient.json、deep-night.json、pro-doc.json 的配色、字体搭配、间距和版式思路；在 card-templates/public/ 按 Reed 的封面、正文、结尾 slot 结构重写。
+
+**没采用**：
+
+- 上游 JSON 里的 coverImage（jpg 预览封面）、示例照片、贴纸和图标一律没有带入；所有装饰只用 CSS 渐变、线条、色块和圆角绘制。
+- 没有复制上游的 Canvas / 渲染代码，也没有使用其字体文件；成品只引用 Reed 已内置的字体，并走与用户上传完全相同的 .reedcard 解析和安全检查。
+
+**[md2card（uhhc）](https://github.com/uhhc/md2card)**（MIT，uhhc）
+
+- 两套公用卡片模板参考 src/lib/themes/tech-pulse.ts 与 fresh-notes.ts 的配色、标题与正文字体配对、卡片内边距和圆角；Tech Pulse 与 Fresh Notes 的封面、正文、结尾均在 card-templates/public/ 中按 Reed 结构重写。
+
+**没采用**：
+
+- 没有复制上游主题对象的渲染代码；源里引用的 Fira Code / 其他未随 Reed 内置的字体没有打包，改用现有 Noto Sans SC、Space Grotesk、Caveat 与 Geist Mono。
+
+**[md2card（Haodong Cui）](https://github.com/haodongcui/md2card)**（MIT，Haodong Cui）
+
+- 一套公用卡片模板（Pine Notebook / 雾松笔记）参考 src/styles/cards/themes/notebook.css 的松绿 / 雾白色阶、层级间距、圆角标题标记和浅深两版思路；在 card-templates/public/pine-notebook/ 用自己的 CSS 重写。
+
+**没采用**：
+
+- 没有复制上游的页面结构、示例素材或代码；封面装饰只用 CSS 色块与渐变。
 
 **[doocs/md](https://github.com/doocs/md)**（WTFPL，Doocs <admin@doocs.org>）
 

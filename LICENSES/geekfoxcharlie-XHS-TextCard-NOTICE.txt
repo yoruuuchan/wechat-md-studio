@@ -1,0 +1,18 @@
+XHS-TextCard Open Source Edition
+
+Original project:
+https://github.com/geekfoxcharlie/XHS-TextCard
+
+Official hosted version:
+https://xhs-textcard.site/
+
+This repository contains the pure frontend, zero-backend open-source edition
+of XHS-TextCard. It runs locally in the browser and focuses on Markdown input,
+Canvas rendering, template customization, and image export.
+
+The official hosted version may include cloud-enhanced capabilities such as
+AI-assisted formatting, API access, Feishu automation, account/quota features,
+and other services that are not part of this open-source static edition.
+
+When distributing modified copies, please keep the license notice and preserve
+a reasonable attribution to the original project.

@@ -111,6 +111,53 @@ export const CREDITS: Credit[] = [
     ],
   },
   {
+    name: 'XHS-TextCard',
+    author: 'geekfoxcharlie',
+    repo: 'https://github.com/geekfoxcharlie/XHS-TextCard',
+    license: 'MIT',
+    licenseFile: 'geekfoxcharlie-XHS-TextCard-LICENSE.txt',
+    licenseCopyright: 'Copyright (c) 2026 geekfoxcharlie',
+    licenseNote: '同时保留上游 NOTICE（LICENSES/geekfoxcharlie-XHS-TextCard-NOTICE.txt）：修改再分发时保留许可与合理署名。',
+    usage: 'adapted',
+    borrowed: [
+      '六套公用卡片模板（Swiss Grid / Editorial White / Book Notes / Aurora / Deep Night / Doc Frame）参考 templates/swiss-studio.json、minimalist-magazine.json、elegant-book.json、aura-gradient.json、deep-night.json、pro-doc.json 的配色、字体搭配、间距和版式思路；在 card-templates/public/ 按 Reed 的封面、正文、结尾 slot 结构重写。',
+    ],
+    declined: [
+      '上游 JSON 里的 coverImage（jpg 预览封面）、示例照片、贴纸和图标一律没有带入；所有装饰只用 CSS 渐变、线条、色块和圆角绘制。',
+      '没有复制上游的 Canvas / 渲染代码，也没有使用其字体文件；成品只引用 Reed 已内置的字体，并走与用户上传完全相同的 .reedcard 解析和安全检查。',
+    ],
+  },
+  {
+    name: 'md2card（uhhc）',
+    author: 'uhhc',
+    repo: 'https://github.com/uhhc/md2card',
+    license: 'MIT',
+    licenseFile: 'uhhc-md2card-LICENSE.txt',
+    licenseCopyright: 'Copyright (c) 2026 uhhc',
+    usage: 'adapted',
+    borrowed: [
+      '两套公用卡片模板参考 src/lib/themes/tech-pulse.ts 与 fresh-notes.ts 的配色、标题与正文字体配对、卡片内边距和圆角；Tech Pulse 与 Fresh Notes 的封面、正文、结尾均在 card-templates/public/ 中按 Reed 结构重写。',
+    ],
+    declined: [
+      '没有复制上游主题对象的渲染代码；源里引用的 Fira Code / 其他未随 Reed 内置的字体没有打包，改用现有 Noto Sans SC、Space Grotesk、Caveat 与 Geist Mono。',
+    ],
+  },
+  {
+    name: 'md2card（Haodong Cui）',
+    author: 'Haodong Cui',
+    repo: 'https://github.com/haodongcui/md2card',
+    license: 'MIT',
+    licenseFile: 'haodongcui-md2card-LICENSE.txt',
+    licenseCopyright: 'Copyright (c) 2026 Haodong Cui',
+    usage: 'adapted',
+    borrowed: [
+      '一套公用卡片模板（Pine Notebook / 雾松笔记）参考 src/styles/cards/themes/notebook.css 的松绿 / 雾白色阶、层级间距、圆角标题标记和浅深两版思路；在 card-templates/public/pine-notebook/ 用自己的 CSS 重写。',
+    ],
+    declined: [
+      '没有复制上游的页面结构、示例素材或代码；封面装饰只用 CSS 色块与渐变。',
+    ],
+  },
+  {
     name: 'JSZip',
     author: 'Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso',
     repo: 'https://github.com/Stuk/jszip',

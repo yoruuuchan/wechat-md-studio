@@ -63,7 +63,7 @@
   letter-spacing: -0.025em;
 }
 
-.cover-subtitle {
+.xhs-cover .cover-subtitle {
   max-width: 82%;
   padding-top: 15px;
   border-top: 1px solid var(--line);
@@ -130,16 +130,6 @@
 
 .xhs-body p {
   margin: 0.95em 0;
-}
-
-.xhs-body > p:first-of-type::first-letter {
-  float: left;
-  margin: 0.04em 0.14em 0 0;
-  color: var(--accent);
-  font-family: "Noto Serif SC", serif;
-  font-size: 3.35em;
-  font-weight: 700;
-  line-height: 0.86;
 }
 
 .xhs-body h2 {

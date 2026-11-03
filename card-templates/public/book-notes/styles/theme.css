@@ -8,8 +8,8 @@
   --accent: #8c3a3a;
   --soft: #efe4d4;
   --cover-wash: linear-gradient(145deg, #fbf6ec 0%, #f3e8d8 58%, #f8f1e5 100%);
-  --display: "Noto Serif SC", "Songti SC", serif;
-  --body-font: "Noto Serif SC", "Songti SC", serif;
+  --display: "Zhuque Fangsong", "Songti SC", serif;
+  --body-font: "Zhuque Fangsong", "Songti SC", serif;
   --quote-bg: #f0e5d5;
   --quote-ink: #4a3a2d;
   --code-bg: #eadccb;
@@ -81,7 +81,7 @@
 
 .cover-top {
   color: var(--muted);
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
   font-size: 10px;
   letter-spacing: 0.16em;
 }
@@ -109,12 +109,12 @@
 
 .cover-copy h1 {
   max-width: 92%;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.18;
   letter-spacing: 0.015em;
 }
 
-.cover-subtitle {
+.xhs-cover .cover-subtitle {
   max-width: 84%;
   padding: 12px 0 0 16px;
   border-left: 2px solid var(--accent);
@@ -126,14 +126,14 @@
 .cover-foot {
   padding-top: 14px;
   border-top: 1px solid var(--line);
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
   font-size: 11px;
   letter-spacing: 0.08em;
 }
 
 .page-head {
   color: var(--muted);
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
   font-size: 10px;
   letter-spacing: 0.1em;
 }
@@ -161,7 +161,7 @@
 .page-foot {
   padding-top: 13px;
   border-top: 1px solid var(--line);
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
   font-size: 9px;
   letter-spacing: 0.08em;
 }
@@ -170,15 +170,6 @@
   font-size: 17px;
   line-height: 1.96;
   letter-spacing: 0.04em;
-}
-
-.xhs-body > p:first-of-type::first-letter {
-  float: left;
-  margin: 0.08em 0.16em 0 0;
-  color: var(--accent);
-  font-size: 2.6em;
-  font-weight: 700;
-  line-height: 0.9;
 }
 
 .xhs-body h2 {
@@ -216,7 +207,7 @@
   top: 5px;
   left: 8px;
   color: var(--accent);
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
   font-size: 31px;
   line-height: 1;
 }
@@ -311,7 +302,7 @@
 }
 
 .end-title {
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
   font-size: 48px;
   letter-spacing: 0.01em;
 }
@@ -325,5 +316,13 @@
 .end-meta {
   margin-top: 50px;
   border-top: 1px solid var(--line);
-  font-family: "Noto Serif SC", serif;
+  font-family: "Zhuque Fangsong", serif;
 }
+/* Zhuque Fangsong ships one genuine 400 face; keep synthesized bold out of PNG export. */
+.xhs-body h1,
+.xhs-body h2,
+.xhs-body h3,
+.xhs-body h4,
+.xhs-body th,
+.xhs-body strong { font-weight: 400; }
+.end-title { font-weight: 400; }

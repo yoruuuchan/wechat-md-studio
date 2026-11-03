@@ -112,6 +112,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { useEditorLayout } from '@/hooks/use-mobile'
 import { useCardTemplates } from '@/hooks/useCardTemplates'
 import { withTemplate, type CardOptions } from '@/lib/cards'
+import { isPublicCardTemplateId } from '@/lib/public-card-templates'
 import {
   DEFAULT_CARD_OPTIONS, loadCardOptions, reconcileCardOptions, saveCardOptions,
 } from '@/lib/card-options'
@@ -218,7 +219,7 @@ export default function EditorPage() {
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
   const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
   const [cardOptions, setCardOptions] = useState<CardOptions>(() => loadCardOptions() ?? DEFAULT_CARD_OPTIONS)
-  const cardTemplates = useCardTemplates()
+  const cardTemplates = useCardTemplates({ loadPublic: previewMode === 'cards' })
   const [cardsStatus, setCardsStatus] = useState<CardsStatus>({
     ready: false, busy: false, total: 0, failed: false, error: false, progress: { done: 0, total: 0 },
   })
@@ -323,11 +324,24 @@ export default function EditorPage() {
   // Wait until uploaded templates are registered before deciding whether the
   // remembered id still exists; a package that is gone (deleted here or not yet
   // synced) returns the selection to Reed.
+  //
+  // A remembered public template is loaded lazily with card mode. In the WeChat
+  // mode its id is still valid, so leave the preference alone rather than
+  // treating "not fetched yet" as "removed".
   useEffect(() => {
     if (cardTemplates.loading) return
-    const available = new Set(cardTemplates.templates.map((item) => item.template))
+    if (isPublicCardTemplateId(cardOptions.template) &&
+      (cardTemplates.publicLoading ||
+        (!cardTemplates.publicError && cardTemplates.publicTemplates.length === 0))) return
+    const available = new Set([
+      ...cardTemplates.templates.map((item) => item.template),
+      ...cardTemplates.publicTemplates.map((item) => item.template),
+    ])
     setCardOptions((current) => reconcileCardOptions(current, available))
-  }, [cardTemplates.loading, cardTemplates.templates])
+  }, [
+    cardTemplates.loading, cardTemplates.templates, cardTemplates.publicLoading,
+    cardTemplates.publicTemplates, cardTemplates.publicError, cardOptions.template,
+  ])
 
   // First visit only: let the panes settle, then auto-start the tour. The tour
   // points at the three-column furniture, so it only auto-starts on the wide

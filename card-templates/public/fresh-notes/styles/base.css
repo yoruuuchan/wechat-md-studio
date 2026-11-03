@@ -91,7 +91,7 @@
   text-wrap: balance;
 }
 
-.cover-subtitle {
+.xhs-cover .cover-subtitle {
   margin: 0;
   max-width: 92%;
   color: var(--muted);

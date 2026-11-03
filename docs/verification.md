@@ -36,6 +36,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 |---|---|---|
 | 小红书卡片 | `node scripts/cdp-verify-xhs-cards.mjs 3201 9334` | SAMPLE_DOC / 中文长文、右栏「模板」里的三比例 × 默认模板五背景、默认模板 × 各自变体的封面 + 前两页导出与像素对比（3:4）、封面标题 / 副标题 / 第 3 页正文对比度、PNG 尺寸与 ZIP 张数、明暗 / 中英界面、图片读取失败、卡片视图下改稿时卡片与阅读位置保持、CDP 实际字体；本地 mock 图床、独立 `data/test-xhs.db`，证据在 `verify-out/xhs/`，模板小样在 `verify-out/templates/` |
 | 上传卡片模板 | `node scripts/cdp-verify-card-template-upload.mjs 3281 9398 [输出目录]` | 只用仓库里的示例模板：`.reedcard` 打包、空 / 有内容两态、多文件上传（含坏包逐项拒绝）、上传后进入选择器与「我的模板」、选中渲染、单张 PNG 与整包 ZIP、预览 DOM / PNG 像素一致、刷新后仍在、恶意包被拒绝并显示提示、删除及刷新后不再出现；站长登录后自动上云、全新浏览器 profile 登录后自动下载、登录删除两边消失、访客看不到同步；`data/test-card-template.db` 与本地 mock 图床，证据默认在 `verify-out/card-template-upload/` |
+| 公用卡片模板 | `node scripts/cdp-verify-public-cards.mjs 3281 9398 [模板id,...]` | 九套公用模板全部经上传同款解析与激活；公众号模式不请求包、进入卡片模式才加载；逐个变体检查封面 / 正文 / 结尾页溢出、3:4 封面 + 正文导出、1:1 / 9:16 封面导出、DOM / PNG 像素一致（mean < 2、bad < 0.025）、封面标题墨色与标题 / 正文对比度；记住公用模板选择并在刷新后恢复；证据在 `verify-out/public-cards/` |
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
 | 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱 |
@@ -62,6 +63,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 [save-status](../scripts/cdp-verify-save-status.mjs)、
 [guest-save-guidance](../scripts/cdp-verify-guest-save-guidance.mjs)、
 [mobile-panes](../scripts/cdp-verify-mobile-panes.mjs)、
+[public-cards](../scripts/cdp-verify-public-cards.mjs)、
 [math-readiness](../scripts/cdp-verify-math-readiness.mjs)、
 [publish-preflight](../scripts/cdp-verify-publish-preflight.mjs)、
 [materials-states](../scripts/cdp-verify-materials-states.mjs)、

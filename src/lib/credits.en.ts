@@ -36,6 +36,32 @@ export const CREDITS_EN: Record<string, CreditTextEn> = {
       'Runtime dependency dompurify 3.4.17, used as the HTML whitelist filter for uploaded card templates. Scripts, event attributes, iframe / form / foreignObject and external URLs are rejected before any template markup reaches the DOM.',
     ],
   },
+  'https://github.com/geekfoxcharlie/XHS-TextCard': {
+    licenseNote: 'The upstream NOTICE is retained alongside the MIT license (LICENSES/geekfoxcharlie-XHS-TextCard-NOTICE.txt); modified redistributions keep the license and reasonable attribution.',
+    borrowed: [
+      'Six public card templates (Swiss Grid / Editorial White / Book Notes / Aurora / Deep Night / Doc Frame) draw on the palettes, font pairings, spacing and layout ideas in templates/swiss-studio.json, minimalist-magazine.json, elegant-book.json, aura-gradient.json, deep-night.json and pro-doc.json. They are reimplemented for Reed\'s cover / body / end slots under card-templates/public/.',
+    ],
+    declined: [
+      'The upstream coverImage JPEGs, sample photos, stickers and icons are not included; every decoration is drawn with CSS gradients, rules, colour blocks and radii.',
+      'No upstream Canvas / rendering code is copied, and no upstream font files are shipped. The finished templates use only Reed\'s bundled fonts and pass the exact same .reedcard parser and safety checks as user uploads.',
+    ],
+  },
+  'https://github.com/uhhc/md2card': {
+    borrowed: [
+      'Two public card templates draw on the palettes, heading / body font pairings, card padding and radii in src/lib/themes/tech-pulse.ts and fresh-notes.ts. Tech Pulse and Fresh Notes covers, body and end pages are rewritten for Reed under card-templates/public/.',
+    ],
+    declined: [
+      'No upstream theme-object rendering code is copied. Fira Code and other fonts that Reed does not bundle are not packaged; the templates use the existing Noto Sans SC, Space Grotesk, Caveat and Geist Mono faces.',
+    ],
+  },
+  'https://github.com/haodongcui/md2card': {
+    borrowed: [
+      'One public card template (Pine Notebook) draws on the pine / mist colour scale, hierarchy spacing, rounded heading markers and light / dark pair in src/styles/cards/themes/notebook.css; it is rewritten with our own CSS under card-templates/public/pine-notebook/.',
+    ],
+    declined: [
+      'No upstream page structure, sample assets or code is copied; cover decoration uses only CSS colour blocks and gradients.',
+    ],
+  },
   'https://github.com/Stuk/jszip': {
     licenseNote: 'The package offers (MIT OR GPL-3.0-or-later); this project chooses MIT. The complete upstream LICENSE.markdown is retained, including both alternatives.',
     borrowed: [

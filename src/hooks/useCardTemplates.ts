@@ -14,6 +14,9 @@ import { planCardTemplateSync, type LocalCardTemplateCandidate } from '@/lib/car
 import {
   deleteCardTemplateRecord, listCardTemplateRecords, saveCardTemplateRecord,
 } from '@/lib/card-template-store'
+import {
+  PUBLIC_CARD_TEMPLATES, isPublicCardTemplateId, publicCardTemplateInstanceId,
+} from '@/lib/public-card-templates'
 
 export interface CardTemplateUploadFailure {
   file: string
@@ -34,7 +37,11 @@ export type CardTemplateSyncState = 'idle' | 'syncing' | 'synced' | 'failed'
 
 export interface CardTemplateUpload {
   templates: CardTemplateSummary[]
+  /** Reed's own templates, loaded from `/card-templates/*.reedcard` in card mode. */
+  publicTemplates: CardTemplateSummary[]
   loading: boolean
+  publicLoading: boolean
+  publicError: CardTemplateError | null
   uploading: boolean
   error: CardTemplateError | null
   /** Every file in the last batch that could not be added, in picker order. */
@@ -48,6 +55,44 @@ export interface CardTemplateUpload {
   clearError: () => void
 }
 
+interface PublicLoadResult {
+  templates: CardTemplateSummary[]
+  error: CardTemplateError | null
+}
+
+let publicLoadPromise: Promise<PublicLoadResult> | null = null
+
+/**
+ * Fetch the nine public packages through the ordinary upload parser. The
+ * promise is module-level so two mounts (or a dev remount) cannot install the
+ * same stylesheet twice. A public instance gets a `public-*` record id, which
+ * `customTemplateId` turns into a runtime id distinct from every user upload.
+ */
+function loadPublicTemplates(): Promise<PublicLoadResult> {
+  if (publicLoadPromise) return publicLoadPromise
+  publicLoadPromise = (async () => {
+    const templates: CardTemplateSummary[] = []
+    let firstError: CardTemplateError | null = null
+    for (const item of PUBLIC_CARD_TEMPLATES) {
+      try {
+        const response = await fetch(item.pack, { cache: 'no-cache' })
+        if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
+        const raw = await response.arrayBuffer()
+        const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
+        if (record.parsed.manifest.id !== item.id) {
+          throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
+        }
+        const loaded = await activateCardTemplate(record)
+        templates.push(loaded.summary)
+      } catch (itemError) {
+        firstError ??= asError(itemError, 'unknown')
+      }
+    }
+    return { templates, error: firstError }
+  })()
+  return publicLoadPromise
+}
+
 function newId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
@@ -59,9 +104,13 @@ function asError(item: unknown, fallback: 'unknown' | 'storage' | 'cloud'): Card
   return new CardTemplateError(fallback, item instanceof Error ? item.message : String(item))
 }
 
-export function useCardTemplates(): CardTemplateUpload {
+export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTemplateUpload {
+  const { loadPublic = false } = options
   const [templates, setTemplates] = useState<CardTemplateSummary[]>([])
+  const [publicTemplates, setPublicTemplates] = useState<CardTemplateSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [publicLoading, setPublicLoading] = useState(false)
+  const [publicError, setPublicError] = useState<CardTemplateError | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<CardTemplateError | null>(null)
   const [failures, setFailures] = useState<CardTemplateUploadFailure[]>([])
@@ -71,7 +120,9 @@ export function useCardTemplates(): CardTemplateUpload {
   const syncing = useRef(false)
 
   const refresh = useCallback(() => {
-    setTemplates(loadedCardTemplateSummaries())
+    // The runtime registry is shared, but "My templates" must stay limited to
+    // the user's uploads; public packages have their own summary list.
+    setTemplates(loadedCardTemplateSummaries().filter((item) => !isPublicCardTemplateId(item.template)))
   }, [])
 
   useEffect(() => {
@@ -99,6 +150,19 @@ export function useCardTemplates(): CardTemplateUpload {
     })()
     return () => { alive = false }
   }, [refresh])
+
+  useEffect(() => {
+    if (!loadPublic) return
+    let alive = true
+    setPublicLoading(true)
+    void loadPublicTemplates().then((result) => {
+      if (!alive) return
+      setPublicTemplates(result.templates)
+      setPublicError(result.error)
+      setPublicLoading(false)
+    })
+    return () => { alive = false }
+  }, [loadPublic])
 
   /** Upload one local record and align its clock with the server's upload time. */
   const pushLocal = useCallback(async (record: CardTemplateSourceRecord): Promise<void> => {
@@ -243,7 +307,10 @@ export function useCardTemplates(): CardTemplateUpload {
 
   return {
     templates,
+    publicTemplates,
     loading,
+    publicLoading,
+    publicError,
     uploading,
     error,
     failures,

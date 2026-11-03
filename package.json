@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && esbuild api/boot.ts --platform=node --bundle --format=esm --loader:.md=text --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
+    "build": "npm run pack:public-cards && vite build && esbuild api/boot.ts --platform=node --bundle --format=esm --loader:.md=text --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "NODE_ENV=production node dist/boot.js",
@@ -17,6 +17,7 @@
     "import:themes": "esbuild scripts/themes/import.ts --bundle --platform=node --format=esm --external:esbuild --external:postcss --external:js-yaml --outfile=node_modules/.tmp/import-themes.mjs --log-level=warning && node node_modules/.tmp/import-themes.mjs",
     "format": "prettier --write .",
     "pack:template": "node scripts/cards/pack-template.mjs",
+    "pack:public-cards": "node scripts/cards/pack-public-templates.mjs",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

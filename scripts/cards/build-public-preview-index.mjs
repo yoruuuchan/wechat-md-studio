@@ -52,9 +52,10 @@ const rows = catalog.map((item, index) => {
   const source = SOURCES[item.id] ?? { file: '上游文件', repo: '未知', license: 'MIT' }
   const variants = (manifest.variants ?? []).map((variant) => {
     const pictures = ROLES.map(([ratio, role, label]) => {
-      const relative = path.join(item.id, variant.id, ratio, `${role}.png`).replace(/\\/g, '/')
-      if (!fs.existsSync(path.join(shotsDir, relative))) return ''
-      return `<figure class="shot"><a href="${html(relative)}" target="_blank" rel="noopener"><img src="${html(relative)}" alt="${html(item.name + ' ' + variant.name + ' ' + label)}" loading="lazy" /></a><figcaption>${html(label)}</figcaption></figure>`
+      const shotRelative = path.join(item.id, variant.id, ratio, `${role}.png`).replace(/\\/g, '/')
+      if (!fs.existsSync(path.join(shotsDir, shotRelative))) return ''
+      const href = path.relative(path.dirname(outPath), path.join(shotsDir, shotRelative)).replace(/\\/g, '/')
+      return `<figure class="shot"><a href="${html(href)}" target="_blank" rel="noopener"><img src="${html(href)}" alt="${html(item.name + ' ' + variant.name + ' ' + label)}" loading="lazy" /></a><figcaption>${html(label)}</figcaption></figure>`
     }).join('')
     return `<section class="variant"><div class="variant-head"><h3>${html(variant.name)} <span>${variant.dark ? '深色' : '浅色'}</span></h3></div><div class="shots">${pictures}</div></section>`
   }).join('')
