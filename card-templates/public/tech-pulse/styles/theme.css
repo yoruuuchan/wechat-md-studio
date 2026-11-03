@@ -82,6 +82,7 @@
 .tech-copy .cover-subtitle {
   max-width: 86%;
   margin: 0;
+  font-family: var(--body-font);
   padding-top: 15px;
   border-top: 1px solid var(--line);
   color: var(--muted);
@@ -92,6 +93,7 @@
 
 .tech-foot {
   display: flex;
+  font-family: var(--body-font);
   align-items: center;
   gap: 12px;
   margin-top: auto;
@@ -375,6 +377,7 @@
 
 .tech-end-author {
   margin: 24px 0 0;
+  font-family: var(--body-font);
   color: var(--muted);
   font-size: 15px;
   line-height: 1.6;
@@ -386,7 +389,7 @@
   padding-top: 13px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-family: "Geist Mono", "Space Grotesk", monospace;
+  font-family: "Geist Mono", "Space Grotesk", "Noto Sans SC", monospace;
   font-size: 13px;
   line-height: 1.5;
   letter-spacing: 0.08em;

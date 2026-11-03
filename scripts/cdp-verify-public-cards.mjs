@@ -26,16 +26,24 @@ const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'reed-public-cards-'))
 const checks = []
 const exceptions = []
 const consoleErrors = []
-const evidence = { output, checks, exports: [], pixels: [], coverTitles: [], contrast: [], textSizes: [], templates: [] }
+const evidence = { output, checks, exports: [], pixels: [], coverTitles: [], contrast: [], textSizes: [], fonts: [], templates: [] }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const check = (name, passed, detail) => {
   checks.push({ name, passed: Boolean(passed), detail })
   console.log(`[${passed ? 'PASS' : 'FAIL'}] ${name}${detail === undefined ? '' : ': ' + JSON.stringify(detail)}`)
 }
 
-const DRAFT = `# 把日常写成值得收藏的卡片：一份关于观察、记忆与缓慢记录的练习
+const FONT_PROBE = '芦苇卡片 Reed 2026 ，。！？「」——·'
 
-用一篇固定的测试稿，检验长标题、副标题、列表、引用与多页排版。
+const DRAFT = `---
+author: Reed
+---
+
+# 把日常写成值得收藏的卡片：一份关于观察、记忆与缓慢记录的练习
+
+用一篇固定的测试稿 Reed 2026，检验长标题、副标题、列表、引用与多页排版。
+
+${FONT_PROBE}
 
 ## 阅读从这里开始
 
@@ -89,6 +97,21 @@ const TEMPLATES = [
   { id: 'fresh-notes', variants: ['mint', 'peach'] },
   { id: 'pine-notebook', variants: ['pine', 'dusk'] },
 ].filter((item) => !process.argv[4] || process.argv[4].split(',').includes(item.id))
+
+/** The manifest is the only list a template is allowed to render with. */
+const manifestFontFamilies = new Map()
+function declaredFontFamilies(id) {
+  if (!manifestFontFamilies.has(id)) {
+    const manifest = JSON.parse(fs.readFileSync(path.join('card-templates/public', id, 'manifest.json'), 'utf8'))
+    manifestFontFamilies.set(id, manifest.fonts.map((font) => font.family))
+  }
+  return manifestFontFamilies.get(id)
+}
+/** Chrome reports a face's full name ("Noto Sans SC Bold"); the family is the prefix. */
+function declaredFamily(actual, families) {
+  return families.find((family) => actual === family ||
+    actual.startsWith(family + ' ') || actual.startsWith(family + ' (')) ?? null
+}
 
 async function freePort(value) {
   const server = net.createServer()
@@ -425,6 +448,83 @@ async function textSizeChecks(label, pageCount) {
   })
 }
 
+/**
+ * Ask Chrome which faces actually painted each visible direct-text node. CSS
+ * declarations are not evidence: a missing glyph or an undeclared family
+ * silently falls back to a system face, and `isCustomFont: false` exposes it.
+ */
+async function fontChecks(template, variant, pageIndex, role, label) {
+  const token = `fp-${template}-${pageIndex}`
+  const probe = await evaluate(`(() => {
+    const card = document.querySelector('[data-card-index="${pageIndex}"]');
+    if (!card) return { missing: true, elements: [] };
+    const frame = card.getBoundingClientRect();
+    const elements = [];
+    for (const el of card.querySelectorAll('*')) {
+      if (el.closest('[aria-hidden="true"]')) continue;
+      const direct = [...el.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join('');
+      if (!direct.trim()) continue;
+      const style = getComputedStyle(el);
+      if (style.display === 'none' || style.visibility !== 'visible' || Number.parseFloat(style.opacity) === 0) continue;
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      if (rect.right <= frame.left || rect.left >= frame.right || rect.bottom <= frame.top || rect.top >= frame.bottom) continue;
+      const id = '${token}-' + elements.length;
+      el.setAttribute('data-font-probe', id);
+      elements.push({
+        probe: id,
+        tag: el.tagName.toLowerCase(),
+        className: typeof el.className === 'string' ? el.className : '',
+        text: direct.trim().slice(0, 80),
+        fontFamily: style.fontFamily,
+        fontWeight: style.fontWeight,
+        fontSize: style.fontSize,
+      });
+    }
+    return { missing: false, elements };
+  })()`)
+  if (probe.missing) {
+    evidence.fonts.push({ label, role, page: pageIndex + 1, missing: true, failures: [{ text: 'card missing' }] })
+    check(`${label} ${role}: actual fonts are declared built-in faces`, false, { template, variant, page: role, failure: 'card missing' })
+    return
+  }
+  const families = declaredFontFamilies(template)
+  const used = new Set()
+  const failures = []
+  try {
+    const { root } = await send('DOM.getDocument', { depth: 0 }, sessionId)
+    for (const element of probe.elements) {
+      const { nodeId } = await send('DOM.querySelector', {
+        nodeId: root.nodeId, selector: `[data-font-probe="${element.probe}"]`,
+      }, sessionId)
+      if (!nodeId) {
+        failures.push({ ...element, actual: [], reason: 'element vanished before the font probe' })
+        continue
+      }
+      const { fonts } = await send('CSS.getPlatformFontsForNode', { nodeId }, sessionId)
+      const actual = fonts.map((font) => ({
+        familyName: font.familyName, isCustomFont: Boolean(font.isCustomFont), glyphCount: font.glyphCount,
+      }))
+      for (const font of actual) used.add(font.familyName)
+      const declared = actual.map((font) => declaredFamily(font.familyName, families))
+      if (!actual.length || actual.some((font) => !font.isCustomFont) || declared.some((family) => !family)) {
+        failures.push({ ...element, actual, declared })
+      }
+    }
+  } finally {
+    await evaluate(`document.querySelectorAll('[data-font-probe^="${token}-"]').forEach((el) => el.removeAttribute('data-font-probe'))`)
+  }
+  const passed = failures.length === 0
+  evidence.fonts.push({ label, role, page: pageIndex + 1, elements: probe.elements.length, actual: [...used], failures })
+  check(`${label}: ${role} page uses only declared built-in fonts`, passed, {
+    template, variant, page: role, elements: probe.elements.length,
+    failures: failures.map((failure) => ({
+      template, variant, page: role, element: failure.tag + (failure.className ? '.' + failure.className.split(/\s+/).join('.') : ''),
+      text: failure.text, actual: failure.actual, declared: failure.declared ?? null,
+    })),
+  })
+}
+
 async function creditChecks(label, pageCount) {
   const pages = await evaluate(`(() => {
     const cards = [...document.querySelectorAll('.xhs-card')];
@@ -495,7 +595,7 @@ try {
   })
   const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
   ;({ sessionId } = await send('Target.attachToTarget', { targetId, flatten: true }))
-  for (const domain of ['Page', 'Runtime', 'DOM']) await send(domain + '.enable', {}, sessionId)
+  for (const domain of ['Page', 'Runtime', 'DOM', 'CSS']) await send(domain + '.enable', {}, sessionId)
   await send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1100, deviceScaleFactor: 1, mobile: false }, sessionId)
   await send('Page.addScriptToEvaluateOnNewDocument', {
     source: `try {localStorage.setItem('mopai.onboarding.v1','done');localStorage.setItem('mopai.theme.v1','akari');localStorage.setItem('mopai.lang.v1','zh')}catch{}`,
@@ -522,6 +622,9 @@ try {
 
   await click('[data-card-ratio="3:4"]')
   await cardsReady()
+  check('font probe draft reaches the first body page with Chinese, Latin, digits and CJK punctuation',
+    await evaluate(`document.querySelector('[data-card-index="1"]')?.textContent?.includes(${JSON.stringify(FONT_PROBE)}) ?? false`),
+    FONT_PROBE)
 
   for (const [templateIndex, template] of TEMPLATES.entries()) {
     const runtime = `custom.public-${template.id}`
@@ -538,6 +641,9 @@ try {
       const bounds = await evaluate(boundsExpression)
       check(`${label}: every card fits`, bounds.count >= 3 && bounds.bad.length === 0 && !bounds.warning, bounds.bad.length ? bounds.bad : { pages: bounds.count })
       check(`${label}: cover + at least two body pages`, bounds.count >= 3, bounds.count)
+      await fontChecks(template.id, variant, 0, '3:4 cover', label)
+      await fontChecks(template.id, variant, 1, '3:4 body', label)
+      await fontChecks(template.id, variant, bounds.count - 1, '3:4 end', label)
 
       const coverDom = await nativeCardShot('[data-card-index="0"]', `${template.id}-${variant}-3x4-cover-dom`)
       const coverPng = await download('[data-card-export="0"]', `${template.id}-${variant}-3x4-cover`, '.png')
@@ -568,6 +674,7 @@ try {
         await click(`[data-card-ratio="${ratio}"]`)
         await cardsReady()
         const ratioPages = await evaluate(`document.querySelectorAll('.xhs-card').length`)
+        await fontChecks(template.id, variant, 0, `${ratio} cover`, `${label} ${ratio}`)
         await textSizeChecks(`${label} ${ratio}`, ratioPages)
         await creditChecks(`${label} ${ratio}`, ratioPages)
         const file = await download('[data-card-export="0"]', `${template.id}-${variant}-${ratio.replace(':', 'x')}-cover`, '.png')

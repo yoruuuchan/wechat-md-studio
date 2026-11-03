@@ -118,6 +118,7 @@
 .pine-copy .cover-subtitle {
   max-width: 90%;
   margin: 0;
+  font-family: var(--body-font);
   padding-top: 15px;
   border-top: 1px solid var(--page-line);
   color: var(--muted);
@@ -128,6 +129,7 @@
 
 .pine-foot {
   margin-top: auto;
+  font-family: var(--body-font);
   padding-top: 13px;
   border-top: 1px solid var(--page-line);
   color: var(--muted);
@@ -411,6 +413,7 @@
 
 .pine-end-author {
   margin: 32px 0 0;
+  font-family: var(--body-font);
   color: var(--muted);
   font-size: 16px;
   line-height: 32px;

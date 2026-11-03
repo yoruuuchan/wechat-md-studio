@@ -126,6 +126,7 @@
 .aurora-card .cover-subtitle {
   max-width: 100%;
   margin: 20px 0 0;
+  font-family: var(--body-font);
   padding-top: 16px;
   border-top: 1px solid var(--line);
   color: var(--muted);
@@ -136,6 +137,7 @@
 
 .aurora-foot {
   position: relative;
+  font-family: var(--body-font);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -375,6 +377,7 @@
 
 .aurora-end-author {
   position: relative;
+  font-family: var(--body-font);
   z-index: 2;
   align-self: stretch;
   max-width: 100%;

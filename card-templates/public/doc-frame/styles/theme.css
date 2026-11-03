@@ -89,12 +89,18 @@
 .doc-titlebox .cover-subtitle {
   max-width: 90%;
   margin: 0;
+  font-family: var(--body-font);
   padding: 4px 0 4px 14px;
   border-left: 4px solid var(--accent);
   color: var(--muted);
   font-size: 16px;
   line-height: 1.72;
   letter-spacing: 0.01em;
+}
+
+.doc-metatable,
+.doc-sign {
+  font-family: var(--display);
 }
 
 .doc-metatable {
