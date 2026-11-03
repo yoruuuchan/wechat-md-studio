@@ -1,0 +1,35 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "tech-pulse",
+  "name": "Tech Pulse · 科技脉冲",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 uhhc/md2card（MIT）",
+  "description": "改编自 uhhc/md2card 的 tech-pulse.ts（MIT）。深蓝到青灰的渐变、克制的技术网格和半透明信息块，适合 AI、产品与工程笔记。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "pulse", "name": "脉冲", "dark": true, "tokens": { "accent": "#63DDFF", "text": "#EAF7FF", "muted": "#B2CCE5" } }
+  ],
+  "metrics": {
+    "padX": 46,
+    "padTop": 100,
+    "padBottom": 72,
+    "contentWidth": 448,
+    "headerTop": 32,
+    "footerBottom": 28,
+    "coverInsetX": 46,
+    "coverInsetY": 64,
+    "coverFootBottom": 36,
+    "coverReserve": 186,
+    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Space Grotesk", "weights": [400, 500, 700] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

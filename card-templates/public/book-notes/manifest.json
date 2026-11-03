@@ -1,0 +1,36 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "book-notes",
+  "name": "Book Notes · 书页摘录",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 elegant-book.json（MIT）。暖白纸色、衬线正文和书脊式装订线的阅读笔记版式，适合摘录、书评与长文。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "cream", "name": "米纸", "dark": false, "tokens": { "accent": "#8C3A3A", "text": "#332A22", "muted": "#67584A" } },
+    { "id": "night", "name": "夜读", "dark": true, "tokens": { "accent": "#D9A06A", "text": "#EFE3D3", "muted": "#C6B6A2" } }
+  ],
+  "metrics": {
+    "padX": 50,
+    "padTop": 96,
+    "padBottom": 74,
+    "contentWidth": 440,
+    "headerTop": 30,
+    "footerBottom": 28,
+    "coverInsetX": 54,
+    "coverInsetY": 74,
+    "coverFootBottom": 42,
+    "coverReserve": 196,
+    "coverTitleSize": [60, 53, 46, 40, 34],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Serif SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

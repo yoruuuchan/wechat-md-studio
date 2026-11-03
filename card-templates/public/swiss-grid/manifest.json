@@ -1,0 +1,36 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "swiss-grid",
+  "name": "Swiss Grid · 瑞士秩序",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 swiss-studio.json（MIT）。瑞士平面风格的秩序感：严格左对齐、粗细分明的无衬线标题、橙色方形强调与克制的灰白页面。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "day", "name": "日光", "dark": false, "tokens": { "accent": "#E24A16", "text": "#171717", "muted": "#5B5B5B" } },
+    { "id": "ink", "name": "墨夜", "dark": true, "tokens": { "accent": "#FF6A33", "text": "#F4F1E9", "muted": "#C8C5BD" } }
+  ],
+  "metrics": {
+    "padX": 44,
+    "padTop": 88,
+    "padBottom": 66,
+    "contentWidth": 452,
+    "headerTop": 26,
+    "footerBottom": 24,
+    "coverInsetX": 46,
+    "coverInsetY": 58,
+    "coverFootBottom": 34,
+    "coverReserve": 176,
+    "coverTitleSize": [62, 54, 47, 40, 34],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

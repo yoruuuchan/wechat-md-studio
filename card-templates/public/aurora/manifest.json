@@ -1,0 +1,36 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "aurora",
+  "name": "Aurora · 柔光极光",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 aura-gradient.json（MIT）。只用 CSS 渐变和柔焦色块做出的弥散光背景，正文落在半透明纸片上，适合生活与创意记录。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "dawn", "name": "晨光", "dark": false, "tokens": { "accent": "#6556C9", "text": "#24232B", "muted": "#585467" } },
+    { "id": "dusk", "name": "暮色", "dark": true, "tokens": { "accent": "#C0B0FF", "text": "#F4F0FF", "muted": "#C8C2DA" } }
+  ],
+  "metrics": {
+    "padX": 42,
+    "padTop": 92,
+    "padBottom": 68,
+    "contentWidth": 456,
+    "headerTop": 28,
+    "footerBottom": 26,
+    "coverInsetX": 42,
+    "coverInsetY": 64,
+    "coverFootBottom": 38,
+    "coverReserve": 180,
+    "coverTitleSize": [60, 52, 45, 39, 33],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Space Grotesk", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

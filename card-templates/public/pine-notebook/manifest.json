@@ -1,0 +1,36 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "pine-notebook",
+  "name": "Pine Notebook · 雾松笔记",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 Haodong Cui/md2card（MIT）",
+  "description": "改编自 Haodong Cui/md2card 的 notebook.css（MIT）。松绿与雾白的分层纸面、圆角标题标记和安静的自然阅读节奏。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "pine", "name": "雾松", "dark": false, "tokens": { "accent": "#356C59", "text": "#18352A", "muted": "#506A5B" } },
+    { "id": "dusk", "name": "松夜", "dark": true, "tokens": { "accent": "#8FC9AD", "text": "#E8F1EB", "muted": "#B6C9BD" } }
+  ],
+  "metrics": {
+    "padX": 46,
+    "padTop": 94,
+    "padBottom": 70,
+    "contentWidth": 448,
+    "headerTop": 28,
+    "footerBottom": 26,
+    "coverInsetX": 46,
+    "coverInsetY": 64,
+    "coverFootBottom": 38,
+    "coverReserve": 184,
+    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Serif SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

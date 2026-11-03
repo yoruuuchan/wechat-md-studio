@@ -1,0 +1,239 @@
+.xhs-card {
+  --paper: #0c0d10;
+  --ink: #e7e3da;
+  --title-ink: #f7f4ed;
+  --body-ink: #ddd9d0;
+  --muted: #a9a59c;
+  --line: #34383e;
+  --accent: #8fb7c9;
+  --soft: #17191e;
+  --cover-wash:
+    radial-gradient(circle at 78% 6%, rgba(143, 183, 201, 0.12), transparent 34%),
+    linear-gradient(165deg, #111318 0%, #0b0c0f 68%, #101217 100%);
+  --display: "Noto Sans SC", "Geist", sans-serif;
+  --body-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --quote-bg: #15171c;
+  --quote-ink: #d7d3ca;
+  --code-bg: #1d2127;
+  --code-ink: #b8d4e0;
+  --mark-bg: #354a55;
+  --table-head: #181b21;
+  --code-block-bg: #12151a;
+  --code-block-ink: #d6e3ea;
+}
+
+.cover-wash {
+  background: var(--cover-wash);
+}
+
+.cover-shape {
+  display: block;
+  inset: 17px;
+  border: 1px solid var(--line);
+}
+
+.cover-top {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: "Geist Mono", "Noto Sans SC", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.cover-index {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.cover-date {
+  font-size: 9px;
+}
+
+.cover-copy {
+  gap: 20px;
+  padding: 36px 0 28px;
+}
+
+.cover-copy h1 {
+  max-width: 96%;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+}
+
+.cover-subtitle {
+  max-width: 86%;
+  padding-left: 14px;
+  border-left: 1px solid var(--accent);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.cover-foot {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-family: "Geist Mono", "Noto Sans SC", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.page-head {
+  color: var(--muted);
+  font-family: "Geist Mono", "Noto Sans SC", monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.page-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent 82%);
+}
+
+.page-head-title {
+  max-width: 74%;
+  color: var(--ink);
+}
+
+.page-head-no {
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.page-content {
+  padding-top: 5px;
+}
+
+.page-foot {
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 9px;
+}
+
+.xhs-body {
+  font-size: 17px;
+  line-height: 1.86;
+  letter-spacing: 0.02em;
+}
+
+.xhs-body h2 {
+  margin-top: 1.6em;
+  padding-left: 13px;
+  border-left: 2px solid var(--accent);
+  font-size: 1.24em;
+  line-height: 1.42;
+  letter-spacing: 0.01em;
+}
+
+.xhs-body h3 {
+  color: var(--accent);
+  font-size: 1.06em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.xhs-body strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.xhs-body blockquote {
+  padding: 15px 18px;
+  border-left: 2px solid var(--accent);
+  background: var(--quote-bg);
+}
+
+.xhs-body blockquote p {
+  color: var(--quote-ink);
+  font-size: 0.98em;
+}
+
+.xhs-body ul {
+  list-style-type: square;
+}
+
+.xhs-body li::marker {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.xhs-body th {
+  background: var(--table-head);
+  color: var(--title-ink);
+  font-weight: 700;
+}
+
+.xhs-body th,
+.xhs-body td {
+  border-color: var(--line);
+  padding: 9px 10px;
+}
+
+.xhs-body pre {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--code-block-bg);
+  color: var(--code-block-ink);
+}
+
+.xhs-body code {
+  color: var(--code-ink);
+}
+
+.xhs-body hr {
+  border-top: 1px solid var(--line);
+}
+
+.end-page {
+  padding-left: 52px;
+  padding-right: 52px;
+}
+
+.end-page::before {
+  content: "";
+  position: absolute;
+  inset: 17px;
+  border: 1px solid var(--line);
+}
+
+.end-shape {
+  top: 44px;
+  right: 44px;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+}
+
+.end-kicker {
+  width: 40px;
+  height: 1px;
+  margin-bottom: 34px;
+}
+
+.end-title {
+  font-size: 46px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.end-article {
+  max-width: 76%;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.end-meta {
+  margin-top: 52px;
+  border-top: 1px solid var(--line);
+  font-size: 9px;
+}

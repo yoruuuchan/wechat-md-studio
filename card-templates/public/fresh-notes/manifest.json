@@ -1,0 +1,36 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "fresh-notes",
+  "name": "Fresh Notes · 清爽手帐",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 uhhc/md2card（MIT）",
+  "description": "改编自 uhhc/md2card 的 fresh-notes.ts（MIT）。薄荷底、圆角便签和轻盈的清单排版，手帐感来自留白、色块与字距，不依赖贴纸素材。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "mint", "name": "薄荷", "dark": false, "tokens": { "accent": "#2F7D46", "text": "#224D2B", "muted": "#4F6F55" } },
+    { "id": "peach", "name": "蜜桃", "dark": false, "tokens": { "accent": "#B54D34", "text": "#4A2B23", "muted": "#77584E" } }
+  ],
+  "metrics": {
+    "padX": 44,
+    "padTop": 94,
+    "padBottom": 72,
+    "contentWidth": 452,
+    "headerTop": 28,
+    "footerBottom": 28,
+    "coverInsetX": 44,
+    "coverInsetY": 62,
+    "coverFootBottom": 38,
+    "coverReserve": 180,
+    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Caveat", "weights": [400] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

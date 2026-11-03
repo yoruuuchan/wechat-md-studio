@@ -1,11 +1,15 @@
 // Captures one fixed Markdown draft as card PNGs for every template variant and
 // supported ratio. Run only against a built `dist/`:
-//   node scripts/cards/capture-card-matrix.mjs --out <dir> [--templates a,b] [--mode builtin] [--append]
+//   node scripts/cards/capture-card-matrix.mjs --out <dir> [--templates a,b] [--mode builtin] [--append] [--profile preview]
 //
 // Batching: run one template per invocation so Chrome and the app are torn down
 // between templates. `--append` merges the new entries into an existing
 // manifest in `--out`, which is how a batched `--mode uploaded` capture is
 // assembled without redoing earlier templates.
+//
+// `--profile preview` keeps the public-template preview compact: every variant
+// gets 3:4 cover/body/end, plus a cover at 1:1 and 9:16. The default `matrix`
+// profile keeps the full ratio × role grid.
 //
 // It owns a fresh Chrome profile, a local mock image worker and the app's test
 // database. Baseline and converted-template directories are compared by
@@ -35,6 +39,7 @@ const onlyRatios = (arg('ratios', '') || '').split(',').filter(Boolean)
 const catalogPath = arg('catalog', '')
 const catalog = catalogPath ? JSON.parse(fs.readFileSync(catalogPath, 'utf8')) : []
 const append = args.includes('--append')
+const captureProfile = arg('profile', 'matrix')
 
 const TEMPLATES = ['reed']
 const VARIANTS = {
@@ -359,7 +364,7 @@ try {
           ['cover', 0],
           ['body', 1],
           ['end', state.count - 1],
-        ]
+        ].filter(([role]) => captureProfile !== 'preview' || ratio === '3:4' || role === 'cover')
         for (const [role, index] of roles) {
           const dir = path.join(out, row.id, variantId, ratio.replace(':', 'x'), role + '-download')
           const file = await download(`[data-card-export="${index}"]`, dir, '.png')

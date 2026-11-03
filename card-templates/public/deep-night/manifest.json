@@ -1,0 +1,35 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "deep-night",
+  "name": "Deep Night · 夜间研究",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 deep-night.json（MIT）。深夜阅读的沉浸暗色：低亮背景、温白正文和冰蓝强调，保留代码、引用与表格的层级。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "night", "name": "深夜", "dark": true, "tokens": { "accent": "#8FB7C9", "text": "#E7E3DA", "muted": "#A9A59C" } }
+  ],
+  "metrics": {
+    "padX": 42,
+    "padTop": 98,
+    "padBottom": 70,
+    "contentWidth": 456,
+    "headerTop": 30,
+    "footerBottom": 28,
+    "coverInsetX": 44,
+    "coverInsetY": 66,
+    "coverFootBottom": 36,
+    "coverReserve": 186,
+    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}

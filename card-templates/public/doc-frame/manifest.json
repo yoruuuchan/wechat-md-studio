@@ -1,0 +1,36 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "doc-frame",
+  "name": "Doc Frame · 文档结构",
+  "version": "1.0.0",
+  "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 pro-doc.json（MIT）。技术文档的清晰框架：编号标题、细边表格、蓝灰强调和可扫读的信息层级。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    { "id": "paper", "name": "纸灰", "dark": false, "tokens": { "accent": "#2457C5", "text": "#111827", "muted": "#4B5563" } },
+    { "id": "ink", "name": "墨蓝", "dark": true, "tokens": { "accent": "#8FAFFF", "text": "#E8EEF8", "muted": "#B3BFD2" } }
+  ],
+  "metrics": {
+    "padX": 40,
+    "padTop": 104,
+    "padBottom": 70,
+    "contentWidth": 460,
+    "headerTop": 34,
+    "footerBottom": 28,
+    "coverInsetX": 44,
+    "coverInsetY": 62,
+    "coverFootBottom": 34,
+    "coverReserve": 184,
+    "coverTitleSize": [58, 51, 45, 39, 33],
+    "coverSmallScale": 0.84
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Inter", "weights": [400, 600] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] }
+  ],
+  "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
+  "styles": ["styles/base.css", "styles/theme.css"]
+}
