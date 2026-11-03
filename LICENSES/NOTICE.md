@@ -4,7 +4,7 @@
 LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07
-- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。
+- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。2026-11-03 增加 DOMPurify 3.4.17，按双许可择一 Apache-2.0，与 AGPL-3.0-or-later 兼容。
 - **抓取方式**：从本地 shallow clone（`git clone --depth 1`）逐字复制 LICENSE 文件，未经任何修改、截断或重新排版。
 - **结构化数据**：[credits.ts](../src/lib/credits.ts) 是来源与使用性质的统一事实源，[References](https://wechat.yoru-and-akari.dev/references) 直接读它；[README](../README.md) 只保留入口。本文件保存许可证副本、核实时间、commit 与摘要；主题来源另见 [THEME-SOURCES](../THEME-SOURCES.md)。
 
@@ -18,6 +18,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | `woodti-mopai-LICENSE.txt` | github.com/woodti/mopai | MIT | `Copyright (c) 2026 woodti` | `0c2b2f8e983727da7c5b2b10fafb540c5ed70893`（2026-10-31 核实） | `bbb1ee83d5221d4efdc7c663f4944749` |
 | `html-to-image-LICENSE.txt` | github.com/bubkoo/html-to-image | MIT | `Copyright (c) 2017-2025 W.Y.` | npm `html-to-image@1.11.13`（2026-10-31 核实） | `3eeb2e7abce2370a4f5e29e4b46e28b0` |
 | `jszip-LICENSE.markdown` | github.com/Stuk/jszip | MIT（双许可择一） | `Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso` | npm `jszip@3.10.2`（2026-10-31 核实） | `28c4d6943c892a3c61ac2aaa5d781861` |
+| `dompurify-LICENSE.txt` | github.com/cure53/DOMPurify | Apache-2.0（MPL-2.0 / Apache-2.0 双许可，本项目选择 Apache-2.0） | 标准 Apache 2.0 附录；npm `author`: `Dr.-Ing. Mario Heiderich, Cure53 <mario@cure53.de>` | npm `dompurify@3.4.17`（2026-11-03 核实） | `3b83ef96387f14655fc854ddc3c6bd57` |
 | `doocs-md-LICENSE.txt` | github.com/doocs/md | **WTFPL**（DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004） | `Copyright (C) 2025 Doocs <admin@doocs.org>` | `a7c17fc`（2026-09-29） | `3bb7c32637627c1ab12bc7cd873b7aa0` |
 | `laogou717-md-wechat-LICENSE.txt` | github.com/laogou717/md-wechat | MIT | `Copyright (c) 2026 字间排版` | `8a21962`（2026-09-02） | `23972954ac1a477e76be78b98dfd25a2` |
 | `alchaincyf-huasheng_editor-LICENSE.txt` | github.com/alchaincyf/huasheng_editor | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `433819c`（2026-10-03） | `402e260d672920057369ceeaf718f6a2` |

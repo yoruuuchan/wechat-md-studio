@@ -98,6 +98,19 @@ export const CREDITS: Credit[] = [
     ],
   },
   {
+    name: 'DOMPurify',
+    author: 'Cure53 and contributors',
+    repo: 'https://github.com/cure53/DOMPurify',
+    license: 'Apache-2.0',
+    licenseFile: 'dompurify-LICENSE.txt',
+    licenseCopyright: 'Cure53 and DOMPurify contributors',
+    licenseNote: '包声明为 (MPL-2.0 OR Apache-2.0) 双许可；本项目选择 Apache-2.0，与 AGPL-3.0-or-later 兼容，并按 Apache-2.0 保留许可证全文。',
+    usage: 'ported',
+    borrowed: [
+      '运行时依赖 dompurify 3.4.17，用于上传的卡片模板 HTML 白名单过滤；模板里的 script、事件属性、iframe / form / foreignObject 与外部 URL 都在进入 DOM 前被拒绝。',
+    ],
+  },
+  {
     name: 'JSZip',
     author: 'Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso',
     repo: 'https://github.com/Stuk/jszip',

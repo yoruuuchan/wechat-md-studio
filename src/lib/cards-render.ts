@@ -3,7 +3,7 @@ import type { Doc, InlineSeg, ListBlock, SignatureConfig } from './types'
 import type { DiagramResolver, ImageResolver, MathResolver } from './render'
 import { esc } from './theme-kit'
 import { t } from './i18n'
-import { cardMetrics, type CardBackground, type CardTemplate } from './cards'
+import { cardMetrics, type CardBackground, type CardTemplateId } from './cards'
 
 function inline(segs: InlineSeg[]): string {
   return segs.map((seg) => {
@@ -32,7 +32,11 @@ function listHtml(list: ListBlock): string {
 export function renderCardArticle(doc: Doc, options: {
   source: string
   height: number
-  template: CardTemplate
+  template: CardTemplateId
+  /** CSS key for `data-template`; runtime metrics still come from `template`. */
+  renderTemplate?: string
+  /** Unique uploaded-template id used by the scoped stylesheet. */
+  templateSource?: string
   background: CardBackground
   accent: string
   dark: boolean
@@ -44,7 +48,8 @@ export function renderCardArticle(doc: Doc, options: {
   const root = document.createElement('section')
   const metrics = cardMetrics(options.template)
   root.className = 'xhs-body'
-  root.dataset.template = options.template
+  root.dataset.template = options.renderTemplate ?? options.template
+  if (options.templateSource) root.dataset.cardTemplateSource = options.templateSource
   root.dataset.variant = options.background
   root.style.width = `${metrics.contentWidth}px`
   root.style.setProperty('--xhs-accent', options.accent)

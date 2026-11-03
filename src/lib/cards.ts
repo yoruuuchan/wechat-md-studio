@@ -14,6 +14,7 @@ export const CARD_TEMPLATES = [
   'kunlun', 'rift', 'core', 'aozora', 'kihon', 'mayonaka',
 ] as const
 export type CardTemplate = typeof CARD_TEMPLATES[number]
+export type CardTemplateId = string
 
 export const CARD_TEMPLATE_VARIANTS = {
   reed: ['paper', 'white', 'grid', 'tint', 'night'],
@@ -30,15 +31,16 @@ export const CARD_TEMPLATE_VARIANTS = {
 
 /** Reed's original background ids, kept for callers that only speak old API. */
 export const CARD_BACKGROUNDS = CARD_TEMPLATE_VARIANTS.reed
-export type CardBackground = typeof CARD_TEMPLATE_VARIANTS[CardTemplate][number]
-export interface CardOptions { ratio: CardRatio; template: CardTemplate; background: CardBackground }
+export type CardBackground = string
+export interface CardOptions { ratio: CardRatio; template: CardTemplateId; background: CardBackground }
 
-export function templateVariants(template: CardTemplate): readonly CardBackground[] {
-  return CARD_TEMPLATE_VARIANTS[template]
+export function templateVariants(template: CardTemplateId): readonly CardBackground[] {
+  return customCardTemplateRuntime(template)?.variants.map((variant) => variant.id) ??
+    (CARD_TEMPLATE_VARIANTS as Record<string, readonly string[]>)[template] ?? []
 }
 
-export function defaultVariant(template: CardTemplate): CardBackground {
-  return CARD_TEMPLATE_VARIANTS[template][0]
+export function defaultVariant(template: CardTemplateId): CardBackground {
+  return templateVariants(template)[0] ?? 'paper'
 }
 
 /**
@@ -46,18 +48,20 @@ export function defaultVariant(template: CardTemplate): CardBackground {
  * ratio; switching to KIHON moves a 3:4 / 1:1 card to 9:16 instead of
  * squeezing the native portrait layout into a frame the system does not have.
  */
-export function templateRatios(template: CardTemplate): readonly CardRatio[] {
-  return template === 'kihon' ? ['9:16'] : ['3:4', '1:1', '9:16']
+export function templateRatios(template: CardTemplateId): readonly CardRatio[] {
+  return customCardTemplateRuntime(template)?.ratios ?? (template === 'kihon' ? ['9:16'] : ['3:4', '1:1', '9:16'])
 }
 
 /** Ratio and variant survive a template switch; the variant becomes the new first one. */
-export function withTemplate(options: CardOptions, template: CardTemplate): CardOptions {
+export function withTemplate(options: CardOptions, template: CardTemplateId): CardOptions {
   const ratio = templateRatios(template).includes(options.ratio) ? options.ratio : templateRatios(template)[0]
   return { ratio, template, background: defaultVariant(template) }
 }
 
 /** Ratios that must switch the whole card to dark paper. */
-export function isDarkVariant(template: CardTemplate, background: CardBackground): boolean {
+export function isDarkVariant(template: CardTemplateId, background: CardBackground): boolean {
+  const custom = customCardTemplateRuntime(template)
+  if (custom) return custom.variants.find((variant) => variant.id === background)?.dark ?? false
   return (template === 'reed' && background === 'night') ||
     (template === 'paper' && background === 'midnight') ||
     (template === 'console' && background === 'yoru') ||
@@ -82,8 +86,10 @@ const TEMPLATE_ACCENTS: Partial<Record<CardTemplate, Partial<Record<CardBackgrou
 }
 
 /** Reed keeps the article theme's accent; the design systems own their accent. */
-export function cardAccent(template: CardTemplate, background: CardBackground, fallback: string): string {
-  return TEMPLATE_ACCENTS[template]?.[background] ?? fallback
+export function cardAccent(template: CardTemplateId, background: CardBackground, fallback: string): string {
+  const custom = customCardTemplateRuntime(template)
+  if (custom) return custom.variants.find((variant) => variant.id === background)?.accent || fallback
+  return TEMPLATE_ACCENTS[template as CardTemplate]?.[background] ?? fallback
 }
 
 export interface CardMeasurements {
@@ -182,8 +188,8 @@ export const CARD_METRICS: Record<CardTemplate, CardMeasurements> = {
   },
 }
 
-export function cardMetrics(template: CardTemplate): CardMeasurements {
-  return CARD_METRICS[template]
+export function cardMetrics(template: CardTemplateId): CardMeasurements {
+  return customCardTemplateRuntime(template)?.metrics ?? CARD_METRICS[template as CardTemplate] ?? CARD_METRICS.reed
 }
 
 export interface CardFontFace {
@@ -253,6 +259,66 @@ export const CARD_TEMPLATE_FONTS: Record<CardTemplate, readonly CardFontFace[]> 
     { family: 'Noto Sans SC', weights: [400, 700] },
   ],
 }
+
+export interface CardTemplateVariantRuntime {
+  id: string
+  name: string
+  /** Fixed accent for this variant; empty means the article theme supplies it. */
+  accent?: string
+  dark: boolean
+}
+
+/**
+ * An uploaded template, flattened to the few measurements and font faces the
+ * shared pagination / cover fitter needs. Built-in templates never enter this
+ * map; their rows stay the single source for their pixel-identical output.
+ */
+export interface CardTemplateRuntime {
+  template: CardTemplateId
+  name: string
+  variants: readonly CardTemplateVariantRuntime[]
+  ratios: readonly CardRatio[]
+  metrics: CardMeasurements
+  fonts: readonly CardFontFace[]
+}
+
+const CUSTOM_TEMPLATE_RUNTIMES = new Map<CardTemplateId, CardTemplateRuntime>()
+
+export function isBuiltinCardTemplate(template: CardTemplateId): template is CardTemplate {
+  return (CARD_TEMPLATES as readonly string[]).includes(template)
+}
+
+export function registerCardTemplateRuntime(runtime: CardTemplateRuntime): void {
+  CUSTOM_TEMPLATE_RUNTIMES.set(runtime.template, runtime)
+}
+
+export function unregisterCardTemplateRuntime(template: CardTemplateId): void {
+  CUSTOM_TEMPLATE_RUNTIMES.delete(template)
+}
+
+export function customCardTemplateRuntime(template: CardTemplateId): CardTemplateRuntime | undefined {
+  return CUSTOM_TEMPLATE_RUNTIMES.get(template)
+}
+
+/** The face list shared by pagination preload and PNG embedding. */
+export function cardTemplateFonts(template: CardTemplateId): readonly CardFontFace[] {
+  return customCardTemplateRuntime(template)?.fonts ?? CARD_TEMPLATE_FONTS[template as CardTemplate] ?? []
+}
+
+/** The built-in families a manifest may reference by name. */
+export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = (() => {
+  const rows = new Map<string, { family: string; weights: number[]; styles: ('normal' | 'italic')[] }>()
+  for (const face of Object.values(CARD_TEMPLATE_FONTS).flat()) {
+    const found = rows.get(face.family)
+    if (!found) {
+      rows.set(face.family, { family: face.family, weights: [...face.weights], styles: [...(face.styles ?? ['normal'])] })
+    } else {
+      for (const weight of face.weights) if (!found.weights.includes(weight)) found.weights.push(weight)
+      for (const style of face.styles ?? ['normal']) if (!found.styles.includes(style)) found.styles.push(style)
+    }
+  }
+  return new Map([...rows].map(([family, face]) => [family, face]))
+})()
 
 /** The CSS files that declare the faces above. */
 export const CARD_FONT_SHEETS = [
@@ -386,12 +452,12 @@ function splitter(block: HTMLElement): Splitter | null {
  */
 export async function paginateCards(article: HTMLElement, options: {
   height: number
-  template?: CardTemplate
+  template?: CardTemplateId
   signal?: AbortSignal
   measure?: (page: HTMLElement) => number
 }): Promise<{ pages: CardPage[]; scaledBlocks: number }> {
   const { height, signal } = options
-  const template = options.template ?? (article.dataset.template as CardTemplate | undefined) ?? 'reed'
+  const template = options.template ?? article.dataset.template ?? 'reed'
   const metrics = cardMetrics(template)
   const measure = options.measure ?? ((el) => el.getBoundingClientRect().height)
   const maxHeight = height - metrics.padTop - metrics.padBottom
@@ -416,6 +482,12 @@ export async function paginateCards(article: HTMLElement, options: {
   host.style.cssText = 'position:fixed;left:-10000px;top:0;visibility:hidden;pointer-events:none'
   document.body.append(host)
   let scaledBlocks = 0
+  /**
+   * The hidden body is a clone of the article root, so it keeps the same
+   * `data-template` / `data-card-template-source` attributes and the variables
+   * declared on `.xhs-body`. Uploaded CSS is scoped to that attribute, which is
+   * what lets measurement and the preview resolve the same body rules.
+   */
   const newPage = () => {
     const el = article.cloneNode(false) as HTMLElement
     host.replaceChildren(el)
@@ -461,7 +533,7 @@ export async function paginateCards(article: HTMLElement, options: {
     host.append(article)
     if (document.fonts) {
       const text = article.textContent ?? ''
-      await Promise.all(CARD_TEMPLATE_FONTS[template].flatMap(({ family, weights, styles }) =>
+      await Promise.all(cardTemplateFonts(template).flatMap(({ family, weights, styles }) =>
         weights.flatMap((weight) => (styles ?? ['normal']).map((style) =>
           document.fonts.load(`${style === 'italic' ? 'italic ' : ''}${weight} 18px "${family}"`, text),
         )),
@@ -520,7 +592,7 @@ export async function paginateCards(article: HTMLElement, options: {
   }
 }
 
-export function coverTitleSize(title: string, height: number, template: CardTemplate = 'reed'): number {
+export function coverTitleSize(title: string, height: number, template: CardTemplateId = 'reed'): number {
   const n = Array.from(title).length
   const metrics = cardMetrics(template)
   const size = n <= 8 ? metrics.coverTitleSize[0] : n <= 14 ? metrics.coverTitleSize[1]

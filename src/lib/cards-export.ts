@@ -1,6 +1,15 @@
 // Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt.
-import { CARD_FONT_SHEETS, CARD_TEMPLATE_FONTS, CARD_WIDTH, type CardTemplate } from './cards'
+import {
+  CARD_FONT_SHEETS, CARD_TEMPLATE_FONTS, CARD_WIDTH, type CardFontFace, type CardTemplate, type CardTemplateId,
+} from './cards'
 import { t } from './i18n'
+
+/** Faces the embedder should keep, plus package faces that need no fetch. */
+export interface CardFontEmbedSpec {
+  faces: readonly CardFontFace[]
+  /** @font-face rules with data: URLs, built from the template archive. */
+  packageCss?: string
+}
 
 function blobDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -76,13 +85,20 @@ async function fontDataUrl(url: string): Promise<string> {
  * current card template for the actual glyphs instead, preserving
  * unicode-range and family ordering.
  */
-export async function cardFontCss(text: string, template: CardTemplate = 'reed'): Promise<string> {
-  const declared = CARD_TEMPLATE_FONTS[template]
+export async function cardFontCss(
+  text: string,
+  source: CardTemplateId | CardFontEmbedSpec = 'reed',
+): Promise<string> {
+  const spec: CardFontEmbedSpec = typeof source === 'string'
+    ? { faces: CARD_TEMPLATE_FONTS[source as CardTemplate] ?? [] }
+    : source
+  const declared = spec.faces
   const wanted = (family: string, weight: string, style: string) => declared.some((face) =>
     face.family === family &&
     face.weights.includes(Number(weight)) &&
     (face.styles ?? ['normal']).includes(style as 'normal' | 'italic'),
   )
+  if (!declared.length) return spec.packageCss ?? ''
   const rules = await Promise.all(CARD_FONT_SHEETS.map(async (path) => {
     const url = new URL(path, location.href)
     const response = await fetch(url)
@@ -100,7 +116,7 @@ export async function cardFontCss(text: string, template: CardTemplate = 'reed')
       return rule.replace(/url\([^)]+\)/, `url("${data}")`)
     }))
   }))
-  return rules.flat().filter(Boolean).join('\n')
+  return [...rules.flat().filter(Boolean), spec.packageCss ?? ''].filter(Boolean).join('\n')
 }
 
 const EXACT_FONT_SIZE = '--xhs-export-font-size'
@@ -145,7 +161,10 @@ async function toBlobWithExactFonts(
 }
 
 /** Freeze the cards, so editing or switching panes during ZIP export is safe. */
-export async function createCardExporter(nodes: HTMLElement[], template: CardTemplate = 'reed') {
+export async function createCardExporter(
+  nodes: HTMLElement[],
+  source: CardTemplateId | CardFontEmbedSpec = 'reed',
+) {
   const stage = document.createElement('div')
   stage.setAttribute('aria-hidden', 'true')
   stage.style.cssText = 'position:fixed;left:-100000px;top:0;pointer-events:none'
@@ -154,7 +173,7 @@ export async function createCardExporter(nodes: HTMLElement[], template: CardTem
   document.body.append(stage)
   markExactFontSizes(nodes, snapshots)
   try {
-    const fontEmbedCSS = await cardFontCss(stage.textContent ?? '', template)
+    const fontEmbedCSS = await cardFontCss(stage.textContent ?? '', source)
     await document.fonts.ready
     const { toBlob } = await import('html-to-image')
     return {

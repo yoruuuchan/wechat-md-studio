@@ -1,7 +1,8 @@
 # 小红书卡片
 
-在编辑页顶栏的模式入口切到「小红书卡片」，同一份 Markdown 会自动分页。卡片先在右栏「模板」标签里选模板：默认、铅字房（YORU Content）、纸本（PAPER）、灯与夜（yoru-and-akari Console）、昆仑（KUNLUN）、裂隙（RIFT）、core（霜纸/夜池）、青空（Aozora）、基本（KIHON）、真夜中（Mayonaka）；每套模板有自己的变体——默认是米白纸、纯白、方格本、主色浅底、夜读，铅字房是 Signal、Lab、Studio、Special，纸本是 Editorial、Analog、Midnight，灯与夜是 Akari、Yoru，昆仑是虚空、雪线，裂隙是深色、黎明，core 是霜纸、夜池，青空是昼、夜空，基本是银、玄，真夜中是午夜、日落。再选 3:4、1:1、9:16；KIHON 只有 9:16，选中它会自动切到 9:16 并禁用另外两种比例（按钮下方给一句提示）。每张下方的 PNG 按钮下载单张，顶栏的「导出全部 ZIP」下载整套。
-比例、模板与变体在本次编辑会话内保留，切换模板时变体自动换成新模板的第一个，切回公众号文章模式或调整窗口大小后继续沿用；刷新页面恢复默认。
+在编辑页顶栏的模式入口切到「小红书卡片」，同一份 Markdown 会自动分页。卡片先在右栏「模板」标签里选模板：默认、铅字房（YORU Content）、纸本（PAPER）、灯与夜（yoru-and-akari Console）、昆仑（KUNLUN）、裂隙（RIFT）、core（霜纸/夜池）、青空（Aozora）、基本（KIHON）、真夜中（Mayonaka）；每套模板有自己的变体——默认是米白纸、纯白、方格本、主色浅底、夜读，铅字房是 Signal、Lab、Studio、Special，纸本是 Editorial、Analog、Midnight，灯与夜是 Akari、Yoru，昆仑是虚空、雪线，裂隙是深色、黎明，core 是霜纸、夜池，青空是昼、夜空，基本是银、玄，真夜中是午夜、日落。再选 3:4、1:1、9:16；KIHON 只有 9:16，选中它会自动切到 9:16 并禁用另外两种比例（按钮下方给一句提示）。
+右栏同一处还有「我的模板」：可以上传 `.reedcard` 模板文件（zip），文件会保存在本机 IndexedDB，刷新后还在，也可以删除。上传的模板和内置模板一样参与分页、封面标题适配、精确字号导出、字体嵌入、单张 PNG 与整包 ZIP，只支持 manifest 声明的比例；比例不满足时自动切换并提示。每张下方的 PNG 按钮下载单张，顶栏的「导出全部 ZIP」下载整套。格式、slot、CSS 限制与完整示例见 [卡片模板文件格式](card-template-format.md)。
+比例、模板与变体在本次编辑会话内保留，切换模板时变体自动换成新模板的第一个，切回公众号文章模式或调整窗口大小后继续沿用；刷新页面恢复默认内置模板（上传的模板本身仍在）。
 
 - 首个一级标题生成封面，紧接着不超过 60 字的段落作为副标题；没有一级标题时直接生成正文卡片。空稿不生成卡片，只有一级标题时生成一张封面。
 - 单独一行 `---` 是卡片的手动分页符。公众号预览、复制、HTML 导出仍按原有分隔线渲染。开头的 YAML front matter 仍由 Reed 的既有解析器处理。
@@ -36,12 +37,15 @@
 
 ## 验证
 
-单元测试：[cards.test.ts](../src/lib/cards.test.ts)。真实 Chrome 验收：
+单元测试：[cards.test.ts](../src/lib/cards.test.ts)、模板格式与安全：[card-template.test.ts](../src/lib/card-template.test.ts)、[card-template-store.test.ts](../src/lib/card-template-store.test.ts)。真实 Chrome 验收：
 
 ```powershell
 npm run build
 node scripts/cdp-verify-xhs-cards.mjs 3201 9334
+node scripts/cdp-verify-card-template-upload.mjs 3281 9398
 ```
+
+`cdp-verify-card-template-upload.mjs` 只用仓库里的示例模板（`examples/card-templates/example`，运行时打包成 `.reedcard`），覆盖上传、选择器、「我的模板」、单张 PNG / 整包 ZIP、预览 DOM 与导出 PNG 像素对比、刷新后仍在、恶意包被拒绝、删除后刷新不再出现。模板格式、slot 与限制见 [卡片模板文件格式](card-template-format.md)。
 
 脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与默认模板背景，并遍历十套模板 × 各自变体的封面 + 前两张正文（KIHON 为 9:16，其余模板为 3:4），检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示、CDP 实际字体与 DOM / PNG 像素对比。六套设计系统模板（昆仑、裂隙、core、青空、基本、真夜中）还会逐个变体检查封面标题、副标题与第 3 页正文：用文字的计算颜色和导出 PNG 中文字包围盒内的中位色算 WCAG 对比度，普通文字不足 4.5:1 或 24px 以上粗体标题不足 3:1 即失败。Reed、YORU、PAPER、Console 是冻结基线，保留原有导出，不参与这项对比度门槛。
 

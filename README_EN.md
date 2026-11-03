@@ -68,7 +68,7 @@ flowchart LR
 - **Article-oriented Markdown**: numbered sections, highlights, pull quotes, quotation boxes, centered text, credits, tables, block equations and Mermaid diagrams.
 - **Images**: upload, compression (automatic, a 1–5 MB target, or the original file), automatic or manual cropping, a media library, same-ratio carousels and two- to four-column galleries.
 - **Editing and preview**: CodeMirror, a Markdown toolbar with per-column and whole-table alignment, semantic format painter, syntax completion, synchronized scrolling and 375 / 677 preview widths. Light, dark and system UI modes.
-- **Xiaohongshu cards**: switch to Xiaohongshu cards from the top-bar mode control; templates, ratios and backgrounds live in the sidebar's **Templates** tab. The same Markdown paginates with an automatic cover, three aspect ratios and five backgrounds. Export 1080px-wide PNGs or a ZIP; put `---` on its own line for a manual page break. See [usage and implementation notes](docs/xhs-cards.md).
+- **Xiaohongshu cards**: switch to Xiaohongshu cards from the top-bar mode control; templates, ratios and backgrounds live in the sidebar's **Templates** tab. The same Markdown paginates with an automatic cover, three aspect ratios and five backgrounds. Export 1080px-wide PNGs or a ZIP; put `---` on its own line for a manual page break. The same tab can upload a local `.reedcard` template; see the [template file format](docs/card-template-format.md) and [usage and implementation notes](docs/xhs-cards.md).
 - **Storage**: local draft protection, plus the site owner's cloud draft library after login, with synchronization and conflict handling.
 - **Import / export**: import Markdown, DOCX and full document backups; rich text pasted from a web page or Word is converted to the article dialect. Export Markdown, article HTML, a complete preview page or a full document backup.
 - **Publish check**: before copying an article, exporting article HTML or exporting the full preview page, unfinished equations and diagrams, empty image slots and image URLs on the local machine or a private network are listed as blockers or warnings. A clean article goes straight through.
@@ -151,6 +151,7 @@ See [THEME-SOURCES](THEME-SOURCES.md) for the audit. Project acknowledgements an
 | [AI writing / Remote MCP](docs/remote-mcp.md) / [Skill](skills/wechat-typesetter/SKILL.md) | Writing instructions and single-document collaboration |
 | [Documents and editor](docs/documents.md) | Storage, synchronization, conflicts and backups |
 | [Rendering and images](docs/rendering.md) | Markdown, themes, WeChat HTML and image lifecycle |
+| [Xiaohongshu cards](docs/xhs-cards.md) / [Template file format](docs/card-template-format.md) | Pagination, templates, ratios, export and uploaded template format |
 | [Agent API](docs/agent-api.md) | REST / Python push-and-read-back workflow |
 | [Configuration](docs/configuration.md) / [Verification](docs/verification.md) / [HANDOFF](HANDOFF.md) | Development, checks and deployment |
 | [Brand and compatibility](docs/branding.md) | Naming and retained internal identifiers |

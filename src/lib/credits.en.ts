@@ -30,6 +30,12 @@ export const CREDITS_EN: Record<string, CreditTextEn> = {
       'Runtime dependency html-to-image, pinned to 1.11.13 and loaded on demand for card export. Its toBlob API generates 1080px-wide PNGs with explicit fontEmbedCSS for Noto Sans SC, Geist and Geist Mono.',
     ],
   },
+  'https://github.com/cure53/DOMPurify': {
+    licenseNote: 'The package is dual-licensed as (MPL-2.0 OR Apache-2.0); this project chooses Apache-2.0, which is compatible with AGPL-3.0-or-later, and keeps the full Apache-2.0 license text.',
+    borrowed: [
+      'Runtime dependency dompurify 3.4.17, used as the HTML whitelist filter for uploaded card templates. Scripts, event attributes, iframe / form / foreignObject and external URLs are rejected before any template markup reaches the DOM.',
+    ],
+  },
   'https://github.com/Stuk/jszip': {
     licenseNote: 'The package offers (MIT OR GPL-3.0-or-later); this project chooses MIT. The complete upstream LICENSE.markdown is retained, including both alternatives.',
     borrowed: [

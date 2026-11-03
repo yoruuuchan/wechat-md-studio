@@ -9,6 +9,8 @@ import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type Signa
 import { useI18n } from '@/hooks/useI18n'
 import type { Theme } from '@/lib/theme-kit'
 import type { CardOptions } from '@/lib/cards'
+import type { CardTemplateSummary } from '@/lib/card-template-format'
+import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import ThemeQuickPicker from '@/components/ThemeQuickPicker'
 import CardSettings from '@/components/CardSettings'
 
@@ -27,6 +29,9 @@ interface Props {
   cardOptions: CardOptions
   onCardOptionsChange: (options: CardOptions) => void
   cardBusy: boolean
+  cardTemplates: CardTemplateUpload
+  onCardTemplateUploaded: (summary: CardTemplateSummary) => void
+  onCardTemplateDeleted: (template: string) => void
   materials: MaterialItem[]
   titles: string[]
   cover: string
@@ -195,7 +200,9 @@ export default function SidePanel(p: Props) {
           </TabsContent>
         ) : (
           <TabsContent value="card" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
-            <CardSettings options={p.cardOptions} onOptionsChange={p.onCardOptionsChange} busy={p.cardBusy} />
+            <CardSettings options={p.cardOptions} onOptionsChange={p.onCardOptionsChange} busy={p.cardBusy}
+              templates={p.cardTemplates} onTemplateUploaded={p.onCardTemplateUploaded}
+              onTemplateDeleted={p.onCardTemplateDeleted} />
           </TabsContent>
         )}
 

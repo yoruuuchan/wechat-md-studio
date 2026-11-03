@@ -10,10 +10,11 @@ import { resolveImgSrc } from '@/lib/image'
 import { safeFilename } from '@/lib/import-export'
 import { renderCardArticle } from '@/lib/cards-render'
 import {
-  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, chinesePageNumber,
+  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, cardTemplateFonts, chinesePageNumber,
   coverTitleSize, isDarkVariant, paginateCards,
   type CardBackground, type CardOptions, type CardPage, type CardTemplate,
 } from '@/lib/cards'
+import { fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
 import { useI18n } from '@/hooks/useI18n'
 import './cards.css'
 
@@ -469,7 +470,7 @@ interface Result {
   scaledBlocks: number
   height: number
   dark: boolean
-  template: CardTemplate
+  template: string
   background: CardBackground
 }
 export interface CardsStatus {
@@ -513,6 +514,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
   const height = CARD_RATIOS[ratio]
   const metrics = cardMetrics(template)
+  const custom = getLoadedCardTemplate(template)
   const dark = isDarkVariant(template, bg)
   const accent = cardAccent(template, bg, themeAccent || BRAND_ACCENT)
   const coverTitle = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
@@ -532,7 +534,8 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
       try {
         const { prepareCardImages } = await import('@/lib/cards-export')
         const article = renderCardArticle(doc, {
-          source, height, template, background: bg, accent, dark, sig, resolveImage: resolveImgSrc,
+          source, height, template, renderTemplate: custom?.renderId, templateSource: custom?.template,
+          background: bg, accent, dark, sig, resolveImage: resolveImgSrc,
           resolveMath: (tex, display) => math.get(tex, display), resolveDiagram,
         })
         const failedImages = await prepareCardImages(article, controller.signal)
@@ -549,7 +552,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
       }
     }, 160)
     return () => { controller.abort(); clearTimeout(timer) }
-  }, [doc, source, height, template, bg, accent, dark, sig, math, resolveDiagram, retry, lang])
+  }, [doc, source, height, template, bg, accent, dark, sig, math, resolveDiagram, retry, lang, custom?.renderId, custom?.template])
 
   useLayoutEffect(() => {
     // Ordinary titles keep each template's size ladder. Extremely long H1s are
@@ -557,16 +560,19 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
     // footer. The reserve comes from the same metrics as pagination.
     for (const card of cardsRef.current) {
       const copy = card?.querySelector<HTMLElement>('.xhs-cover-copy')
-      const h1 = copy?.querySelector<HTMLElement>('h1, .xhs-yoru-title')
-      if (!card || !copy || !h1) continue
+      const h1 = card?.querySelector<HTMLElement>('[data-fit-cover-title]') ??
+        copy?.querySelector<HTMLElement>('h1, .xhs-yoru-title')
+      const box = h1?.closest<HTMLElement>('[data-fit-box]') ?? copy
+      if (!card || !box || !h1) continue
       // A constrained plate (position:absolute with top/bottom) has a fixed
       // box, so compare the content's scroll height with that box. Reed's copy
       // is in flow, so its own height is the content height.
-      const constrained = getComputedStyle(copy).position === 'absolute' ||
-        copy.classList.contains('xhs-cover-copy-constrained')
+      const constrained = box.hasAttribute('data-fit-constrained') ||
+        getComputedStyle(box).position === 'absolute' ||
+        box.classList.contains('xhs-cover-copy-constrained')
       const fits = () => constrained
-        ? copy.scrollHeight <= copy.clientHeight + 0.5
-        : copy.offsetHeight <= height - metrics.coverReserve + 0.5
+        ? box.scrollHeight <= box.clientHeight + 0.5
+        : box.offsetHeight <= height - metrics.coverReserve + 0.5
       let size = Number.parseFloat(h1.dataset.coverTitleSize ?? h1.style.fontSize)
       h1.style.fontSize = `${size}px`
       while (!fits() && size > 1) h1.style.fontSize = `${--size}px`
@@ -582,7 +588,10 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
       const { createCardExporter, downloadCardBlob } = await import('@/lib/cards-export')
       const nodes = cardsRef.current.slice(0, result.pages.length).filter((node): node is HTMLDivElement => node !== null)
       if (nodes.length !== result.pages.length) throw new Error('card not mounted')
-      exporter = await createCardExporter(nodes, result.template)
+      const loaded = getLoadedCardTemplate(result.template)
+      exporter = await createCardExporter(nodes, loaded
+        ? { faces: cardTemplateFonts(result.template), packageCss: loaded.packageFontCss }
+        : result.template)
       const name = safeFilename(articleTitle, t('cards.filename'), '')
       if (index !== undefined) {
         downloadCardBlob(await exporter.shoot(index), `${name}-${String(index + 1).padStart(2, '0')}.png`)
@@ -635,12 +644,30 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
         {result?.scaledBlocks ? <p role="status" className="mb-4 text-xs text-warning-700">{t('cards.scaled', { n: result.scaledBlocks })}</p> : null}
         {result && !total && <p className="text-sm text-ink-2">{t('cards.empty')}</p>}
         <div className="flex flex-wrap justify-center gap-5">
-          {result?.pages.map((page, i) => (
+          {result?.pages.map((page, i) => {
+            const customHtml = custom
+              ? fragmentHtml(renderTemplatePage(custom, {
+                kind: page.kind === 'cover' ? 'cover'
+                  : custom.manifest.pages.end && i === result.pages.length - 1 ? 'end' : 'body',
+                pageIndex: i,
+                total: result.pages.length,
+                title: page.kind === 'cover' ? page.title : articleTitle,
+                subtitle: page.kind === 'cover' ? page.subtitle : '',
+                author,
+                articleTitle,
+                contentHtml: page.kind === 'body' ? page.html : '',
+                height,
+                lang,
+              }, bg, dark))
+              : null
+            return (
             <div key={i} style={{ width: PREVIEW_WIDTH }}>
               <div className="xhs-slot" style={{ width: PREVIEW_WIDTH, height: height * PREVIEW_SCALE }}>
                 <div className="xhs-scale" style={{ transform: `scale(${PREVIEW_SCALE})` }}>
-                  <div className="xhs-card" data-card-index={i} data-card-kind={page.kind} data-template={template} data-variant={bg} data-night={dark}
+                  <div className="xhs-card" data-card-index={i} data-card-kind={page.kind} data-template={custom?.renderId ?? template} data-variant={bg} data-night={dark}
+                    {...(custom ? { 'data-card-template-source': custom.template } : {})}
                     ref={(el) => { cardsRef.current[i] = el }}
+                    {...(customHtml !== null ? { dangerouslySetInnerHTML: { __html: customHtml } } : {})}
                     style={{
                       width: CARD_WIDTH, height, '--xhs-accent': accent,
                       '--xhs-pad-x': `${metrics.padX}px`,
@@ -652,11 +679,11 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
                       '--xhs-cover-inset-x': `${metrics.coverInsetX}px`,
                       '--xhs-cover-inset-y': `${metrics.coverInsetY}px`,
                       '--xhs-cover-foot-bottom': `${metrics.coverFootBottom}px`,
-                      ...background(template, bg, accent, page.kind),
+                      ...(custom ? {} : background(template as CardTemplate, bg, accent, page.kind)),
                     } as CSSProperties}>
-                    {page.kind === 'cover'
-                      ? <Cover page={page} template={template} variant={bg} articleTitle={articleTitle} author={author} total={total} height={height} lang={lang} t={t} />
-                      : <Body page={page} index={i} template={template} variant={bg} articleTitle={articleTitle} author={author} total={total} t={t} />}
+                    {customHtml !== null ? null : page.kind === 'cover'
+                      ? <Cover page={page} template={template as CardTemplate} variant={bg} articleTitle={articleTitle} author={author} total={total} height={height} lang={lang} t={t} />
+                      : <Body page={page} index={i} template={template as CardTemplate} variant={bg} articleTitle={articleTitle} author={author} total={total} t={t} />}
                   </div>
                 </div>
               </div>
@@ -668,7 +695,8 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
                 </button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

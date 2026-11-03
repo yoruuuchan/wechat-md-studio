@@ -110,7 +110,8 @@ import {
 } from '@/lib/upload-writeback'
 import { useI18n } from '@/hooks/useI18n'
 import { useEditorLayout } from '@/hooks/use-mobile'
-import type { CardOptions } from '@/lib/cards'
+import { useCardTemplates } from '@/hooks/useCardTemplates'
+import { withTemplate, type CardOptions } from '@/lib/cards'
 import type { CardsStatus, CardsViewHandle } from '@/components/CardsView'
 
 const CardsView = lazy(() => import('@/components/CardsView'))
@@ -214,6 +215,7 @@ export default function EditorPage() {
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
   const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
   const [cardOptions, setCardOptions] = useState<CardOptions>({ ratio: '3:4', template: 'reed', background: 'paper' })
+  const cardTemplates = useCardTemplates()
   const [cardsStatus, setCardsStatus] = useState<CardsStatus>({
     ready: false, busy: false, total: 0, failed: false, error: false, progress: { done: 0, total: 0 },
   })
@@ -1713,6 +1715,10 @@ export default function EditorPage() {
       cardOptions={cardOptions}
       onCardOptionsChange={setCardOptions}
       cardBusy={cardsStatus.busy}
+      cardTemplates={cardTemplates}
+      onCardTemplateUploaded={(summary) => setCardOptions((current) => withTemplate(current, summary.template))}
+      onCardTemplateDeleted={(template) => setCardOptions((current) =>
+        current.template === template ? withTemplate(current, 'reed') : current)}
       materials={materials}
       titles={parsed.meta.titles}
       cover={parsed.meta.cover}

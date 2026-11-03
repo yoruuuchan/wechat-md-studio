@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // The module reads IMG_BASE_URL / IMG_ADMIN_KEY when it loads, so the
 // environment has to be in place before the import - imports are hoisted.
-process.env.IMG_BASE_URL = process.env.IMG_BASE_URL || 'https://img.example.test'
-process.env.IMG_ADMIN_KEY = process.env.IMG_ADMIN_KEY || 'test-admin-key'
+// Test isolation: a developer `.env` may point IMG_BASE_URL at a local mock,
+// which must not change the URL this test asserts.
+process.env.IMG_BASE_URL = 'https://img.example.test'
+process.env.IMG_ADMIN_KEY = 'test-admin-key'
 const { storage } = await import('./storage')
 
 const TEXT = (status: number) =>

@@ -1,0 +1,56 @@
+{
+  "format": "reed-card-template",
+  "formatVersion": 1,
+  "id": "example-daylight",
+  "name": "示例 · 日光",
+  "version": "1.0.0",
+  "author": "Reed",
+  "description": "一个朴素、可读的示例模板：单栏正文、留白封面、独立结尾页，并用包内 woff2 字体展示自带字体的写法。",
+  "ratios": ["3:4", "1:1", "9:16"],
+  "defaultRatio": "3:4",
+  "variants": [
+    {
+      "id": "day",
+      "name": "日间",
+      "dark": false,
+      "tokens": { "accent": "#2F6F5E", "text": "#1E2328", "muted": "#6E756F" }
+    },
+    {
+      "id": "dusk",
+      "name": "傍晚",
+      "dark": true,
+      "tokens": { "accent": "#86D8C4", "text": "#E8E4DC", "muted": "#A7ADA6" }
+    }
+  ],
+  "metrics": {
+    "padX": 44,
+    "padTop": 76,
+    "padBottom": 64,
+    "contentWidth": 452,
+    "headerTop": 26,
+    "footerBottom": 24,
+    "coverInsetX": 44,
+    "coverInsetY": 82,
+    "coverFootBottom": 40,
+    "coverReserve": 190,
+    "coverTitleSize": [58, 50, 44, 38, 32],
+    "coverSmallScale": 0.86
+  },
+  "fonts": [
+    { "source": "builtin", "family": "Noto Sans SC", "weights": [400, 700] },
+    { "source": "builtin", "family": "Geist Mono", "weights": [400] },
+    {
+      "source": "package",
+      "family": "Example Grotesk",
+      "file": "fonts/example-grotesk.woff2",
+      "weight": 400,
+      "style": "normal"
+    }
+  ],
+  "pages": {
+    "cover": "pages/cover.html",
+    "body": "pages/body.html",
+    "end": "pages/end.html"
+  },
+  "styles": ["styles/template.css"]
+}
