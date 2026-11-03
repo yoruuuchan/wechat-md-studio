@@ -804,6 +804,30 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 页面正常加载，控制台只有 Cloudflare 内联探针 CSP violation（每次加载一条，本次四次加载共四条），
 > 无其他报错或页面异常。冒烟未保存、未上传、未改线上稿。
 
+> 2026-11-03 部署记录（顶栏模式与右栏按模式切换上线）：`feat/ui-modes`（`0ee3da0`，从 master
+> `39d5f48` 直接快进，含 README 两张编辑器截图重截）合入并推送 master（origin/master = `0ee3da0`）。
+> 功能：顶栏只留稿件名 / 保存状态、四个模式入口（长图、动效为不可选占位）、当前模式最常用按钮与
+> 「更多」；右栏首个标签跟随模式（公众号「主题」/ 小红书「模板」），主题快切移入右栏；预览区只留预览。
+> 验证：`check`、2971 项测试、`verify:themes`、`build` 全过；首次 `npm test` 因会话把 worktree `.env`
+> 注入进程环境，出现 4 个 URL 断言失败，清掉这些变量后全过，非代码问题。入口
+> `index-BzhiNdJO.js`（jsxDEV=0）/ `index-By8YCQZz.css`，`dist/boot.js` sha256 `7fb86b2e…`。
+> 部署：包 `mopai-0ee3da0.tar.gz`（50,368,910 B，sha256 `320a0760…`），13×4 MiB 分块逐块 sha256
+> 后 `cat` 重组、整包哈希一致。WSL 的 SSH 直连被出口重置（`Connection closed by … port 22`），改用
+> Git Bash 的 `scp` / OpenSSH；直连单包 >30 MB 仍按老规矩分块。安装前把上一版 dist 备份到
+> `/opt/mopai/backups/dist-20261103T020116Z-bfaa6583`，`flock` 安装于 **2026-11-03 02:02:16 UTC**
+> （`ExecMainStartTimestamp` 一致）；`sudo flock` 打不开锁文件，改为 ubuntu 持锁、锁内跑 `sudo -n bash`。
+> 三重核对全过：线上 `dist/boot.js` sha256 = 本地；`index.html` 资产名本地 = 线上 = 公网
+> （`index-BzhiNdJO.js` / `index-By8YCQZz.css`）；`sudo bash /opt/mopai/scripts/verify-all.sh` exit 0
+> （ALL DEPLOYED CHECKS PASSED）。
+> 公网只读冒烟（无头 Chrome/CDP 9391、全新临时 profile，22 项断言全过）：1536 四个模式入口、
+> 长图 / 动效不可选；切「小红书卡片」后主按钮「导出全部 ZIP」、右栏「模板」，切回「公众号文章」
+> 右栏「主题」，「更多」含草稿箱 / 素材库 / 导入 / 导出；768 编辑 + 预览并排，抽屉可开、Esc 可关；
+> 390 模式行在位、单面板、无横向滚动。控制台每次加载仅一条 Cloudflare JS-detection 内联探针
+> CSP violation（哈希与页面内联脚本对得上，内容含 `__CF$cv$params` / `cdn-cgi/challenge-platform`），
+> 无其他报错或异常。冒烟未保存、未上传、未改线上稿。
+> README `editor-akari` / `editor-yoru` 已按 1600×1100 重截（示例稿、Golden Sample、右栏「主题」，
+> 等 `document.fonts.ready` 后截图）；`theme-library` / `typeset-golden` 未动。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
