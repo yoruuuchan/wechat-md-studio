@@ -13,6 +13,7 @@ import {
   activateCardTemplate, deactivateCardTemplate, fragmentHtml,
   parseCardTemplateSource, renderTemplatePage, type CardTemplateSourceRecord,
 } from './card-template'
+import { currentLang, setLanguage } from './i18n'
 
 const metrics = {
   padX: 40, padTop: 52, padBottom: 76, contentWidth: 460,
@@ -342,6 +343,31 @@ describe('parsed template runtime', () => {
     expect(bodyHtml).toContain('02 / 03')
     deactivateCardTemplate(record.template)
     expect(document.head.querySelector('style[data-card-template-style]')).toBeNull()
+  })
+
+  it('keeps the shared page-count copy stable for uploaded templates', async () => {
+    const before = currentLang()
+    setLanguage('zh')
+    try {
+      const counted = '<div class="xhs-card-content" data-slot="content"></div><span data-slot="page-count" data-format="plain"></span><span data-slot="page-count" data-format="chinese"></span>'
+      const zip = await zipFiles({
+        'manifest.json': JSON.stringify(manifest()),
+        'pages/cover.html': cover,
+        'pages/body.html': counted,
+        'styles/template.css': 'p { margin: 0; }',
+      })
+      const record = await parseCardTemplateSource(zip, 'page-count-id')
+      const loaded = await activateCardTemplate(record)
+      const html = fragmentHtml(renderTemplatePage(loaded, {
+        kind: 'body', pageIndex: 0, total: 6, title: '', subtitle: '',
+        author: 'Yoru', articleTitle: '标题', contentHtml: '<p>正文</p>', height: 720, lang: 'zh',
+      }, 'paper', false))
+      expect(html).toContain('共6页')
+      expect(html).toContain('共〇六页')
+      deactivateCardTemplate(record.template)
+    } finally {
+      setLanguage(before)
+    }
   })
 
   it('prunes variant-only elements declaratively', async () => {

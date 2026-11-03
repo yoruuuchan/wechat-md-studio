@@ -538,7 +538,7 @@ export const zh = {
   'cards.bg.grid': '方格本',
   'cards.bg.tint': '主色浅底',
   'cards.bg.night': '夜读',
-  'cards.pageCount': '共 {n} 页',
+  'cards.pageCount': '共{n}页',
   'cards.summary': '共 {n} 张 · 导出尺寸 1080 × {height}',
   'cards.exportAll': '导出全部 ZIP',
   'cards.exporting': '正在导出 {n} / {total}',
