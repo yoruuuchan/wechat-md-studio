@@ -14,6 +14,7 @@ import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
+import { shortBarScanExpression } from './lib/card-decor-check.mjs'
 
 const port = Number(process.argv[2] || 3281)
 const cdpPort = Number(process.argv[3] || 9398)
@@ -26,7 +27,7 @@ const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'reed-public-cards-'))
 const checks = []
 const exceptions = []
 const consoleErrors = []
-const evidence = { output, checks, exports: [], pixels: [], coverTitles: [], contrast: [], textSizes: [], fonts: [], templates: [] }
+const evidence = { output, checks, exports: [], pixels: [], coverTitles: [], contrast: [], textSizes: [], fonts: [], templates: [], decorations: [] }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const check = (name, passed, detail) => {
   checks.push({ name, passed: Boolean(passed), detail })
@@ -525,6 +526,17 @@ async function fontChecks(template, variant, pageIndex, role, label) {
   })
 }
 
+/** Every card on screen (cover, body, end) must be free of short thick rules. */
+async function decorationChecks(template, variant, ratio, label) {
+  const scan = await evaluate(shortBarScanExpression())
+  const passed = scan.cards > 0 && scan.hits.length === 0
+  evidence.decorations.push({ label, template, variant, ratio, ...scan })
+  check(`${label} ${ratio}: no short thick decorative rules`, passed, {
+    template, variant, ratio, pages: scan.cards,
+    hits: scan.hits, whitelisted: scan.whitelisted,
+  })
+}
+
 async function creditChecks(label, pageCount) {
   const pages = await evaluate(`(() => {
     const cards = [...document.querySelectorAll('.xhs-card')];
@@ -667,6 +679,7 @@ try {
       ])
       await textSizeChecks(`${label} 3:4`, bounds.count)
       await creditChecks(`${label} 3:4`, bounds.count)
+      await decorationChecks(template.id, variant, '3:4', label)
 
       for (const ratio of ['1:1', '9:16']) {
         const size = ratio === '1:1' ? 1080 : 1080
@@ -677,6 +690,7 @@ try {
         await fontChecks(template.id, variant, 0, `${ratio} cover`, `${label} ${ratio}`)
         await textSizeChecks(`${label} ${ratio}`, ratioPages)
         await creditChecks(`${label} ${ratio}`, ratioPages)
+        await decorationChecks(template.id, variant, ratio, label)
         const file = await download('[data-card-export="0"]', `${template.id}-${variant}-${ratio.replace(':', 'x')}-cover`, '.png')
         const dims = dimensions(fs.readFileSync(file))
         check(`${label} ${ratio}: cover export is ${size} wide`, dims.width === size && dims.height === height, dims)

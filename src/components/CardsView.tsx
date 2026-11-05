@@ -52,7 +52,6 @@ function Cover({ page, author, height, t }: CoverProps) {
   return (
     <div className="xhs-cover">
       <div className="xhs-cover-copy">
-        <i className="xhs-cover-bar" />
         <h1 style={{ fontSize: titleSize }} data-cover-title-size={titleSize}>{page.title}</h1>
         {page.subtitle && <p>{page.subtitle}</p>}
       </div>
@@ -73,7 +72,7 @@ function Body({ page, index, articleTitle, author, total }: BodyProps) {
   const pageNo = index + 1
   return (
     <>
-      <div className="xhs-card-head"><i /><span>{articleTitle}</span></div>
+      <div className="xhs-card-head"><span>{articleTitle}</span></div>
       <div className="xhs-card-content" dangerouslySetInnerHTML={{ __html: page.html }} />
       <div className="xhs-card-foot"><span>{author}</span><span>{String(pageNo).padStart(2, '0')} / {String(total).padStart(2, '0')}</span></div>
     </>

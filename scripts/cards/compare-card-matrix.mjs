@@ -168,6 +168,14 @@ function compare(aFile, bFile) {
   let exact = true
   let max = 0
   const total = a.width * a.height
+  const anyBox = { left: a.width, top: a.height, right: -1, bottom: -1 }
+  const strongBox = { left: a.width, top: a.height, right: -1, bottom: -1 }
+  const grow = (box, x, y) => {
+    if (x < box.left) box.left = x
+    if (y < box.top) box.top = y
+    if (x > box.right) box.right = x
+    if (y > box.bottom) box.bottom = y
+  }
   for (let i = 0; i < total; i++) {
     let worst = 0
     for (let channel = 0; channel < 3; channel++) {
@@ -178,12 +186,22 @@ function compare(aFile, bFile) {
       diff[i * 4 + channel] = Math.min(255, delta * 4)
     }
     if (worst > max) max = worst
-    if (worst > 16) bad++
+    const x = i % a.width
+    const y = Math.floor(i / a.width)
+    if (worst > 0) grow(anyBox, x, y)
+    if (worst > 16) { bad++; grow(strongBox, x, y) }
     diff[i * 4 + 3] = 255
+  }
+  const bounds = (box) => box.right < 0 ? null : {
+    rows: [box.top, box.bottom],
+    columns: [box.left, box.right],
+    left: box.left, top: box.top, right: box.right, bottom: box.bottom,
+    width: box.right - box.left + 1, height: box.bottom - box.top + 1,
   }
   return {
     width: a.width, height: a.height, sizeMismatch: false,
     exact, mean: sum / (total * 3), bad: bad / total, max,
+    bounds: bounds(anyBox), strongBounds: bounds(strongBox),
     diff: encodePng(a.width, a.height, diff),
   }
 }
@@ -211,6 +229,7 @@ for (const before of baselineEntries) {
     key: key(before), template: before.template, variant: before.variant, ratio: before.ratio, role: before.role,
     pageIndex: before.pageIndex, sha256Baseline: before.sha256, sha256Current: after.sha256,
     exact: result.exact, mean: result.mean, bad: result.bad, max: result.max, sizeMismatch: result.sizeMismatch,
+    bounds: result.bounds, strongBounds: result.strongBounds,
     thresholdPass: !result.sizeMismatch && result.mean < 0.5 && result.bad < 0.001,
   }
   entries.push(row)

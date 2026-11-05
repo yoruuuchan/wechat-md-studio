@@ -209,15 +209,6 @@
   letter-spacing: -0.02em;
 }
 
-.xhs-body h2::before {
-  content: "";
-  display: block;
-  width: 42px;
-  height: 2px;
-  margin-bottom: 14px;
-  background: var(--accent);
-}
-
 .xhs-body h2 small {
   display: block;
   margin-bottom: 0.4em;

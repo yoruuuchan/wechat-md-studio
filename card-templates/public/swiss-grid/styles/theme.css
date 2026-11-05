@@ -34,7 +34,7 @@
 }
 
 /* Cover: one loose Swiss grid, a single orange field, and the title pressed
-   into the lower-left corner. The thin 01 is a graphic, not a page number. */
+   into the lower-left corner. */
 .swiss-cover {
   position: absolute;
   inset: 0;
@@ -61,18 +61,6 @@
   width: 150px;
   height: 104px;
   background: var(--accent);
-}
-
-.swiss-ordinal {
-  position: absolute;
-  top: 38px;
-  left: 42px;
-  color: var(--line);
-  font-family: "Geist", "Noto Sans SC", sans-serif;
-  font-size: 132px;
-  font-weight: 400;
-  line-height: 0.82;
-  letter-spacing: -0.08em;
 }
 
 .swiss-copy {
@@ -148,12 +136,6 @@
   height: 84px;
 }
 
-.xhs-card[data-card-aspect="1:1"] .swiss-ordinal {
-  top: 34px;
-  left: 36px;
-  font-size: 86px;
-}
-
 .xhs-card[data-card-aspect="1:1"] .swiss-copy {
   gap: 12px;
   padding-bottom: 18px;
@@ -174,12 +156,6 @@
   height: 288px;
 }
 
-.xhs-card[data-card-aspect="9:16"] .swiss-ordinal {
-  top: 58px;
-  left: 40px;
-  font-size: 212px;
-}
-
 .xhs-card[data-card-aspect="9:16"] .swiss-copy {
   gap: 24px;
   padding-bottom: 112px;
@@ -190,15 +166,6 @@
 .swiss-bodypage {
   position: absolute;
   inset: 0;
-}
-
-.swiss-rule {
-  position: absolute;
-  top: 33px;
-  left: 44px;
-  width: 116px;
-  height: 9px;
-  background: var(--accent);
 }
 
 .swiss-pageno {
@@ -340,7 +307,7 @@
   border-top: 4px solid var(--accent);
 }
 
-/* End: a single left-aligned statement, a heavy orange rule, one author line. */
+/* End: a single left-aligned statement and one author line. */
 .swiss-end {
   position: absolute;
   inset: 0;
@@ -348,13 +315,6 @@
   flex-direction: column;
   justify-content: center;
   padding: 74px 52px 64px;
-}
-
-.swiss-end-bar {
-  width: 128px;
-  height: 12px;
-  margin-bottom: 34px;
-  background: var(--accent);
 }
 
 .swiss-end-title {
@@ -380,10 +340,6 @@
 
 .xhs-card[data-card-aspect="1:1"] .swiss-end {
   padding: 52px 44px 42px;
-}
-
-.xhs-card[data-card-aspect="1:1"] .swiss-end-bar {
-  margin-bottom: 24px;
 }
 
 .xhs-card[data-card-aspect="1:1"] .swiss-end-title {

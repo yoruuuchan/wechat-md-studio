@@ -97,7 +97,8 @@ const page = `<!doctype html>
   .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding-bottom: 30px; border-bottom: 2px solid var(--ink); }
   h1 { margin: 0; font: 700 44px/1.08 "Noto Serif SC", "Songti SC", serif; letter-spacing: -0.03em; }
   .lede { max-width: 720px; margin: 14px 0 0; color: var(--muted); font-size: 14px; }
-  .intro-link { display: inline-block; margin-top: 14px; color: var(--accent); font-size: 13px; text-decoration: none; border-bottom: 1px solid var(--accent); }
+  .intro-links { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 14px; }
+  .intro-link { display: inline-block; color: var(--accent); font-size: 13px; text-decoration: none; border-bottom: 1px solid var(--accent); }
   .intro-link:hover { color: var(--ink); border-color: var(--ink); }
   .count { color: var(--accent); font: 700 56px/1 "Geist Mono", monospace; letter-spacing: -0.05em; }
   .count small { display: block; color: var(--muted); font: 400 12px/1.4 "Noto Sans SC", sans-serif; letter-spacing: 0; text-align: right; }
@@ -137,7 +138,10 @@ const page = `<!doctype html>
     <div>
       <h1>公用卡片模板 · 第二版九套效果图</h1>
       <p class="lede">同一份固定测试稿、三种比例的真实 PNG 导出。每套都有自己的封面 / 正文 / 结尾结构与版式动作，点图片看原图。参考源只用于版式方向，封面照片、贴纸和图标都没有带过来。</p>
-      <a class="intro-link" href="v1/index.html">← 对照第一版（同一骨架换颜色）</a>
+      <div class="intro-links">
+        <a class="intro-link" href="v2/index.html">← 对照改前（v2）</a>
+        <a class="intro-link" href="v1/index.html">← 对照第一版（v1，同一骨架换颜色）</a>
+      </div>
     </div>
     <div class="count">${catalog.length}<small>套 · 每套 1–2 个变体</small></div>
   </section>

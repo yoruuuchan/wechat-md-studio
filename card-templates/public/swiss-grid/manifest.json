@@ -5,7 +5,7 @@
   "name": "Swiss Grid · 瑞士秩序",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 swiss-studio.json（MIT）。严格瑞士网格：超大粗标题压在左下，橙色模块占住右上网格，细体大号 01 当图形；正文左栏用大号章号配右栏阅读，结尾一条粗线收束。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 swiss-studio.json（MIT）。严格瑞士网格：超大粗标题压在左下，橙色模块占住右上网格；正文左栏用大号章号配右栏阅读，结尾以文章题与作者署名收束。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [

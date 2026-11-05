@@ -96,13 +96,6 @@
   margin: auto 0;
 }
 
-.pine-mark {
-  display: block;
-  width: 46px;
-  height: 5px;
-  background: var(--accent);
-}
-
 .pine-copy h1 {
   max-width: 100%;
   margin: 0;

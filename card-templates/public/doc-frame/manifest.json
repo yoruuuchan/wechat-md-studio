@@ -5,7 +5,7 @@
   "name": "Doc Frame · 文档结构",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 pro-doc.json（MIT）。技术文档首页：顶部文档表头带编号，底部作者 / 页数信息表；正文用 1. 与 1.1 分级标题、完整边框表格和左侧大纲线；结尾是带边框的签名表。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 pro-doc.json（MIT）。技术文档首页：顶部一条文档表头线，底部作者 / 页数信息表；正文用 1. 与 1.1 分级标题、完整边框表格和左侧大纲线；结尾是带边框的签名表。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [

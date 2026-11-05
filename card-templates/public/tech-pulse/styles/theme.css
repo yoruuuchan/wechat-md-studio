@@ -95,20 +95,12 @@
   display: flex;
   font-family: var(--body-font);
   align-items: center;
-  gap: 12px;
   margin-top: auto;
   padding-top: 13px;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0.06em;
-}
-
-.tech-foot::before {
-  content: "";
-  width: 34px;
-  height: 3px;
-  background: var(--accent);
 }
 
 .xhs-card[data-card-aspect="1:1"] .tech-cover {
@@ -325,19 +317,11 @@
   bottom: 28px;
   display: flex;
   align-items: center;
-  gap: 9px;
   color: var(--muted);
   font-family: "Geist Mono", "Space Grotesk", monospace;
   font-size: 16px;
   line-height: 1;
   letter-spacing: 0.08em;
-}
-
-.tech-pageno::before {
-  content: "";
-  width: 11px;
-  height: 3px;
-  background: var(--accent);
 }
 
 /* End: the signal returns once; title and author sit under it. */

@@ -22,7 +22,7 @@
 | Reed 版式 | 可定位参考 | 借用内容 |
 |---|---|---|
 | 分页 | `src/cards.ts` | 隐藏容器实测、540px 宽、默认模板的页边距与正文宽、分段与标题跟随；上传模板从 manifest 读自己的度量 |
-| 封面、页眉页脚 | `src/CardsView.tsx`、`src/styles.css` | 标题字号阶梯、色条、副标题、页码、作者位置；上传模板用自己的页面片段与 CSS |
+| 封面、页眉页脚 | `src/CardsView.tsx`、`src/styles.css` | 标题字号阶梯、副标题、页码、作者位置；上传模板用自己的页面片段与 CSS |
 | 正文 | `src/themes.ts` 的基础样式 | 18px 正文、1.8 行距、引用、代码、列表、表格和图片；上传模板在作用域内覆写 `src/components/cards.css` 的基础规则 |
 | 比例、模板、背景、导出 | `src/cards.ts`、`src/components/CardSettings.tsx`、`src/CardsView.tsx`、`src/components/TopBar.tsx` | 三种比例、内置默认模板与上传模板、1080px PNG、ZIP；控件在右栏「模板」，整套导出在顶栏 |
 | 界面控件 | Reed `SidePanel.tsx`、`TopBar.tsx`、`PreviewPane.tsx`、`src/index.css` | `ya-well` 凹陷承载、`ya-selected` 1.5px 描边、现有按钮与明暗 token |
@@ -47,7 +47,7 @@ node scripts/cdp-verify-card-template-upload.mjs 3281 9398
 
 `cdp-verify-card-template-upload.mjs` 只用仓库里的示例模板（`examples/card-templates/example`，运行时打包成 `.reedcard`），覆盖多文件上传（其中一个坏包被拒绝并逐个提示原因）、选择器、「我的模板」、单张 PNG / 整包 ZIP、预览 DOM 与导出 PNG 像素对比、刷新后仍在、恶意包被拒绝、删除后刷新不再出现；登录状态下还会验证自动上传到云端、全新浏览器 profile 登录后模板自动出现、登录删除两边都消失、访客看不到同步状态，以及两个独立浏览器 profile 的双设备场景：A 删除后 B 同步只删本机并提示、云端与 A 也都没有，B 重新上传后 A 再次同步能重新拿到。模板格式、slot 与限制见 [卡片模板文件格式](card-template-format.md)。
 
-脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与默认模板的五种背景，并遍历默认模板每个变体的封面 + 前两张正文（3:4），检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示、CDP 实际字体与 DOM / PNG 像素对比。默认模板逐个变体检查封面标题、副标题与第 3 页正文的 WCAG 对比度：用文字的计算颜色和导出 PNG 中文字包围盒内的中位色算对比度，普通文字不足 4.5:1 或 24px 以上粗体标题不足 3:1 即失败。
+脚本使用当前 worktree 的 `data/test-xhs.db`、本地 mock 图床与独立 Chrome profile。截图、导出 PNG / ZIP、实际字体和像素对比结果写到 `verify-out/xhs/`。它测试 SAMPLE_DOC 和约 3000 字的中文混合稿，遍历比例与默认模板的五种背景，并遍历默认模板每个变体的封面 + 前两张正文（3:4），检查内容边界、下载尺寸 / 张数、中英与明暗界面、图片失败提示、CDP 实际字体与 DOM / PNG 像素对比。默认模板的每个变体 × 三种比例还会扫描封面、正文与结尾的所有可见元素及其 `::before` / `::after`：高 2–16px、宽为高 3–160 倍且带可见填充的短粗横线一律判失败，1px 细线和超过 160px 的整行分隔线除外。默认模板逐个变体检查封面标题、副标题与第 3 页正文的 WCAG 对比度：用文字的计算颜色和导出 PNG 中文字包围盒内的中位色算对比度，普通文字不足 4.5:1 或 24px 以上粗体标题不足 3:1 即失败。
 
 每套模板的每个变体都会把封面与前两张正文导出到 `verify-out/templates/<template>-<variant>-01..03.png`，并生成按模板分组的 `verify-out/templates/index.html`；第 3 页的 DOM / PNG 对照图在 `verify-out/templates/dom-vs-png/`。封面除整页像素对比外，还会取标题元素在预览中的包围盒、换算到导出坐标后检查墨色像素，防止标题被压成 0 像素。Reed 的 PNG 与改动前在本机跑出的基线目录逐像素核对（`verify-out/` 不进 git，基线要在动手前先跑一次验收生成）：
 

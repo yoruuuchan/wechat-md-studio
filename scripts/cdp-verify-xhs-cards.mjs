@@ -12,6 +12,7 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { transformSync } from 'esbuild'
 import JSZip from 'jszip'
+import { shortBarScanExpression } from './lib/card-decor-check.mjs'
 
 const port = Number(process.argv[2] || 3201)
 const cdpPort = Number(process.argv[3] || 9334)
@@ -38,7 +39,7 @@ const CARD_VARIANTS = {
 const checks = []
 const exceptions = []
 const consoleErrors = []
-const evidence = { output, matrix: [], templates: [], exports: [], fonts: {}, fontSelections: {}, coverTitles: [], comparisons: [], contrast: [], pixels: [], reference: {} }
+const evidence = { output, matrix: [], templates: [], exports: [], fonts: {}, fontSelections: {}, coverTitles: [], comparisons: [], contrast: [], pixels: [], decorations: [], reference: {} }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const check = (name, passed, detail) => {
   checks.push({ name, passed: Boolean(passed), detail })
@@ -633,6 +634,17 @@ async function composeComparisonSheet(files) {
   return file
 }
 
+/** Every card on screen (cover, body, end) must be free of short thick rules. */
+async function decorationChecks(template, variant, ratio, label) {
+  const scan = await evaluate(shortBarScanExpression())
+  const passed = scan.cards > 0 && scan.hits.length === 0
+  evidence.decorations.push({ label, template, variant, ratio, ...scan })
+  check(`${label} ${ratio}: no short thick decorative rules`, passed, {
+    template, variant, ratio, pages: scan.cards,
+    hits: scan.hits, whitelisted: scan.whitelisted,
+  })
+}
+
 try {
   for (let i = 0; i < 100; i++) {
     try { if ((await fetch(origin)).ok) break } catch { /* booting */ }
@@ -711,6 +723,9 @@ try {
         const label = `${docName}-${lang}-${theme}-${ratio.replace(':', 'x')}-${bg}`
         evidence.matrix.push({ label, ...bounds })
         check(label + ': every card fits', bounds.count > 0 && bounds.bad.length === 0 && !bounds.warning, bounds.bad.length ? bounds.bad : { pages: bounds.count })
+        if (docName === 'long' && lang === 'zh' && theme === 'akari') {
+          await decorationChecks('reed', bg, ratio, `reed/${bg}`)
+        }
         if (lang === 'zh' && theme === 'akari') await shot(label)
         if (ratio === '3:4' && bg === 'paper') await shot(`${docName}-${lang}-${theme}`)
       }
