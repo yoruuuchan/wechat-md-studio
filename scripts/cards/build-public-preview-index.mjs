@@ -136,10 +136,11 @@ const page = `<!doctype html>
 <div class="wrap">
   <section class="intro">
     <div>
-      <h1>公用卡片模板 · 第二版九套效果图</h1>
+      <h1>公用卡片模板 · 第三版九套效果图</h1>
       <p class="lede">同一份固定测试稿、三种比例的真实 PNG 导出。每套都有自己的封面 / 正文 / 结尾结构与版式动作，点图片看原图。参考源只用于版式方向，封面照片、贴纸和图标都没有带过来。</p>
       <div class="intro-links">
-        <a class="intro-link" href="v2/index.html">← 对照改前（v2）</a>
+        <a class="intro-link" href="v3/index.html">← 对照去细线前（v3）</a>
+        <a class="intro-link" href="v2/index.html">← 对照去粗线前（v2）</a>
         <a class="intro-link" href="v1/index.html">← 对照第一版（v1，同一骨架换颜色）</a>
       </div>
     </div>

@@ -109,39 +109,6 @@
   text-align: center;
 }
 
-.book-ornament {
-  position: relative;
-  display: block;
-  width: 96px;
-  height: 10px;
-}
-
-.book-ornament::before {
-  content: "";
-  position: absolute;
-  top: 4px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--line);
-}
-
-.book-ornament::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  border: 1px solid var(--accent);
-  background: var(--paper);
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.book-ornament-low {
-  margin-top: 4px;
-}
-
 .book-foot {
   position: relative;
   z-index: 2;
@@ -178,11 +145,6 @@
 .xhs-card[data-card-aspect="1:1"] .book-titleplate .cover-subtitle {
   font-size: 15px;
   line-height: 1.7;
-}
-
-.xhs-card[data-card-aspect="1:1"] .book-ornament {
-  width: 72px;
-  height: 8px;
 }
 
 .xhs-card[data-card-aspect="9:16"] .book-cover {
@@ -247,15 +209,6 @@
   text-indent: 0;
 }
 
-.xhs-body h2::before {
-  content: "";
-  display: block;
-  width: 36px;
-  height: 1px;
-  margin: 0 auto 13px;
-  background: var(--accent);
-}
-
 .xhs-body h2 small {
   display: block;
   margin-bottom: 0.35em;
@@ -298,7 +251,7 @@
 }
 
 .xhs-body blockquote::after {
-  content: "—— 原文";
+  content: "原文";
   display: block;
   margin-top: 8px;
   color: var(--muted);

@@ -5,7 +5,7 @@
   "name": "Book Notes · 书页摘录",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 elegant-book.json（MIT）。书的扉页：布书脊、居中衬线标题、CSS 小花饰和书签丝带；正文首行缩进两字、宽行距，引文作摘录；结尾把标题与作者收进一条长书签。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 elegant-book.json（MIT）。书的扉页：布书脊、居中衬线标题和书签丝带；正文首行缩进两字、宽行距，引文作摘录；结尾把标题与作者收进一条长书签。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [

@@ -5,7 +5,7 @@
   "name": "Editorial White · 纸页杂志",
   "version": "1.0.0",
   "author": "Reed · 改编自 geekfoxcharlie/XHS-TextCard（MIT）",
-  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 minimalist-magazine.json（MIT）。杂志封面式社论：上下双细线夹住衬线大标题，副题当导语；正文首段放大成导语，引文居中排成大号引语，结尾以文章题作引、落「— 作者」。",
+  "description": "改编自 geekfoxcharlie/XHS-TextCard 的 minimalist-magazine.json（MIT）。杂志封面式社论：上下双细线夹住衬线大标题，副题当导语；正文首段放大成导语，引文居中排成大号引语，结尾以文章题作引、落作者署名。",
   "ratios": ["3:4", "1:1", "9:16"],
   "defaultRatio": "3:4",
   "variants": [

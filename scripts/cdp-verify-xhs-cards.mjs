@@ -12,7 +12,7 @@ import path from 'node:path'
 import zlib from 'node:zlib'
 import { transformSync } from 'esbuild'
 import JSZip from 'jszip'
-import { shortBarScanExpression } from './lib/card-decor-check.mjs'
+import { cardDecorScanExpression } from './lib/card-decor-check.mjs'
 
 const port = Number(process.argv[2] || 3201)
 const cdpPort = Number(process.argv[3] || 9334)
@@ -634,12 +634,12 @@ async function composeComparisonSheet(files) {
   return file
 }
 
-/** Every card on screen (cover, body, end) must be free of short thick rules. */
+/** Every card on screen (cover, body, end) must be free of short decorative rules and dashes. */
 async function decorationChecks(template, variant, ratio, label) {
-  const scan = await evaluate(shortBarScanExpression())
+  const scan = await evaluate(cardDecorScanExpression())
   const passed = scan.cards > 0 && scan.hits.length === 0
   evidence.decorations.push({ label, template, variant, ratio, ...scan })
-  check(`${label} ${ratio}: no short thick decorative rules`, passed, {
+  check(`${label} ${ratio}: no short decorative rules or dashes`, passed, {
     template, variant, ratio, pages: scan.cards,
     hits: scan.hits, whitelisted: scan.whitelisted,
   })

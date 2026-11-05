@@ -305,7 +305,6 @@
   left: 50%;
   display: flex;
   align-items: center;
-  gap: 10px;
   color: var(--muted);
   font-family: "EB Garamond", "Noto Serif SC", serif;
   font-size: 14px;
@@ -313,14 +312,6 @@
   line-height: 1;
   letter-spacing: 0.18em;
   transform: translateX(-50%);
-}
-
-.editorial-pageno::before,
-.editorial-pageno::after {
-  content: "";
-  width: 22px;
-  height: 1px;
-  background: var(--line);
 }
 
 /* End: the article title becomes a pull quote with an attribution. */

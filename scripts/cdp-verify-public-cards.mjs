@@ -14,7 +14,7 @@ import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
-import { shortBarScanExpression } from './lib/card-decor-check.mjs'
+import { cardDecorScanExpression } from './lib/card-decor-check.mjs'
 
 const port = Number(process.argv[2] || 3281)
 const cdpPort = Number(process.argv[3] || 9398)
@@ -526,12 +526,12 @@ async function fontChecks(template, variant, pageIndex, role, label) {
   })
 }
 
-/** Every card on screen (cover, body, end) must be free of short thick rules. */
+/** Every card on screen (cover, body, end) must be free of short decorative rules and dashes. */
 async function decorationChecks(template, variant, ratio, label) {
-  const scan = await evaluate(shortBarScanExpression())
+  const scan = await evaluate(cardDecorScanExpression())
   const passed = scan.cards > 0 && scan.hits.length === 0
   evidence.decorations.push({ label, template, variant, ratio, ...scan })
-  check(`${label} ${ratio}: no short thick decorative rules`, passed, {
+  check(`${label} ${ratio}: no short decorative rules or dashes`, passed, {
     template, variant, ratio, pages: scan.cards,
     hits: scan.hits, whitelisted: scan.whitelisted,
   })

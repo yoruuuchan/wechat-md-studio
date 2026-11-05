@@ -141,19 +141,11 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 12px;
   padding: 16px 8px 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0.06em;
-}
-
-.aurora-foot::before {
-  content: "";
-  width: 30px;
-  height: 1px;
-  background: var(--accent);
 }
 
 .xhs-card[data-card-aspect="1:1"] .aurora-cover {
