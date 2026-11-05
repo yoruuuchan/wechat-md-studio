@@ -250,17 +250,6 @@
   text-indent: 0;
 }
 
-.xhs-body blockquote::after {
-  content: "原文";
-  display: block;
-  margin-top: 8px;
-  color: var(--muted);
-  font-family: "Noto Serif SC", "Songti SC", serif;
-  font-size: 12px;
-  line-height: 1.5;
-  letter-spacing: 0.08em;
-}
-
 .xhs-body ul,
 .xhs-body ol {
   margin: 1em 0;
