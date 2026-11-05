@@ -43,39 +43,52 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
   const templateName = publicTemplate?.name ?? publicMeta?.name ??
     custom?.name ?? (isBuiltinCardTemplate(template) ? t(`cards.template.${template}` as MsgKey) : template)
   const loadedPublic = new Set(templates.publicTemplates.map((item) => item.template))
+  const groupLabel = 'mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3'
 
   return (
     <div data-card-settings className="space-y-4">
       <div>
         <p className="ya-eyebrow mb-2">{t('cards.template')}</p>
-        <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('cards.template')}>
-          {CARD_TEMPLATES.map((id) => (
-            <button key={id} data-card-template={id} aria-pressed={template === id} disabled={busy}
-              className={`ya-tool xhs-option ${template === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange(withTemplate(options, id))}>{t(`cards.template.${id}` as MsgKey)}</button>
-          ))}
-          {PUBLIC_CARD_TEMPLATES.map((item) => {
-            const runtime = publicCardTemplateRuntimeId(item.id)
-            const ready = loadedPublic.has(runtime)
-            return (
-              <button key={runtime} data-card-template={runtime} data-card-template-public={item.id}
-                aria-pressed={template === runtime} disabled={busy || !ready}
-                title={ready ? item.reference : t('cards.publicTemplatesLoading')}
-                className={`ya-tool xhs-option ${template === runtime ? 'ya-selected' : ''}`}
-                onClick={() => onOptionsChange(withTemplate(options, runtime))}>
-                {item.name}
-                <span className="ml-1 rounded bg-brand-100 px-1 text-[9px] font-medium text-brand">{t('cards.templatePublic')}</span>
-              </button>
-            )
-          })}
-          {templates.templates.map((item) => (
-            <button key={item.template} data-card-template={item.template} data-card-template-custom="true"
-              aria-pressed={template === item.template} disabled={busy}
-              className={`ya-tool xhs-option ${template === item.template ? 'ya-selected' : ''}`}
-              onClick={() => onOptionsChange(withTemplate(options, item.template))}>
-              {item.name}
-              <span className="ml-1 rounded bg-brand-100 px-1 text-[9px] font-medium text-brand">{t('cards.templateMine')}</span>
-            </button>
-          ))}
+        {/* Uploaded templates and the shared ones sit in two labelled groups,
+            the user's own first, so the two kinds never interleave. */}
+        {templates.templates.length > 0 ? (
+          <div data-card-template-group="mine" className="mb-3">
+            <p className={groupLabel}>{t('cards.templateMine')}</p>
+            <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group"
+              aria-label={`${t('cards.template')} · ${t('cards.templateMine')}`}>
+              {templates.templates.map((item) => (
+                <button key={item.template} data-card-template={item.template} data-card-template-custom="true"
+                  aria-pressed={template === item.template} disabled={busy}
+                  className={`ya-tool xhs-option ${template === item.template ? 'ya-selected' : ''}`}
+                  onClick={() => onOptionsChange(withTemplate(options, item.template))}>
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div data-card-template-group="public">
+          <p className={groupLabel}>{t('cards.templatePublic')}</p>
+          <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group"
+            aria-label={`${t('cards.template')} · ${t('cards.templatePublic')}`}>
+            {CARD_TEMPLATES.map((id) => (
+              <button key={id} data-card-template={id} aria-pressed={template === id} disabled={busy}
+                className={`ya-tool xhs-option ${template === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange(withTemplate(options, id))}>{t(`cards.template.${id}` as MsgKey)}</button>
+            ))}
+            {PUBLIC_CARD_TEMPLATES.map((item) => {
+              const runtime = publicCardTemplateRuntimeId(item.id)
+              const ready = loadedPublic.has(runtime)
+              return (
+                <button key={runtime} data-card-template={runtime} data-card-template-public={item.id}
+                  aria-pressed={template === runtime} disabled={busy || !ready}
+                  title={ready ? item.reference : t('cards.publicTemplatesLoading')}
+                  className={`ya-tool xhs-option ${template === runtime ? 'ya-selected' : ''}`}
+                  onClick={() => onOptionsChange(withTemplate(options, runtime))}>
+                  {item.name}
+                </button>
+              )
+            })}
+          </div>
         </div>
         {templates.publicLoading ? (
           <p data-public-card-loading className="mt-2 text-[11px] text-ink-3" role="status">
