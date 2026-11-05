@@ -612,7 +612,7 @@ export default function Themes() {
   }
 
   return (
-    <div className="ya-page min-h-screen text-ink-1">
+    <div className="ya-page ya-min-viewport text-ink-1">
       <header className="ya-glass sticky top-0 z-10 flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
         <button onClick={() => navigate('/')} className="ya-btn ya-btn-secondary ya-btn-sm !h-8 shrink-0">
           ← {t('common.backToEditor')}

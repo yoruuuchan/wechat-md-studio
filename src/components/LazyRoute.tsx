@@ -7,7 +7,7 @@ type PageLoader = () => Promise<PageModule>
 
 function PageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="ya-page flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+    <div className="ya-page flex ya-min-viewport flex-col items-center justify-center gap-4 px-6 text-center">
       <YoruMark height={22} />
       {children}
     </div>

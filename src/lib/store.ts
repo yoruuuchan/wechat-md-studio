@@ -960,7 +960,11 @@ export const ZOOM_STEPS = [90, 100, 110, 125] as const
 
 export function applyZoom(percent: number): void {
   const step = ZOOM_STEPS.includes(percent as (typeof ZOOM_STEPS)[number]) ? percent : 100
-  document.documentElement.style.zoom = String(step / 100)
+  const root = document.documentElement
+  root.style.zoom = String(step / 100)
+  // Zoom scales viewport units too, so a 100dvh shell would end short of the
+  // screen at 90% and run past it above 100%. CSS divides by this to undo it.
+  root.style.setProperty('--ui-zoom', String(step / 100))
 }
 
 export function saveSettings(s: AppSettings) {

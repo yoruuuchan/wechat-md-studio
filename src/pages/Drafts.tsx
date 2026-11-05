@@ -466,7 +466,7 @@ function Shell({
 }) {
   const { t } = useI18n()
   return (
-    <div className="ya-page min-h-screen">
+    <div className="ya-page ya-min-viewport">
       <header className="ya-glass sticky top-0 z-10 flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
         <button
           onClick={onBack}

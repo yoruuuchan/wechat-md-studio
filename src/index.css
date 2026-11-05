@@ -329,14 +329,20 @@ body {
 }
 
 /* 软键盘弹起时用动态视口高度，别让底部操作被键盘顶出屏幕 */
+/* The interface zoom setting (applyZoom) scales viewport units with the page;
+   dividing by --ui-zoom keeps these exactly one screen tall at every step. */
 .ya-viewport {
-  height: 100dvh;
+  height: calc(100dvh / var(--ui-zoom, 1));
 }
 
 @supports not (height: 100dvh) {
   .ya-viewport {
-    height: 100vh;
+    height: calc(100vh / var(--ui-zoom, 1));
   }
+}
+
+.ya-min-viewport {
+  min-height: calc(100vh / var(--ui-zoom, 1));
 }
 
 /* 卡片用影子定义，不用描边 */
