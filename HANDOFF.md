@@ -865,6 +865,20 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 公网只读冒烟 19 项全过（新增「游客只看到一组『公用』，共 10 个模板」），仍只有那条 Cloudflare 探针 CSP violation。
 > 冒烟未保存、未上传、未改线上稿。
 
+> 2026-11-05 部署记录（界面缩放不再露白边或溢出）：`fix/zoom-viewport-gap`（`04ac2e4`，从 master `8603c4b` 直接快进）
+> 合入并推送 master。问题：设置里的「整体字体大小」给 `html` 设 `zoom`，视口单位也跟着缩放。90% 时 `100dvh` 的编辑器外框
+> 矮一截，底部露出 body 的白底；110% / 125% 时外框超出一屏，整页可以滚动（实测多出 90 / 225 px），底部状态栏被挤出屏幕。
+> 修复：`applyZoom` 同时写 `--ui-zoom`，`.ya-viewport` 和新增的 `.ya-min-viewport`（替换八处 `ya-page` 整屏页面原来的
+> `min-h-screen`）用 `calc(100dvh / var(--ui-zoom, 1))` 还原成一屏高，100% 时与原来等价。只改前端，`dist/boot.js` 不变。
+> 验证：`check`、3035 项测试（新增 `store-zoom.test.ts` 2 项）、`lint`（0 错误）、`verify:themes`、`build` 全过；
+> `cdp-verify-mobile-panes` 152/152、`cdp-verify-ui-modes` 66/66。入口 `index-BGqJ-ZOt.js`（jsxDEV=0）/ `index-Dn_mUN45.css`。
+> 部署：包 `mopai-04ac2e4.tar.gz`（50,410,929 B，sha256 `de51e4c6…`），13 块分块一次传完、整包哈希一致；
+> dist 与数据库先备份到 `/opt/mopai/backups/dist-20261105T084240Z-fb903f9e` 与 `mopai-20261105T084240Z-fb903f9e.db`
+> （integrity_check ok），`flock` 安装于 **2026-11-05 08:42:42 UTC**（`ExecMainStartTimestamp` 一致）。
+> 核对：资产名本地 = 线上 = 公网；`verify-all.sh` exit 0；重启后无 warning 级日志；`card_templates` 仍是 9 行。
+> 公网实测四档缩放（90 / 100 / 110 / 125）：视口最底一行都落在编辑器外框内，整页不可滚动；草稿箱 90% 同样铺满。
+> 公网只读冒烟 19 项全过，仍只有 Cloudflare 探针那条 CSP violation。冒烟未保存、未上传、未改线上稿。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
