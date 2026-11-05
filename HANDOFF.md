@@ -852,6 +852,19 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 内联探针的 CSP violation（页面唯一的内联脚本就是 `__CF$cv$params` 探针），与 11-03 相同。
 > 冒烟未保存、未上传、未改线上稿。
 
+> 2026-11-05 部署记录（卡片模板列表分组）：`feat/card-template-groups`（`8b0189f`，从 master `048f80f` 直接快进）
+> 合入并推送 master。功能：右栏「卡片模板」分成「我的」（上传的模板，没上传时不显示）和「公用」（默认 + 九套公用）
+> 两组，去掉每个模板名后面的「我的 / 公用」小标签。只改前端，`dist/boot.js` 与上一版相同（sha256 `6fbbdc14…`）。
+> 验证：`check`、3033 项测试、`lint`（0 错误）、`verify:themes`、`build` 全过；`cdp-verify-public-cards` 452/452，
+> 上传模板与小红书卡片两套浏览器验收全过。入口 `index-DCeeleCz.js`（jsxDEV=0）/ `index-By8YCQZz.css`。
+> 部署：包 `mopai-8b0189f.tar.gz`（50,410,453 B，sha256 `6058cb33…`），13 块分块一次传完、整包哈希一致；
+> dist 与数据库先备份到 `/opt/mopai/backups/dist-20261105T080500Z-bd57f332` 与 `mopai-20261105T080500Z-bd57f332.db`
+> （integrity_check ok），`flock` 安装于 **2026-11-05 08:05:04 UTC**（`ExecMainStartTimestamp` 一致）。
+> 核对：`index.html` 资产名本地 = 线上 = 公网；九个公用模板包从公网下载与本地构建逐字节一致；`verify-all.sh` exit 0；
+> 重启后无 warning 级日志；部署后 `card_templates` 仍是 9 行（站长此前上传的模板都在）。
+> 公网只读冒烟 19 项全过（新增「游客只看到一组『公用』，共 10 个模板」），仍只有那条 Cloudflare 探针 CSP violation。
+> 冒烟未保存、未上传、未改线上稿。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
