@@ -828,6 +828,30 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > README `editor-akari` / `editor-yoru` 已按 1600×1100 重截（示例稿、Golden Sample、右栏「主题」，
 > 等 `document.fonts.ready` 后截图）；`theme-library` / `typeset-golden` 未动。
 
+> 2026-11-05 部署记录（卡片模板文件化 + 九套公用卡片模板上线）：`feat/card-template-files`（`057b2b6`，
+> 从 master `3170fa3` 直接快进，14 个提交）合入并推送 master。
+> 功能：卡片模板改成 `.reedcard` 模板文件，任何人都能上传（本机保存；站长登录后跨设备同步，删除记进墓碑表）；
+> 移除九套内置模板，只留默认模板；新增九套公用模板（构建时由 `card-templates/public/` 打包到
+> `public/card-templates/`，进入卡片模式才加载）；公用模板去掉了装饰短横线、细线与装饰破折号。
+> 数据库：启动时 `CREATE TABLE IF NOT EXISTS` 新建 `card_templates`、`card_template_tombstones` 及两个索引，
+> 只加不改；安装前用 sqlite 在线备份 API 备份到 `/opt/mopai/backups/mopai-20261105T072110Z-0d0d88b4.db`
+> （integrity_check ok）。
+> 验证：`check`、3033 项测试、`lint`（0 错误，1 条既有 warning）、`verify:themes`、`build` 全过；
+> `cdp-verify-public-cards` 452/452，上传模板与小红书卡片两套浏览器验收全过。入口 `index-B6NEZ9nz.js`
+> （jsxDEV=0）/ `index-a1Yyc8AR.css`，`dist/boot.js` sha256 `6fbbdc14…`。
+> 部署：包 `mopai-057b2b6.tar.gz`（50,410,724 B，sha256 `56519faa…`），13×4 MiB 分块逐块 sha256 后 `cat`
+> 重组、整包哈希一致；这次 13 块一次传完、无重传，约 60 KB/s，用时约 14 分钟。上一版 dist 备份到
+> `/opt/mopai/backups/dist-20261105T072110Z-0d0d88b4`，ubuntu 持 `flock`、锁内 `sudo -n bash` 安装于
+> **2026-11-05 07:21:14 UTC**（`ExecMainStartTimestamp` 一致）。
+> 核对全过：线上 `dist/boot.js` sha256 = 本地；`index.html` 资产名本地 = 线上 = 公网；九个公用模板包从公网下载
+> 与本地构建逐字节一致；`sudo bash /opt/mopai/scripts/verify-all.sh` exit 0（ALL DEPLOYED CHECKS PASSED）；
+> 重启后无 warning 级日志；新表与索引已建，`card_templates` 0 行。
+> 公网只读冒烟（无头 Chrome/CDP 9411、全新临时 profile，18 项断言全过）：公众号模式不预取模板包；切到小红书卡片后
+> 九个模板包都是 200，模板列表恰好是「默认 + 九套公用」，「上传模板文件」入口在位（接受 .reedcard / .zip）；
+> 九套逐一可选，每套排出 6–7 张卡片；无异常、无 console 报错、无失败请求。只有一条 Cloudflare JS-detection
+> 内联探针的 CSP violation（页面唯一的内联脚本就是 `__CF$cv$params` 探针），与 11-03 相同。
+> 冒烟未保存、未上传、未改线上稿。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
