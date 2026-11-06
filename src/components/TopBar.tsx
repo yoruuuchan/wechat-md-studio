@@ -278,7 +278,7 @@ export default function TopBar(p: Props) {
               value={p.docName}
               onChange={(e) => p.onRename(e.target.value)}
               placeholder={t('common.unnamedDoc')}
-              className={`w-full min-w-0 bg-transparent py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4 ${p.phone ? '!px-0' : 'px-1.5'}`}
+              className={`w-full min-w-0 bg-transparent py-1 text-[13px] text-ink-1 text-ellipsis outline-none placeholder:text-ink-4 ${p.phone ? '!px-0' : 'px-1.5'}`}
               title={t('topbar.docNameTitle')}
             />
             <DropdownMenu>

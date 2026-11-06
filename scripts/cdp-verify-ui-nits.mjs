@@ -2,7 +2,8 @@
 //   1. phone mode switching is a pill in the top bar, not a second row;
 //   2. 外观与语言 moved from 更多 into the side panel's 设置 tab;
 //   3. 中文 quick save reads 存草稿 at every width;
-//   4. uploading / deleting / sync / errors live inside the 我的 template group.
+//   4. uploading / deleting / sync / errors live inside the 我的 template group;
+//   5. a clipped article name ends in an ellipsis instead of a half character.
 //
 // It connects to an already-running production build (default
 // http://127.0.0.1:3271/, CDP 9397), uses the ignored .env ACCESS_KEY to sign
@@ -241,6 +242,21 @@ try {
     };
   })()`)
 
+  const measureDocName = () => evaluate(`(() => {
+    const input = document.querySelector('[data-doc-name]');
+    const cs = getComputedStyle(input);
+    const header = document.querySelector('[data-topbar]');
+    return {
+      value: input.value,
+      textOverflow: cs.textOverflow,
+      overflowX: cs.overflowX,
+      scrollWidth: input.scrollWidth,
+      clientWidth: input.clientWidth,
+      headerOverflow: header.scrollWidth - header.clientWidth,
+      pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+    };
+  })()`)
+
   const measurePhoneBody = () => evaluate(`(() => {
     const box = (selector) => {
       const el = document.querySelector(selector);
@@ -328,6 +344,24 @@ try {
       }
     }
   }
+
+  // -------------------------------------------------------------------------
+  console.log('\n=== article name ellipsis ===')
+  await setPrefs({ lang: 'zh' })
+  await setWidth(1280, 900)
+  await setMode('wechat')
+  const wideName = await measureDocName()
+  check('the doc-name input computes text-overflow: ellipsis', wideName.textOverflow === 'ellipsis', wideName)
+
+  const narrowNames = []
+  for (const width of [390, 360]) {
+    await setWidth(width, widthHeight(width))
+    await setMode('wechat')
+    narrowNames.push({ width, ...(await measureDocName()) })
+  }
+  check('390px and 360px: an overflowing article name is ellipsized and the top bar does not overflow horizontally',
+    narrowNames.every((item) => item.scrollWidth > item.clientWidth && item.textOverflow === 'ellipsis' && item.headerOverflow <= 0 && item.pageOverflow <= 0),
+    narrowNames)
 
   // -------------------------------------------------------------------------
   console.log('\n=== phone screenshots and pill mode switching ===')
@@ -555,6 +589,12 @@ try {
   check('1280px English: the top bar and sidebar labels still fit',
     enBar.headerOverflow <= 0 && enBar.clipped.length === 0 &&
     (await evaluate(`(() => { const l = document.querySelector('[data-onboarding="sidebar"] [role=tablist]'); return !!l && l.scrollWidth <= l.clientWidth })()`)), enBar)
+
+  await setWidth(390, 844)
+  await click(`document.querySelector('[data-pane-tab="editor"]')`)
+  await setMode('wechat')
+  await evaluate('document.fonts.ready.then(() => true)')
+  await shot('390-en-wechat.png')
   await setPrefs({ lang: 'zh', theme: 'akari' })
 
   check('no uncaught page exceptions', exceptions.length === 0, exceptions.length)

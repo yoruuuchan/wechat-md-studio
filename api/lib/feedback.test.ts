@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   buildFeedbackEmail,
   feedbackApiUrl,
@@ -137,6 +137,18 @@ describe('buildFeedbackEmail', () => {
 })
 
 describe('sendFeedbackEmail', () => {
+  // A local .env may point RESEND_API_URL at the mock relay used by browser
+  // acceptance. This test pins the production default, so hide that override.
+  let savedUrl: string | undefined
+  beforeEach(() => {
+    savedUrl = process.env.RESEND_API_URL
+    delete process.env.RESEND_API_URL
+  })
+  afterEach(() => {
+    if (savedUrl === undefined) delete process.env.RESEND_API_URL
+    else process.env.RESEND_API_URL = savedUrl
+  })
+
   it('posts a Resend-shaped request and resolves on 2xx', async () => {
     const calls: { url: string; init: RequestInit }[] = []
     const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
