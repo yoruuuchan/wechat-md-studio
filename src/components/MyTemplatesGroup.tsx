@@ -165,7 +165,11 @@ export default function MyTemplatesGroup({ state, selected, busy, onSelect, onUp
       ) : null}
 
       {state.templates.length === 0 ? (
-        <p className="ya-well p-2.5 text-[12px] leading-relaxed text-ink-3">{t('cards.templateEmpty')}</p>
+        // Until the saved templates are restored the list is only empty because
+        // it has not loaded yet; the loading line above already says so.
+        state.loading ? null : (
+          <p className="ya-well p-2.5 text-[12px] leading-relaxed text-ink-3">{t('cards.templateEmpty')}</p>
+        )
       ) : (
         <div
           className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1"
