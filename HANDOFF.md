@@ -879,6 +879,36 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 公网实测四档缩放（90 / 100 / 110 / 125）：视口最底一行都落在编辑器外框内，整页不可滚动；草稿箱 90% 同样铺满。
 > 公网只读冒烟 19 项全过，仍只有 Cloudflare 探针那条 CSP violation。冒烟未保存、未上传、未改线上稿。
 
+> 2026-11-06 部署记录（手机顶栏收紧、外观与语言移进设置、卡片模板操作并进「我的」）：`fix/ui-nits-1106`（`87dcbb7`，
+> 从 master `c2670e2` 直接快进，含 `35c70a8`、`5370993`、`87dcbb7`）合入并推送 master。改动：
+> - 手机档（<640px）去掉顶栏下面单独一行的模式条，模式入口改成顶栏右侧的胶囊下拉（`data-topbar-mode-pill`，长图、动效
+>   仍可见不可选）；顶栏整体 105 → 57 px，正文首行上移 48 px（390 / 360 相同）。稿件名输入框加 `text-ellipsis`，放不下时
+>   以省略号收尾。中文 `topbar.saveQuickShort` 由「存」改为「存草稿」。保存状态按用户选择不动：登录后「存草稿」按钮在场，
+>   保存状态只露出「本」「云」两个字；游客没有这个按钮，显示「本机已保…」「云端未登录」。
+> - 「更多」里的语言、明暗控件换成一项「外观与语言」（`data-more-item="appearance-language"`），点开按布局打开右栏的
+>   「设置」（宽档常驻栏、768 档抽屉、手机切到侧栏面板）；「设置」最上方新增语言、明暗两行（`data-settings-item`）。
+> - 卡片模板的上传、管理（删除）、同步状态和报错并进模板选择器的「我的」组（新 `MyTemplatesGroup.tsx`，删掉
+>   `CardTemplatesSection.tsx`），下面不再有第二块「我的模板」列表。空组保留上传和空状态提示，「管理」置灰；加载中不再闪
+>   「还没有上传的模板」。模板片上只显示名称，不再显示作者、版本号。
+> - `api/lib/feedback.test.ts` 在 `sendFeedbackEmail` 的用例前后保存并还原 `RESEND_API_URL`，本机 `.env` 覆盖这个变量时
+>   测试不再失败。
+> 已知取舍：<768px 的英文界面让稿件名截断让位，640 px 的模式导航不再严格居中。
+> `dist/boot.js` 也变了（`6fbbdc14…` → `17a8780a…`）：服务端经共用的 `src/lib` 模块打进了界面文字表，本轮新增的
+> `templateManageDone` 键在 boot.js 里出现 2 次；`api/` 下只改了一个测试文件。
+> 验证：`87dcbb7` 上 `check`、3035 项测试（75 个文件）、`lint`（无错误）、`build`（jsxDEV=0）全过，`cdp-verify-ui-nits`
+> 133/133；`5370993` 上另跑过 `verify:themes`（227 套）、`cdp-verify-ui-modes` 111/111、`cdp-verify-mobile-panes` 152/152；
+> `35c70a8` 上另跑过 `verify:sources`、`cdp-verify-i18n` 35/35、`cdp-verify-dark-theme`、`cdp-verify-card-template-upload`，
+> 全过。入口 `index-BsMmNCEF.js` / `index-B6SAo9Ff.css`。
+> 部署：包 `mopai-87dcbb7.tar.gz`（50,410,784 B，sha256 `eedd1ee2…`），13 块分块一次传完、整包哈希一致；
+> dist 与数据库先备份到 `/opt/mopai/backups/dist-20261106T050910Z-a4c210c4` 与 `mopai-20261106T050910Z-a4c210c4.db`
+> （integrity_check ok），`flock` 安装，服务于 **2026-11-06 05:09:13 UTC** 重启（部署输出与 postcheck 一致）。
+> 核对：资产名与 boot.js 哈希本地 = 线上，公网首页引用同一对资产；`verify-all.sh` exit 0；重启后无 warning 级日志；
+> `card_templates` 仍是 9 行。
+> 公网只读冒烟 23 项全过：分组检查改成游客看到空的「我的」组（上传、置灰的「管理」、空状态提示）在上、「公用」组 10 个
+> 模板在下，模板只列一处；新增三项：「更多」只有一项「外观与语言」并落到「设置」；390 px 下模式胶囊在栏内、没有单独的
+> 模式行、稿件名 `text-overflow: ellipsis`、横向无溢出、顶栏 57 px。冒烟打开了两次页面，所以有两条 CSP violation，都来自
+> Cloudflare 探针（首页唯一的内联脚本是它每次插入的，哈希每次不同）。冒烟未保存、未上传、未改线上稿。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
