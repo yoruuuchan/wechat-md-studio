@@ -161,11 +161,21 @@ async function openMore() {
   for (let i = 0; i < 40 && !(await evaluate(`!!document.querySelector('[role=menu]')`)); i++) await sleep(100)
   if (!(await evaluate(`!!document.querySelector('[role=menu]')`))) throw new Error('More menu did not open')
 }
-async function chooseLang(lang) {
+// The language and theme controls moved out of 更多 and into the settings tab;
+// 更多 now owns one 外观与语言 entry that opens that tab.
+async function openSettings() {
   await openMore()
-  await evaluate(`document.querySelector('[data-lang="${lang}"]').click()`)
+  await realClick('[data-more-item="appearance-language"]')
+  for (let i = 0; i < 60; i++) {
+    if (await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang]') !== null`)) return
+    await sleep(100)
+  }
+  throw new Error('settings tab with the language control did not open')
+}
+async function chooseLang(lang) {
+  await openSettings()
+  await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang="${lang}"]').click()`)
   await sleep(700)
-  await escapeMenu()
 }
 // React-controlled fields need the native setter plus a bubbling input event.
 const FILL = `(selector, value) => {
@@ -187,18 +197,17 @@ function check(name, ok, detail = '') {
 
 // ---------- 中文 is the default ----------
 await goto(APP)
-await openMore()
+await openSettings()
 const zh = JSON.parse(
   await evaluate(`JSON.stringify({
     lang: document.documentElement.lang,
     title: document.title,
     brand: document.querySelector('header span.text-ink-1')?.textContent?.trim(),
     copyBtn: [...document.querySelectorAll('button')].some(b => b.textContent.includes('复制到公众号')),
-    hasToggle: !!document.querySelector('[data-lang="zh"]') && !!document.querySelector('[data-lang="en"]'),
+    hasToggle: !!document.querySelector('[data-settings-item="language"] [data-lang="zh"]') && !!document.querySelector('[data-settings-item="language"] [data-lang="en"]'),
     stored: localStorage.getItem('mopai.lang.v1'),
   })`),
 )
-await escapeMenu()
 check('中文 is the default on a fresh profile', zh.lang === 'zh-CN' && zh.brand === '芦苇', JSON.stringify(zh))
 check('the title is the Chinese one', zh.title.includes('芦苇'), zh.title)
 check('the editor renders Chinese copy', zh.copyBtn === true)

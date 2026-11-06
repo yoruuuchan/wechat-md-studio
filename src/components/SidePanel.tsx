@@ -13,6 +13,8 @@ import type { CardTemplateSummary } from '@/lib/card-template-format'
 import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import ThemeQuickPicker from '@/components/ThemeQuickPicker'
 import CardSettings from '@/components/CardSettings'
+import { LanguageToggle } from '@/components/LanguageToggle'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export type SidePanelTab = 'theme' | 'card' | 'materials' | 'titles' | 'settings'
 
@@ -307,7 +309,28 @@ export default function SidePanel(p: Props) {
         </TabsContent>
 
         <TabsContent value="settings" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
-          <Label>{t('panel.settings.experience')}</Label>
+          {/* 外观与语言 moved here from the 更多 menu; the rows copy the zoom
+              row below so the new group looks native to this tab. */}
+          <Label>{t('topbar.moreLook')}</Label>
+          <div className="space-y-1.5">
+            <div
+              data-settings-item="language"
+              className="flex items-center justify-between gap-2 rounded-xl bg-surface-sunken px-3 py-2"
+              style={{ boxShadow: 'var(--shadow-inset)' }}
+            >
+              <span className="text-[12px] text-ink-1">{t('lang.group')}</span>
+              <LanguageToggle />
+            </div>
+            <div
+              data-settings-item="appearance"
+              className="flex items-center justify-between gap-2 rounded-xl bg-surface-sunken px-3 py-2"
+              style={{ boxShadow: 'var(--shadow-inset)' }}
+            >
+              <span className="text-[12px] text-ink-1">{t('theme.group')}</span>
+              <ThemeToggle />
+            </div>
+          </div>
+          <div className="mt-4"><Label>{t('panel.settings.experience')}</Label></div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
               <span className="text-[12px] text-ink-1">{t('panel.settings.syncScroll')}</span>

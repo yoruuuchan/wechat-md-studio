@@ -11,7 +11,7 @@ import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import type { CardTemplateSummary } from '@/lib/card-template-format'
 import type { MsgKey } from '@/lib/i18n'
 import { useI18n } from '@/hooks/useI18n'
-import CardTemplatesSection from '@/components/CardTemplatesSection'
+import MyTemplatesGroup from '@/components/MyTemplatesGroup'
 import { PUBLIC_CARD_TEMPLATES, publicCardTemplateFor, publicCardTemplateRuntimeId } from '@/lib/public-card-templates'
 
 interface Props {
@@ -50,23 +50,16 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
       <div>
         <p className="ya-eyebrow mb-2">{t('cards.template')}</p>
         {/* Uploaded templates and the shared ones sit in two labelled groups,
-            the user's own first, so the two kinds never interleave. */}
-        {templates.templates.length > 0 ? (
-          <div data-card-template-group="mine" className="mb-3">
-            <p className={groupLabel}>{t('cards.templateMine')}</p>
-            <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group"
-              aria-label={`${t('cards.template')} · ${t('cards.templateMine')}`}>
-              {templates.templates.map((item) => (
-                <button key={item.template} data-card-template={item.template} data-card-template-custom="true"
-                  aria-pressed={template === item.template} disabled={busy}
-                  className={`ya-tool xhs-option ${template === item.template ? 'ya-selected' : ''}`}
-                  onClick={() => onOptionsChange(withTemplate(options, item.template))}>
-                  {item.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
+            the user's own first, so the two kinds never interleave. Upload,
+            delete, sync state and errors belong to the own group itself. */}
+        <MyTemplatesGroup
+          state={templates}
+          selected={template}
+          busy={busy}
+          onSelect={(id) => onOptionsChange(withTemplate(options, id))}
+          onUploaded={onTemplateUploaded}
+          onDeleted={onTemplateDeleted}
+        />
         <div data-card-template-group="public">
           <p className={groupLabel}>{t('cards.templatePublic')}</p>
           <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group"
@@ -101,8 +94,6 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
           </p>
         ) : null}
       </div>
-
-      <CardTemplatesSection state={templates} selected={template} onUploaded={onTemplateUploaded} onDeleted={onTemplateDeleted} />
 
       <div>
         <p className="ya-eyebrow mb-2">{t('cards.ratio')}</p>

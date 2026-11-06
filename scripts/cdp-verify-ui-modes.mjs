@@ -2,17 +2,18 @@
 //
 // It connects to an already-running local production build (default
 // http://127.0.0.1:3271/, CDP 9397), drives a fresh Chrome profile, and checks:
-//   * the top bar at 1536 / 1280 / 960 / 768 / 640 / 390 — no horizontal
+//   * the top bar at 1536 / 1280 / 960 / 768 / 640 / 390 / 360 — no horizontal
 //     overflow, no clipped or overlapping controls;
 //   * the article name still fits eight CJK characters at >= 960px;
 //   * the four mode entries, the two placeholders and the side-panel tab that
-//     follows the mode;
-//   * every item in 更多, including import/export/account and the appearance
-//     controls;
+//     follows the mode; on a phone the same entries live in the mode pill menu;
+//   * every item in 更多, including import/export/account and the one 外观与语言
+//     entry that opens the settings tab, where language and theme now live;
 //   * card template/ratio/background in the side panel and the live preview;
 //   * the theme quick-switcher in the side panel and the live preview;
 //   * 复制到公众号 and 导出全部 ZIP (the ZIP is generated and discarded);
-//   * the signed-in one-click save next to the save status.
+//   * the signed-in one-click save next to the save status, which reads 存草稿
+//     at every width.
 //
 // It also writes the review screenshots and verify-out/ui/index.html.
 //
@@ -197,8 +198,20 @@ try {
     await sleep(250)
   }
   const setMode = async (mode) => {
-    await click(`document.querySelector('[data-preview-mode="${mode}"]')`)
-    await waitFor(`document.querySelector('[data-preview-mode="${mode}"]')?.getAttribute('aria-pressed') === 'true'`, `${mode} mode selected`)
+    // Phone merges the four modes into a pill menu; medium and wide keep the
+    // segmented navigation in the bar.
+    const pill = await evaluate(`!!document.querySelector('[data-topbar-mode-pill]')`)
+    if (pill) {
+      if ((await evaluate(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode`)) !== mode) {
+        await click(`document.querySelector('[data-topbar-mode-pill]')`)
+        await waitFor(`!!document.querySelector('[role=menu] [data-preview-mode="${mode}"]')`, `${mode} pill menu open`)
+        await click(`document.querySelector('[role=menu] [data-preview-mode="${mode}"]')`)
+      }
+      await waitFor(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === ${JSON.stringify(mode)}`, `${mode} mode selected`)
+    } else {
+      await click(`document.querySelector('[data-preview-mode="${mode}"]')`)
+      await waitFor(`document.querySelector('[data-preview-mode="${mode}"]')?.getAttribute('aria-pressed') === 'true'`, `${mode} mode selected`)
+    }
     if (mode === 'cards') await cardsReady()
   }
   const cardsReady = async () => {
@@ -370,7 +383,7 @@ try {
   await openMore()
   const moreIds = await evaluate(`(() => [...document.querySelectorAll('[data-more-item]')].map((el) => el.dataset.moreItem))()`)
   console.log(' ', JSON.stringify(moreIds))
-  const expectedMore = ['save-draft', 'drafts', 'materials', 'panel', 'import-markdown', 'import-docx', 'import-bundle', 'export-markdown', 'export-clean', 'export-page', 'export-bundle', 'language', 'appearance', 'references', 'github', 'login']
+  const expectedMore = ['save-draft', 'drafts', 'materials', 'panel', 'import-markdown', 'import-docx', 'import-bundle', 'export-markdown', 'export-clean', 'export-page', 'export-bundle', 'appearance-language', 'references', 'github', 'login']
   check('更多 exposes all required entries', expectedMore.every((id) => moreIds.includes(id)) && moreIds.length === expectedMore.length, moreIds)
   await escape()
 
@@ -444,25 +457,68 @@ try {
   const panelCountAfter = await evaluate(`document.querySelectorAll('[data-slot="resizable-panel"]').length`)
   record('panel', panelClosed && panelBack, { panelBefore, panelClosed, panelBack, panelCountAfter })
 
-  await goto()
-  await moreItem('language')
-  await click(`document.querySelector('[data-more-item="language"] [data-lang="en"]')`)
-  const toEnglish = await waitFor(`document.documentElement.lang === 'en'`, 'language switch', 5000).then(() => true).catch(() => false)
-  await click(`document.querySelector('[data-more-item="language"] [data-lang="zh"]')`)
-  await waitFor(`document.documentElement.lang === 'zh'`, 'language restored', 5000).catch(() => {})
-  record('language', toEnglish)
-  await escape()
+  const settingsState = () => evaluate(`(() => {
+    const drawer = document.querySelector('[data-side-drawer]');
+    const sidePane = document.querySelector('[data-pane="side"]');
+    const sidebar = document.querySelector('[data-onboarding="sidebar"]');
+    const tab = document.querySelector('[data-side-tab="settings"]');
+    return {
+      drawer: drawer ? drawer.dataset.state : null,
+      sidePaneVisible: sidePane ? getComputedStyle(sidePane).visibility !== 'hidden' : null,
+      sidebarVisible: sidebar ? sidebar.getBoundingClientRect().width > 0 : false,
+      settingsSelected: tab?.getAttribute('aria-selected') === 'true',
+      hasLanguage: !!document.querySelector('[data-settings-item="language"] [data-lang="en"]'),
+      hasTheme: !!document.querySelector('[data-settings-item="appearance"] [role=radio]'),
+    };
+  })()`)
+
+  // 更多 → 外观与语言 is now one plain menu item. Check it at all three panel
+  // shapes: the wide column (1280), the medium drawer (768) and the phone's
+  // own side pane (390), and toggle both controls from the new location.
+  for (const width of [1280, 768, 390]) {
+    const height = width === 390 ? 844 : 900
+    await setWidth(width, height)
+    await setMode('wechat')
+    await moreItem('appearance-language')
+    const opened = await waitFor(`(() => {
+      const tab = document.querySelector('[data-side-tab="settings"]');
+      return tab?.getAttribute('aria-selected') === 'true';
+    })()`, `${width}px settings tab after 更多`, 10000).then(settingsState).catch(() => null)
+    const visible = Boolean(opened) && (
+      width >= 1200 ? opened.sidebarVisible
+        : width >= 640 ? opened.drawer === 'open'
+          : opened.sidePaneVisible === true
+    )
+    check(`${width}px: 更多 → 外观与语言 opens the panel on 设置`, visible && Boolean(opened?.settingsSelected), opened)
+    check(`${width}px: 设置 holds the language and appearance controls`, Boolean(opened?.hasLanguage && opened?.hasTheme), opened?.hasLanguage && opened?.hasTheme ? 'both' : opened)
+
+    await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang="en"]').click()`)
+    const toEnglish = await waitFor(`document.documentElement.lang === 'en'`, `${width}px language switch`, 5000).then(() => true).catch(() => false)
+    check(`${width}px: the settings language control switches to English`, toEnglish)
+    await sleep(600)
+    await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang="zh"]').click()`)
+    const backToChinese = await waitFor(`document.documentElement.lang === 'zh-CN'`, `${width}px language restored`, 5000).then(() => true).catch(() => false)
+    check(`${width}px: the settings language control switches back to 中文`, backToChinese)
+    await sleep(600)
+
+    await evaluate(`document.querySelectorAll('[data-settings-item="appearance"] [role=radio]')[2].click()`)
+    const toDark = await waitFor(`document.documentElement.classList.contains('dark')`, `${width}px dark theme`, 5000).then(() => true).catch(() => false)
+    check(`${width}px: the settings appearance control switches to dark`, toDark)
+    await sleep(300)
+    await evaluate(`document.querySelectorAll('[data-settings-item="appearance"] [role=radio]')[0].click()`)
+    const toLight = await waitFor(`!document.documentElement.classList.contains('dark')`, `${width}px light theme`, 5000).then(() => true).catch(() => false)
+    check(`${width}px: the settings appearance control switches back to light`, toLight)
+
+    if (width >= 640 && width < 1200) {
+      await escape()
+      await waitFor(`!document.querySelector('[data-side-drawer]')`, `${width}px drawer closed`, 5000).catch(() => {})
+    } else if (width < 640) {
+      await click(`document.querySelector('[data-pane-tab="editor"]')`)
+      await waitFor(`getComputedStyle(document.querySelector('[data-pane="editor"]')).visibility !== 'hidden'`, `${width}px editor pane`, 5000)
+    }
+  }
   await goto()
 
-  await moreItem('appearance')
-  await click(`document.querySelectorAll('[data-more-item="appearance"] [role=radio]')[2]`)
-  const toDark = await waitFor(`document.documentElement.classList.contains('dark')`, 'dark theme', 5000).then(() => true).catch(() => false)
-  await click(`document.querySelectorAll('[data-more-item="appearance"] [role=radio]')[0]`)
-  await waitFor(`!document.documentElement.classList.contains('dark')`, 'light theme restored', 5000).catch(() => {})
-  record('appearance', toDark)
-  await escape()
-
-  await goto()
   await openMore()
   const github = await evaluate(`(() => {
     const a = document.querySelector('[data-more-item="github"]');
@@ -512,9 +568,63 @@ try {
     };
   })()`)
 
-  const widths = [1536, 1280, 960, 768, 640, 390]
+  const measurePhoneBody = () => evaluate(`(() => {
+    const box = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { top: Math.round(r.top * 10) / 10, height: Math.round(r.height * 10) / 10 };
+    };
+    return {
+      header: box('[data-topbar]'),
+      headerMain: box('[data-topbar-main]'),
+      modesRow: box('[data-topbar-modes-row]'),
+      note: box('[data-narrow-note]'),
+      switcher: box('[data-pane-switcher]'),
+      editorPaneTop: box('[data-pane="editor"]')?.top ?? null,
+      bodyTextTop: box('.cm-content')?.top ?? null,
+      pill: box('[data-topbar-mode-pill]'),
+    };
+  })()`)
+
+  // The old phone shell put a 48px mode row under the 56px bar. The pill lives
+  // inside the bar, so the article must start at least 40px higher; these are
+  // the measured pre-change offsets from verify-out/nits/before/measurements.json.
+  const PHONE_BASELINE = {
+    390: { editorPaneTop: 201.8, bodyTextTop: 286.8, headerHeight: 105 },
+    360: { editorPaneTop: 201.8, bodyTextTop: 286.8, headerHeight: 105 },
+  }
+  const checkPhonePicker = async (width) => {
+    const bar = await measurePhoneBody()
+    const baseline = PHONE_BASELINE[width]
+    check(`${width}px: the separate mode row is gone`, bar.modesRow === null, bar.modesRow)
+    check(`${width}px: the mode pill sits inside the single top bar`, bar.pill !== null && bar.header.height < baseline.headerHeight, bar)
+    check(`${width}px: the article starts at least 40px higher than before`,
+      bar.editorPaneTop !== null && bar.editorPaneTop <= baseline.editorPaneTop - 40 && bar.bodyTextTop <= baseline.bodyTextTop - 40,
+      { before: baseline, after: { editorPaneTop: bar.editorPaneTop, bodyTextTop: bar.bodyTextTop } })
+    await click(`document.querySelector('[data-topbar-mode-pill]')`)
+    await waitFor(`!!document.querySelector('[role=menu]')`, `${width}px mode menu open`)
+    const entries = await evaluate(`(() => [...document.querySelectorAll('[role=menu] [data-preview-mode]')].map((el) => ({
+      id: el.dataset.previewMode,
+      text: el.textContent.trim(),
+      disabled: el.hasAttribute('data-disabled') || el.getAttribute('aria-disabled') === 'true',
+      placeholder: el.dataset.modePlaceholder === 'true',
+      selected: el.dataset.modeSelected === 'true',
+    })))()`)
+    check(`${width}px: the pill menu lists all four modes`, JSON.stringify(entries.map((entry) => entry.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), entries)
+    check(`${width}px: long-image and motion are disabled placeholders in the pill menu`,
+      entries.filter((entry) => entry.id === 'long' || entry.id === 'motion').every((entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')), entries)
+    check(`${width}px: the pill marks the current mode`, entries.some((entry) => entry.id === 'wechat' && entry.selected), entries)
+    await shot(`${width}-mode-picker.png`)
+    await setMode('cards')
+    check(`${width}px: the pill switches to cards`, (await evaluate(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode`)) === 'cards')
+    await setMode('wechat')
+    await escape()
+  }
+
+  const widths = [1536, 1280, 960, 768, 640, 390, 360]
   for (const width of widths) {
-    const height = width === 390 ? 844 : 900
+    const height = width === 390 ? 844 : width === 360 ? 740 : 900
     await setWidth(width, height)
     const bar = await measureTopbar()
     check(`${width}px: the top bar has no horizontal overflow`, bar.headerOverflow <= 0 && bar.pageOverflow <= 0, bar)
@@ -551,6 +661,15 @@ try {
         const tab = await activeSideTab()
         check(`${width}px: the right column stays on the card 模板 tab`, tab === '模板', tab)
       }
+    }
+
+    if (width < 640) {
+      // The phone mode navigation is a menu; the review shot wants the editor
+      // pane behind it, the same pane the pre-change mode row was captured in.
+      await click(`document.querySelector('[data-pane-tab="editor"]')`)
+      await waitFor(`getComputedStyle(document.querySelector('[data-pane="editor"]')).visibility !== 'hidden'`, 'phone editor pane')
+      await setMode('wechat')
+      await checkPhonePicker(width)
     }
   }
 
@@ -640,12 +759,17 @@ try {
       const saved = await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')].some((el) => /已保存到草稿箱|Saved to drafts/.test(el.textContent))`, 'save toast', 15_000).then(() => true).catch(() => false)
       check('signed in: one click saves the article to the drafts box', saved, await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((el) => el.textContent).join(' | ')`))
     }
-    await setWidth(960, 900)
-    const signedBar = await measureTopbar()
-    check('960px signed in: the quick save and every control are not clipped', signedBar.headerOverflow <= 0 && signedBar.pageOverflow <= 0 && signedBar.clipped.length === 0 && signedBar.overlaps.length === 0, signedBar)
-    await setWidth(390, 844)
-    const signedPhoneBar = await measureTopbar()
-    check('390px signed in: the quick save and every control are not clipped', signedPhoneBar.headerOverflow <= 0 && signedPhoneBar.pageOverflow <= 0 && signedPhoneBar.clipped.length === 0 && signedPhoneBar.overlaps.length === 0, signedPhoneBar)
+    // The short quick-save label used to collapse to a single 存 on medium and
+    // phone. 中文 must read 存草稿 at every width; English keeps its short form.
+    for (const width of [1536, 1280, 960, 768, 640, 390, 360]) {
+      const height = width === 390 ? 844 : width === 360 ? 740 : 900
+      await setWidth(width, height)
+      const label = await evaluate(`document.querySelector('[data-save-draft-quick]')?.textContent?.trim() || ''`)
+      check(`${width}px signed in: the quick save still says 存草稿`, label === '存草稿', label)
+      const signedBar = await measureTopbar()
+      check(`${width}px signed in: the quick save and every control are not clipped`,
+        signedBar.headerOverflow <= 0 && signedBar.pageOverflow <= 0 && signedBar.clipped.length === 0 && signedBar.overlaps.length === 0, signedBar)
+    }
 
     // 更多 owns the account entry: while signed in it must offer logout, and
     // using it must actually sign out (the app returns to /login; the signed-out
@@ -672,7 +796,7 @@ try {
 
 // ---------------------------------------------------------------------------
 function writeReviewIndex() {
-  const widths = [1536, 1280, 960, 768, 640, 390]
+  const widths = [1536, 1280, 960, 768, 640, 390, 360]
   const figure = (src, label) => {
     if (!fs.existsSync(path.join(OUTPUT, src))) return ''
     return `<figure><img src="${src}" alt="${label}"><figcaption>${label}</figcaption></figure>`

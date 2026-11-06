@@ -11,8 +11,6 @@ import { PanelRightOpen } from 'lucide-react'
 import type { DocRecord } from '@/lib/store'
 import { REPO_URL } from '@/lib/brand'
 import { YoruMark } from '@/components/YoruMark'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { LanguageToggle } from '@/components/LanguageToggle'
 import { useI18n } from '@/hooks/useI18n'
 import { SaveStatus } from '@/components/SaveStatus'
 import type { ArticleSaveStatus } from '@/lib/save-status'
@@ -50,6 +48,8 @@ interface Props {
   onOpenReferences: () => void
   panelOpen: boolean
   onTogglePanel: () => void
+  /** Open the right panel on its 设置 tab (wide column, drawer or phone pane). */
+  onOpenSettings: () => void
   /** Medium layout: images/settings live in a drawer, so the bar opens it. */
   onOpenSidePanel?: () => void
   userName: string
@@ -67,10 +67,25 @@ interface Props {
   cardsProgress: { done: number; total: number }
   onExportAll: () => void
 
-  /** Phone puts the mode navigation on its own row under the bar. */
+  /** Phone merges the mode navigation into the top bar as a pill menu. */
   phone: boolean
   /** Wide shows the full mode labels; medium uses the shorter ones. */
   wide: boolean
+}
+
+type ModeItem = { id: EditorMode | 'long' | 'motion'; label: string; soon?: boolean }
+type Translate = ReturnType<typeof useI18n>['t']
+
+/** The four entries share their labels and order with the wide navigation. */
+function modeItems(t: Translate, compact: boolean): ModeItem[] {
+  return [
+    { id: 'wechat', label: compact ? t('topbar.mode.wechatShort') : t('topbar.mode.wechat') },
+    { id: 'cards', label: compact ? t('topbar.mode.cardsShort') : t('topbar.mode.cards') },
+    // Placeholders are visible and focusable so their "coming soon" hint is
+    // reachable by keyboard, but choosing them changes nothing.
+    { id: 'long', label: compact ? t('topbar.mode.longShort') : t('topbar.mode.long'), soon: true },
+    { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), soon: true },
+  ]
 }
 
 function ModeNav({
@@ -85,14 +100,7 @@ function ModeNav({
   fullWidth?: boolean
 }) {
   const { t } = useI18n()
-  const items: { id: EditorMode | 'long' | 'motion'; label: string; soon?: boolean }[] = [
-    { id: 'wechat', label: compact ? t('topbar.mode.wechatShort') : t('topbar.mode.wechat') },
-    { id: 'cards', label: compact ? t('topbar.mode.cardsShort') : t('topbar.mode.cards') },
-    // Placeholders are visible and focusable so their "coming soon" hint is
-    // reachable by keyboard, but choosing them changes nothing.
-    { id: 'long', label: compact ? t('topbar.mode.longShort') : t('topbar.mode.long'), soon: true },
-    { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), soon: true },
-  ]
+  const items = modeItems(t, compact)
 
   return (
     <div
@@ -136,6 +144,66 @@ function ModeNav({
         )
       })}
     </div>
+  )
+}
+
+/**
+ * Phone-only mode switch: the current mode and a chevron in one pill. The
+ * menu keeps the same four entries and the same disabled placeholders as the
+ * wide navigation, so the mode row under the bar is no longer needed.
+ */
+function PhoneModePicker({
+  mode,
+  onModeChange,
+}: {
+  mode: EditorMode
+  onModeChange: (mode: EditorMode) => void
+}) {
+  const { t } = useI18n()
+  const items = modeItems(t, true)
+  const current = items.find((item) => !item.soon && item.id === mode) ?? items[0]
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-topbar-mode-pill
+          data-mode={mode}
+          aria-label={`${t('topbar.mode.label')} · ${current.label}`}
+          title={t('topbar.mode.label')}
+          className="ya-tool ya-selected !h-9 shrink-0 whitespace-nowrap rounded-xl !px-2 !text-[12px] font-medium text-ink-1"
+        >
+          <span>{current.label}</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true" className="text-ink-3">
+            <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="ya-pop w-48 border-none">
+        {items.map((item) => {
+          const selected = !item.soon && mode === item.id
+          return (
+            <DropdownMenuItem
+              key={item.id}
+              data-preview-mode={item.id}
+              data-mode-placeholder={item.soon ? 'true' : undefined}
+              data-mode-selected={selected ? 'true' : undefined}
+              aria-disabled={item.soon ? 'true' : undefined}
+              disabled={item.soon}
+              onSelect={() => {
+                if (item.soon) return
+                onModeChange(item.id as EditorMode)
+              }}
+              className={`rounded-lg ${selected ? 'ya-selected text-ink-1' : ''} ${item.soon ? 'opacity-50' : ''}`}
+            >
+              <span>{item.label}</span>
+              {item.soon && <span className="ml-auto text-[11px] font-normal text-ink-3">{t('topbar.mode.soon')}</span>}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -189,8 +257,11 @@ export default function TopBar(p: Props) {
   return (
     <header data-topbar className="ya-glass flex shrink-0 flex-col">
       <div data-topbar-main className={`flex h-14 items-center ${p.phone ? 'gap-1.5 px-2' : 'gap-2 px-3'}`}>
-        {/* Left: brand, article name and the save state. */}
-        <div className={`flex min-w-0 items-center ${p.phone ? 'flex-1 gap-1.5' : 'shrink-0 gap-2'}`}>
+        {/* Left: brand, article name and the save state. At 640px the longer
+            English labels do not fit beside a fixed-width name column, so below
+            768px the name yields space and truncates instead of pushing the mode
+            navigation over its neighbours. */}
+        <div className={`flex min-w-0 items-center ${p.phone ? 'flex-1 gap-1.5' : 'flex-1 gap-2 min-[768px]:flex-none'}`}>
           <div className="flex shrink-0 items-center gap-2">
             {p.wide && <YoruMark height={17} />}
             <span className="whitespace-nowrap text-[14px] font-bold tracking-wide text-ink-1">{t('app.name')}</span>
@@ -199,7 +270,7 @@ export default function TopBar(p: Props) {
           <div
             data-doc-name-group
             className={`flex min-w-0 items-center rounded-lg transition-colors hover:bg-line-1 ${
-              p.phone ? 'flex-1' : 'w-[8rem] min-[960px]:w-[9rem] shrink-0'
+              p.phone ? 'flex-1' : 'flex-1 min-[768px]:w-[8rem] min-[960px]:w-[9rem] min-[768px]:shrink-0'
             }`}
           >
             <input
@@ -207,7 +278,7 @@ export default function TopBar(p: Props) {
               value={p.docName}
               onChange={(e) => p.onRename(e.target.value)}
               placeholder={t('common.unnamedDoc')}
-              className="w-full min-w-0 bg-transparent px-1.5 py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4"
+              className={`w-full min-w-0 bg-transparent py-1 text-[13px] text-ink-1 outline-none placeholder:text-ink-4 ${p.phone ? '!px-0' : 'px-1.5'}`}
               title={t('topbar.docNameTitle')}
             />
             <DropdownMenu>
@@ -270,15 +341,17 @@ export default function TopBar(p: Props) {
         </div>
 
         {/* One navigation for the whole editor; this is the widest, most
-            prominent control in the bar, not a pair of small preview toggles. */}
+            prominent control in the bar, not a pair of small preview toggles.
+            A phone has no room for a second row, so it gets the pill instead. */}
         {!p.phone && (
-          <div className="flex min-w-0 flex-1 justify-center">
+          <div className={`flex min-w-0 justify-center ${p.wide ? 'flex-1' : 'shrink-0 min-[768px]:flex-1'}`}>
             <ModeNav mode={p.mode} onModeChange={p.onModeChange} compact={!p.wide} />
           </div>
         )}
 
         {/* Right: the current mode's main action, then everything else. */}
         <div className={`flex shrink-0 items-center gap-1.5 ${p.phone ? '' : 'ml-auto'}`}>
+          {p.phone && <PhoneModePicker mode={p.mode} onModeChange={p.onModeChange} />}
           {p.onOpenSidePanel && (
             <button
               data-open-side-panel
@@ -344,15 +417,9 @@ export default function TopBar(p: Props) {
                 {t('topbar.export.bundle')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <p className="ya-eyebrow px-2 pb-1 pt-1.5">{t('topbar.moreLook')}</p>
-              <div data-more-item="language" className="flex items-center justify-between gap-2 px-2 pb-1.5">
-                <span className="text-[12px] text-ink-2">{t('lang.group')}</span>
-                <LanguageToggle />
-              </div>
-              <div data-more-item="appearance" className="flex items-center justify-between gap-2 px-2 pb-1.5">
-                <span className="text-[12px] text-ink-2">{t('theme.group')}</span>
-                <ThemeToggle />
-              </div>
+              <DropdownMenuItem data-more-item="appearance-language" onSelect={p.onOpenSettings} className="rounded-lg">
+                {t('topbar.moreLook')}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem data-more-item="references" onSelect={p.onOpenReferences} className="rounded-lg">
                 {t('topbar.references')}
@@ -376,14 +443,6 @@ export default function TopBar(p: Props) {
           </DropdownMenu>
         </div>
       </div>
-
-      {/* A phone cannot fit both rows in 56px, so the mode navigation gets its
-          own compact segmented row directly under the bar. */}
-      {p.phone && (
-        <div data-topbar-modes-row className="px-2 pb-2">
-          <ModeNav mode={p.mode} onModeChange={p.onModeChange} compact fullWidth />
-        </div>
-      )}
     </header>
   )
 }

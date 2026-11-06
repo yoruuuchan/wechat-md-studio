@@ -149,6 +149,15 @@ const measure = `(() => {
   const active = triggers.find((t) => t.dataset.state === 'active')
   const inactive = triggers.filter((t) => t !== active)
   const trackBg = bgOf(track)
+  const rows = [...document.querySelectorAll('[data-settings-item]')].map((el) => {
+    const label = el.querySelector('span')
+    return {
+      item: el.dataset.settingsItem,
+      label: label ? label.textContent.trim() : '',
+      color: label ? getComputedStyle(label).color : '',
+      contrastVsRow: label ? Math.round(ratio(getComputedStyle(label).color, bgOf(el)) * 100) / 100 : 0,
+    }
+  })
   return JSON.stringify({
     triggers: triggers.map((t) => t.textContent.trim()),
     active: {
@@ -162,12 +171,32 @@ const measure = `(() => {
       color: getComputedStyle(t).color,
       contrastVsTrack: Math.round(ratio(getComputedStyle(t).color, trackBg) * 100) / 100,
     })),
+    rows,
+    hasLanguageControl: !!document.querySelector('[data-settings-item="language"] [data-lang]'),
+    hasAppearanceControl: !!document.querySelector('[data-settings-item="appearance"] [role=radio]'),
     htmlClass: document.documentElement.className,
     dataTheme: document.documentElement.dataset.theme,
   })
 })()`
 
 const readTabs = async () => JSON.parse(await evaluate(measure))
+const openSettingsTab = async () => {
+  // Radix tabs activate on pointer events, not a bare .click(), so drive the
+  // real mouse path before measuring the settings rows.
+  const position = await evaluate(`(() => {
+    const tab = document.querySelector('[data-side-tab="settings"]')
+    if (!tab) return null
+    const r = tab.getBoundingClientRect()
+    return r.width && r.height ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null
+  })()`)
+  if (!position) throw new Error('settings tab missing')
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...position }, sessionId)
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...position }, sessionId)
+  await sleep(600)
+  const selected = await evaluate(`document.querySelector('[data-side-tab="settings"]')?.getAttribute('aria-selected') === 'true'`)
+  if (!selected) throw new Error('settings tab did not activate')
+}
 
 // ---------------------------------------------------------------------------
 console.log('=== yoru (dark) ===')
@@ -175,6 +204,7 @@ await evaluate(`localStorage.setItem('mopai.theme.v1', 'yoru'); true`)
 await goto(appUrl)
 await evaluate(`localStorage.setItem('mopai.theme.v1', 'yoru'); true`)
 await goto(appUrl)
+await openSettingsTab()
 const dark = await readTabs()
 console.log(' ', JSON.stringify(dark, null, 1))
 check('yoru: <html> carries data-theme=yoru', dark.dataTheme === 'yoru')
@@ -184,12 +214,19 @@ for (const t of dark.inactive) {
   check(`yoru: inactive "${t.label}" readable on the track`, t.contrastVsTrack >= 3, `contrast=${t.contrastVsTrack} color=${t.color}`)
 }
 check('yoru: active tab is not a white pill', !dark.active.bg.startsWith('rgb(255') && !dark.active.bg.startsWith('rgb(248'), dark.active.bg)
+check('yoru: settings shows the appearance & language rows',
+  dark.hasLanguageControl && dark.hasAppearanceControl && dark.rows.map((row) => row.item).join(',') === 'language,appearance',
+  { controls: [dark.hasLanguageControl, dark.hasAppearanceControl], rows: dark.rows.map((row) => row.item) })
+for (const row of dark.rows) {
+  check(`yoru: settings row "${row.label}" is readable`, row.contrastVsRow >= 3, `contrast=${row.contrastVsRow} color=${row.color}`)
+}
 const shotDark = await screenshot('yoru-side-panel')
 console.log(`  screenshot: ${shotDark}`)
 
 console.log('\n=== akari (light) ===')
 await evaluate(`localStorage.setItem('mopai.theme.v1', 'akari'); true`)
 await goto(appUrl)
+await openSettingsTab()
 const light = await readTabs()
 console.log(' ', JSON.stringify(light, null, 1))
 check('akari: <html> has no .dark class', !light.htmlClass.includes('dark') && light.dataTheme === 'akari')
@@ -197,6 +234,12 @@ for (const t of light.inactive) {
   check(`akari: inactive "${t.label}" readable on the track`, t.contrastVsTrack >= 3, `contrast=${t.contrastVsTrack} color=${t.color}`)
 }
 check('akari: active tab keeps a readable style', light.active.contrastVsTrack >= 3, `contrast=${light.active.contrastVsTrack}`)
+check('akari: settings shows the appearance & language rows',
+  light.hasLanguageControl && light.hasAppearanceControl && light.rows.map((row) => row.item).join(',') === 'language,appearance',
+  { controls: [light.hasLanguageControl, light.hasAppearanceControl], rows: light.rows.map((row) => row.item) })
+for (const row of light.rows) {
+  check(`akari: settings row "${row.label}" is readable`, row.contrastVsRow >= 3, `contrast=${row.contrastVsRow} color=${row.color}`)
+}
 const shotLight = await screenshot('akari-side-panel')
 console.log(`  screenshot: ${shotLight}`)
 

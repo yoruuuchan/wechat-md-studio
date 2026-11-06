@@ -300,8 +300,35 @@ try {
   const openMore = async () => {
     await waitFor(`!document.querySelector('[role=menu]')`, 'previous More menu cleared', 5000).catch(() => {})
     await click(`document.querySelector('[data-topbar-more]')`)
-    await waitFor(`(() => { const el = document.querySelector('[role=menu] [data-lang]'); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 })()`, 'More menu settled')
+    await waitFor(`(() => { const el = document.querySelector('[role=menu] [role=menuitem]'); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 })()`, 'More menu settled')
     await sleep(150)
+  }
+  // At 390 the side panel is the third pane; the appearance controls moved from
+  // 更多 into its 设置 tab.
+  const openPhoneSettings = async () => {
+    // A closing Radix menu still owns the pointer for an animation frame; a
+    // stray click lands on a menu item (this used to open /materials).
+    await waitFor(`!document.querySelector('[role=menu]')`, 'More menu cleared before settings', 5000).catch(() => {})
+    await sleep(200)
+    await click(`document.querySelector('[data-pane-tab="side"]')`)
+    await waitFor(`getComputedStyle(document.querySelector('[data-pane="side"]')).visibility !== 'hidden'`, 'phone side pane visible')
+    await click(`[...document.querySelectorAll('[data-pane="side"] [role=tab]')].find((el) => el.innerText.trim() === '设置')`)
+    await waitFor(`!!document.querySelector('[data-settings-item="language"] [data-lang]')`, 'phone settings language control', 12000)
+  }
+  const chooseMode = async (mode) => {
+    const pill = await evaluate(`!!document.querySelector('[data-topbar-mode-pill]')`)
+    if (!pill) {
+      await click(`document.querySelector('[data-preview-mode="${mode}"]')`)
+      await waitFor(`document.querySelector('[data-preview-mode="${mode}"]')?.getAttribute('aria-pressed') === 'true'`, mode + ' preview selected')
+      return
+    }
+    if ((await evaluate(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode`)) !== mode) {
+      await click(`document.querySelector('[data-topbar-mode-pill]')`)
+      await waitFor(`!!document.querySelector('[role=menu] [data-preview-mode="${mode}"]')`, 'phone mode menu')
+      await click(`document.querySelector('[role=menu] [data-preview-mode="${mode}"]')`)
+    }
+    await waitFor(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === ${JSON.stringify(mode)}`, mode + ' preview selected')
+    await sleep(300)
   }
 // Radix flips data-state before the slide animation finishes; measure the
 // drawer only once its right edge has reached the viewport edge.
@@ -698,7 +725,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
   await waitFor(`document.querySelector('[data-open-remote-mcp]').getBoundingClientRect().height > 0`, 'advanced MCP entry expanded', 12_000)
   await dialogOpenClose(`document.querySelector('[data-open-remote-mcp]')`, 'the single-document MCP dialog')
 
-  // ---------- 12. language and theme through the narrow More menu ----------
+  // ---------- 12. language and theme from the settings tab ----------
   await openMore()
   // The narrow bar keeps only the article name, the save status and the copy
   // button, so the owner sign-in entry moves in here; it still has to be
@@ -706,10 +733,33 @@ const drawerOpenSettled = () => waitFor(`(() => {
   // suite, which owns the "owner sign-in" rename.)
   const accountEntry = await evaluate(`([...document.querySelectorAll('[role=menuitem]')].find((el) => el.textContent.includes('登录')) || {}).textContent || ''`)
   check('390px: the owner sign-in entry is reachable from the More menu', accountEntry.includes('登录'), accountEntry.trim() || 'not found')
-  await click(`document.querySelector('[role=menu] [data-lang="en"]')`)
-  await sleep(200)
-  const english = await evaluate(`(() => ({ lang: document.documentElement.lang, tab: document.querySelector('[data-pane-tab="editor"]').innerText.trim(), overflow: document.documentElement.scrollWidth - window.innerWidth }))()`)
-  check('390px: switching to English through the More menu works', english.lang === 'en' && english.tab === 'Edit', JSON.stringify(english))
+  await escape()
+  await openPhoneSettings()
+  await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang="en"]').click()`)
+  await sleep(800)
+  const afterEnglishState = await evaluate(`JSON.stringify({
+    width: window.innerWidth,
+    lang: document.documentElement.lang,
+    layout: document.querySelector('[data-layout-mode]')?.dataset.layoutMode,
+    path: location.pathname,
+    paneTabs: [...document.querySelectorAll('[data-pane-tab]')].map((el) => ({ id: el.dataset.paneTab, text: el.innerText, w: Math.round(el.getBoundingClientRect().width), visibility: getComputedStyle(el).visibility })),
+    switcher: !!document.querySelector('[data-pane-switcher]'),
+    sideVisible: document.querySelector('[data-pane="side"]') ? getComputedStyle(document.querySelector('[data-pane="side"]')).visibility : null,
+    sideTab: document.querySelector('[data-pane="side"] [role=tab][aria-selected=true]')?.innerText || null,
+    settingsControls: document.querySelectorAll('[data-settings-item]').length,
+    body: document.body.innerText.slice(0, 180),
+  })`)
+  console.log('  after English:', afterEnglishState)
+  await screenshot('narrow-en-state-390.png')
+  // The store notifies synchronously but React commits the new labels on its
+  // next render; wait for the actual English pane label, not just a timeout.
+  const englishLabels = await waitFor(
+    `document.querySelector('[data-pane-tab="editor"]')?.innerText.trim() === 'Edit'`,
+    'English pane labels',
+    10000,
+  ).then(() => true).catch(() => false)
+  const english = await evaluate(`(() => ({ lang: document.documentElement.lang, tab: document.querySelector('[data-pane-tab="editor"]')?.innerText.trim() || '', overflow: document.documentElement.scrollWidth - window.innerWidth }))()`)
+  check('390px: switching to English from the settings tab works', englishLabels && english.lang === 'en' && english.tab === 'Edit', JSON.stringify({ english, afterEnglishState }))
   check('390px: the English narrow layout does not overflow', english.overflow <= 0, `overflow=${english.overflow}`)
   const overflowEn = await evaluate(`(() => {
     const vw = window.innerWidth
@@ -717,15 +767,20 @@ const drawerOpenSettled = () => waitFor(`(() => {
   })()`)
   check('390px: no English header button is clipped', overflowEn.length === 0, overflowEn.join(', ') || 'none')
   await screenshot('narrow-en-390.png')
-  await click(`document.querySelector('[role=menu] button[title="Dark"]')`)
-  await sleep(200)
-  const dark = await evaluate(`document.documentElement.classList.contains('dark')`)
-  check('390px: switching to the dark theme through the More menu works', dark === true, `dark=${dark}`)
+  const appearanceRadios = await evaluate(`document.querySelectorAll('[data-settings-item="appearance"] [role=radio]').length`)
+  const dark = appearanceRadios === 3
+    ? await evaluate(`(() => { document.querySelectorAll('[data-settings-item="appearance"] [role=radio]')[2].click(); return document.documentElement.classList.contains('dark') })()`)
+    : false
+  await sleep(300)
+  check('390px: switching to the dark theme from the settings tab works', dark === true, `dark=${dark} radios=${appearanceRadios} state=${afterEnglishState}`)
   await screenshot('narrow-en-dark-390.png')
-  await escape()
-  await openMore()
-  await click(`document.querySelector('[role=menu] [data-lang="zh"]')`)
-  await escape()
+  if (appearanceRadios === 3) {
+    await evaluate(`document.querySelector('[data-settings-item="appearance"] [role=radio][title="Light"]').click()`)
+    await sleep(300)
+  }
+  await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang="zh"]')?.click()`)
+  await sleep(400)
+  await click(`document.querySelector('[data-pane-tab="editor"]')`)
 
   // ---------- 13. keyboard operation of the switcher ----------
   await evaluate(`document.querySelector('[data-pane-tab="editor"]').focus()`)
@@ -776,10 +831,10 @@ const drawerOpenSettled = () => waitFor(`(() => {
       await click(`document.querySelector('[data-pane-tab="preview"]')`)
       await waitFor(`getComputedStyle(document.querySelector('[data-pane="preview"]')).visibility !== 'hidden'`, 'phone preview visible for screenshots')
     }
-    await waitFor(`document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'true'`, 'WeChat preview selected')
+    await waitFor(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === 'wechat' || document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'true'`, 'WeChat preview selected')
     await evaluate('document.fonts.ready.then(() => true)')
     await screenshot(`layout-${width}-wechat.png`)
-    await click(`document.querySelector('[data-preview-mode="cards"]')`)
+    await chooseMode('cards')
     await waitFor(`document.querySelector('[data-xhs-view]')?.dataset.ready === 'true' && !!document.querySelector('.xhs-card')`, 'cards ready for screenshot', 20_000)
     await evaluate('document.fonts.ready.then(() => true)')
     await sleep(400)

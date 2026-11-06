@@ -191,6 +191,12 @@ async function upload(files, session = sessionId) {
   return before
 }
 const dimensions = (bytes) => ({ width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) })
+/** 删除 lives inside the group's management mode now. */
+async function enterTemplateManage(session = sessionId) {
+  const pressed = await evaluate(`document.querySelector('[data-card-template-manage]')?.getAttribute('aria-pressed')`, session)
+  if (pressed !== 'true') await click('[data-card-template-manage]', session)
+  await waitFor(`document.querySelector('[data-card-template-manage]')?.getAttribute('aria-pressed') === 'true'`, 5000, session)
+}
 async function download(selector, label, extension) {
   await send('Page.bringToFront', {}, sessionId)
   await cardsReady()
@@ -362,10 +368,16 @@ try {
   check('multi-file upload names the rejected file and explains why',
     failureText.includes('malicious.reedcard') && failureText.length > 'malicious.reedcard'.length + 4, failureText)
   check('multi-file upload ends with one summary line', summary.includes('已添加 2 个，1 个失败'), summary)
+  check('the upload error lives inside the 我的 group',
+    await evaluate(`!!document.querySelector('[data-card-template-group="mine"] [data-card-template-error]')`))
+  check('only one place lists the 我的 templates',
+    await evaluate(`document.querySelectorAll('[data-card-templates]').length === 1 &&
+      [...document.querySelectorAll('[data-card-template-item]')].every((el) => !!el.closest('[data-card-template-group="mine"]'))`))
   await shot('my-templates-multi-upload')
 
   // A guest delete touches this browser only and says so.
   await evaluate(`window.confirm = () => true`)
+  await enterTemplateManage()
   await evaluate(`(() => {
     const row = [...document.querySelectorAll('[data-card-template-item]')]
       .find((el) => (el.textContent || '').includes('示例 · 第二份'));
@@ -378,6 +390,18 @@ try {
     guestDeleteToasts.includes('只从这台设备删除'), guestDeleteToasts)
   await upload(secondZip)
   await waitFor(`document.querySelectorAll('[data-card-template-item]').length === ${before + 2}`)
+  check('uploading leaves the management state', await evaluate(`document.querySelector('[data-card-template-manage]')?.getAttribute('aria-pressed') !== 'true'`))
+
+  await enterTemplateManage()
+  const selectedBeforeManageClick = await evaluate(`document.querySelector('[data-card-template-custom][aria-pressed="true"]')?.textContent || ''`)
+  await evaluate(`[...document.querySelectorAll('[data-card-template-custom]')]
+    .find((el) => (el.textContent || '').includes('示例 · 日光'))?.click()`)
+  await sleep(400)
+  const selectedAfterManageClick = await evaluate(`document.querySelector('[data-card-template-custom][aria-pressed="true"]')?.textContent || ''`)
+  check('clicking a template while managing does not switch the selection',
+    selectedBeforeManageClick === selectedAfterManageClick && selectedBeforeManageClick !== '', { selectedBeforeManageClick, selectedAfterManageClick })
+  await click('[data-card-template-manage]')
+  await waitFor(`document.querySelector('[data-card-template-manage]')?.getAttribute('aria-pressed') !== 'true'`, 5000)
 
   await evaluate(`[...document.querySelectorAll('[data-card-template-custom]')]
     .find((el) => (el.textContent || '').includes('示例 · 日光'))?.click()`)
@@ -480,8 +504,23 @@ try {
 
   // Deleting while signed in removes the cloud row and the local one.
   await evaluate(`window.confirm = () => true`, fresh)
-  await click('[data-card-template-delete]', fresh)
+  await evaluate(`[...document.querySelectorAll('[data-card-template-custom]')]
+    .find((el) => (el.textContent || '').includes('示例 · 日光'))?.click()`, fresh)
+  await cardsReady(fresh)
+  check('a synced template can be selected before deleting', await evaluate(`[...document.querySelectorAll('[data-card-template-custom][aria-pressed="true"]')].some((el) => (el.textContent || '').includes('示例 · 日光'))`, fresh))
+  await enterTemplateManage(fresh)
+  await evaluate(`(() => {
+    const row = [...document.querySelectorAll('[data-card-template-item]')]
+      .find((el) => (el.textContent || '').includes('示例 · 日光'));
+    row?.querySelector('[data-card-template-delete]')?.click();
+    return true;
+  })()`, fresh)
   await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 1`, 45000, fresh)
+  const fallback = await evaluate(`({
+    defaultSelected: document.querySelector('[data-card-template="reed"]')?.getAttribute('aria-pressed') === 'true',
+    customSelected: [...document.querySelectorAll('[data-card-template-custom][aria-pressed="true"]')].length,
+  })`, fresh)
+  check('deleting the selected template falls back to the default template', fallback.defaultSelected && fallback.customSelected === 0, fallback)
   const cloudAfterFirstDelete = await cloudItems(fresh)
   check('signed-in delete removes the template on both sides',
     (await evaluate(`document.querySelectorAll('[data-card-template-item]').length`, fresh)) === 1 && cloudAfterFirstDelete.length === 1,
@@ -534,6 +573,7 @@ try {
 
   // A deletes it. The cloud row goes away and a tombstone remains.
   await evaluate(`window.confirm = () => true`, fresh)
+  await enterTemplateManage(fresh)
   await click('[data-card-template-delete]', fresh)
   await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 0`, 45000, fresh)
   const afterDelete = await cloudState(fresh)

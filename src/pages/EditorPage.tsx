@@ -1709,6 +1709,18 @@ export default function EditorPage() {
     setSideTab(next === 'cards' ? 'card' : 'theme')
   }, [])
 
+  /**
+   * The 更多 menu owns a single 外观与语言 entry now. It lands on the settings
+   * tab wherever this layout keeps the panel: the wide column, the medium
+   * drawer, or the phone's side pane.
+   */
+  const openSettings = useCallback(() => {
+    setSideTab('settings')
+    if (phone) setPane('side')
+    else if (medium) setSideDrawerOpen(true)
+    else setPanelOpen(true)
+  }, [phone, medium])
+
   const previewPaneBody = previewMode === 'cards' ? (
     <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('cards.measuring')}</div>}>
       <CardsView ref={cardsViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
@@ -1832,6 +1844,7 @@ export default function EditorPage() {
         onOpenReferences={() => navigate('/references')}
         panelOpen={panelOpen}
         onTogglePanel={() => setPanelOpen((v) => !v)}
+        onOpenSettings={openSettings}
         onOpenSidePanel={medium ? () => setSideDrawerOpen(true) : undefined}
         userName={user?.name || ''}
         signedIn={isAuthenticated}
