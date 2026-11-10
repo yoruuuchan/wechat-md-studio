@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { PanelRightOpen } from 'lucide-react'
 import type { DocRecord } from '@/lib/store'
 import { REPO_URL } from '@/lib/brand'
+import { MOTION_URL } from '@/lib/motion'
 import { YoruMark } from '@/components/YoruMark'
 import { useI18n } from '@/hooks/useI18n'
 import { SaveStatus } from '@/components/SaveStatus'
@@ -74,7 +75,8 @@ interface Props {
   wide: boolean
 }
 
-type ModeItem = { id: EditorMode | 'long' | 'motion'; label: string; soon?: boolean }
+/** `soon` is a placeholder; `href` leaves the editor for a page of its own. */
+type ModeItem = { id: EditorMode | 'long' | 'motion'; label: string; soon?: boolean; href?: string }
 type Translate = ReturnType<typeof useI18n>['t']
 
 /** The four entries share their labels and order with the wide navigation. */
@@ -85,7 +87,11 @@ function modeItems(t: Translate, compact: boolean): ModeItem[] {
     // Placeholders are visible and focusable so their "coming soon" hint is
     // reachable by keyboard, but choosing them changes nothing.
     { id: 'long', label: compact ? t('topbar.mode.longShort') : t('topbar.mode.long'), soon: true },
-    { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), soon: true },
+    // The motion composer is a page of its own, there only when the build
+    // packed it (scripts/motion/pack-motion.mjs); otherwise a placeholder too.
+    MOTION_URL
+      ? { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), href: MOTION_URL }
+      : { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), soon: true },
   ]
 }
 
@@ -112,6 +118,16 @@ function ModeNav({
     >
       {items.map((item) => {
         const selected = !item.soon && mode === item.id
+        const look = `ya-tool !h-9 whitespace-nowrap rounded-xl ${compact ? '!px-2' : '!px-3'} !text-[12px] font-medium transition-all ${
+          fullWidth ? 'flex-1' : ''
+        }`
+        if (item.href) {
+          return (
+            <a key={item.id} href={item.href} data-preview-mode={item.id} className={`${look} text-ink-2 no-underline`}>
+              {item.label}
+            </a>
+          )
+        }
         const button = (
           <button
             key={item.id}
@@ -125,9 +141,7 @@ function ModeNav({
               if (item.soon) return
               onModeChange(item.id as EditorMode)
             }}
-            className={`ya-tool !h-9 whitespace-nowrap rounded-xl ${compact ? '!px-2' : '!px-3'} !text-[12px] font-medium transition-all ${
-              fullWidth ? 'flex-1' : ''
-            } ${selected ? 'ya-selected text-ink-1' : ''} ${
+            className={`${look} ${selected ? 'ya-selected text-ink-1' : ''} ${
               item.soon ? 'cursor-not-allowed text-ink-4 opacity-50 hover:bg-transparent' : 'text-ink-2'
             }`}
           >
@@ -184,6 +198,13 @@ function PhoneModePicker({
       <DropdownMenuContent align="end" className="ya-pop w-48 border-none">
         {items.map((item) => {
           const selected = !item.soon && mode === item.id
+          if (item.href) {
+            return (
+              <DropdownMenuItem key={item.id} asChild className="rounded-lg">
+                <a href={item.href} data-preview-mode={item.id}>{item.label}</a>
+              </DropdownMenuItem>
+            )
+          }
           return (
             <DropdownMenuItem
               key={item.id}

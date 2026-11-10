@@ -17,6 +17,9 @@ verify-out/
 # generated public card-template archives
 public/card-templates/
 
+# the motion composer's built page, copied in by scripts/motion/pack-motion.mjs
+public/motion/
+
 # worker local secrets
 mopai-worker/.dev.vars
 mopai-worker/node_modules/

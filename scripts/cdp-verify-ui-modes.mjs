@@ -303,12 +303,18 @@ try {
     pressed: el.getAttribute('aria-pressed'),
     title: el.getAttribute('title') || '',
     label: el.getAttribute('aria-label') || '',
+    href: el.getAttribute('href') || '',
     height: Math.round(el.getBoundingClientRect().height),
   })))()`)
   console.log(' ', JSON.stringify(modes))
   check('all four mode entries are present', JSON.stringify(modes.map((m) => m.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), modes.map((m) => m.id))
   check('mode entries are at least as large as the old preview toggle (>= 28px)', modes.every((m) => m.height >= 28), modes.map((m) => m.height))
-  check('long-image and motion are visibly disabled placeholders', modes.filter((m) => m.id === 'long' || m.id === 'motion').every((m) => m.disabled && m.label.includes('即将推出')), modes.filter((m) => m.id === 'long' || m.id === 'motion'))
+  // The motion entry depends on the build: a link to the composer's own page
+  // when scripts/motion/pack-motion.mjs packed it, a placeholder like long-image otherwise.
+  const isPlaceholder = (m) => m.disabled && m.label.includes('即将推出')
+  check('long-image is a visibly disabled placeholder', modes.filter((m) => m.id === 'long').every(isPlaceholder), modes.filter((m) => m.id === 'long'))
+  check('motion links to the composer, or is a placeholder when the build has none',
+    modes.filter((m) => m.id === 'motion').every((m) => (m.href === '/motion/' && !m.disabled && m.pressed === null) || isPlaceholder(m)), modes.filter((m) => m.id === 'motion'))
   const placeholderBox = await evaluate(`(() => {
     const r = document.querySelector('[data-preview-mode="long"]').getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
@@ -610,10 +616,13 @@ try {
       disabled: el.hasAttribute('data-disabled') || el.getAttribute('aria-disabled') === 'true',
       placeholder: el.dataset.modePlaceholder === 'true',
       selected: el.dataset.modeSelected === 'true',
+      href: el.getAttribute('href') || '',
     })))()`)
     check(`${width}px: the pill menu lists all four modes`, JSON.stringify(entries.map((entry) => entry.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), entries)
-    check(`${width}px: long-image and motion are disabled placeholders in the pill menu`,
-      entries.filter((entry) => entry.id === 'long' || entry.id === 'motion').every((entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')), entries)
+    const isPlaceholder = (entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')
+    check(`${width}px: long-image is a disabled placeholder in the pill menu`, entries.filter((entry) => entry.id === 'long').every(isPlaceholder), entries)
+    check(`${width}px: motion links to the composer in the pill menu, or is a placeholder when the build has none`,
+      entries.filter((entry) => entry.id === 'motion').every((entry) => (entry.href === '/motion/' && !entry.disabled) || isPlaceholder(entry)), entries)
     check(`${width}px: the pill marks the current mode`, entries.some((entry) => entry.id === 'wechat' && entry.selected), entries)
     await shot(`${width}-mode-picker.png`)
     await setMode('cards')
