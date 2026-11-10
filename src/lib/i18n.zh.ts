@@ -328,6 +328,7 @@ export const zh = {
 
   // ---- 编辑器 ----
   'editor.aiWriting': 'AI 帮我写',
+  'editor.aiDiagram': 'AI 图表',
   'editor.mcp.conflict': 'AI 协作有冲突',
   'editor.mcp.error': 'AI 同步待重试',
   'editor.mcp.saving': 'AI 同步中…',
@@ -649,6 +650,25 @@ export const zh = {
   'ai.label.skill': '完整 Skill',
   'ai.promptBody':
     '请根据下面的主题和资料，帮我写一篇可直接在芦苇使用的公众号文章。\n\n先读取写作 Skill：{url}\n按 Skill 前半部分的 Markdown 方言与图片规则写稿。只需写稿，无需登录、调用 API 或配置模型。若无法读取链接，请告诉我，我会粘贴完整 Skill。\n\n主题 / 目标读者 / 目的：\n[在这里补充]\n\n参考资料 / 需要保留的事实与图片：\n[在这里粘贴]\n\n篇幅 / 语气 / 其他要求：\n[在这里补充]\n\n请只输出可直接粘贴到芦苇左侧编辑器的 Markdown 源稿，不加解释，不把整篇包进代码块。不要编造事实、引用或图片地址；缺图片时用带图注的空地址占位。',
+
+  // ---- AI 图表（外部 diagram-design-zh Skill 的入口）----
+  'diagramSkill.title': 'AI 图表',
+  'diagramSkill.desc': '把内容交给你常用的 AI，按 diagram-design-zh Skill 画中文图表，再把生成的 PNG 传进芦苇当公众号插图。',
+  'diagramSkill.promptNote': '复制提示词，补上要表达的内容和资料，再发给 AI。',
+  'diagramSkill.promptAria': '图表提示词',
+  'diagramSkill.skillNote':
+    'AI 能打开链接时，发 Skill 地址就够了；读不了链接时，把 SKILL.md 正文粘给它。图表由 AI 生成，本站不调用模型，也不托管这个 Skill。',
+  'diagramSkill.langNote': '图表 Skill 只有中文一份，中英文界面共用；它的排版规则为中文而写，图里的文字按你给的内容来。',
+  'diagramSkill.installNote': '用 Codex、Claude Code 这类能读本地 Skill 的 agent 时，直接装整个 Skill：',
+  'diagramSkill.uploadNote':
+    '拿到 PNG 后，把文件拖进编辑器，或用工具栏的图片按钮上传：图会进素材库并插到光标处；正文里留空的 ![图注]() 占位，也能在右栏「图片」清单里点上传回填。',
+  'diagramSkill.sourcePrefix': '图表 Skill 来自 ',
+  'diagramSkill.source': 'patrick-xin/diagram-design-zh',
+  'diagramSkill.sourceMiddle': '（作者 patrick-xin · MIT 许可），其中文排版规则基于英文原版 ',
+  'diagramSkill.sourceUpstream': 'cathrynlavery/diagram-design',
+  'diagramSkill.sourceTail': '（原作者 Cathryn Lavery）。芦苇只提供入口与致谢。',
+  'diagramSkill.promptBody':
+    '请根据下面的内容，帮我画一张适合公众号文章插图的中文图表。\n\n先读取图表 Skill：{url}\n按 Skill 的规则制图：先根据内容选择合适的图表类型并说明理由，再按其中的中文排版规范绘制（汉字不低于字号下限、中英与数字之间留空格、标点按语境）。只需制图，无需登录、调用 API 或配置模型。若无法读取链接，请告诉我，我会粘贴完整 Skill。\n\n内容 / 数据 / 要表达的关系或流程：\n[在这里补充]\n\n读者 / 用途 / 希望读者一眼看出什么：\n[在这里补充]\n\n输出要求：\n- 优先交付 PNG：按 Skill 的公众号正文插图规格（doc-inline 尺寸、2 倍率），白底，不裁字、不缩小汉字。\n- 一并保留可继续编辑的自包含 HTML 源文件，方便日后改尺寸或换类型。\n- 当前环境导不出 PNG 时，请说明原因，并给我能在浏览器里直接打开的 HTML，我自行截图。',
 
   // ---- Remote MCP ----
   'mcp.title': 'AI 直接编辑当前稿件',

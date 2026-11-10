@@ -45,6 +45,8 @@ If your AI can open links, send it the Skill URL. Otherwise, copy the full Skill
 
 The website, public endpoint and MCP tool all expose [the same repository Skill](skills/wechat-typesetter/SKILL.md). The Skill is currently in Chinese; its syntax examples are the shared reference.
 
+The editor also offers **AI 图表** (“Diagram with AI”), which works exactly the same way: hand the content to the AI you already use and let it read the [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill (by patrick-xin, MIT; its Chinese typography rules build on the English original [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery), choose the diagram type that fits and export a PNG suited to an article illustration. Here the two actions are **copy Skill URL** and **copy prompt** — Reed calls no model API and neither hosts nor changes that Skill. Drop the finished PNG into the editor or upload it from the toolbar, and it lands in the media library at your cursor.
+
 ### 3. Let your own AI / agent edit the current document
 
 Open **设置 → 高级功能 → AI 直接编辑当前稿件** (“Settings → Advanced → Let AI edit this document”) and create a **Remote MCP** connection. Guests can use it too. Reed provides a Streamable HTTP endpoint and Bearer authorization header; configure them in a compatible MCP client and the agent can read the writing Skill, read this document and update its Markdown directly.

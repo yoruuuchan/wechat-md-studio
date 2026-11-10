@@ -72,6 +72,7 @@ import PaneSwitcher, { type EditorPaneId } from '@/components/PaneSwitcher'
 import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
 import { useRemoteMcp } from '@/hooks/useRemoteMcp'
 import AiWritingDialog from '@/components/AiWritingDialog'
+import AiDiagramDialog from '@/components/AiDiagramDialog'
 import RemoteMcpDialog from '@/components/RemoteMcpDialog'
 import OnboardingTour from '@/components/OnboardingTour'
 import { useAuth } from '@/hooks/useAuth'
@@ -233,6 +234,7 @@ export default function EditorPage() {
   // editor) — deciding is required before that article syncs again.
   const [conflictOpen, setConflictOpen] = useState(false)
   const [aiWritingOpen, setAiWritingOpen] = useState(false)
+  const [aiDiagramOpen, setAiDiagramOpen] = useState(false)
   const [remoteMcpOpen, setRemoteMcpOpen] = useState(false)
   const [importKind, setImportKind] = useState<ImportKind>('markdown')
   const importKindRef = useRef<ImportKind>('markdown')
@@ -1639,11 +1641,12 @@ export default function EditorPage() {
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line-2 px-3 py-1.5">
         <span className="ya-eyebrow">Markdown</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {activeDoc?.remoteMcp && <button data-mcp-editor-status onClick={() => setRemoteMcpOpen(true)} className="ya-link-btn !text-[11px]">
             {remoteMcp.phase === 'conflict' ? t('editor.mcp.conflict') : remoteMcp.phase === 'error' ? t('editor.mcp.error') : remoteMcp.phase === 'saving' ? t('editor.mcp.saving') : t('editor.mcp.synced')}
           </button>}
           <button data-open-ai-writing onClick={() => setAiWritingOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('editor.aiWriting')}</button>
+          <button data-open-ai-diagram onClick={() => setAiDiagramOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('editor.aiDiagram')}</button>
         </div>
       </div>
       <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
@@ -1954,6 +1957,7 @@ export default function EditorPage() {
       )}
 
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
+      <AiDiagramDialog open={aiDiagramOpen} onOpenChange={setAiDiagramOpen} />
       <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />
       <OnboardingTour run={tourRun} onEnd={endTour} />
       <PublishPreflight

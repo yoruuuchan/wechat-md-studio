@@ -44,6 +44,8 @@ AI 能读取链接，就把 Skill 地址发给它；不能读取链接，就复�
 
 网页、公开地址与 MCP 读取都来自仓库里的 [同一份 Skill](skills/wechat-typesetter/SKILL.md)。
 
+左栏还有一个「AI 图表」，走同一套交互：把要表达的内容交给你常用的 AI，让它读取 [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) 图表 Skill（作者 patrick-xin，MIT；其中文排版规则基于 [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) 的英文原版，作者 Cathryn Lavery），按内容选择合适的图表类型并导出适合公众号插图的 PNG。这里只有**复制 Skill 地址、复制提示词**两个动作，芦苇不接入模型 API，也不托管或修改这个 Skill。AI 画完把 PNG 拖进编辑器或用工具栏上传，图就进素材库并插到光标处。
+
 ### 3. 让自己的 AI / Agent 直接编辑当前稿件
 
 在右栏「设置 → 高级功能 → AI 直接编辑当前稿件」创建 **Remote MCP** 连接，未登录也能使用。页面会给出 Streamable HTTP 地址与 Bearer 请求头；配置到自己的 MCP 客户端后，AI 就能读取写作 Skill、读取这一篇稿件，并直接修改 Markdown。

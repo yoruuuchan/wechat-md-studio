@@ -17,6 +17,20 @@ AI 能读链接时发 Skill 地址，不能读链接时复制完整 Skill。最�
 `text/markdown`。网站不为某个 AI 单独维护副本，不能读取链接或提取不完整时使用「复制完整 Skill」。
 也可读取同源仓库的 [Raw Skill](https://raw.githubusercontent.com/yoruuuchan/wechat-md-studio/master/skills/wechat-typesetter/SKILL.md)。
 
+## 普通用户：AI 图表
+
+「AI 图表」和「AI 帮我写」在编辑器左栏并排，交互相同，只是把内容交给外部图表 Skill 而不是本站写作 Skill：
+提示词让 AI 先读 [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) 的
+[SKILL.md](https://github.com/patrick-xin/diagram-design-zh/blob/main/skills/diagram-design-zh/SKILL.md)，
+按内容选图表类型、按其中的中文排版规范制图，并优先导出适合公众号正文的 PNG（Skill 的 doc-inline 尺寸、2 倍率）。
+
+这个 Skill 不在本仓库、也不在本站图床：芦苇只提供入口、复制动作和来源致谢，不接入模型 API，没有图表编辑器，
+也不代理生成服务。作者 patrick-xin（MIT），其中文排版规则基于英文原版
+[cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design)（Cathryn Lavery）。
+能读本地 Skill 的 agent 可用上游给出的 `npx skills add …` 命令整包安装，弹窗里直接列出。
+
+AI 交付的 PNG 由用户自己拖进编辑器或用工具栏上传，走现有图片链路进素材库并插到光标处；本入口不自动上传。
+
 ## 高级用户：授权当前稿件
 
 1. 打开编辑器右栏「设置」→「高级功能」→「AI 直接编辑当前稿件」。未登录也能使用。
