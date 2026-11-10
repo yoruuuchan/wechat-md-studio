@@ -664,21 +664,18 @@ export const en: Record<MsgKey, Msg> = {
   // ---- AI diagram (entry for the external diagram-design-zh Skill) ----
   'diagramSkill.title': 'Diagram with AI',
   'diagramSkill.desc':
-    'Hand your content to the AI you already use, let it draw the chart with the diagram-design-zh Skill, then upload the PNG here as an article illustration.',
-  'diagramSkill.promptNote': 'Copy the prompt, add the content you want shown, and send it to your AI.',
+    'Copy the prompt, add your content, and let your AI draw the chart with diagram-design-zh. Drop the PNG into the editor and it uploads to the media library at the cursor.',
+  'diagramSkill.examplesLink': '45 chart types · see all examples',
+  'diagramSkill.exampleArchitecture': 'Architecture',
+  'diagramSkill.exampleFlowchart': 'Flowchart',
+  'diagramSkill.exampleBar': 'Bar chart',
   'diagramSkill.promptAria': 'Diagram prompt',
-  'diagramSkill.skillNote':
-    'If your AI can open links, the Skill URL is enough; if not, paste the SKILL.md text to it. The AI draws the chart — this site calls no model and does not host the Skill.',
-  'diagramSkill.langNote':
-    'The diagram Skill exists in Chinese only, and both interfaces share that one copy. Its typography rules are written for Chinese, while the labels follow whatever content you give it.',
-  'diagramSkill.installNote': 'With an agent that reads local Skills, such as Codex or Claude Code, install the whole Skill instead:',
-  'diagramSkill.uploadNote':
-    'Once you have the PNG, drop it into the editor or use the image button in the toolbar: it uploads to the media library and lands at the cursor. An empty ![caption]() placeholder can also be filled by clicking Upload in the Images panel.',
+  'diagramSkill.skillLink': 'diagram-design-zh · SKILL.md',
   'diagramSkill.sourcePrefix': 'Diagram Skill from ',
   'diagramSkill.source': 'patrick-xin/diagram-design-zh',
   'diagramSkill.sourceMiddle': ' (by patrick-xin, MIT) — its Chinese typography rules build on the English original ',
   'diagramSkill.sourceUpstream': 'cathrynlavery/diagram-design',
-  'diagramSkill.sourceTail': ' (by Cathryn Lavery). Reed only provides the entry and the credit.',
+  'diagramSkill.sourceTail': ' (Cathryn Lavery). The examples come from that repository; Reed only provides the entry — it calls no model and does not host the Skill.',
   'diagramSkill.promptBody':
     'Please turn the content below into one diagram suited to a WeChat Official Account article.\n\nFirst read the diagram Skill: {url}\nThen follow it: pick the diagram type that fits the content and say why, and lay the chart out to the Skill’s Chinese typography rules (no CJK glyph below its minimum size, a space between Han and Latin or numbers, punctuation matched to the surrounding text). Draw the chart only — no login, no API calls, no model setup. If you cannot open the link, tell me and I will paste the full Skill.\n\nContent / data / the relationship or flow to show:\n[fill in here]\n\nReaders / purpose / what the reader should get at a glance:\n[fill in here]\n\nOutput:\n- Deliver a PNG first, at the Skill’s in-article spec (doc-inline size, 2x scale), on white, with no clipped or shrunk characters.\n- Keep the self-contained HTML source as well, so the size or type can be changed later.\n- If this environment cannot export a PNG, say so and hand me the HTML I can open in a browser and screenshot myself.',
 

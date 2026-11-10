@@ -321,3 +321,16 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - SvelteKit + 桌面壳（mac App Store / Windows / Linux）的产品形态。我们是纯 Web 应用 + Cloudflare 部署。
 <!-- END GENERATED: notice-credits -->
+
+## 六、打包进界面的示例图
+
+`public/diagram-examples/` 里的三张图（`architecture.png`、`flowchart.png`、`bar.png`）取自
+[patrick-xin/diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) 的 `screenshots/`，
+用于「AI 画图表」弹窗里让人先看到成品长什么样，再决定要不要把提示词交给自己的 AI。
+
+- **许可证**：MIT，副本见 [`patrick-xin-diagram-design-zh-LICENSE.txt`](patrick-xin-diagram-design-zh-LICENSE.txt)；
+  版权行为 `Copyright (c) 2025 Cathryn Lavery` 与 `Copyright (c) 2026 Patrick Xin (diagram-design-zh)`——后者本身也是基于前者的英文原版项目。
+- **核对的 commit**：`5da5332b22d1bf64c8db48b79b96d9fd18b86079`（2026-10-15，2026-11-10 取 `screenshots/` 原始文件）。
+- **改动**：仅等比缩放到 480px 宽并重新压缩 PNG；未裁剪、未改色、未在图内添加文字。
+- **用途**：弹窗里的示例缩略图，点击进入上游在线画廊看原图；不参与正文渲染，也不进入图片产物。
+- **维护**：示例图与上游是软链接性质的一致关系，不跟随上游自动更新；要换图时按同一方式重新下载并重写本节。

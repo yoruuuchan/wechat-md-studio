@@ -1,4 +1,4 @@
-// Real Chrome acceptance for the 「AI 图表」 entry: the editor opens the dialog,
+// Real Chrome acceptance for the 「AI 画图表」 entry: the editor opens the dialog,
 // both copy actions land in the clipboard, the Skill stays external (only its
 // address is handed over), and the wording survives both languages and themes.
 // node scripts/cdp-verify-ai-diagram.mjs [appPort=3228] [cdpPort=9356] [outputDir]
@@ -168,7 +168,7 @@ try {
     const row = document.querySelector('[data-open-ai-writing]')?.parentElement
     return row ? [...row.querySelectorAll('button')].map((b) => b.textContent.trim()) : []
   })()`)
-  check('both AI entries share one row', entries.join('|') === 'AI 帮我写|AI 图表', entries.join('|'))
+  check('both AI entries share one row', entries.join('|') === 'AI 帮我写|AI 画图表', entries.join('|'))
 
   const docBefore = await ev('window.__mopaiCodemirror.state.doc.toString()')
   const marked = sinceMark()
@@ -176,9 +176,11 @@ try {
   await opened(PROMPT)
   const text = await dialogText(PROMPT)
   // innerText carries the visible copy; the prompt itself is checked separately below.
-  const zhWants = ['AI 图表', 'diagram-design-zh', 'PNG', '素材库', 'patrick-xin', 'MIT', 'Cathryn Lavery', '复制提示词', '复制 Skill 地址', 'npx skills add']
+  const zhWants = ['AI 图表', 'diagram-design-zh', 'PNG', '素材库', '架构图', '流程图', '柱状图', 'patrick-xin', 'MIT', 'Cathryn Lavery', '复制提示词', '复制 Skill 地址']
   const zhMissing = zhWants.filter((w) => !text.includes(w))
-  check('Chinese dialog covers prompt, Skill, PNG upload and credit', zhMissing.length === 0, zhMissing.join(','))
+  check('Chinese dialog covers examples, prompt, PNG upload and credit', zhMissing.length === 0, zhMissing.join(','))
+  // The dialog explains itself with pictures; the copy is meant to stay one sentence.
+  check('visible copy stays short', text.length < 420, `${text.length} chars`)
   const zhPrompt = await dialogPrompt(PROMPT)
   check('prompt asks to read the Skill and export a PNG',
     zhPrompt.includes(SKILL_URL) && zhPrompt.includes('图表 Skill') && zhPrompt.includes('图表类型') && zhPrompt.includes('PNG') && zhPrompt.includes('doc-inline') && zhPrompt.includes('选择合适') && zhPrompt.includes('中文排版'),
@@ -198,21 +200,67 @@ try {
   check('attribution names the author and the English original',
     links.repo?.text === 'patrick-xin/diagram-design-zh' && links.upstream?.text === 'cathrynlavery/diagram-design',
     `${links.repo?.text} / ${links.upstream?.text}`)
-  check('install command is shown for local agents', text.includes('npx skills add') && text.includes('--skill diagram-design-zh'))
-  check('prompt box is not collapsed', await ev(`${dialogWith(PROMPT)}.querySelector('textarea').getBoundingClientRect().height >= 180`))
+  // The three examples are what carries the explanation: real local files, decoded
+  // pixels, each one a link into its own section of the upstream gallery.
+  await waitFor(`[...${dialogWith(PROMPT)}.querySelectorAll('[data-diagram-example] img')].every((i) => i.complete && i.naturalWidth > 0)`, 'example images decoded')
+  const examples = await ev(`(() => {
+    const dialog = ${dialogWith(PROMPT)}
+    const tiles = [...dialog.querySelectorAll('[data-diagram-example]')]
+    return tiles.map((a) => {
+      const img = a.querySelector('img')
+      const r = img.getBoundingClientRect()
+      return {
+        src: img.getAttribute('src'),
+        href: a.getAttribute('href'),
+        target: a.target,
+        rel: a.rel,
+        loaded: img.complete && img.naturalWidth > 0,
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        capped: img.naturalWidth > 0 && Math.round(r.width) < img.naturalWidth,
+        alt: img.alt,
+      }
+    })
+  })()`)
+  check('three examples render from local files', examples.length === 3
+    && examples.every((e) => e.src?.startsWith('/diagram-examples/') && e.loaded && e.w > 60 && e.capped),
+    JSON.stringify(examples.map((e) => [e.src, e.loaded, e.w, e.h])))
+  check('each example links to its gallery section', examples.every((e) => e.href?.startsWith('https://patrick-xin.github.io/diagram-design-zh/#') && e.target === '_blank' && e.rel.includes('noreferrer')
+    && e.alt && e.alt.length > 0), JSON.stringify(examples.map((e) => e.href)))
+  check('prompt box is not collapsed', await ev(`${dialogWith(PROMPT)}.querySelector('textarea').getBoundingClientRect().height >= 120`))
+  // Hierarchy is the point of this entry: one well holding the only action, the
+  // rest as plain reference, so it reads like 「AI 帮我写」 instead of a pile of
+  // equally weighted blocks. A second well made the upload hint compete with the prompt.
+  check('one primary well holds the only action', await ev(`(() => {
+    const dialog = ${dialogWith(PROMPT)}
+    const wells = [...dialog.querySelectorAll('.ya-well')]
+    return wells.length === 1 && Boolean(wells[0].querySelector('[data-ai-copy="diagram-prompt"]'))
+  })()`))
+  // The type scale steps down (description > image captions >= credit), which is
+  // what keeps four bands from reading as equal weight.
+  const tiers = await ev(`(() => {
+    const dialog = ${dialogWith(PROMPT)}
+    const size = (el) => el ? parseFloat(getComputedStyle(el).fontSize) : 0
+    return {
+      desc: size(dialog.querySelector('[data-slot="dialog-description"]')),
+      caption: size(dialog.querySelector('[data-diagram-example] span')),
+      credit: size(dialog.querySelector('[data-diagram-credit]')),
+    }
+  })()`)
+  check('type scale steps down to the credit', tiers.desc >= 13 && tiers.caption <= 11 && tiers.credit <= 11 && tiers.desc > tiers.caption, JSON.stringify(tiers))
   // Typography: the dialog must inherit the app font stack and really have the CJK
   // face available, not fall back per glyph.
   const type = await ev(`(() => {
     const dialog = ${dialogWith(PROMPT)}
     return {
       ui: getComputedStyle(dialog).fontFamily,
-      code: getComputedStyle(dialog.querySelector('code')).fontFamily,
+      caption: getComputedStyle(dialog.querySelector('[data-diagram-example] span')).fontFamily,
       cjkReady: document.fonts.check('12px "Noto Sans SC"', '中文图表'),
       latinReady: document.fonts.check('12px "Geist"'),
     }
   })()`)
   check('dialog inherits the UI font stack and the CJK face',
-    type.ui.includes('Geist') && type.ui.includes('Noto Sans SC') && type.code.includes('Geist Mono') && type.cjkReady && type.latinReady,
+    type.ui.includes('Geist') && type.ui.includes('Noto Sans SC') && type.caption.includes('Noto Sans SC') && type.cjkReady && type.latinReady,
     JSON.stringify(type))
   // Opening, reading and copying must not reach off-page: no Skill fetch, no model
   // call, no upload. The Skill stays external and the image never passes through us.
@@ -250,7 +298,7 @@ try {
   await click(select('[data-open-ai-diagram]'))
   await opened(PROMPT)
   const enText = await dialogText(PROMPT)
-  const enWants = ['Diagram with AI', 'diagram-design-zh', 'PNG', 'media library', 'patrick-xin', 'MIT', 'Cathryn Lavery', 'Copy prompt', 'Copy Skill URL', 'npx skills add']
+  const enWants = ['Diagram with AI', 'diagram-design-zh', 'PNG', 'media library', 'Architecture', 'Flowchart', 'Bar chart', 'patrick-xin', 'MIT', 'Cathryn Lavery', 'Copy prompt', 'Copy Skill URL']
   const enMissing = enWants.filter((w) => !enText.includes(w))
   check('English dialog carries the same content', enMissing.length === 0, enMissing.join(','))
   const enCjk = enText.match(/[\u3400-\u9fff]+/g) || []
@@ -302,6 +350,10 @@ try {
     return { onlyOne: document.querySelectorAll('[role="dialog"]').length >= 1, hasDiagram: !!d.querySelector('[data-ai-copy="diagram-prompt"]') }
   })()`)
   check('the two entries do not share a dialog', !mixed.hasDiagram, JSON.stringify(mixed))
+  check('both AI dialogs keep the same single-well shape', await ev(`(() => {
+    const w = ${dialogWith(WRITING_PROMPT)}
+    return w.querySelectorAll('.ya-well').length === 1
+  })()`))
   await closeDialog(WRITING_PROMPT)
 
   fs.writeFileSync(path.join(shots, 'ai-diagram.json'), JSON.stringify({ failures, results, appLog: appLog.slice(-2000) }, null, 2))

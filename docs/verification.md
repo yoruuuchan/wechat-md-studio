@@ -49,7 +49,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；中英文文案 |
 | 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
-| AI 图表入口 | `node scripts/cdp-verify-ai-diagram.mjs 3228 9356 [输出目录]` | 两个 AI 入口同排、「AI 图表」弹窗的中英文文案与提示词、两次真实复制（提示词 / Skill 地址）、三个外链（SKILL.md、仓库、英文原版）都带 `rel="noreferrer"`、弹窗不请求 Skill / 模型 / 图床、提示词框未塌陷、界面与等宽字体实际生效、明暗主题对比度、390px 无横向溢出且弹窗在视口内、打开图表弹窗不改正文、与「AI 帮我写」互不串弹窗；截图为明暗 / 中文 / 英文 / 390px 四张，JSON 与日志写入 `verify-out/ai-diagram/` |
+| AI 画图表入口 | `node scripts/cdp-verify-ai-diagram.mjs 3228 9356 [输出目录]` | 两个 AI 入口同排、「AI 图表」弹窗的中英文文案与提示词、可见文案保持简短、弹窗只有一个主 well、三张示例图从本地 `public/diagram-examples/` 真实解码且各自链到上游画廊对应锚点（带 alt 与 `rel="noreferrer"`）、两次真实复制（提示词 / Skill 地址）、三个外链（SKILL.md、仓库、英文原版）都带 `rel="noreferrer"`、弹窗不请求 Skill / 模型 / 图床、提示词框未塌陷、界面与示例图注字体实际生效、明暗主题对比度、390px 无横向溢出且弹窗在视口内、打开图表弹窗不改正文、与「AI 帮我写」互不串弹窗且同为一 well 结构；截图为明暗 / 中文 / 英文 / 390px 四张，JSON 与日志写入 `verify-out/ai-diagram/` |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
 | 多图网格 | `node scripts/cdp-verify-gallery.mjs 3221 9353` | 参数、上传前裁切、网格布局、HTML 输出 |
 | 轮播复制 / 图片链路 | `node scripts/cdp-verify-carousel-copy.mjs 3232 9362` | 三次整篇复制 payload 逐字节一致、无固定像素宽度结构、URL 绝对可读、GET / HEAD 与并发、滑动几何；设 `MOPAI_CAROUSEL_URLS=<url,url>` 时同一套抓图检查跑在给定公网地址上 |

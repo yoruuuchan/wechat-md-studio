@@ -44,7 +44,7 @@ AI 能读取链接，就把 Skill 地址发给它；不能读取链接，就复�
 
 网页、公开地址与 MCP 读取都来自仓库里的 [同一份 Skill](skills/wechat-typesetter/SKILL.md)。
 
-左栏还有一个「AI 图表」，走同一套交互：把要表达的内容交给你常用的 AI，让它读取 [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) 图表 Skill（作者 patrick-xin，MIT；其中文排版规则基于 [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) 的英文原版，作者 Cathryn Lavery），按内容选择合适的图表类型并导出适合公众号插图的 PNG。这里只有**复制 Skill 地址、复制提示词**两个动作，芦苇不接入模型 API，也不托管或修改这个 Skill。AI 画完把 PNG 拖进编辑器或用工具栏上传，图就进素材库并插到光标处。
+左栏还有一个「AI 画图表」，走同一套交互：把要表达的内容交给你常用的 AI，让它读取 [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) 图表 Skill（作者 patrick-xin，MIT；其中文排版规则基于 [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) 的英文原版，作者 Cathryn Lavery），按内容选择合适的图表类型并导出适合公众号插图的 PNG。弹窗里先放了三张成品示例，能画成什么样一眼就看到。这里只有**复制 Skill 地址、复制提示词**两个动作，芦苇不接入模型 API，也不托管或修改这个 Skill。AI 画完把 PNG 拖进编辑器或用工具栏上传，图就进素材库并插到光标处。
 
 ### 3. 让自己的 AI / Agent 直接编辑当前稿件
 
