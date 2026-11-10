@@ -909,6 +909,31 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 模式行、稿件名 `text-overflow: ellipsis`、横向无溢出、顶栏 57 px。冒烟打开了两次页面，所以有两条 CSP violation，都来自
 > Cloudflare 探针（首页唯一的内联脚本是它每次插入的，哈希每次不同）。冒烟未保存、未上传、未改线上稿。
 
+> 2026-11-10 部署记录（编辑器新增「AI 画图表」入口）：`master` 两次直接提交并推送（`fb59943`、`83ea773`，
+> 公开仓库 `b2645ee..83ea773`）。改动：
+> - 编辑栏 Markdown 标题栏在「AI 帮我写」右侧加「AI 画图表」（`data-open-ai-diagram`）。弹窗沿用同一套 `Dialog`、
+>   剪贴板工具和 i18n（`diagramSkill.*`）：一个 `ya-well` 只放提示词与「复制提示词」，下面「diagram-design-zh · SKILL.md」
+>   链接加「复制 Skill 地址」，末尾一行署名（patrick-xin · MIT，中文排版规则来自 Cathryn Lavery 的英文原版）。
+> - 弹窗顶部放三张成品示例（架构 / 流程 / 柱状，`public/diagram-examples/`，等比缩到 480px 宽、共约 50 KB）。示例图
+>   打包进仓库而不热链上游图床——`raw.githubusercontent.com` 与 `*.github.io` 在国内经常打不开。每张链到上游画廊对应
+>   锚点，另有「45 种图表类型 · 看全部示例」一句。
+> - 提示词让 AI 先读那个外部 Skill、按内容选图表类型、按其中文排版规范出图，并优先交付 PNG（Skill 的 `doc-inline`
+>   尺寸、2 倍率）；导出不了 PNG 时要求说明原因并给能直接打开的 HTML，因为多数网页版 AI 跑不了 Skill 里的 Playwright。
+> - 只提供入口：不接模型 API、没有图表编辑器、不代理生成服务。示例图的 MIT 副本与取用说明记在
+>   `LICENSES/NOTICE.md` 第六节，`verify:sources` 覆盖。
+> 验证：`check`、3035 项测试（75 文件）、`lint`（无错误，只剩 `EditorPage` 那条既有 warning）、`verify:themes`（227 套）、
+> `sync:docs` + `verify:sources`、`build` 全过；新增 `cdp-verify-ai-diagram.mjs` 26/26（中英、明暗、390px、两次真实复制、
+> 三张示例在本地解码、单 well 与字号层级），`cdp-verify-mobile-panes` 152/152（这轮动了编辑栏标题行）。
+> 入口 `index-CoVQaGdK.js` / `index-Dj-Mi3Hl.css`。
+> 部署：包 `mopai-83ea773.tar.gz`（50,460,124 B，sha256 `c11e625ae5…`），13 块分块一次传完、逐块与整包哈希一致；
+> `flock` 安装，服务于 **2026-11-10 02:44:18 UTC** 重启（部署输出与 postcheck 一致）。
+> 核对：`dist/boot.js` sha256 本地 = 线上 `d454b2b1…`；`index.html` 引用的资产名本地 = 线上；公网首页引用同一对资产，
+> `/diagram-examples/architecture.png` 200（18,964 B）、`/skill.md` 200；`verify-all.sh` exit 0
+> （ALL DEPLOYED CHECKS PASSED，沿用其既有的真实图床上传用例）。公网只读冒烟 8 项全过：入口标签是「AI 画图表」、
+> 弹窗能打开、三张示例在线上解码为 480px、可见文案 325 字、提示词含 Skill 地址、无 4xx 静态请求、无页面异常。
+> 遗留：本轮没有取 `dist` / 数据库备份（服务器 `/opt/mopai/backups` 已不存在）。安装脚本只替换 `dist`、未碰数据库，
+> 回滚要从 `b2645ee` 重新构建；下次部署前先确认要不要重建备份目录。
+
 ### 产品方向（用户明确拍板的）（用户明确拍板的）
 
 - **公开源码已落地**：`src/lib/brand.ts` 的 `REPO_URL` 指向 `yoruuuchan/wechat-md-studio`；增量发布与部署对应关系见上面的发布流水线。
