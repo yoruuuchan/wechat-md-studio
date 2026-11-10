@@ -977,6 +977,11 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 6. **轮播比例改动后，旧图需手动重裁**：现在只提示"N 张图还是旧比例"。能不能批量重裁？或自动提示？
 7. **`img:` 协议跨域**：复制到公众号后，微信转存图片，但如果 R2 挂了，正文会裂图。是否有降级方案？
 
+> 2026-11-10 部署记录（复制反馈 / 手机工具栏）：`9f12dba`（feat: 复制结果原地确认 + <640px 工具栏横向滚动）。
+> `check`、`lint`（0 errors，保留 1 条既有 exhaustive-deps warning）、`test` 3035 项、`build`、`verify:themes` 全过；CDP：发布前检查 88/88、手机布局 152/152、公式就绪 ALL CHECKS PASSED。
+> 生产包 50,461,274 B，sha256 `36088ab3…`，13×4MB 分块上传且逐块核对，重组整包 hash 一致；`flock` 安装于 2026-11-10 04:56:56 UTC。
+> 三重核对全过：线上 `dist/boot.js` sha256 = 本地 `be2987d1…`，入口 `index-Cb5awqAx.js` / `index-jMgmJ9jY.css` 本地=线上=公网；公网 200，bundle 含新文案与滚动样式。公开仓库增量发布未做。
+
 ---
 
 ## 七、交付与部署验收
