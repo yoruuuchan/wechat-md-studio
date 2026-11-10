@@ -655,10 +655,18 @@ const drawerOpenSettled = () => waitFor(`(() => {
   // ---------- 10. the actions a phone visitor needs still complete ----------
   await setWidth(390)
   await click(`document.querySelector('[data-onboarding="copy"]')`)
+  const copyFeedback = await waitFor(`(() => {
+    const b = document.querySelector('button[data-onboarding="copy"]')
+    return b && b.dataset.copied === 'true' ? { copied: true, label: b.innerText.trim(), width: Math.round(b.getBoundingClientRect().width) } : null
+  })()`, 'copy button confirmation',3000)
   const copied = await waitFor(`navigator.clipboard.readText().then((text) => text.includes('BASE_A'))`, 'copy reached the clipboard', 15_000).then(() => true).catch(() => false)
   const copyToast = await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText).join(' | ')`)
   check('390px: copying the article actually reaches the clipboard', copied, `toast=${copyToast}`)
-  check('390px: the copy reports success', /复制|已|Copied/i.test(copyToast), copyToast)
+  check(
+    '390px: the copy button confirms in place instead of a toast',
+    copyFeedback?.copied === true && /已复制/.test(copyFeedback.label) && !/已复制/.test(copyToast),
+    JSON.stringify({ copyFeedback, copyToast }),
+  )
 
   // import a Markdown file through the narrow "More" menu
   await click(`document.querySelector('[data-topbar-more]')`)

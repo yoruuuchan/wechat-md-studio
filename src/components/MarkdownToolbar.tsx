@@ -108,6 +108,8 @@ interface Props {
   brush: BrushMode
   onAction: (a: ToolbarAction) => void
   onBrush: (b: BrushMode) => void
+  /** Phone: lay every item out in a horizontal scroller instead of folding. */
+  scrollable?: boolean
 }
 
 // ---------- layout model ----------
@@ -437,7 +439,7 @@ function CodePanel({ onInsert, onClose }: { onInsert: (lang: string) => void; on
 
 // ---------- the toolbar ----------
 
-export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Props) {
+export default function MarkdownToolbar({ state, brush, onAction, onBrush, scrollable = false }: Props) {
   const { t, lang } = useI18n()
   const frameRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
@@ -445,7 +447,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
   const [moreOpen, setMoreOpen] = useState(false)
   const [panel, setPanel] = useState<PanelKind | null>(null)
 
-  const foldedSet = new Set(folded)
+  const foldedSet = new Set(scrollable ? [] : folded)
   const has = (id: string) => !foldedSet.has(id)
 
   /**
@@ -472,6 +474,10 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
    */
   const recompute = useCallback(() => {
     const frame = frameRef.current
+    if (scrollable) {
+      setFolded((prev) => (prev.length ? [] : prev))
+      return
+    }
     if (!frame || !measureRef.current) return
 
     const helpW = (set: Set<string>) => (set.has('helpText') ? widthOf('helpIcon') : widthOf('helpFull'))
@@ -509,7 +515,7 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
     }
     const next = [...set].sort()
     setFolded((prev) => (prev.join(',') === next.join(',') ? prev : next))
-  }, [])
+  }, [scrollable])
 
   // The fold decision can only be made once the row is in the DOM, and it has
   // to land before the first paint — otherwise the toolbar shows every item for
@@ -793,13 +799,17 @@ export default function MarkdownToolbar({ state, brush, onAction, onBrush }: Pro
   const foldedList = foldedSet.has('list')
 
   return (
-    <div className="h-11 shrink-0 border-b border-line-1 px-3">
-      <div ref={frameRef} className="relative flex h-full w-full min-w-0 items-center gap-[3px]">
+    <div className={`h-11 shrink-0 border-b border-line-1 ${scrollable ? '' : 'px-3'}`}>
+      <div
+        ref={frameRef}
+        data-toolbar-scroll={scrollable ? 'true' : undefined}
+        className={`${scrollable ? 'ya-toolbar-scroll overflow-x-auto overflow-y-hidden px-3' : ''} relative flex h-full w-full min-w-0 items-center gap-[3px]`}
+      >
         {/* Hidden measuring row: every item at its natural width, always. */}
         <div
           ref={measureRef}
           aria-hidden
-          className="pointer-events-none absolute left-0 top-0 flex w-max items-center gap-[3px] whitespace-nowrap opacity-0"
+          className={`${scrollable ? 'hidden' : ''} pointer-events-none absolute left-0 top-0 flex w-max items-center gap-[3px] whitespace-nowrap opacity-0`}
         >
           <span data-mid="label" className="px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3">
             {t('toolbar.label')}

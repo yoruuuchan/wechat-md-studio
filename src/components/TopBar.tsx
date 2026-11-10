@@ -40,7 +40,8 @@ interface Props {
   unsaved: boolean
   onOpenDrafts: () => void
   onOpenMaterials: () => void
-  copying: boolean
+  /** The last article copy landed; shown in place on the copy button. */
+  copied: boolean
   onCopy: () => void
   onExport: (kind: 'clean' | 'page' | 'markdown' | 'bundle') => void
   onImport: (kind: 'markdown' | 'docx' | 'bundle') => void
@@ -210,26 +211,36 @@ function PhoneModePicker({
 export default function TopBar(p: Props) {
   const { t } = useI18n()
 
+  const copyLabel = p.wide ? t('topbar.copy') : t('topbar.copyShort')
   const copyButton = (
     <button
       data-onboarding="copy"
       data-topbar-primary
+      data-copied={p.copied ? 'true' : undefined}
       onClick={p.onCopy}
       title={t('topbar.copy')}
-      className={`ya-btn ya-btn-primary whitespace-nowrap ${p.phone ? '!px-2.5 !text-[12px]' : 'px-4'}`}
+      aria-label={p.copied ? t('common.copied') : copyLabel}
+      className={`ya-btn whitespace-nowrap ${p.copied ? 'ya-btn-copied' : 'ya-btn-primary'} ${p.phone ? '!px-1 !text-[12px]' : 'px-4'}`}
     >
-      {p.copying ? (
-        <>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      {/* Both labels sit in one grid cell, so the button keeps the wider
+          label's width instead of resizing when the state flips. */}
+      <span className="inline-grid">
+        <span
+          aria-hidden={p.copied ? true : undefined}
+          className={`col-start-1 row-start-1 flex items-center justify-center ${p.phone ? 'gap-[3px] text-[11px]' : 'gap-[7px]'} ${p.copied ? 'invisible' : ''}`}
+        >
+          {copyLabel}
+        </span>
+        <span
+          aria-hidden={p.copied ? undefined : true}
+          className={`col-start-1 row-start-1 flex items-center justify-center ${p.phone ? 'gap-[3px] text-[11px]' : 'gap-[7px]'} ${p.copied ? '' : 'invisible'}`}
+        >
+          <svg width={p.phone ? 10 : 13} height={p.phone ? 10 : 13} viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 12.5l5 5L20 6.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           {t('common.copied')}
-        </>
-      ) : p.wide ? (
-        t('topbar.copy')
-      ) : (
-        t('topbar.copyShort')
-      )}
+        </span>
+      </span>
     </button>
   )
 

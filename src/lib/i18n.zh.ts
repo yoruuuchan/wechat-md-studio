@@ -357,6 +357,7 @@ export const zh = {
   'editor.toast.exportedUnfinished': '按你的选择带了未完成项',
   'editor.toast.copyFailed': '复制失败',
   'editor.toast.copyFailedDesc': '浏览器拒绝了剪贴板权限，请改用「导出」',
+  'editor.toast.copyFailedFallback': '浏览器拒绝了剪贴板权限。可以改用「更多 → 导出 → 干净正文 HTML」，再粘贴到公众号后台。',
   'editor.toast.exportedMarkdown': '已导出 Markdown 源稿',
   'editor.toast.exportedMarkdownDesc': '方言标记原样保留，可以再导回来',
   'editor.toast.bundleFailed': '整包备份没有导出',

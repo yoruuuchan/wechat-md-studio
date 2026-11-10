@@ -354,7 +354,7 @@ try {
   }
   const exportMenu = async (label) => {
     const opened = await ev(`(() => {
-      const b = [...document.querySelectorAll('header button')].find(x => x.textContent.trim() === '导出')
+      const b = document.querySelector('[data-topbar-more]')
       if (!b) return 'no export button'
       b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
       b.click()
@@ -513,7 +513,21 @@ try {
     Boolean(formulaCopy?.html?.includes('<svg')) && (formulaCopy?.html?.match(/<path /g) ?? []).length > 3,
     formulaCopy ? `${formulaCopy.html.length}B / ${(formulaCopy.html.match(/<path /g) ?? []).length} paths` : 'no copy',
   )
-  check('the success toast says it copied', /已复制/.test(await freshToasts()), await freshToasts())
+  const formulaButton = await ev(`(() => {
+  const b = document.querySelector('button[data-onboarding=copy]')
+  return b ? { copied: b.dataset.copied === 'true', label: b.innerText.trim() } : null
+ })()`)
+  check(
+    'the copy button confirms in place, without a success toast',
+    formulaButton?.copied === true && /已复制/.test(formulaButton.label) && !/已复制/.test(await freshToasts()),
+    JSON.stringify({ button: formulaButton, toasts: await freshToasts() }),
+  )
+  await sleep(1600)
+ const formulaButtonReset = await ev(`(() => {
+  const b = document.querySelector('button[data-onboarding=copy]')
+  return b ? b.dataset.copied === 'true' : null
+ })()`)
+  check('the copy confirmation clears itself after a moment', formulaButtonReset === false, String(formulaButtonReset))
 
   console.log('\n=== broken TeX is refused, and the source is an explicit choice ===')
   await setContent('$$\n\\frac{1}{\n$$\n')

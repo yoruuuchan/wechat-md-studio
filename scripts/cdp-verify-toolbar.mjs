@@ -825,6 +825,86 @@ titles:
   await sleep(600)
   const restored = await resizeEditorTo(1000)
   check('widening brings the buttons back', await evaluate(`!!(${visibleBtn('image')})`), `width=${restored}`)
+  // -------------------------------------------------------------------------
+  console.log('\n=== phone: toolbar scrolls instead of folding ===')
+  await send('Emulation.setDeviceMetricsOverride', { width:390, height:844, deviceScaleFactor:1, mobile:false }, sessionId)
+  await sleep(900)
+  const phoneToolbar = await evaluate(`(() => {
+    const frame = document.querySelector('[data-toolbar-scroll="true"]')
+    if (!frame) return null
+    const bar = frame.closest('div.h-11')
+    const tools = [...frame.querySelectorAll('[data-tool]')].filter((el) => el.getClientRects().length >0 && !el.closest('[aria-hidden="true"]'))
+    const centers = [...frame.children].filter((el) => el.getClientRects().length >0 && !String(el.className).includes('absolute')).map((el) => { const r = el.getBoundingClientRect(); return r.top + r.height/2 })
+    return {
+    mode: document.querySelector('[data-layout-mode]')?.dataset.layoutMode,
+    height: bar ? Math.round(bar.getBoundingClientRect().height) :0,
+    overflowX: getComputedStyle(frame).overflowX,
+    touchAction: getComputedStyle(frame).touchAction,
+    scrollWidth: frame.scrollWidth,
+    clientWidth: frame.clientWidth,
+    oneRow: centers.length >0 && Math.max(...centers) - Math.min(...centers) <=2,
+    ids: tools.map((el) => el.dataset.tool),
+    measureHidden: getComputedStyle(frame.querySelector('[data-mid="label"]').parentElement).display === 'none',
+    pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+    }
+  })()`)
+  check('390px switches to the phone layout', phoneToolbar?.mode === 'phone', JSON.stringify(phoneToolbar))
+  check('the toolbar is a real horizontal scroller', phoneToolbar?.overflowX === 'auto' && phoneToolbar.scrollWidth > phoneToolbar.clientWidth, JSON.stringify(phoneToolbar))
+  check('every group stays on one line', phoneToolbar?.oneRow === true, JSON.stringify(phoneToolbar))
+  check('the fold measurer is out of the way', phoneToolbar?.measureHidden === true)
+  check('the toolbar keeps its 44px row', phoneToolbar?.height ===44, String(phoneToolbar?.height))
+  check('the page itself has no horizontal scrollbar', phoneToolbar?.pageOverflow <=0, String(phoneToolbar?.pageOverflow))
+  check('every toolbar action is present', ['image', 'link', 'table', 'quote', 'list', 'more', 'help'].every((id) => phoneToolbar?.ids.includes(id)), JSON.stringify(phoneToolbar?.ids))
+  check('touch pans sideways without fighting the editor', phoneToolbar?.touchAction === 'pan-x', String(phoneToolbar?.touchAction))
+  await evaluate(`(() => { const frame = document.querySelector('[data-toolbar-scroll="true"]'); frame.scrollLeft = frame.scrollWidth; return true })()`)
+  await sleep(200)
+  const moreBox = await boxOf(visibleBtn('more'))
+  if (moreBox) await clickAt(moreBox.x, moreBox.y)
+  await sleep(350)
+  const moreMenu = await evaluate(`(() => {
+    const el = document.querySelector('[data-menu="more"]')
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, vw:innerWidth, vh:innerHeight }
+  })()`)
+  check('the ··· menu opens on a phone', Boolean(moreMenu), JSON.stringify(moreMenu))
+  check('the ··· menu stays inside the viewport', Boolean(moreMenu) && moreMenu.left >=0 && moreMenu.right <= moreMenu.vw && moreMenu.top >=0 && moreMenu.bottom <= moreMenu.vh, JSON.stringify(moreMenu))
+  await clickMenuItem('表格')
+  await sleep(350)
+  const panelBox = await evaluate(`(() => {
+    const el = document.querySelector('[data-menu="more"]')
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, vw:innerWidth, vh:innerHeight, text:el.innerText.slice(0,40) }
+  })()`)
+  check('the table panel fits a narrow viewport', Boolean(panelBox) && panelBox.left >=0 && panelBox.right <= panelBox.vw && panelBox.top >=0 && panelBox.bottom <= panelBox.vh, JSON.stringify(panelBox))
+  await pressEscape()
+  await sleep(300)
+  await evaluate(`(() => { const frame = document.querySelector('[data-toolbar-scroll="true"]'); frame.scrollLeft = frame.scrollWidth; return true })()`)
+  await sleep(200)
+  const helpBox = await boxOf(visibleBtn('help'))
+  if (helpBox) await clickAt(helpBox.x, helpBox.y)
+  await sleep(350)
+  const helpPopover = await evaluate(`(() => {
+    const el = [...document.querySelectorAll('.ya-pop')].find((x) => x.getClientRects().length >0 && x.innerText.includes('语法'))
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, vw:innerWidth, vh:innerHeight, items:el.querySelectorAll('li').length }
+  })()`)
+  check('the help button is reachable by scrolling', Boolean(helpBox))
+  check('the help popover fits a narrow viewport', Boolean(helpPopover) && helpPopover.left >=0 && helpPopover.right <= helpPopover.vw && helpPopover.top >=0 && helpPopover.bottom <= helpPopover.vh, JSON.stringify(helpPopover))
+  check('the help popover still lists the syntax', Boolean(helpPopover) && helpPopover.items >0, String(helpPopover?.items))
+  await pressEscape()
+  await sleep(300)
+  await send('Emulation.setDeviceMetricsOverride', { width:1536, height:1000, deviceScaleFactor:1, mobile:false }, sessionId)
+  await sleep(900)
+  const restoredToolbar = await evaluate(`(() => ({
+    scroll: Boolean(document.querySelector('[data-toolbar-scroll="true"]')),
+    mode: document.querySelector('[data-layout-mode]')?.dataset.layoutMode,
+    image: Boolean(${visibleBtn('image')}),
+    }))()`)
+  check('desktop returns to the folding toolbar', restoredToolbar.scroll === false && restoredToolbar.mode === 'wide', JSON.stringify(restoredToolbar))
+  check('the wide toolbar still shows the image button', restoredToolbar.image === true, JSON.stringify(restoredToolbar))
 
   // -------------------------------------------------------------------------
   console.log('\n=== hand editing still works ===')

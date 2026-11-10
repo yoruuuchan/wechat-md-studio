@@ -108,6 +108,21 @@ body {
 
 /* 预览中的轮播横向滚动条保持细腻 */
 .preview-scroll::-webkit-scrollbar { height: 6px; }
+/* Phone toolbar: one row that scrolls sideways instead of folding. */
+.ya-toolbar-scroll {
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.ya-toolbar-scroll > * { flex-shrink: 0; }
+.ya-toolbar-scroll::-webkit-scrollbar { height: 4px; }
+.ya-toolbar-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+.ya-toolbar-scroll::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }
+.ya-toolbar-scroll::-webkit-scrollbar-track { background: transparent; }
 
 /* ============================================================
    yoru-and-akari Console tokens（akari 灯 / yoru 夜）
@@ -385,6 +400,9 @@ body {
 .ya-btn-primary { background: var(--primary-500); color: var(--ink-on-primary); box-shadow: var(--glow-brand); }
 .ya-btn-primary:hover:not(:disabled) { background: var(--primary-600); }
 .ya-btn-primary:active:not(:disabled) { box-shadow: inset 3px 3px 6px rgba(46,68,176,0.5); }
+/* Copy feedback: token colours keep the confirmation readable in both themes. */
+.ya-btn-copied { background: var(--success-100); color: var(--success-700); box-shadow: inset 0 0 0 1.5px var(--success-500); }
+.ya-btn-copied:hover:not(:disabled) { background: var(--success-100); }
 
 .ya-btn-secondary { background: var(--bg-base); color: var(--ink-1); box-shadow: var(--shadow-raised); }
 .ya-btn-secondary:hover:not(:disabled) { background: var(--bg-tint); }

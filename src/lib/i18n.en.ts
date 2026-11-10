@@ -363,6 +363,7 @@ export const en: Record<MsgKey, Msg> = {
   'editor.toast.exportedUnfinished': 'Exported with the unfinished parts you chose to keep',
   'editor.toast.copyFailed': 'Copy failed',
   'editor.toast.copyFailedDesc': 'The browser refused clipboard access; use Export instead',
+  'editor.toast.copyFailedFallback': 'The browser refused clipboard access. Use "More → Export → Clean article HTML" instead, then paste it into WeChat.',
   'editor.toast.exportedMarkdown': 'Markdown source exported',
   'editor.toast.exportedMarkdownDesc': 'Dialect markers are kept as-is, so it imports back cleanly',
   'editor.toast.bundleFailed': 'The backup was not exported',

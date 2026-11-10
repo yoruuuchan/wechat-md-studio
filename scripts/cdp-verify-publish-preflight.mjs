@@ -312,10 +312,22 @@ try {
       return 'panel:' + (go ? go.dataset.preflightState : '?')
     })()`)
   }
-  const exportMenu = async (label) => {
-    const opened = await openMenu(`[...document.querySelectorAll('header button')].find((x) => x.textContent.trim() === '导出')`)
+  const copyFeedback = () => evaluate(`(() => {
+    const b = document.querySelector('button[data-onboarding=copy]')
+    return b ? { copied: b.dataset.copied === 'true', label: b.innerText.trim(), width: Math.round(b.getBoundingClientRect().width) } : null
+  })()`)
+  const toastText = () => evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((t) => t.innerText).join('\\n')`)
+  const exportMenu = async (kind) => {
+    const opened = await openMenu(`document.querySelector('[data-topbar-more]')`)
     await sleep(400)
-    const picked = await menuItem(label)
+    const picked = await evaluate(`(() => {
+      const item = document.querySelector('[data-export="${kind}"]')
+      if (!item) return 'missing'
+      item.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      item.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+      item.click()
+      return 'ok'
+    })()`)
     await sleep(600)
     return `${opened}/${picked}`
   }
@@ -357,10 +369,59 @@ try {
   await installSinks()
   check('the editor opened on the text-only article', (await activeDocId()) === 'u02-text', await activeDocId())
   await resetSinks()
+  const defaultCopy = await copyFeedback()
   const textClick = await clickCopy()
   check('no publish check appears for a text-only article', textClick === 'copied', textClick)
-  check('the text-only article reaches the clipboard on the first click', (await copies()).length === 1, JSON.stringify((await copies()).map((c) => c.ok)))
+  check('the text-only article reaches the clipboard on the first click', (await copies()).length ===1, JSON.stringify((await copies()).map((c) => c.ok)))
+  const textCopy = await copyFeedback()
+  const textToast = await toastText()
+  check('the copy button keeps its width when it confirms', textCopy?.width === defaultCopy?.width, `${defaultCopy?.width} -> ${textCopy?.width}`)
+  check('success is shown in the button, not in a toast', textCopy?.copied === true && /已复制/.test(textCopy.label) && !/已复制/.test(textToast), JSON.stringify({ textCopy, textToast }))
+  await sleep(1600)
+  check('the confirmation clears itself', (await copyFeedback())?.copied === false)
+  console.log('\n=== a second copy restarts the confirmation window ===')
+  await resetSinks()
+  await clickCopy()
+  await sleep(900)
+  await clickCopy()
+  await sleep(700)
+  check('the later copy keeps the confirmation up', (await copyFeedback())?.copied === true)
+  await sleep(900)
+  check('the restarted confirmation clears once', (await copyFeedback())?.copied === false)
+  console.log('\n=== a refused clipboard falls back to the HTML export ===')
+  await evaluate(`(() => {
+    window.__wrappedWrite = navigator.clipboard.write
+    window.__wrappedExec = document.execCommand
+    navigator.clipboard.write = async () => { throw new Error('denied') }
+    document.execCommand = () => false
+    return true
+  })()`)
+  await clickCopy()
+  const failedCopy = await copyFeedback()
+  const failedToast = await toastText()
+  check('a refused clipboard does not leave the button on copied', failedCopy?.copied === false, JSON.stringify(failedCopy))
+  check('the failure toast offers the HTML fallback', /更多/.test(failedToast) && /干净正文 HTML/.test(failedToast), failedToast.slice(0,220))
+  await evaluate(`(() => {
+    navigator.clipboard.write = window.__wrappedWrite
+    document.execCommand = window.__wrappedExec
+    return true
+  })()`)
+  await resetSinks()
 
+  console.log('\n=== switching articles clears the copy confirmation ===')
+  await resetSinks()
+  await clickCopy()
+  const beforeSwitch = await copyFeedback()
+  const openedSwitch = await openMenu(`document.querySelector('header input')?.parentElement?.querySelector('button')`)
+  await sleep(250)
+  const pickedSwitch = await menuItem('U02 hosted')
+  await sleep(250)
+  const afterSwitch = await copyFeedback()
+  check(
+  'switching articles clears the copy confirmation',
+  beforeSwitch?.copied === true && openedSwitch === 'ok' && pickedSwitch === 'ok' && afterSwitch?.copied === false,
+  JSON.stringify({ beforeSwitch, openedSwitch, pickedSwitch, afterSwitch }),
+  )
   console.log('\n=== an empty image slot is a warning the author can locate and accept ===')
   check('switched to the placeholder article', (await openDoc('U02 placeholder')) === 'ok/ok')
   await resetSinks()
@@ -477,12 +538,12 @@ try {
   console.log('\n=== Markdown and the full backup still export the source ===')
   check('switched back to the blocked article', (await openDoc('U02 local')) === 'ok/ok')
   await resetSinks()
-  const mdExport = await exportMenu('Markdown')
+  const mdExport = await exportMenu('markdown')
   check('the Markdown export is not blocked', mdExport === 'ok/ok' && (await preflight()) === null, `${mdExport} / panel=${JSON.stringify(await preflight())}`)
   const mdDownloads = await downloads()
   check('... and writes the source file', mdDownloads.length === 1 && String(mdDownloads[0]?.text ?? '').includes('localhost:5173'), JSON.stringify(mdDownloads.map((d) => d.name)))
   await resetSinks()
-  const bundleExport = await exportMenu('整包备份')
+  const bundleExport = await exportMenu('bundle')
   await sleep(1500)
   const bundleDownloads = await downloads()
   check('the full backup export is not blocked either', bundleExport === 'ok/ok' && (await preflight()) === null, `${bundleExport}`)

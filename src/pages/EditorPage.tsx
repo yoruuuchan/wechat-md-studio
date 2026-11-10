@@ -157,6 +157,9 @@ function formatMoment(ts: number, unknownLabel: string): string {
 /** The cloud side of a conflict can be megabytes; a long look, not a full one. */
 const CONFLICT_PREVIEW_CHARS = 20_000
 
+/** How long the copy button keeps its confirmation. */
+const COPIED_FEEDBACK_MS = 1500
+
 /** One pending upload: the files, where they go, and whether a ratio is required. */
 interface FrameTask {
   files: File[]
@@ -532,6 +535,27 @@ export default function EditorPage() {
   docsRef.current = docs
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
+  /** One timer owns the copy confirmation; repeat clicks replace it. */
+  const copiedTimerRef = useRef<number | null>(null)
+  const clearCopiedTimer = useCallback(() => {
+    if (copiedTimerRef.current === null) return
+    window.clearTimeout(copiedTimerRef.current)
+    copiedTimerRef.current = null
+  }, [])
+  const flashCopied = useCallback(() => {
+    clearCopiedTimer()
+    setCopied(true)
+    copiedTimerRef.current = window.setTimeout(() => {
+      copiedTimerRef.current = null
+      setCopied(false)
+    }, COPIED_FEEDBACK_MS)
+  }, [clearCopiedTimer])
+  useEffect(() => () => clearCopiedTimer(), [clearCopiedTimer])
+  // A confirmation belongs to the article that was copied, not the next one.
+  useEffect(() => {
+    clearCopiedTimer()
+    setCopied(false)
+  }, [activeId, clearCopiedTimer])
   const pendingWrites = useRef<Map<string, { content: string; targets: Map<number, WriteTarget> }>>(
     new Map(),
   )
@@ -749,24 +773,30 @@ export default function EditorPage() {
     })
   }
 
-  const copyArticle = async (allowUnfinished: boolean, notices?: PreflightReport) => {
+  const copyArticle = async (notices?: PreflightReport) => {
+    // The confirmation belongs to a completed clipboard write, never to the
+    // click that may still be sitting behind the publish check.
+    const docId = activeIdRef.current
+    clearCopiedTimer()
+    setCopied(false)
     if (activeBodyError) {
       toast.error(activeBodyError)
       return
     }
     const { article, snapshot } = currentArticle()
-    const { html, stats } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
+    const { html } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
       snapshot.get(tex, display), resolveDiagram)
     const ok = await copyRichText(cleanHtml(html), plainTextOf(html))
+    // Switching articles while the clipboard write was in flight must not
+    // paint the new article as copied.
+    if (activeIdRef.current !== docId) return
     if (ok) {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-      toast.success(t('editor.toast.copied', { chars: stats.chars, imgs: stats.images }), {
-        description: allowUnfinished ? t('editor.toast.copiedUnfinished') : t('editor.toast.copiedDesc'),
-      })
+      flashCopied()
       if (notices) announceNotices(notices)
     } else {
-      toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedDesc') })
+      clearCopiedTimer()
+      setCopied(false)
+      toast.error(t('editor.toast.copyFailed'), { description: t('editor.toast.copyFailedFallback') })
     }
   }
 
@@ -832,7 +862,7 @@ export default function EditorPage() {
   }
 
   const runPublish = (kind: PublishAction, allowUnfinished: boolean, notices?: PreflightReport) => {
-    if (kind === 'copy') void copyArticle(allowUnfinished, notices)
+    if (kind === 'copy') void copyArticle(notices)
     else exportHtml(kind, allowUnfinished, notices)
   }
 
@@ -1649,7 +1679,7 @@ export default function EditorPage() {
           <button data-open-ai-diagram onClick={() => setAiDiagramOpen(true)} className="ya-btn ya-btn-secondary ya-btn-sm">{t('editor.aiDiagram')}</button>
         </div>
       </div>
-      <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} />
+      <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} scrollable={phone} />
       <div className="min-h-0 flex-1">
         {activeBodyError ? (
           <div
@@ -1830,7 +1860,7 @@ export default function EditorPage() {
         unsaved={hasUnsavedChanges || neverSaved}
         onOpenDrafts={() => navigate('/drafts')}
         onOpenMaterials={() => navigate('/materials')}
-        copying={copied}
+        copied={copied}
         onCopy={handleCopy}
         onExport={handleExport}
         onImport={(kind) => {
