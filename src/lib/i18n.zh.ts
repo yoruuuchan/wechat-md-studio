@@ -132,6 +132,8 @@ export const zh = {
   'topbar.mode.motion': '动效',
   'topbar.mode.motionShort': '动效',
   'topbar.mode.soon': '即将推出',
+  'motion.frameTitle': '推文动效搭建台',
+  'motion.loading': '正在打开动效搭建台…',
   'topbar.copyShort': '复制',
   'topbar.exportAllShort': '导出 ZIP',
   'topbar.exportingShort': '导出中 {done}/{total}',

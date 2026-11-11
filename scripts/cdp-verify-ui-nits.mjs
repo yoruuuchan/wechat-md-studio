@@ -381,8 +381,12 @@ try {
     selected: el.dataset.modeSelected === 'true',
   })))()`)
   check('390px: the pill menu lists all four modes', JSON.stringify(entries.map((entry) => entry.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), entries)
-  check('390px: 长图 and 动效 stay visible but disabled with the coming-soon hint',
-    entries.filter((entry) => entry.id === 'long' || entry.id === 'motion').every((entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')), entries)
+  // 动效 is a mode of its own when the build carries the composer, a placeholder otherwise
+  // (cdp-verify-ui-modes.mjs checks the mode itself).
+  const isPlaceholder = (entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')
+  check('390px: 长图 stays visible but disabled with the coming-soon hint', entries.filter((entry) => entry.id === 'long').every(isPlaceholder), entries)
+  check('390px: 动效 is selectable, or a placeholder when the build has no composer',
+    entries.filter((entry) => entry.id === 'motion').every((entry) => (!entry.disabled && !entry.placeholder) || isPlaceholder(entry)), entries)
   await evaluate(`document.querySelector('[role=menu] [data-preview-mode="long"]')?.click()`)
   await sleep(300)
   check('390px: choosing a disabled placeholder changes nothing',

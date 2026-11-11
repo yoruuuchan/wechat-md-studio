@@ -2,7 +2,7 @@
 
 [项目首页](../README.md) · [Agent 工作入口](../AGENTS.md) · [验证导航](verification.md)
 
-推文动效搭建台是一个独立的静态页面：在画布上摆元素、排「碰一下之后谁先动」，复制出公众号能用的 SVG 动效。它不属于 React 应用，顶栏的「动效」入口是一个普通链接，点开后浏览器离开编辑器。
+推文动效搭建台是一个独立的静态页面：在画布上摆元素、排「碰一下之后谁先动」，复制出公众号能用的 SVG 动效。它不属于 React 应用；顶栏的「动效」把它原地嵌进编辑器（同源 iframe，`/motion/?embed=1`），切回公众号文章或小红书卡片时只是隐藏，摆到一半的东西还在。`/motion/` 仍可单独打开，是完整的一页。
 
 ## 页面从哪里来
 
@@ -15,6 +15,8 @@
 - `/motion` 由 [boot.ts](../api/boot.ts) 重定向到 `/motion/`，页面按相对地址取自己的脚本、字体和许可文件。
 
 搭建台带的开源素材和字体的许可原文随页面一起发布（`/motion/LICENSE-*.txt`、`/motion/fonts/OFL-NotoSansSC.txt`），页面里「怎么用 → 开源素材和许可」列出每一项。
+
+只有以 `/motion/` 开头的响应允许被本站页面嵌入（`frame-ancestors 'self'`、`X-Frame-Options: SAMEORIGIN`）；其余路径仍是 `frame-ancestors 'none'` / `DENY`。
 
 ## 稿子存在哪里
 
@@ -43,5 +45,5 @@
 ## 验证
 
 - 接口：`npx vitest run api/motion-drafts-router.test.ts`（鉴权、账号隔离、存 / 列 / 开 / 覆盖 / 删、校验与三项限制）。
-- 顶栏入口：`node scripts/cdp-verify-ui-modes.mjs <url>`，「动效」是指向 `/motion/` 的链接；构建里没有搭建台时是占位，两种都算通过。
+- 顶栏入口：`node scripts/cdp-verify-ui-modes.mjs <url>`，点「动效」原地切换、iframe 里搭建台能画出来、切回文章稿子仍在；构建里没有搭建台时是占位，这些检查跳过并打印一行说明。
 - 页面本身（本站内容策略下能运行、按需载入素材表、访客与站长两种「稿子」对话框、存 / 覆盖 / 打开 / 删除）由搭建台项目的 `tool/qa-drafts.mjs <origin> <口令文件>` 对着本地生产构建检查。

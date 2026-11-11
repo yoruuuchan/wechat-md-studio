@@ -60,9 +60,12 @@ interface Props {
   onLogout: () => void
   remoteConnected?: boolean
 
-  /** Article preview or card preview. The other two modes are placeholders. */
+  /** Article preview or card preview; motion opens in place, not as a preview. */
   mode: EditorMode
   onModeChange: (mode: EditorMode) => void
+  /** The embedded motion composer is the visible workspace. */
+  motion: boolean
+  onOpenMotion: () => void
   /** Cards have finished layout and can be exported as one ZIP. */
   cardsReady: boolean
   cardsExporting: boolean
@@ -75,8 +78,8 @@ interface Props {
   wide: boolean
 }
 
-/** `soon` is a placeholder; `href` leaves the editor for a page of its own. */
-type ModeItem = { id: EditorMode | 'long' | 'motion'; label: string; soon?: boolean; href?: string }
+/** `soon` is a placeholder; every other entry switches the visible workspace. */
+type ModeItem = { id: EditorMode | 'long' | 'motion'; label: string; soon?: boolean }
 type Translate = ReturnType<typeof useI18n>['t']
 
 /** The four entries share their labels and order with the wide navigation. */
@@ -87,10 +90,10 @@ function modeItems(t: Translate, compact: boolean): ModeItem[] {
     // Placeholders are visible and focusable so their "coming soon" hint is
     // reachable by keyboard, but choosing them changes nothing.
     { id: 'long', label: compact ? t('topbar.mode.longShort') : t('topbar.mode.long'), soon: true },
-    // The motion composer is a page of its own, there only when the build
+    // The motion composer is embedded in place, there only when the build
     // packed it (scripts/motion/pack-motion.mjs); otherwise a placeholder too.
     MOTION_URL
-      ? { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), href: MOTION_URL }
+      ? { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion') }
       : { id: 'motion', label: compact ? t('topbar.mode.motionShort') : t('topbar.mode.motion'), soon: true },
   ]
 }
@@ -99,11 +102,15 @@ function ModeNav({
   mode,
   onModeChange,
   compact,
+  motion,
+  onOpenMotion,
   fullWidth,
 }: {
   mode: EditorMode
   onModeChange: (mode: EditorMode) => void
   compact: boolean
+  motion: boolean
+  onOpenMotion: () => void
   fullWidth?: boolean
 }) {
   const { t } = useI18n()
@@ -117,17 +124,10 @@ function ModeNav({
       className={`ya-well flex items-center gap-0.5 rounded-xl p-0.5 ${fullWidth ? 'w-full' : ''}`}
     >
       {items.map((item) => {
-        const selected = !item.soon && mode === item.id
+        const selected = !item.soon && (item.id === 'motion' ? motion : !motion && mode === item.id)
         const look = `ya-tool !h-9 whitespace-nowrap rounded-xl ${compact ? '!px-2' : '!px-3'} !text-[12px] font-medium transition-all ${
           fullWidth ? 'flex-1' : ''
         }`
-        if (item.href) {
-          return (
-            <a key={item.id} href={item.href} data-preview-mode={item.id} className={`${look} text-ink-2 no-underline`}>
-              {item.label}
-            </a>
-          )
-        }
         const button = (
           <button
             key={item.id}
@@ -139,7 +139,8 @@ function ModeNav({
             aria-label={item.soon ? `${item.label} · ${t('topbar.mode.soon')}` : item.label}
             onClick={() => {
               if (item.soon) return
-              onModeChange(item.id as EditorMode)
+              if (item.id === 'motion') onOpenMotion()
+              else onModeChange(item.id as EditorMode)
             }}
             className={`${look} ${selected ? 'ya-selected text-ink-1' : ''} ${
               item.soon ? 'cursor-not-allowed text-ink-4 opacity-50 hover:bg-transparent' : 'text-ink-2'
@@ -169,14 +170,18 @@ function ModeNav({
  */
 function PhoneModePicker({
   mode,
+  motion,
   onModeChange,
+  onOpenMotion,
 }: {
   mode: EditorMode
+  motion: boolean
   onModeChange: (mode: EditorMode) => void
+  onOpenMotion: () => void
 }) {
   const { t } = useI18n()
   const items = modeItems(t, true)
-  const current = items.find((item) => !item.soon && item.id === mode) ?? items[0]
+  const current = items.find((item) => !item.soon && (item.id === 'motion' ? motion : !motion && item.id === mode)) ?? items[0]
 
   return (
     <DropdownMenu>
@@ -184,7 +189,7 @@ function PhoneModePicker({
         <button
           type="button"
           data-topbar-mode-pill
-          data-mode={mode}
+          data-mode={motion ? 'motion' : mode}
           aria-label={`${t('topbar.mode.label')} · ${current.label}`}
           title={t('topbar.mode.label')}
           className="ya-tool ya-selected !h-9 shrink-0 whitespace-nowrap rounded-xl !px-2 !text-[12px] font-medium text-ink-1"
@@ -197,14 +202,7 @@ function PhoneModePicker({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="ya-pop w-48 border-none">
         {items.map((item) => {
-          const selected = !item.soon && mode === item.id
-          if (item.href) {
-            return (
-              <DropdownMenuItem key={item.id} asChild className="rounded-lg">
-                <a href={item.href} data-preview-mode={item.id}>{item.label}</a>
-              </DropdownMenuItem>
-            )
-          }
+          const selected = !item.soon && (item.id === 'motion' ? motion : !motion && mode === item.id)
           return (
             <DropdownMenuItem
               key={item.id}
@@ -215,7 +213,8 @@ function PhoneModePicker({
               disabled={item.soon}
               onSelect={() => {
                 if (item.soon) return
-                onModeChange(item.id as EditorMode)
+                if (item.id === 'motion') onOpenMotion()
+                else onModeChange(item.id as EditorMode)
               }}
               className={`rounded-lg ${selected ? 'ya-selected text-ink-1' : ''} ${item.soon ? 'opacity-50' : ''}`}
             >
@@ -238,10 +237,11 @@ export default function TopBar(p: Props) {
       data-onboarding="copy"
       data-topbar-primary
       data-copied={p.copied ? 'true' : undefined}
+      aria-hidden={p.motion ? true : undefined}
       onClick={p.onCopy}
       title={t('topbar.copy')}
       aria-label={p.copied ? t('common.copied') : copyLabel}
-      className={`ya-btn whitespace-nowrap ${p.copied ? 'ya-btn-copied' : 'ya-btn-primary'} ${p.phone ? '!px-1 !text-[12px]' : 'px-4'}`}
+      className={`ya-btn whitespace-nowrap ${p.motion ? 'invisible' : ''} ${p.copied ? 'ya-btn-copied' : 'ya-btn-primary'} ${p.phone ? '!px-1 !text-[12px]' : 'px-4'}`}
     >
       {/* Both labels sit in one grid cell, so the button keeps the wider
           label's width instead of resizing when the state flips. */}
@@ -269,10 +269,11 @@ export default function TopBar(p: Props) {
     <button
       data-topbar-primary
       data-card-export-all
+      aria-hidden={p.motion ? true : undefined}
       onClick={p.onExportAll}
       disabled={!p.cardsReady || p.cardsExporting}
       title={t('cards.exportAll')}
-      className={`ya-btn ya-btn-primary whitespace-nowrap ${p.phone ? '!px-2.5 !text-[12px]' : 'px-4'}`}
+      className={`ya-btn ya-btn-primary whitespace-nowrap ${p.motion ? 'invisible' : ''} ${p.phone ? '!px-2.5 !text-[12px]' : 'px-4'}`}
     >
       {p.cardsExporting ? (
         t('topbar.exportingShort', { done: p.cardsProgress.done, total: p.cardsProgress.total })
@@ -301,7 +302,8 @@ export default function TopBar(p: Props) {
           <span className={`h-4 w-px shrink-0 bg-line-2 ${p.phone ? 'hidden' : ''}`} />
           <div
             data-doc-name-group
-            className={`flex min-w-0 items-center rounded-lg transition-colors hover:bg-line-1 ${
+            aria-hidden={p.motion ? true : undefined}
+            className={`flex min-w-0 items-center rounded-lg transition-colors hover:bg-line-1 ${p.motion ? 'invisible' : ''} ${
               p.phone ? 'flex-1' : 'flex-1 min-[768px]:w-[8rem] min-[960px]:w-[9rem] min-[768px]:shrink-0'
             }`}
           >
@@ -350,7 +352,9 @@ export default function TopBar(p: Props) {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className={`${p.phone ? 'w-[66px]' : p.wide ? 'w-[88px]' : 'w-[72px]'} shrink-0`}>
+          <div
+            aria-hidden={p.motion ? true : undefined}
+            className={`${p.phone ? 'w-[66px]' : p.wide ? 'w-[88px]' : 'w-[72px]'} shrink-0 ${p.motion ? 'invisible' : ''}`}>
             <SaveStatus
               status={p.saveStatus}
               docName={p.docName}
@@ -377,13 +381,13 @@ export default function TopBar(p: Props) {
             A phone has no room for a second row, so it gets the pill instead. */}
         {!p.phone && (
           <div className={`flex min-w-0 justify-center ${p.wide ? 'flex-1' : 'shrink-0 min-[768px]:flex-1'}`}>
-            <ModeNav mode={p.mode} onModeChange={p.onModeChange} compact={!p.wide} />
+            <ModeNav mode={p.mode} motion={p.motion} onModeChange={p.onModeChange} onOpenMotion={p.onOpenMotion} compact={!p.wide} />
           </div>
         )}
 
         {/* Right: the current mode's main action, then everything else. */}
         <div className={`flex shrink-0 items-center gap-1.5 ${p.phone ? '' : 'ml-auto'}`}>
-          {p.phone && <PhoneModePicker mode={p.mode} onModeChange={p.onModeChange} />}
+          {p.phone && <PhoneModePicker mode={p.mode} motion={p.motion} onModeChange={p.onModeChange} onOpenMotion={p.onOpenMotion} />}
           {p.onOpenSidePanel && (
             <button
               data-open-side-panel

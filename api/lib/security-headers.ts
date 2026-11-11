@@ -122,6 +122,16 @@ export function securityHeaders(): MiddlewareHandler {
       c.header('Access-Control-Allow-Origin', '*')
       c.header('Cross-Origin-Resource-Policy', 'cross-origin')
     }
+    // The motion composer is served from this same origin and embedded by the
+    // editor at /motion/?embed=1. Only that path relaxes framing, and only to
+    // same-origin pages: every other response stays unframeable.
+    if (c.req.path.startsWith('/motion/')) {
+      const csp = c.res.headers.get('Content-Security-Policy')
+      if (csp) {
+        c.header('Content-Security-Policy', csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'"))
+      }
+      c.header('X-Frame-Options', 'SAMEORIGIN')
+    }
     if (env.isProduction && isHttpsRequest(c)) {
       c.header('Strict-Transport-Security', HSTS_VALUE)
     }

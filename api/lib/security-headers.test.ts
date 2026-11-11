@@ -23,6 +23,8 @@ function testApp() {
   app.use('*', securityHeaders())
   app.get('/', (c) => c.html('<div>editor</div>'))
   app.get('/api/img/:key', (c) => c.redirect('https://img.example.test/img/x', 302))
+  app.get('/motion/', (c) => c.html('<!doctype html><div>composer</div>'))
+  app.get('/motion/*', (c) => c.body('x', 200, { 'Content-Type': 'application/javascript' }))
   return app
 }
 
@@ -110,6 +112,26 @@ describe('the response headers', () => {
     expect(csp).toContain("form-action 'self'")
     expect(csp).toContain("frame-ancestors 'none'")
     expect(csp).not.toContain('unsafe-eval')
+  })
+
+  it('allows only same-origin framing of the motion page', async () => {
+    for (const path of ['/motion/', '/motion/app.x.js']) {
+      const res = await testApp().request(path)
+      const csp = res.headers.get('content-security-policy') ?? ''
+      expect(res.headers.get('x-frame-options')).toBe('SAMEORIGIN')
+      expect(csp).toContain("frame-ancestors 'self'")
+      expect(csp).not.toContain("frame-ancestors 'none'")
+      // Every other directive is still the app-wide policy.
+      expect(csp).toContain("default-src 'self'")
+      expect(csp).toContain("object-src 'none'")
+    }
+    for (const path of ['/', '/api/trpc/auth.me', '/motionless']) {
+      const res = await testApp().request(path)
+      const csp = res.headers.get('content-security-policy') ?? ''
+      expect(res.headers.get('x-frame-options')).toBe('DENY')
+      expect(csp).toContain("frame-ancestors 'none'")
+      expect(csp).not.toContain("frame-ancestors 'self'")
+    }
   })
 
   it('sends HSTS only for a request that arrived over HTTPS', async () => {

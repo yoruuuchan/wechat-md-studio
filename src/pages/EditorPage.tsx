@@ -114,6 +114,7 @@ import { useEditorLayout } from '@/hooks/use-mobile'
 import { useCardTemplates } from '@/hooks/useCardTemplates'
 import { withTemplate, type CardOptions } from '@/lib/cards'
 import { isPublicCardTemplateId } from '@/lib/public-card-templates'
+import { MOTION_EMBED_URL } from '@/lib/motion'
 import {
   DEFAULT_CARD_OPTIONS, loadCardOptions, reconcileCardOptions, saveCardOptions,
 } from '@/lib/card-options'
@@ -222,6 +223,11 @@ export default function EditorPage() {
   const layoutRef = useRef<Record<string, number>>(initialLayout ?? {})
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
   const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
+  /** The embedded composer is up; previewMode stays on article or cards. */
+  const [motionOpen, setMotionOpen] = useState(false)
+  /** Created on first use and kept mounted, so the composer keeps its work. */
+  const [motionMounted, setMotionMounted] = useState(false)
+  const [motionReady, setMotionReady] = useState(false)
   const [cardOptions, setCardOptions] = useState<CardOptions>(() => loadCardOptions() ?? DEFAULT_CARD_OPTIONS)
   const cardTemplates = useCardTemplates({ loadPublic: previewMode === 'cards' })
   const [cardsStatus, setCardsStatus] = useState<CardsStatus>({
@@ -1738,8 +1744,16 @@ export default function EditorPage() {
 
   /** Switching modes takes the right column to that mode's own tab. */
   const changePreviewMode = useCallback((next: 'wechat' | 'cards') => {
+    setMotionOpen(false)
     setPreviewMode(next)
     setSideTab(next === 'cards' ? 'card' : 'theme')
+  }, [])
+
+  /** First open creates the iframe; later opens just show it again. */
+  const openMotion = useCallback(() => {
+    if (!MOTION_EMBED_URL) return
+    setMotionMounted(true)
+    setMotionOpen(true)
   }, [])
 
   /**
@@ -1748,6 +1762,8 @@ export default function EditorPage() {
    * drawer, or the phone's side pane.
    */
   const openSettings = useCallback(() => {
+    // The settings tab is part of the workspace the composer covers.
+    setMotionOpen(false)
     setSideTab('settings')
     if (phone) setPane('side')
     else if (medium) setSideDrawerOpen(true)
@@ -1886,6 +1902,8 @@ export default function EditorPage() {
         remoteConnected={Boolean(activeDoc?.remoteMcp)}
         mode={previewMode}
         onModeChange={changePreviewMode}
+        motion={motionOpen}
+        onOpenMotion={openMotion}
         cardsReady={cardsStatus.ready}
         cardsExporting={cardsStatus.busy}
         cardsProgress={cardsStatus.progress}
@@ -1909,83 +1927,111 @@ export default function EditorPage() {
           </div>
         )}
 
-      {/* 手机上才需要这条说明：单面板切换怎么用；640px 起就是编辑 + 预览两栏 */}
-      {phone && (
-        <div data-narrow-note className="flex shrink-0 items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3">
-          {t('editor.narrowNote')}
+      <div
+        data-editor-workspace
+        hidden={motionOpen}
+        style={motionOpen ? { display: 'none' } : undefined}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {/* 手机上才需要这条说明：单面板切换怎么用；640px 起就是编辑 + 预览两栏 */}
+        {phone && (
+          <div data-narrow-note className="flex shrink-0 items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3">
+            {t('editor.narrowNote')}
+          </div>
+        )}
+
+        {phone ? (
+          <PaneSwitcher pane={pane} onPaneChange={setPane}>
+            {/* All three panes stay mounted and laid out; the inactive ones are
+                only invisible, so the editor keeps its caret and scroll offset
+                and an in-flight upload keeps running while another pane is up. */}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <div role="tabpanel" id="pane-editor" aria-labelledby="pane-tab-editor" data-pane="editor" className={`absolute inset-0 min-h-0 ${pane === 'editor' ? '' : 'invisible pointer-events-none'}`}>{editorPaneBody}</div>
+              <div role="tabpanel" id="pane-preview" aria-labelledby="pane-tab-preview" data-pane="preview" className={`absolute inset-0 min-h-0 ${pane === 'preview' ? '' : 'invisible pointer-events-none'}`}>{previewPaneBody}</div>
+              <div role="tabpanel" id="pane-side" aria-labelledby="pane-tab-side" data-pane="side" className={`absolute inset-0 min-h-0 ${pane === 'side' ? '' : 'invisible pointer-events-none'}`}>{sidebarPaneBody}</div>
+            </div>
+          </PaneSwitcher>
+        ) : (
+          <>
+            <ResizablePanelGroup
+              orientation="horizontal"
+              className="min-h-0 flex-1"
+              defaultLayout={initialLayout}
+              onLayoutChange={(layout) => {
+                layoutRef.current = { ...layoutRef.current, ...layout }
+                try {
+                  localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRef.current))
+                } catch {
+                  // 宽度记不住也不碍事
+                }
+              }}
+            >
+              {/* 左：Markdown 编辑（支持拖图上传）。中等档把最小宽度让给预览。 */}
+              <ResizablePanel id="editor" defaultSize={wide ? '55%' : '50%'} minSize={wide ? '320px' : '240px'} className="min-w-0">
+                {editorPaneBody}
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖，没有上限） */}
+              <ResizablePanel id="preview" defaultSize={wide ? '500px' : '50%'} minSize={wide ? '380px' : '360px'} className="min-w-0 border-l border-line-2">
+                {previewPaneBody}
+              </ResizablePanel>
+
+              {/* 右：只在宽屏占一栏，且可以一直拖宽；中等档改用下面的抽屉。 */}
+              {wide && panelOpen && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" className="min-w-0">
+                    {sidebarPaneBody}
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+
+            {/* The medium drawer reuses the same SidePanel; its selected tab is
+                owned by the page so closing and reopening keeps it, and uploaded
+                images already live in the page state. */}
+            {medium && (
+              <Sheet open={sideDrawerOpen} onOpenChange={setSideDrawerOpen}>
+                <SheetContent
+                  side="right"
+                  data-side-drawer
+                  className="w-[420px] max-w-[92vw] gap-0 border-line-2 bg-surface-base p-0 pt-10 sm:max-w-[420px]"
+                >
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>{t('editor.pane.side')}</SheetTitle>
+                    <SheetDescription>{t('editor.sideDrawerDescription')}</SheetDescription>
+                  </SheetHeader>
+                  {sidebarPaneBody}
+                </SheetContent>
+              </Sheet>
+            )}
+          </>
+        )}
+      </div>
+
+      {MOTION_EMBED_URL && motionMounted && (
+        <div
+          data-motion-frame-shell
+          hidden={!motionOpen}
+          style={motionOpen ? undefined : { display: 'none' }}
+          className="relative min-h-0 flex-1"
+        >
+          {!motionReady && (
+            <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[13px] text-ink-3" role="status">
+              {t('motion.loading')}
+            </p>
+          )}
+          <iframe
+            data-motion-frame
+            src={MOTION_EMBED_URL}
+            title={t('motion.frameTitle')}
+            onLoad={() => setMotionReady(true)}
+            className={`h-full w-full border-0 ${motionReady ? '' : 'invisible'}`}
+          />
         </div>
       )}
-
-      {phone ? (
-        <PaneSwitcher pane={pane} onPaneChange={setPane}>
-          {/* All three panes stay mounted and laid out; the inactive ones are
-              only invisible, so the editor keeps its caret and scroll offset
-              and an in-flight upload keeps running while another pane is up. */}
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div role="tabpanel" id="pane-editor" aria-labelledby="pane-tab-editor" data-pane="editor" className={`absolute inset-0 min-h-0 ${pane === 'editor' ? '' : 'invisible pointer-events-none'}`}>{editorPaneBody}</div>
-            <div role="tabpanel" id="pane-preview" aria-labelledby="pane-tab-preview" data-pane="preview" className={`absolute inset-0 min-h-0 ${pane === 'preview' ? '' : 'invisible pointer-events-none'}`}>{previewPaneBody}</div>
-            <div role="tabpanel" id="pane-side" aria-labelledby="pane-tab-side" data-pane="side" className={`absolute inset-0 min-h-0 ${pane === 'side' ? '' : 'invisible pointer-events-none'}`}>{sidebarPaneBody}</div>
-          </div>
-        </PaneSwitcher>
-      ) : (
-        <>
-          <ResizablePanelGroup
-            orientation="horizontal"
-            className="min-h-0 flex-1"
-            defaultLayout={initialLayout}
-            onLayoutChange={(layout) => {
-              layoutRef.current = { ...layoutRef.current, ...layout }
-              try {
-                localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRef.current))
-              } catch {
-                // 宽度记不住也不碍事
-              }
-            }}
-          >
-            {/* 左：Markdown 编辑（支持拖图上传）。中等档把最小宽度让给预览。 */}
-            <ResizablePanel id="editor" defaultSize={wide ? '55%' : '50%'} minSize={wide ? '320px' : '240px'} className="min-w-0">
-              {editorPaneBody}
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖，没有上限） */}
-            <ResizablePanel id="preview" defaultSize={wide ? '500px' : '50%'} minSize={wide ? '380px' : '360px'} className="min-w-0 border-l border-line-2">
-              {previewPaneBody}
-            </ResizablePanel>
-
-            {/* 右：只在宽屏占一栏，且可以一直拖宽；中等档改用下面的抽屉。 */}
-            {wide && panelOpen && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" className="min-w-0">
-                  {sidebarPaneBody}
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-
-          {/* The medium drawer reuses the same SidePanel; its selected tab is
-              owned by the page so closing and reopening keeps it, and uploaded
-              images already live in the page state. */}
-          {medium && (
-            <Sheet open={sideDrawerOpen} onOpenChange={setSideDrawerOpen}>
-              <SheetContent
-                side="right"
-                data-side-drawer
-                className="w-[420px] max-w-[92vw] gap-0 border-line-2 bg-surface-base p-0 pt-10 sm:max-w-[420px]"
-              >
-                <SheetHeader className="sr-only">
-                  <SheetTitle>{t('editor.pane.side')}</SheetTitle>
-                  <SheetDescription>{t('editor.sideDrawerDescription')}</SheetDescription>
-                </SheetHeader>
-                {sidebarPaneBody}
-              </SheetContent>
-            </Sheet>
-          )}
-        </>
-      )}
-
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
       <AiDiagramDialog open={aiDiagramOpen} onOpenChange={setAiDiagramOpen} />
       <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />

@@ -134,6 +134,8 @@ export const en: Record<MsgKey, Msg> = {
   'topbar.mode.motion': 'Motion',
   'topbar.mode.motionShort': 'Motion',
   'topbar.mode.soon': 'Coming soon',
+  'motion.frameTitle': 'Motion composer',
+  'motion.loading': 'Opening the motion composer…',
   'topbar.copyShort': 'Copy',
   'topbar.exportAllShort': 'Export ZIP',
   'topbar.exportingShort': 'Exporting {done}/{total}',
