@@ -77,16 +77,18 @@ export default function LongSettings({
         ) : null}
       </div>
 
-      <div>
-        <p className="ya-eyebrow mb-2">{t('long.variant')}</p>
-        <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('long.variant')}>
-          {variants.map((id) => (
-            <button key={id} data-long-variant={id} aria-pressed={options.variant === id} disabled={busy}
-              className={`ya-tool xhs-option ${options.variant === id ? 'ya-selected' : ''}`}
-              onClick={() => onOptionsChange({ ...options, variant: id })}>{variantName(id)}</button>
-          ))}
+      {variants.length > 1 && (
+        <div>
+          <p className="ya-eyebrow mb-2">{t('long.variant')}</p>
+          <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group" aria-label={t('long.variant')}>
+            {variants.map((id) => (
+              <button key={id} data-long-variant={id} aria-pressed={options.variant === id} disabled={busy}
+                className={`ya-tool xhs-option ${options.variant === id ? 'ya-selected' : ''}`}
+                onClick={() => onOptionsChange({ ...options, variant: id })}>{variantName(id)}</button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
         <p className="ya-eyebrow mb-2">{t('long.width')}</p>

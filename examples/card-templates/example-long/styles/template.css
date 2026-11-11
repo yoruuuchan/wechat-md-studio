@@ -14,12 +14,6 @@
   width: calc(100% +96px);
   margin: -48px -48px 22px;
 }
-.example-long-kicker {
-  margin: 0;
-  font-size: 10px;
-  letter-spacing: 4px;
-  color: #6e756f;
-}
 .example-long-head h1 {
   margin: 14px 0 0;
   font-size: 34px;
@@ -68,7 +62,7 @@
   padding-top: 10px;
 }
 .reed-long-lede {
-  margin:0;
+  margin: 0;
   padding-bottom: 12px;
   font-size: 13px;
   line-height: 1.8;
@@ -144,12 +138,6 @@
 .example-long-foot {
   padding: 54px 48px 52px;
   text-align: center;
-}
-.example-long-rule {
-  width: 56px;
-  height: 1px;
-  margin: 0 auto 22px;
-  background: #cec8bc;
 }
 .example-long-foot p {
   margin: 0;

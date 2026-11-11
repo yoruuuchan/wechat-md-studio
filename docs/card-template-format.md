@@ -298,3 +298,80 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 - 封面标题自适应、页眉、页脚、页码。
 
 把它打包后上传，就能在「我的」组里看到并使用。
+
+## 10. 长图模板
+
+同一个 `.reedcard` 包也可以是长图模板：在 manifest 里写 `"kind": "long"`。不写 `kind` 就是卡片，前面九节的规则不变。长图的用法见 [长图模式](long-image.md)。
+
+和卡片不同的地方只有这些：
+
+| 项 | 长图模板 |
+|---|---|
+| `ratios` / `defaultRatio` | 不接受，写了会被拒绝（长图没有固定比例） |
+| `metrics` | 只有四项：`padX`（0–140）、`contentWidth`（200–540）、`photoGap`（0–60）、`photoInset`（0–80）；`contentWidth + 2 × padX` 不能超过 540 |
+| `pages` | 只有 `header` 和 `footer`，都可以不写；小节和照片组由引擎生成 |
+| CSS 作用域根 | `.reed-long-root`（外层）和 `.reed-long-flow`（内容流） |
+
+其余字段（`id`、`renderId`、`name`、`version`、`author`、`description`、`variants`、`fonts`、`styles`）、允许的 HTML、CSS 规则、字体、大小限制和上传存储都与卡片相同。
+
+### 页面片段与 slot
+
+`header` 在稿件有一级标题时出现，`footer` 在稿件有落款（最后一个单独一行的 `---` 之后有内容）时出现。可用的 slot：
+
+| slot | 内容 |
+|---|---|
+| `title` / `subtitle` | 一级标题和紧跟的短段落；为空时元素被移除 |
+| `cover` | 头图，只能放在 `<img>` 上，引擎写入 `src`；没有头图时元素被移除 |
+| `content` | 仅 `footer`：落款内容（引擎渲染好的段落） |
+| `author` | front matter 的 `author`；为空时元素被移除 |
+| `brand` / `date` | 与卡片相同 |
+
+条件属性在卡片的 `data-when-variant`、`data-when-dark` 之外多一个 `data-when-cover="true|false"`：有没有头图时各显示哪一块。
+
+### 引擎生成的结构
+
+```html
+<div class="reed-long-root" data-template="…" data-variant="…" data-kind="long">
+  <div class="reed-long-flow">
+    <!-- header 片段 -->
+    <div class="reed-long-preamble">…</div>            <!-- 第一个二级标题之前的正文 -->
+    <section class="reed-long-section">
+      <div class="reed-long-section-head">
+        <span class="reed-long-section-mark"></span>
+        <h2 class="reed-long-section-label"><span>小节标题</span></h2>
+        <span class="reed-long-section-kicker">KICKER</span>   <!-- 写了才有 -->
+      </div>
+      <div class="reed-long-section-body">
+        <p class="reed-long-lede">小节的第一段</p>
+        <div class="reed-long-photos" data-photo-count="5">
+          <div class="reed-long-photo-frame">
+            <div class="reed-long-photo-row">
+              <figure class="reed-long-photo"><img></figure>
+            </div>
+          </div>
+          <span class="reed-long-photo-next"></span>
+        </div>
+        <div class="reed-long-divider"></div>             <!-- 小节里的 --- -->
+      </div>
+    </section>
+    <!-- footer 片段 -->
+  </div>
+</div>
+```
+
+照片行的宽高由引擎按原始比例算好并写成内联样式，模板不要改 `.reed-long-photo` 的宽高，只画外框、间距和装饰。
+
+引擎在 `.reed-long-root` 上提供这些变量：
+
+| 变量 | 含义 |
+|---|---|
+| `--long-pad-x`、`--long-content-w`、`--long-photo-gap`、`--long-photo-inset` | manifest 里的四项 metrics，带 `px` |
+| `--long-title-units`、`--long-subtitle-units` | 标题、副标题大约相当于多少个全角字（中文算 1，其它算 0.55）。用它让长标题自动缩小，例如 `font-size: clamp(30px, calc(486px / var(--long-title-units, 8) - 2px), 56px)` |
+
+### 最小示例
+
+`examples/card-templates/example-long/` 是一个可以直接打包上传的长图模板：白底、一个变体、只用内置 Noto Sans SC。
+
+```bash
+node scripts/cards/pack-template.mjs examples/card-templates/example-long example-long.reedcard
+```
