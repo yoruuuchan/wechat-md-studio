@@ -998,6 +998,21 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 公网只读冒烟 25/25（`live-smoke.mjs … groups,nits,motion`，`motion` 是这次新加的一组），搭建台页面以访客身份另查 8 项全过。
 > Cloudflare 往 `/motion/` 的 HTML 里同样会加它自己的探测脚本，被内容策略拦下，每次打开一条 CSP 提示，和主页一样，无害。
 > 线上没有用站长账号登录测过：云端草稿的存取只在本地生产构建上验证。
+>
+> 2026-11-11 部署记录（「动效」原地切换 + 搭建台深色界面）：`8925641`（feat(motion)：点顶栏「动效」不再跳到 `/motion/`，
+> 而是和「公众号文章 / 小红书卡片」一样原地切换：顶栏不动，工作区让位给同源 iframe `/motion/?embed=1`；首次使用才创建、
+> 载入完成前不显示、之后只是隐藏，所以文章和搭建台里的内容来回切换都保留）。说明见 [docs/motion.md](docs/motion.md)。
+> 安全头：只有 `/motion/` 下的响应改成 `frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`，其余路径仍是 `'none'` / `DENY`（公网已核对）。
+> 同一次发布带上了搭建台的深色界面（仓库外的静态页面，随 `pack:motion` 进包）：嵌在编辑器里时读父页面 `<html data-theme>` 并实时跟随，
+> 单独打开时读 `mopai.theme.v1`，没有就跟系统。芦苇这边不需要为它改代码。
+> `check`、`lint`、`test` 3045 项、`build`（`[pack-motion] 328 files`）全过；本地生产构建上的浏览器检查：原地切换与主题跟随 12/12，
+> `cdp-verify-ui-nits` 134/134，搭建台 27 项全过；`cdp-verify-ui-modes` 126/129，不过的仍是 11-10 起就有的「稿件名至少显示八个汉字」三项，本次没有处理。
+> 生产包 62,796,030 B，sha256 `c0628832…`，15×4MB 分块上传且逐块核对；安装前备份 `dist-20261111T071917Z-c46cd4d8` 与同名 `.db`，
+> `flock` 安装，服务于 **2026-11-11 07:19:21 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `e5e59ce2…`；入口 `index-BMhZKATG.js` / `index-jMgmJ9jY.css`、`/motion/app.6946eed0e3.js`、
+> `/motion/theme.js` 公网与本地逐字节一致；`verify-all.sh` 通过；`card_templates` 9 行、`motion_drafts` 0 行，都没变。
+> 公网只读冒烟 28/28（`live-smoke.mjs … groups,nits,motion`；`motion` 一组改成查原地切换、主题实时跟随、手机预览保持白底），
+> 搭建台页面以访客身份另查 18 项全过。线上仍然没有用站长账号登录测过。
 
 ---
 
