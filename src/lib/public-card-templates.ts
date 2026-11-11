@@ -162,63 +162,63 @@ export function publicCardTemplateFor(template: string): PublicCardTemplate | un
 /** Summary from static metadata, before the zip has arrived. */
 /** A public long-image template shares the same archive and loader path. */
 export interface PublicLongTemplate {
- id: string
- name: string
- author: string
- description: string
- reference: string
- license: 'MIT'
- sourceUrl: string
- pack: string
- variants: readonly { id: string; name: string }[]
+  id: string
+  name: string
+  author: string
+  description: string
+  reference: string
+  license: 'MIT'
+  sourceUrl: string
+  pack: string
+  variants: readonly { id: string; name: string }[]
 }
 
 export const PUBLIC_LONG_TEMPLATES: readonly PublicLongTemplate[] = [
- {
- id: 'blue-tech-recap',
- name: '蓝色科技活动回顾',
- author: 'Reed',
- description: '深蓝渐变上的活动回顾长图：满宽头图叠白到浅蓝的粗斜标题，小节用白底标签、手写感宽字距和细描边照片框，落款居中收束。适合成立大会、发布会与线下活动。',
- reference: '作者本人的一张活动回顾长图（未公开）',
- license: 'MIT',
- sourceUrl: 'https://github.com/yoruuuchan/wechat-md-studio',
- pack: '/card-templates/blue-tech-recap.reedcard',
- variants: [{ id: 'blue', name: '科技蓝' }],
- },
+  {
+    id: 'blue-tech-recap',
+    name: '蓝色科技活动回顾',
+    author: 'Reed',
+    description: '深蓝渐变上的活动回顾长图：满宽头图叠白到浅蓝的粗斜标题，小节用白底标签、手写感宽字距和细描边照片框，落款居中收束。适合成立大会、发布会与线下活动。',
+    reference: '作者本人的一张活动回顾长图（未公开）',
+    license: 'MIT',
+    sourceUrl: 'https://github.com/yoruuuchan/wechat-md-studio',
+    pack: '/card-templates/blue-tech-recap.reedcard',
+    variants: [{ id: 'blue', name: '科技蓝' }],
+  },
 ] as const
 
 export function publicLongTemplateInstanceId(id: string): string {
- return `public-${id}`
+  return `public-${id}`
 }
 
 export function publicLongTemplateRuntimeId(id: string): string {
- return PUBLIC_CARD_TEMPLATE_PREFIX + id
+  return PUBLIC_CARD_TEMPLATE_PREFIX + id
 }
 
 export function publicLongTemplateFor(template: string): PublicLongTemplate | undefined {
- if (!isPublicCardTemplateId(template)) return undefined
- const id = template.slice(PUBLIC_CARD_TEMPLATE_PREFIX.length)
- return PUBLIC_LONG_TEMPLATES.find((item) => item.id === id)
+  if (!isPublicCardTemplateId(template)) return undefined
+  const id = template.slice(PUBLIC_CARD_TEMPLATE_PREFIX.length)
+  return PUBLIC_LONG_TEMPLATES.find((item) => item.id === id)
 }
 
 export function publicLongTemplateSummary(item: PublicLongTemplate): CardTemplateSummary {
- return {
- kind: 'long',
- id: item.id,
- template: publicLongTemplateRuntimeId(item.id),
- name: item.name,
- version: '1.0.0',
- author: item.author,
- variants: item.variants,
- ratios: [],
- }
+  return {
+    kind: 'long',
+    id: item.id,
+    template: publicLongTemplateRuntimeId(item.id),
+    name: item.name,
+    version: '1.0.0',
+    author: item.author,
+    variants: item.variants,
+    ratios: [],
+  }
 }
 
 export function publicCardTemplateSummary(item: PublicCardTemplate): CardTemplateSummary {
   return {
     id: item.id,
     kind: 'card',
- template: publicCardTemplateRuntimeId(item.id),
+    template: publicCardTemplateRuntimeId(item.id),
     name: item.name,
     version: '1.0.0',
     author: item.author,

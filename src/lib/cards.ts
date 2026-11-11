@@ -61,10 +61,10 @@ export function cardAccent(template: CardTemplateId, background: CardBackground,
 
 /** Measurements a long template declares for the shared photo-row engine. */
 export interface LongImageMetrics {
- padX: number
- contentWidth: number
- photoGap: number
- photoInset: number
+  padX: number
+  contentWidth: number
+  photoGap: number
+  photoInset: number
 }
 
 export interface CardMeasurements {
@@ -141,12 +141,12 @@ export interface CardTemplateRuntime {
 
 /** An uploaded long template, flattened for the shared long-image engine. */
 export interface LongTemplateRuntime {
- kind: 'long'
- template: CardTemplateId
- name: string
- variants: readonly CardTemplateVariantRuntime[]
- metrics: LongImageMetrics
- fonts: readonly CardFontFace[]
+  kind: 'long'
+  template: CardTemplateId
+  name: string
+  variants: readonly CardTemplateVariantRuntime[]
+  metrics: LongImageMetrics
+  fonts: readonly CardFontFace[]
 }
 
 const CUSTOM_TEMPLATE_RUNTIMES = new Map<CardTemplateId, CardTemplateRuntime>()
@@ -169,24 +169,24 @@ export function customCardTemplateRuntime(template: CardTemplateId): CardTemplat
 }
 
 export function registerLongTemplateRuntime(runtime: LongTemplateRuntime): void {
- LONG_TEMPLATE_RUNTIMES.set(runtime.template, runtime)
+  LONG_TEMPLATE_RUNTIMES.set(runtime.template, runtime)
 }
 
 export function unregisterLongTemplateRuntime(template: CardTemplateId): void {
- LONG_TEMPLATE_RUNTIMES.delete(template)
+  LONG_TEMPLATE_RUNTIMES.delete(template)
 }
 
 export function longTemplateRuntime(template: CardTemplateId): LongTemplateRuntime | undefined {
- return LONG_TEMPLATE_RUNTIMES.get(template)
+  return LONG_TEMPLATE_RUNTIMES.get(template)
 }
 
 /** Long templates have the same variant rules as cards, without ratios. */
 export function longTemplateVariants(template: CardTemplateId): readonly CardBackground[] {
- return longTemplateRuntime(template)?.variants.map((variant) => variant.id) ?? []
+  return longTemplateRuntime(template)?.variants.map((variant) => variant.id) ?? []
 }
 
 export function longTemplateFonts(template: CardTemplateId): readonly CardFontFace[] {
- return longTemplateRuntime(template)?.fonts ?? []
+  return longTemplateRuntime(template)?.fonts ?? []
 }
 
 /** The face list shared by pagination preload and PNG embedding. */

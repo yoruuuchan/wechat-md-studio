@@ -12,7 +12,7 @@ import {
 import {
   activateCardTemplate, deactivateCardTemplate, fragmentHtml,
   parseCardTemplateSource, renderTemplatePage, type CardTemplateSourceRecord,
- type LoadedCardTemplate,
+  type LoadedCardTemplate,
 } from './card-template'
 import { currentLang, setLanguage } from './i18n'
 
@@ -419,7 +419,7 @@ describe('parsed template runtime', () => {
     walk(source)
     const record = await parseCardTemplateSource(await zip.generateAsync({ type: 'arraybuffer' }), 'example')
     if (record.parsed.manifest.kind !== 'card') throw new Error('expected a card template')
- expect(record.parsed.manifest.pages.end).toBe('pages/end.html')
+    expect(record.parsed.manifest.pages.end).toBe('pages/end.html')
     expect(record.parsed.styles[0].css).toContain('.example-end')
     const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     expect(loaded.summary.name).toContain('示例')

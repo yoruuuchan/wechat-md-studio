@@ -36,11 +36,11 @@ interface Props {
   cardTemplates: CardTemplateUpload
   onCardTemplateUploaded: (summary: CardTemplateSummary) => void
   onCardTemplateDeleted: (template: string) => void
- longOptions: LongOptions
- onLongOptionsChange: (options: LongOptions) => void
- longBusy: boolean
- onLongTemplateUploaded: (summary: CardTemplateSummary) => void
- onLongTemplateDeleted: (template: string) => void
+  longOptions: LongOptions
+  onLongOptionsChange: (options: LongOptions) => void
+  longBusy: boolean
+  onLongTemplateUploaded: (summary: CardTemplateSummary) => void
+  onLongTemplateDeleted: (template: string) => void
   materials: MaterialItem[]
   titles: string[]
   cover: string
@@ -209,21 +209,21 @@ export default function SidePanel(p: Props) {
           </TabsContent>
         ) : (
           <TabsContent value="card" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
- {p.mode === 'long' ? (
- <LongSettings
- options={p.longOptions}
- onOptionsChange={p.onLongOptionsChange}
- busy={p.longBusy}
- templates={p.cardTemplates}
- onTemplateUploaded={p.onLongTemplateUploaded}
- onTemplateDeleted={p.onLongTemplateDeleted}
- />
- ) : (
- <CardSettings options={p.cardOptions} onOptionsChange={p.onCardOptionsChange} busy={p.cardBusy}
- templates={p.cardTemplates} onTemplateUploaded={p.onCardTemplateUploaded}
- onTemplateDeleted={p.onCardTemplateDeleted} />
- )}
- </TabsContent>
+              {p.mode === 'long' ? (
+                <LongSettings
+                  options={p.longOptions}
+                  onOptionsChange={p.onLongOptionsChange}
+                  busy={p.longBusy}
+                  templates={p.cardTemplates}
+                  onTemplateUploaded={p.onLongTemplateUploaded}
+                  onTemplateDeleted={p.onLongTemplateDeleted}
+                />
+              ) : (
+            <CardSettings options={p.cardOptions} onOptionsChange={p.onCardOptionsChange} busy={p.cardBusy}
+              templates={p.cardTemplates} onTemplateUploaded={p.onCardTemplateUploaded}
+              onTemplateDeleted={p.onCardTemplateDeleted} />
+              )}
+          </TabsContent>
         )}
 
         <TabsContent value="materials" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">

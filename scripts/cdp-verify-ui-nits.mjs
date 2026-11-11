@@ -384,13 +384,13 @@ try {
   // 动效 is a mode of its own when the build carries the composer, a placeholder otherwise
   // (cdp-verify-ui-modes.mjs checks the mode itself).
   const isPlaceholder = (entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')
- check('390px:长图 is selectable', entries.filter((entry) => entry.id === 'long').every((entry) => !entry.disabled && !entry.placeholder), entries)
+  check('390px:长图 is selectable', entries.filter((entry) => entry.id === 'long').every((entry) => !entry.disabled && !entry.placeholder), entries)
   check('390px: 动效 is selectable, or a placeholder when the build has no composer',
     entries.filter((entry) => entry.id === 'motion').every((entry) => (!entry.disabled && !entry.placeholder) || isPlaceholder(entry)), entries)
- await evaluate(`document.querySelector('[role=menu] [data-preview-mode="long"]')?.click()`)
+  await evaluate(`document.querySelector('[role=menu] [data-preview-mode="long"]')?.click()`)
   await sleep(300)
- check('390px: choosing长图 switches the mode',
- (await evaluate(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode`)) === 'long')
+  check('390px: choosing长图 switches the mode',
+    (await evaluate(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode`)) === 'long')
   if (!(await evaluate(`!!document.querySelector('[role=menu]')`))) {
     await click(`document.querySelector('[data-topbar-mode-pill]')`)
     await waitFor(`!!document.querySelector('[role=menu]')`, 'phone mode menu reopened')

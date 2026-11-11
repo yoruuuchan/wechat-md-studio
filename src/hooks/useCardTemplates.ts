@@ -38,7 +38,7 @@ export interface CardTemplateRemoveResult {
 export type CardTemplateSyncState = 'idle' | 'syncing' | 'synced' | 'failed'
 
 export interface CardTemplateUpload {
- kind: TemplateKind
+  kind: TemplateKind
   templates: CardTemplateSummary[]
   /** Reed's own templates, loaded from `/card-templates/*.reedcard` in card mode. */
   publicTemplates: CardTemplateSummary[]
@@ -72,31 +72,31 @@ const publicLoadPromises = new Map<TemplateKind, Promise<PublicLoadResult>>()
  * `customTemplateId` turns into a runtime id distinct from every user upload.
  */
 function loadPublicTemplates(kind: TemplateKind): Promise<PublicLoadResult> {
- const existing = publicLoadPromises.get(kind)
- if (existing) return existing
- const promise = (async () => {
- const templates: CardTemplateSummary[] = []
- let firstError: CardTemplateError | null = null
- const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
- for (const item of items) {
- try {
- const response = await fetch(item.pack, { cache: 'no-cache' })
- if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
- const raw = await response.arrayBuffer()
- const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
- if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
- throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
+  const existing = publicLoadPromises.get(kind)
+  if (existing) return existing
+  const promise = (async () => {
+    const templates: CardTemplateSummary[] = []
+    let firstError: CardTemplateError | null = null
+   const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
+   for (const item of items) {
+     try {
+        const response = await fetch(item.pack, { cache: 'no-cache' })
+        if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
+        const raw = await response.arrayBuffer()
+        const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
+   if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
+          throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
  }
- const loaded = await activateCardTemplate(record)
- templates.push(loaded.summary)
- } catch (itemError) {
- firstError ??= asError(itemError, 'unknown')
+        const loaded = await activateCardTemplate(record)
+        templates.push(loaded.summary)
+      } catch (itemError) {
+        firstError ??= asError(itemError, 'unknown')
+   }
  }
- }
- return { templates, error: firstError }
- })()
- publicLoadPromises.set(kind, promise)
- return promise
+    return { templates, error: firstError }
+  })()
+  publicLoadPromises.set(kind, promise)
+  return promise
 }
 
 function newId(): string {
@@ -111,7 +111,7 @@ function asError(item: unknown, fallback: 'unknown' | 'storage' | 'cloud'): Card
 }
 
 export function useCardTemplates(options: { loadPublic?: boolean; kind?: TemplateKind } = {}): CardTemplateUpload {
- const { loadPublic = false, kind = 'card' } = options
+  const { loadPublic = false, kind = 'card' } = options
   const [templates, setTemplates] = useState<CardTemplateSummary[]>([])
   const [publicTemplates, setPublicTemplates] = useState<CardTemplateSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -163,7 +163,7 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     let alive = true
     setPublicLoading(true)
     setPublicTemplates([])
- void loadPublicTemplates(kind).then((result) => {
+    void loadPublicTemplates(kind).then((result) => {
       if (!alive) return
       setPublicTemplates(result.templates)
       setPublicError(result.error)
@@ -338,9 +338,9 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     void runSync()
   }, [runSync])
 
- return {
- kind,
- templates,
+  return {
+    kind,
+    templates,
     publicTemplates,
     loading,
     publicLoading,

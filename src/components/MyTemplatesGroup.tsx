@@ -56,23 +56,23 @@ export default function MyTemplatesGroup({ state, selected, busy, onSelect, onUp
     // A fresh upload is a normal-state operation: leaving management on would
     // make the new tile unselectable until 完成 is pressed.
     setManageRequested(false)
- const result = await state.upload(files)
- const mine = result.added.filter((item) => item.kind === state.kind)
- const other = result.added.filter((item) => item.kind !== state.kind)
- if (mine.length) onUploaded(mine[mine.length -1])
- for (const item of other) {
- toast.info(t('long.otherKindAdded', {
- kind: t(item.kind === 'long' ? 'long.kindLong' : 'long.kindCard'),
- target: t(item.kind === 'long' ? 'long.targetLong' : 'long.targetCards'),
- }))
- }
- if (result.failed.length) {
- toast.error(t('cards.templateBatchSummary', { added: mine.length, failed: result.failed.length }))
- } else if (mine.length ===1) {
- toast.success(t('cards.templateUploaded', { name: mine[0].name }))
- } else if (mine.length >1) {
- toast.success(t('cards.templateAddedSummary', { added: mine.length }))
- }
+    const result = await state.upload(files)
+    const mine = result.added.filter((item) => item.kind === state.kind)
+    const other = result.added.filter((item) => item.kind !== state.kind)
+    if (mine.length) onUploaded(mine[mine.length - 1])
+    for (const item of other) {
+      toast.info(t('long.otherKindAdded', {
+        kind: t(item.kind === 'long' ? 'long.kindLong' : 'long.kindCard'),
+        target: t(item.kind === 'long' ? 'long.targetLong' : 'long.targetCards'),
+      }))
+    }
+    if (result.failed.length) {
+      toast.error(t('cards.templateBatchSummary', { added: mine.length, failed: result.failed.length }))
+    } else if (mine.length === 1) {
+      toast.success(t('cards.templateUploaded', { name: mine[0].name }))
+    } else if (mine.length > 1) {
+      toast.success(t('cards.templateAddedSummary', { added: mine.length }))
+    }
   }
 
   const remove = (summary: CardTemplateSummary) => {

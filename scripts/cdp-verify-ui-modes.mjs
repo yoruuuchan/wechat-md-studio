@@ -314,15 +314,15 @@ try {
   const isPlaceholder = (m) => m.disabled && m.label.includes('即将推出')
   const hasMotion = modes.some((m) => m.id === 'motion' && !m.disabled)
   check(
- 'long-image is a selectable mode',
- modes.filter((m) => m.id === 'long').every((m) => !m.disabled && m.pressed === 'false'),
- modes.filter((m) => m.id === 'long'),
- )
- await click(`document.querySelector('[data-preview-mode="long"]')`)
- await waitFor(`document.querySelector('[data-preview-mode="long"]')?.getAttribute('aria-pressed') === 'true'`, 'long mode selected')
- await waitFor(`!!document.querySelector('[data-long-view]')`, 'long view mounted')
- check('choosing long-image switches the workspace', await evaluate(`!!document.querySelector('[data-long-view]')`))
- await click(`document.querySelector('[data-preview-mode="wechat"]')`)
+    'long-image is a selectable mode',
+    modes.filter((m) => m.id === 'long').every((m) => !m.disabled && m.pressed === 'false'),
+    modes.filter((m) => m.id === 'long'),
+  )
+  await click(`document.querySelector('[data-preview-mode="long"]')`)
+  await waitFor(`document.querySelector('[data-preview-mode="long"]')?.getAttribute('aria-pressed') === 'true'`, 'long mode selected')
+  await waitFor(`!!document.querySelector('[data-long-view]')`, 'long view mounted')
+  check('choosing long-image switches the workspace', await evaluate(`!!document.querySelector('[data-long-view]')`))
+  await click(`document.querySelector('[data-preview-mode="wechat"]')`)
 
   if (hasMotion) {
     console.log('\n=== motion composer embedded in the editor ===')
@@ -761,7 +761,7 @@ try {
       href: el.getAttribute('href') || '',
     })))()`)
     check(`${width}px: the pill menu lists all four modes`, JSON.stringify(entries.map((entry) => entry.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), entries)
- check(`${width}px: long-image is selectable in the pill menu`, entries.filter((entry) => entry.id === 'long').every((entry) => !entry.disabled && !entry.placeholder), entries)
+    check(`${width}px: long-image is selectable in the pill menu`, entries.filter((entry) => entry.id === 'long').every((entry) => !entry.disabled && !entry.placeholder), entries)
     if (hasMotion) {
       check(
         `${width}px: motion is a selectable mode in the pill menu`,

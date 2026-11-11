@@ -71,12 +71,12 @@ interface Props {
   cardsExporting: boolean
   cardsProgress: { done: number; total: number }
   onExportAll: () => void
- /** Long-image export owns progress and cancellation in the primary slot. */
- longReady: boolean
- longExporting: boolean
- longProgress: { done: number; total: number }
- onExportLong: () => void
- onCancelLong: () => void
+  /** Long-image export owns progress and cancellation in the primary slot. */
+  longReady: boolean
+  longExporting: boolean
+  longProgress: { done: number; total: number }
+  onExportLong: () => void
+  onCancelLong: () => void
 
   /** Phone merges the mode navigation into the top bar as a pill menu. */
   phone: boolean
@@ -292,37 +292,37 @@ export default function TopBar(p: Props) {
   )
 
   const longButton = (
- <button
- data-topbar-primary
- data-long-export-all
- aria-hidden={p.motion ? true : undefined}
- onClick={p.onExportLong}
- disabled={!p.longReady || p.longExporting}
- title={t('long.export')}
- className={`ya-btn ya-btn-primary whitespace-nowrap ${p.motion ? 'invisible' : ''} ${p.phone ? '!px-2.5 !text-[12px]' : 'px-4'}`}
- >
- {p.longExporting
- ? t('long.exporting', { done: p.longProgress.done, total: p.longProgress.total })
- : t('long.export')}
- </button>
- )
+    <button
+      data-topbar-primary
+      data-long-export-all
+      aria-hidden={p.motion ? true : undefined}
+      onClick={p.onExportLong}
+      disabled={!p.longReady || p.longExporting}
+      title={t('long.export')}
+      className={`ya-btn ya-btn-primary whitespace-nowrap ${p.motion ? 'invisible' : ''} ${p.phone ? '!px-2.5 !text-[12px]' : 'px-4'}`}
+    >
+      {p.longExporting
+        ? t('long.exporting', { done: p.longProgress.done, total: p.longProgress.total })
+        : t('long.export')}
+    </button>
+  )
 
- const primaryAction: ReactNode = p.mode === 'cards'
- ? cardsButton
- : p.mode === 'long' ? (
- <>
- {p.longExporting && (
- <button
- data-long-export-cancel
- onClick={p.onCancelLong}
- className="ya-btn ya-btn-secondary whitespace-nowrap !px-2.5 !text-[12px]"
- >
- {t('long.cancel')}
- </button>
- )}
- {longButton}
- </>
- ) : copyButton
+  const primaryAction: ReactNode = p.mode === 'cards'
+    ? cardsButton
+    : p.mode === 'long' ? (
+      <>
+        {p.longExporting && (
+          <button
+            data-long-export-cancel
+            onClick={p.onCancelLong}
+            className="ya-btn ya-btn-secondary whitespace-nowrap !px-2.5 !text-[12px]"
+          >
+            {t('long.cancel')}
+          </button>
+        )}
+        {longButton}
+      </>
+    ) : copyButton
 
   return (
     <header data-topbar className="ya-glass flex shrink-0 flex-col">

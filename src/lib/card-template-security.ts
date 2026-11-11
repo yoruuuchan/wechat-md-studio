@@ -428,7 +428,7 @@ export interface CssSanitizeOptions {
 }
 
 export interface CssSanitizeOptions {
- kind?: TemplateKind
+  kind?: TemplateKind
 }
 
 function scopeRoot(template: string, kind: TemplateKind = 'card'): string {
@@ -438,9 +438,9 @@ function scopeRoot(template: string, kind: TemplateKind = 'card'): string {
   // but two packages (or a package and the built-in template) sharing that key
   // must not be able to restyle each other.
   if (kind === 'long') {
- return `.reed-long-root[data-card-template-source="${template}"], .reed-long-flow[data-card-template-source="${template}"]`
- }
- return `.xhs-card[data-card-template-source="${template}"], .xhs-body[data-card-template-source="${template}"]`
+    return `.reed-long-root[data-card-template-source="${template}"], .reed-long-flow[data-card-template-source="${template}"]`
+  }
+  return `.xhs-card[data-card-template-source="${template}"], .xhs-body[data-card-template-source="${template}"]`
 }
 
 function rewriteCssValue(
@@ -531,8 +531,8 @@ function splitSelectors(text: string): string[] {
 function rootScopedSelectors(selectorText: string, kind: TemplateKind): string {
   const roots = splitSelectors(selectorText)
     .map((selector) => (kind === 'long'
- ? selector.replace(/^\.reed-long-(root|flow)\b/, ':scope.reed-long-$1')
- : selector.replace(/^\.xhs-(card|body)\b/, ':scope.xhs-$1')))
+      ? selector.replace(/^\.reed-long-(root|flow)\b/, ':scope.reed-long-$1')
+      : selector.replace(/^\.xhs-(card|body)\b/, ':scope.xhs-$1')))
     .filter((selector, index) => selector !== splitSelectors(selectorText)[index])
   return roots.join(', ')
 }
@@ -543,7 +543,7 @@ function collectRules(
   files: Map<string, CardTemplateArchiveFile>,
   assetUrls: Map<string, string> | undefined,
   out: string[],
- kind: TemplateKind,
+  kind: TemplateKind,
 ): void {
   for (const rule of Array.from(rules)) {
     const candidate = rule as CSSRule & { selectorText?: string; style?: CSSStyleDeclaration; cssRules?: CSSRuleList; media?: MediaList; conditionText?: string }
