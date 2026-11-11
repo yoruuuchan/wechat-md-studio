@@ -1,10 +1,30 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
- LONG_CANVAS_LIMIT_KEY, canvasLimitOverride, computeTileCuts,
+ LONG_CANVAS_LIMIT_KEY, canvasLimitOverride, computeTileCuts, prepareLongImages,
 } from './long-image-export'
 
 beforeEach(() => localStorage.clear())
+afterEach(() => vi.unstubAllGlobals())
+
+describe('photo preparation failure', () => {
+ it('keeps the original src and still lays out a row when a photo cannot be read', async () => {
+ const src = 'http://blocked.invalid/a.jpg'
+ document.body.innerHTML = `<div class="reed-long-root"><div class="reed-long-photos"><div class="reed-long-photo-frame"><div class="reed-long-photo-row"><figure class="reed-long-photo"><img src="${src}" alt=""></figure></div></div></div></div>`
+ const root = document.querySelector<HTMLElement>('.reed-long-root')!
+ const image = root.querySelector('img')!
+ Object.defineProperty(image, 'decode', { value: vi.fn().mockRejectedValue(new Error('blocked')) })
+ vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('blocked')))
+ const result = await prepareLongImages(root, { padX:24, contentWidth:492, photoGap:4, photoInset:13 }, {
+ scale:2,
+ signal:new AbortController().signal,
+ })
+ expect(result.failed).toEqual([src])
+ expect(image.getAttribute('src')).toBe(src)
+ expect(image.dataset.longMissing).toBe('true')
+ expect(root.querySelectorAll('.reed-long-photo-row')).toHaveLength(1)
+ })
+})
 
 describe('tile cut planning', () => {
  it('keeps the whole page on one tile when it fits', () => {

@@ -266,7 +266,7 @@ function checkLongPages(loaded: LoadedLongTemplate): void {
  const holder = document.createElement('div')
  holder.innerHTML = html
  for (const element of Array.from(holder.querySelectorAll('[data-slot="cover"]'))) {
- if (element.tagName !== 'IMG') throw new CardTemplateError('bad-manifest', 'cover slot必须是 img')
+ if (element.tagName !== 'IMG') throw new CardTemplateError('bad-manifest', 'cover slot must be an img element')
  }
  }
 }

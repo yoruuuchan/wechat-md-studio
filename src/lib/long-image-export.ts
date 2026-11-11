@@ -136,12 +136,15 @@ export async function prepareLongImages(
 ): Promise<LongPrepareResult> {
  const images = Array.from(root.querySelectorAll<HTMLImageElement>('img'))
  const failed: string[] = []
+ const originalSrc = new Map<HTMLImageElement, string>()
+ const objectUrls: string[] = []
  const blobs = new Map<HTMLImageElement, { blob: Blob; image: ImageBitmap | HTMLImageElement }>()
  let done =0
  for (const img of images) {
  options.signal.throwIfAborted()
  const src = img.getAttribute('src') ?? ''
  if (!src) continue
+ originalSrc.set(img, src)
  try {
  const blob = src.startsWith('data:image/') ? dataUrlBlob(src) : await fetchBlob(src, options.signal)
  const image = await decode(blob)
@@ -149,18 +152,20 @@ export async function prepareLongImages(
  img.dataset.naturalWidth = String(width)
  img.dataset.naturalHeight = String(height)
  const url = URL.createObjectURL(blob)
+ objectUrls.push(url)
  img.src = url
- try {
  await img.decode()
- } finally {
- URL.revokeObjectURL(url)
- }
  blobs.set(img, { blob, image })
  } catch {
  options.signal.throwIfAborted()
  failed.push(src)
- img.removeAttribute('src')
+ // A failed blob read must not blank a picture the browser can still show;
+ // keep the original src and only mark it when decoding fails too.
+ try {
+ await img.decode()
+ } catch {
  img.dataset.longMissing = 'true'
+ }
  } finally {
  done++
  options.onProgress?.(done, images.length)
@@ -189,10 +194,9 @@ export async function prepareLongImages(
  await img.decode()
  } catch {
  options.signal.throwIfAborted()
- const src = img.getAttribute('src') ?? ''
- failed.push(src)
- img.removeAttribute('src')
- img.dataset.longMissing = 'true'
+ // Keep the last readable src: the preview stays honest and the export is
+ // blocked by `failed`, not blanked.
+ failed.push(originalSrc.get(img) ?? img.getAttribute('src') ?? '')
  } finally {
  done++
  options.onProgress?.(done, images.length)
@@ -201,6 +205,7 @@ export async function prepareLongImages(
  for (const { image } of blobs.values()) {
  if ('close' in image) image.close()
  }
+ for (const url of objectUrls) URL.revokeObjectURL(url)
  return { failed }
 }
 

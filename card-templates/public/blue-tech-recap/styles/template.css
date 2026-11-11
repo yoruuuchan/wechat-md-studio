@@ -44,21 +44,22 @@
 
 .blue-hero-copy {
   position: absolute;
-  top: 38px;
+  top:34px;
   left: 18px;
   right: 18px;
   z-index: 2;
   text-align: center;
 }
 
-.blue-hero-title {
+.blue-hero .blue-hero-title {
   display: inline-block;
   margin: 0;
   font-family: "Noto Sans SC", sans-serif;
-  font-size: 53px;
+  font-size:56px;
   font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: 1px;
+  line-height:1.1;
+  letter-spacing:2px;
+ white-space:nowrap;
   transform: skewX(-9deg);
   background-image: linear-gradient(
     180deg,
@@ -73,14 +74,15 @@
   text-shadow: 0 0 26px rgba(70, 178, 255, 0.38);
 }
 
-.blue-hero-subtitle {
+.blue-hero .blue-hero-subtitle {
   display: inline-block;
-  margin: 12px 0 0;
+  margin:10px 0 0;
   font-family: "Noto Sans SC", sans-serif;
-  font-size: 27px;
+  font-size:29px;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 2px;
+  line-height:1.22;
+  letter-spacing:3px;
+ white-space:nowrap;
   transform: skewX(-9deg);
   background-image: linear-gradient(
     180deg,
@@ -145,20 +147,20 @@
 }
 
 .reed-long-preamble {
-  padding: 34px 22px 10px;
+  padding:32px 24px 10px;
   font-size: 12px;
   line-height: 1.8;
 }
 
 .reed-long-section {
   position: relative;
-  padding: 58px 22px 34px;
+  padding:42px 24px 32px;
 }
 
 .reed-long-section-head {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap:4px;
 }
 
 .reed-long-section-mark {
@@ -176,18 +178,18 @@
   content: "»»";
 }
 
-.reed-long-section-label {
+.reed-long-root .reed-long-section-label {
   position: relative;
   display: inline-block;
   margin: 0;
-  padding: 10px 24px 9px;
+  padding:8px 16px 7px;
   background: var(--blue-paper);
   color: var(--blue-ink);
   font-family: "Zhuque Fangsong", "Noto Sans SC", serif;
-  font-size: 20px;
+  font-size:18px;
   font-weight: 400;
-  line-height: 1.35;
-  letter-spacing: 9px;
+  line-height:1.3;
+  letter-spacing:8px;
   white-space: nowrap;
   box-shadow: 0 7px 18px rgba(0, 22, 62, 0.22);
 }
@@ -199,9 +201,9 @@
 .reed-long-section-label::before {
   content: "";
   position: absolute;
-  left: 20px;
-  top: -4px;
-  width: 74px;
+  left:10px;
+  top:-3px;
+  width:38px;
   height: 3px;
   background-image: linear-gradient(90deg, #63d0ff, #1d78d6);
 }
@@ -214,16 +216,17 @@
 }
 
 .reed-long-section-body {
-  padding-top: 15px;
+  padding-top:8px;
+ padding-left:15px;
   font-size: 11.5px;
   line-height: 1.85;
   color: #f2fbff;
 }
 
-.reed-long-lede {
+.reed-long-root .reed-long-lede {
   position: relative;
-  margin: 0 0 54px;
-  padding-bottom: 14px;
+  margin:0 0 14px;
+  padding-bottom:8px;
   font-size: 12px;
   line-height: 1.85;
   letter-spacing: 0.3px;
@@ -234,8 +237,8 @@
   content: "";
   display: block;
   height: 1px;
-  margin-top: 14px;
-  background-image: linear-gradient(
+  margin-top:8px;
+ background-image: linear-gradient(
     90deg,
     rgba(196, 238, 255, 0.95) 0%,
     rgba(196, 238, 255, 0.58) 52%,
@@ -345,12 +348,12 @@
 
 .reed-long-photos {
   position: relative;
-  margin-top: 14px;
+  margin-top:12px;
 }
 
 .reed-long-photo-frame {
   width: 100%;
-  padding: 10px;
+  padding:12px;
   border: 1px solid var(--blue-line);
   background: rgba(255, 255, 255, 0.018);
 }
@@ -373,7 +376,7 @@
 .reed-long-photo-next {
   position: absolute;
   left: 50%;
-  bottom: -22px;
+  bottom:-10px;
   width: 11px;
   height: 11px;
   border-right: 1px solid rgba(210, 241, 255, 0.85);
@@ -390,26 +393,26 @@
 
 .blue-foot {
   position: relative;
-  padding: 108px 22px 84px;
+  padding:40px 24px 140px;
   text-align: center;
 }
 
 .blue-foot-rule {
   width: calc(100% - 76px);
   height: 1px;
-  margin: 0 auto48px;
+  margin:0 auto 20px;
   background-image: linear-gradient(
     90deg,
     rgba(190, 233, 255, 0),
-    rgba(190, 233, 255, 0.55) 22%,
-    rgba(190, 233, 255, 0.55) 78%,
+    rgba(190,233,255,0.42) 22%,
+    rgba(190,233,255,0.42) 78%,
     rgba(190, 233, 255, 0)
   );
 }
 
 .blue-foot-content {
   font-family: "Zhuque Fangsong", "Noto Sans SC", serif;
-  font-size: 19px;
+  font-size:18px;
   font-weight: 400;
   line-height: 1.9;
   letter-spacing: 7px;
@@ -431,4 +434,9 @@
   font-size: 10px;
   letter-spacing: 3px;
   color: rgba(207, 236, 255, 0.78);
+}
+
+.reed-long-section-body>.reed-long-photos{
+ margin-left:-15px;
+ width:calc(100% + 15px);
 }

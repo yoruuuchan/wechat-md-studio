@@ -241,7 +241,7 @@ export default function EditorPage() {
  })
  const [longOptions, setLongOptions] = useState<LongOptions>(() => loadLongOptions() ?? DEFAULT_LONG_OPTIONS)
  const [longStatus, setLongStatus] = useState<LongStatus>({
- ready: false, busy: false, pending: true, failed: false, error: false,
+ ready: false, layoutReady: false, busy: false, pending: true, failed: false, error: false,
  height:0, sections:0, split:0, progress: { phase: 'measure', done:0, total:0 },
  })
   const [cardsStatus, setCardsStatus] = useState<CardsStatus>({

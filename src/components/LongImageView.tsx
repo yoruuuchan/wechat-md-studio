@@ -18,6 +18,8 @@ import './long-image.css'
 
 export interface LongStatus {
  ready: boolean
+ /** Layout finished even when some photos could not be read. */
+ layoutReady: boolean
  busy: boolean
  /** True while images/fonts are being measured behind the visible preview. */
  pending: boolean
@@ -220,14 +222,15 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
 
  const failed = Boolean(result?.failedImages.length)
  const empty = result !== null && result.height <=0
- const ready = Boolean(result) && !pending && !error && !failed && !empty
+ const layoutReady = Boolean(result) && !pending && !error && !empty
+ const ready = layoutReady && !failed
 
  useEffect(() => {
  onStatusChange?.({
- ready, busy, pending, failed, error, height: result?.height ??0,
+ ready, layoutReady, busy, pending, failed, error, height: result?.height ??0,
  sections: result?.sections ??0, split, progress,
  })
- }, [onStatusChange, ready, busy, pending, failed, error, result, split, progress])
+ }, [onStatusChange, ready, layoutReady, busy, pending, failed, error, result, split, progress])
 
  // Clear a stale image warning as soon as a pixel-complete rebuild lands.
  useEffect(() => {
@@ -236,6 +239,8 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
 
  return (
  <div data-long-view data-ready={ready && !busy ? 'true' : undefined}
+ data-long-layout={layoutReady ? 'ready' : error ? 'error' : 'pending'}
+ data-long-export-blocked={failed ? 'true' : undefined}
  data-long-pending={pending ? 'true' : undefined}
  data-long-error={error ? 'true' : undefined}
  data-long-height={result?.height ?? undefined}

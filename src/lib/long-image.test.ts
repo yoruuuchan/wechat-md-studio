@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseMarkdown } from './parse'
 import type { Block, Doc, InlineSeg } from './types'
 import {
  buildLongDocument, layoutPhotoGroup, photoRowSizes, resampledPhotoWidth,
@@ -34,13 +35,13 @@ function render(blocks: readonly Block[]): string {
  }).join('')
 }
 
-const source = `#标题
+const source = `# 标题
 
 副标题
 
 ![头图](cover.jpg)
 
-##第一节
+## 第一节
 
 说明一
 
@@ -49,7 +50,7 @@ const source = `#标题
 
 ---
 
-##第二节
+## 第二节
 
 说明二
 
@@ -111,7 +112,7 @@ describe('long-image Markdown mapping', () => {
  })
 
  it('reads consecutive image lines that Markdown keeps as one paragraph', () => {
- const src = '#标题\n\n副标题\n\n##一节\n\n说明\n\n![a](a.jpg)\n![b](b.jpg)\n![c](c.jpg)\n'
+ const src = '# 标题\n\n副标题\n\n## 一节\n\n说明\n\n![a](a.jpg)\n![b](b.jpg)\n![c](c.jpg)\n'
  const model = buildLongDocument(doc([
  heading('标题', false,0), paragraph('副标题',2),
  heading('一节', true,4), paragraph('说明',6),
@@ -134,6 +135,46 @@ describe('long-image Markdown mapping', () => {
  expect(model.cover).toBe('a.jpg')
  const photos = model.preamble.find((block) => block.type === 'photos')
  expect(photos?.type === 'photos' && photos.photos.map((photo) => photo.src)).toEqual(['b.jpg'])
+ })
+})
+
+describe('long-image mapping from the real parser', () => {
+ it('turns parsed blocks into header, sections, one photo group and a footer', () => {
+ const md = [
+ '#\u0020一次读书会',
+ '',
+ '把一本书读成一条长图',
+ '',
+ '![头图](cover.jpg)',
+ '',
+ '##\u0020开场',
+ '',
+ '大家带来的书摊在桌上。',
+ '',
+ '![a](a.jpg)',
+ '![b](b.jpg)',
+ '![c](c.jpg)',
+ '',
+ '##\u0020共读',
+ '',
+ '![d](d.jpg)',
+ '',
+ '---',
+ '',
+ '共同走过这一年。',
+ ].join('\n')
+ const model = buildLongDocument(parseMarkdown(md), md, render, (photos) =>
+ `<div class="reed-long-photos">${photos.map((photo) => photo.src).join(',')}</div>`)
+ expect(model.hasHeader).toBe(true)
+ expect(model.title).toBe('一次读书会')
+ expect(model.subtitle).toBe('把一本书读成一条长图')
+ expect(model.cover).toBe('cover.jpg')
+ expect(model.sections.map((section) => section.title)).toEqual(['开场', '共读'])
+ expect(model.sections[0].lede).toContain('大家带来的书摊在桌上。')
+ const group = model.sections[0].blocks.find((block) => block.type === 'photos')
+ expect(group?.type === 'photos' && group.photos.map((photo) => photo.src)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
+ expect(model.hasFooter).toBe(true)
+ expect(model.footer).toContain('共同走过这一年。')
  })
 })
 
