@@ -167,7 +167,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
       window.clearTimeout(timer)
     }
     // `previewWidth` is deliberately excluded from the rebuild trigger: the root
-    // is laid out at540px and only the wrapper scale changes.
+    // is laid out at 540px and only the wrapper scale changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, source, lang, template, loadedVersion, options.template, options.variant, options.width, sig, math, resolveDiagram, retry])
 

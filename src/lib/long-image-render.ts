@@ -14,7 +14,7 @@ import { inline, listHtml } from './cards-render'
 import { renderLongTemplatePage, type LoadedLongTemplate } from './card-template'
 import {
   buildLongDocument, layoutPhotoGroup, LONG_WIDTH, type LongContentBlock, type LongDocument,
-  type LongPhoto, type LongSection,
+  type LongPhoto, type LongSection, textUnits,
 } from './long-image'
 
 export interface LongRenderOptions {
@@ -116,6 +116,8 @@ export function renderLongArticle(
   root.style.setProperty('--long-content-w', `${options.metrics.contentWidth}px`)
   root.style.setProperty('--long-photo-gap', `${options.metrics.photoGap}px`)
   root.style.setProperty('--long-photo-inset', `${options.metrics.photoInset}px`)
+  root.style.setProperty('--long-title-units', String(textUnits(model.title)))
+  root.style.setProperty('--long-subtitle-units', String(textUnits(model.subtitle)))
 
   const flow = document.createElement('div')
   flow.className = 'reed-long-flow'

@@ -12,7 +12,8 @@ import {
   type CardTemplateRuntime, type LongTemplateRuntime,
 } from './cards'
 import {
-  CardTemplateError, type LongTemplateManifest, type ReedTemplateManifest, type CardTemplateSummary,
+  CardTemplateError, type CardTemplateManifest, type CardTemplateSummary, type LongTemplateManifest,
+  type ReedTemplateManifest,
 } from './card-template-format'
 import {
   archiveAssetUrls, loadPackageFonts, openCardTemplateArchive, packageFontCss,
@@ -73,7 +74,7 @@ interface LoadedTemplateBase {
 
 export interface LoadedCardTemplate extends LoadedTemplateBase {
   kind: 'card'
-  manifest: import('./card-template-format').CardTemplateManifest
+  manifest: CardTemplateManifest
   pages: { cover: string; body: string; end: string }
 }
 
@@ -208,7 +209,7 @@ export async function activateCardTemplate(record: CardTemplateSourceRecord): Pr
   document.head.append(style)
   try {
     const fonts = await loadPackageFonts(manifest, files)
-   const base = {
+    const base = {
       template: record.template,
       renderId,
       manifest,
@@ -217,46 +218,46 @@ export async function activateCardTemplate(record: CardTemplateSourceRecord): Pr
       packageFontCss: packageFontCss(manifest, files),
       style,
       fonts,
-   }
-   let loaded: LoadedTemplate
-   if (manifest.kind === 'long') {
-     const header = parsed.pages.header
-     const footer = parsed.pages.footer
-     const page = (source?: CardTemplatePageSource) => source
-       ? sanitizeTemplateHtml(source.html, source.path, { files, resolve: (path) => assetUrls.get(path) ?? null })
-       : ''
-     loaded = {
-       ...base,
-       kind: 'long',
-       manifest,
-       pages: { header: page(header), footer: page(footer) },
-     }
-     checkLongPages(loaded)
-    LOADED.set(record.template, loaded)
-   registerLongTemplateRuntime(runtimeOfLong(loaded))
- } else {
-   const page = (source: CardTemplatePageSource | undefined, fallback?: CardTemplatePageSource) =>
-     sanitizeTemplateHtml((source ?? fallback)!.html, (source ?? fallback)!.path, {
-       files, resolve: (path) => assetUrls.get(path) ?? null,
-     })
-   loaded = {
-     ...base,
-     kind: 'card',
-     manifest,
-     pages: {
-       cover: page(parsed.pages.cover),
-       body: page(parsed.pages.body),
-       end: page(parsed.pages.end, parsed.pages.body),
-     },
-   }
-   LOADED.set(record.template, loaded)
-    registerCardTemplateRuntime(runtimeOf(loaded))
- }
+    }
+    let loaded: LoadedTemplate
+    if (manifest.kind === 'long') {
+      const header = parsed.pages.header
+      const footer = parsed.pages.footer
+      const page = (source?: CardTemplatePageSource) => source
+        ? sanitizeTemplateHtml(source.html, source.path, { files, resolve: (path) => assetUrls.get(path) ?? null })
+        : ''
+      loaded = {
+        ...base,
+        kind: 'long',
+        manifest,
+        pages: { header: page(header), footer: page(footer) },
+      }
+      checkLongPages(loaded)
+      LOADED.set(record.template, loaded)
+      registerLongTemplateRuntime(runtimeOfLong(loaded))
+    } else {
+      const page = (source: CardTemplatePageSource | undefined, fallback?: CardTemplatePageSource) =>
+        sanitizeTemplateHtml((source ?? fallback)!.html, (source ?? fallback)!.path, {
+          files, resolve: (path) => assetUrls.get(path) ?? null,
+        })
+      loaded = {
+        ...base,
+        kind: 'card',
+        manifest,
+        pages: {
+          cover: page(parsed.pages.cover),
+          body: page(parsed.pages.body),
+          end: page(parsed.pages.end, parsed.pages.body),
+        },
+      }
+      LOADED.set(record.template, loaded)
+      registerCardTemplateRuntime(runtimeOf(loaded))
+    }
     return loaded
   } catch (error) {
     style.remove()
     throw error
- }
+  }
 }
 
 /** The engine fills the cover slot itself; it must be an img element. */
@@ -451,6 +452,7 @@ export function fragmentHtml(fragment: DocumentFragment): string {
   holder.append(fragment)
   return holder.innerHTML
 }
+
 export interface LongTemplatePageContext {
   kind: 'header' | 'footer'
   title: string

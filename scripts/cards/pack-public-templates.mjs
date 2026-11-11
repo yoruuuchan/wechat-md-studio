@@ -22,8 +22,8 @@ const kinds = new Map(entries.map((id) => {
 const cards = entries.filter((id) => kinds.get(id) === 'card')
 const longs = entries.filter((id) => kinds.get(id) === 'long')
 
-if (cards.length !== 9) throw new Error(`expected9 public card template sources, found ${cards.length}`)
-if (longs.length !== 1) throw new Error(`expected1 public long-image template source, found ${longs.length}`)
+if (cards.length !== 9) throw new Error(`expected 9 public card template sources, found ${cards.length}`)
+if (longs.length !== 1) throw new Error(`expected 1 public long-image template source, found ${longs.length}`)
 
 fs.mkdirSync(outputRoot, { recursive: true })
 for (const file of fs.readdirSync(outputRoot)) {

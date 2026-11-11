@@ -164,7 +164,7 @@ async function realClick(selector) {
 }
 async function chooseLang(lang) {
   await realClick('[data-topbar-more]')
-  // Language moved from更多 into设置 →外观与语言; open that tab when the
+  // Language moved from 更多 into 设置 → 外观与语言; open that tab when the
   // toggle is not already on screen.
   if (!await evaluate(`!!document.querySelector('[data-lang="${lang}"]')`)) {
     await realClick('[data-more-item="appearance-language"]')

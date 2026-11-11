@@ -318,6 +318,33 @@ try {
     modes.filter((m) => m.id === 'long').every((m) => !m.disabled && m.pressed === 'false'),
     modes.filter((m) => m.id === 'long'),
   )
+  if (hasMotion) {
+    check(
+      'motion is a selectable mode when the build packs the composer',
+      modes.filter((m) => m.id === 'motion').every((m) => !m.disabled && m.pressed === 'false'),
+      modes.filter((m) => m.id === 'motion'),
+    )
+  } else {
+    check(
+      'motion is a placeholder when the build has none',
+      modes.filter((m) => m.id === 'motion').every(isPlaceholder),
+      modes.filter((m) => m.id === 'motion'),
+    )
+    const placeholderBox = await evaluate(`(() => {
+      const r = document.querySelector('[data-preview-mode="motion"]').getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`)
+    await call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...placeholderBox })
+    const placeholderTip = await waitFor(
+      `(() => { const el = document.querySelector('[data-slot="tooltip-content"]'); return el ? el.textContent.trim() : '' })()`,
+      'placeholder coming-soon tooltip',
+      5000,
+    ).catch(() => '')
+    // Radix puts the visible text and a visually hidden copy inside the same
+    // content node, so textContent contains the hint twice.
+    check('hovering a placeholder shows the coming-soon hint', placeholderTip.includes('即将推出'), placeholderTip)
+    await call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 })
+  }
   await click(`document.querySelector('[data-preview-mode="long"]')`)
   await waitFor(`document.querySelector('[data-preview-mode="long"]')?.getAttribute('aria-pressed') === 'true'`, 'long mode selected')
   await waitFor(`!!document.querySelector('[data-long-view]')`, 'long view mounted')

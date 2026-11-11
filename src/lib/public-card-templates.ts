@@ -179,7 +179,7 @@ export const PUBLIC_LONG_TEMPLATES: readonly PublicLongTemplate[] = [
     name: '蓝色科技活动回顾',
     author: 'Reed',
     description: '深蓝渐变上的活动回顾长图：满宽头图叠白到浅蓝的粗斜标题，小节用白底标签、手写感宽字距和细描边照片框，落款居中收束。适合成立大会、发布会与线下活动。',
-    reference: '作者本人的一张活动回顾长图（未公开）',
+    reference: '一张未公开的活动回顾长图',
     license: 'MIT',
     sourceUrl: 'https://github.com/yoruuuchan/wechat-md-studio',
     pack: '/card-templates/blue-tech-recap.reedcard',

@@ -425,9 +425,7 @@ export interface CssSanitizeOptions {
   cssPath: string
   files: Map<string, CardTemplateArchiveFile>
   assetUrls?: Map<string, string>
-}
-
-export interface CssSanitizeOptions {
+  /** Which root the rules are scoped to; cards when omitted. */
   kind?: TemplateKind
 }
 

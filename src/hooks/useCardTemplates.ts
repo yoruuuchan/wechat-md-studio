@@ -77,22 +77,22 @@ function loadPublicTemplates(kind: TemplateKind): Promise<PublicLoadResult> {
   const promise = (async () => {
     const templates: CardTemplateSummary[] = []
     let firstError: CardTemplateError | null = null
-   const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
-   for (const item of items) {
-     try {
+    const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
+    for (const item of items) {
+      try {
         const response = await fetch(item.pack, { cache: 'no-cache' })
         if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
         const raw = await response.arrayBuffer()
         const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
-   if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
+        if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
           throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
- }
+        }
         const loaded = await activateCardTemplate(record)
         templates.push(loaded.summary)
       } catch (itemError) {
         firstError ??= asError(itemError, 'unknown')
-   }
- }
+      }
+    }
     return { templates, error: firstError }
   })()
   publicLoadPromises.set(kind, promise)

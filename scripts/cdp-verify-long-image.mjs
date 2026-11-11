@@ -258,13 +258,13 @@ try {
 
   const photoUrl = (index) => `${workerOrigin}/photos/p${String(index).padStart(2, '0')}.png`
   const section = (title, lede, start, count, extra = '') => {
-    const lines = [`##\u0020${title}`, '', lede, '', extra]
+    const lines = [`## ${title}`, '', lede, '', extra]
     for (let i = 0; i < count; i++) lines.push(`![照片${start + i}](${photoUrl(start + i)})`)
     lines.push('')
     return lines.join('\n')
   }
   const doc = [
-    '#\u0020一次读书会',
+    '# 一次读书会',
     '',
     '把一本书读成一条长图',
     '',
@@ -359,7 +359,7 @@ try {
   const jpg1080 = await exportPair(1080)
   const png1080 = jpg1080.png
   const png1440 = await exportPair(1440)
-  check('1080 and1440 exports keep the same aspect ratio', Math.abs(jpg1080.jpgDim.height / 1080 - png1440.pngDim.height / 1440) < .01, { h1080: jpg1080.jpgDim.height, h1440: png1440.pngDim.height })
+  check('1080 and 1440 exports keep the same aspect ratio', Math.abs(jpg1080.jpgDim.height / 1080 - png1440.pngDim.height / 1440) < .01, { h1080: jpg1080.jpgDim.height, h1440: png1440.pngDim.height })
 
   // ---- DOM segments against the PNG export ---------------------------------
   const heightCss = Number(await evaluate(`document.querySelector('[data-long-view]')?.dataset.longHeight`))
@@ -372,9 +372,10 @@ try {
     segmentFiles.push(await shot(`dom-segment-${index + 1}`, { x: 8, y: 8, width: 540, height: 1000, scale: 2 }))
     await evaluate(`document.querySelector('#long-acceptance-stage')?.remove()`)
   }
-  const compareUrl = (name) => `${workerOrigin}/export/${encodeURIComponent(path.basename(name))}`
+  // Exports sit in per-format subfolders, so address files by their path under the output folder.
+  const compareUrl = (name) => `${workerOrigin}/export/${path.relative(output, name).split(path.sep).map(encodeURIComponent).join('/')}`
   const compareSegment = async (domFile, pngFile, offset, label) => {
-    const metrics = await evaluate(`(async()=>{const load=async src=>{const img=new Image();img.src=src;await img.decode();return img};const [a,b]=await Promise.all([load(${JSON.stringify(compareUrl(domFile))}),load(${JSON.stringify(compareUrl(pngFile))})]);const c=document.createElement('canvas');c.width=1080;c.height=2000;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(a,0,0,1080,2000);const p=ctx.getImageData(0,0,1080,2000).data;ctx.clearRect(0,0,1080,2000);ctx.drawImage(b,0,0,1080,b.height);const q=ctx.getImageData(0,${offset * 2},1080,2000).data;let sum=0,bad=0;for(let i=0;i<p.length;i+=4){let max=0;for(let j=0;j<3;j++){const d=Math.abs(p[i+j]-q[i+j]);sum+=d;max=Math.max(max,d)}if(max>16)bad++}return {mean:sum/(1080*2000*3),bad:bad/(1080*2000)}})()`)
+    const metrics = await evaluate(`(async()=>{const load=async src=>{const img=new Image();img.crossOrigin='anonymous';img.src=src;await img.decode();return img};const [a,b]=await Promise.all([load(${JSON.stringify(compareUrl(domFile))}),load(${JSON.stringify(compareUrl(pngFile))})]);const c=document.createElement('canvas');c.width=1080;c.height=2000;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(a,0,0,1080,2000);const p=ctx.getImageData(0,0,1080,2000).data;ctx.clearRect(0,0,1080,2000);ctx.drawImage(b,0,${-offset * 2},1080,b.height);const q=ctx.getImageData(0,0,1080,2000).data;let sum=0,bad=0;for(let i=0;i<p.length;i+=4){let max=0;for(let j=0;j<3;j++){const d=Math.abs(p[i+j]-q[i+j]);sum+=d;max=Math.max(max,d)}if(max>16)bad++}return {mean:sum/(1080*2000*3),bad:bad/(1080*2000)}})()`)
     check(label + ': preview DOM and export agree', metrics.mean < 2 && metrics.bad < .025, metrics)
     return metrics
   }
@@ -384,12 +385,12 @@ try {
 
   // ---- ink inside title and section label -----------------------------------
   const boxes = await evaluate(`(()=>{const root=document.querySelector('[data-long-preview-root]').getBoundingClientRect();const box=(s)=>{const el=document.querySelector(s);if(!el)return null;const r=el.getBoundingClientRect();return {x:(r.left-root.left)/root.width*1080,y:(r.top-root.top)/root.width*1080,w:r.width/root.width*1080,h:r.height/root.width*1080}};return {title:box('.blue-hero-title'),label:box('.reed-long-section-label')}})()`)
-  const ink = await evaluate(`(async()=>{const img=new Image();img.src=${JSON.stringify(compareUrl(png1080.file))};await img.decode();const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);const count=(box,bright)=>{const data=ctx.getImageData(Math.max(0,Math.round(box.x)),Math.max(0,Math.round(box.y)),Math.max(1,Math.round(box.w)),Math.max(1,Math.round(box.h))).data;let hit=0;const total=data.length/4;for(let i=0;i<data.length;i+=4){const l=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];if(bright?l>170:l<120)hit++}return {hit,total,fraction:hit/total}};return {title:count(${JSON.stringify(boxes.title)},true),label:count(${JSON.stringify(boxes.label)},false)}})()`)
+  const ink = await evaluate(`(async()=>{const img=new Image();img.crossOrigin='anonymous';img.src=${JSON.stringify(compareUrl(png1080.file))};await img.decode();const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);const count=(box,bright)=>{const data=ctx.getImageData(Math.max(0,Math.round(box.x)),Math.max(0,Math.round(box.y)),Math.max(1,Math.round(box.w)),Math.max(1,Math.round(box.h))).data;let hit=0;const total=data.length/4;for(let i=0;i<data.length;i+=4){const l=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];if(bright?l>170:l<120)hit++}return {hit,total,fraction:hit/total}};return {title:count(${JSON.stringify(boxes.title)},true),label:count(${JSON.stringify(boxes.label)},false)}})()`)
   check('title box contains bright gradient ink', ink.title.fraction > .04, ink.title)
   check('section label box contains dark text ink', ink.label.fraction > .02, ink.label)
 
   // ---- gradient continuity at segment joins --------------------------------
-  const gradient = await evaluate(`(async()=>{const img=new Image();img.src=${JSON.stringify(compareUrl(png1080.file))};await img.decode();const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);const rows=[1000,2000,3000,4000].filter(y=>y<img.naturalHeight);const out=[];for(const y of rows){const a=ctx.getImageData(4,y-1,1,1).data;const b=ctx.getImageData(4,y,1,1).data;out.push({y,d:Math.max(Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1]),Math.abs(a[2]-b[2]))})}return out})()`)
+  const gradient = await evaluate(`(async()=>{const img=new Image();img.crossOrigin='anonymous';img.src=${JSON.stringify(compareUrl(png1080.file))};await img.decode();const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);const rows=[1000,2000,3000,4000].filter(y=>y<img.naturalHeight);const out=[];for(const y of rows){const a=ctx.getImageData(4,y-1,1,1).data;const b=ctx.getImageData(4,y,1,1).data;out.push({y,d:Math.max(Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1]),Math.abs(a[2]-b[2]))})}return out})()`)
   check('background gradient has no seam at segment joins', gradient.every((row) => row.d <= 4), gradient)
 
   // ---- forced canvas limit, split ZIP and notice ---------------------------
@@ -411,22 +412,22 @@ try {
   await setMarkdown('', false)
   await waitFor(`document.querySelector('[data-long-view]')?.dataset.longLayout === 'empty'`, 'empty layout', 30000)
   check('empty document stays a calm empty state', !await evaluate(`!!document.querySelector('[data-long-view]')?.dataset.longError`), await evaluate(`document.querySelector('[data-long-summary]')?.textContent`))
-  await setMarkdown('#\u0020只有标题', false)
+  await setMarkdown('# 只有标题', false)
   await ready()
   check('title-only document renders the plain header without a cover', await evaluate(`!!document.querySelector('.blue-hero-plain') && document.querySelectorAll('.reed-long-section').length ===0`))
-  await setMarkdown('#\u0020没有照片\n\n副标题\n\n##\u0020一节\n\n只有文字。', false)
+  await setMarkdown('# 没有照片\n\n副标题\n\n## 一节\n\n只有文字。', false)
   await ready()
   check('document without photos still lays out sections', await evaluate(`document.querySelectorAll('.reed-long-section').length ===1 && document.querySelectorAll('.reed-long-photos').length ===0`))
   const broken = `${workerOrigin}/photos/missing.png`
-  await setMarkdown(`#\u0020读图失败\n\n##\u0020一节\n\n![缺失](${broken})`, false)
+  await setMarkdown(`# 读图失败\n\n## 一节\n\n![缺失](${broken})`, false)
   await ready()
-  const blocked = await evaluate(`document.querySelector('[data-long-view]')?.dataset.exportBlocked === 'true'`)
+  const blocked = await evaluate(`document.querySelector('[data-long-view]')?.dataset.longExportBlocked === 'true'`)
   const warning = await evaluate(`document.querySelector('[data-long-image-warning]')?.innerText || ''`)
   const exportDisabled = await evaluate(`document.querySelector('[data-long-export-all]')?.disabled === true`)
   check('unreadable image lists its address and pauses export', blocked && warning.includes(broken) && exportDisabled, { blocked, warning: warning.slice(0, 120), exportDisabled })
   await setMarkdown(doc, false)
   await ready()
-  check('a working document clears the export block', await evaluate(`!document.querySelector('[data-long-view]')?.dataset.exportBlocked`))
+  check('a working document clears the export block', await evaluate(`!document.querySelector('[data-long-view]')?.dataset.longExportBlocked`))
 
   // ---- upload the example long template, persist, then delete --------------
   await evaluate(`(async()=>{const response=await fetch('${workerOrigin}/example-long.reedcard');const blob=await response.blob();const file=new File([blob],'example-long.reedcard',{type:'application/zip'});const transfer=new DataTransfer();transfer.items.add(file);const input=document.querySelector('[data-card-template-file]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
@@ -451,7 +452,7 @@ try {
   await evaluate(`window.confirm=()=>true`)
   await click('[data-card-template-manage]')
   await sleep(300)
-  await click(`[data-card-template-delete="${uploaded}"]`)
+  await click(`[data-card-template-item="${uploaded}"] [data-card-template-delete]`)
   await waitFor(`![...document.querySelectorAll('[data-card-template-item]')].some((el)=>el.dataset.cardTemplateItem === ${JSON.stringify(uploaded)})`, 'template deleted', 30000)
   await sleep(500)
   await ready()
@@ -471,7 +472,7 @@ try {
   const darkEn = await uiState('yoru', 'en')
   check('long mode renders in dark English UI without overflow', darkEn.dark && darkEn.lang === 'en' && /Template/i.test(darkEn.text) && !darkEn.overflow, { dark: darkEn.dark, lang: darkEn.lang, text: darkEn.text.slice(0, 80), overflow: darkEn.overflow })
   const lightZh = await uiState('akari', 'zh')
-  check('long mode renders in light Chinese UI without overflow', !lightZh.dark && lightZh.lang === 'zh' && /模板/.test(lightZh.text) && !lightZh.overflow, { dark: lightZh.dark, lang: lightZh.lang, text: lightZh.text.slice(0, 80), overflow: lightZh.overflow })
+  check('long mode renders in light Chinese UI without overflow', !lightZh.dark && lightZh.lang.startsWith('zh') && /模板/.test(lightZh.text) && !lightZh.overflow, { dark: lightZh.dark, lang: lightZh.lang, text: lightZh.text.slice(0, 80), overflow: lightZh.overflow })
 
   const realErrors = errors.filter((item) => !/missing\.png|404|Failed to load resource/.test(item))
   check('no console errors or uncaught exceptions', realErrors.length === 0, realErrors.slice(0, 6))

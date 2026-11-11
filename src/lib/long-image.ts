@@ -55,7 +55,7 @@ export interface PhotoRow {
   height: number
 }
 
-/** How many photos share each row:1 /2s, with the first odd photo alone. */
+/** How many photos share each row: pairs, with the first photo alone when the count is odd. */
 export function photoRowSizes(count: number): number[] {
   if (count <= 0) return []
   if (count === 1) return [1]
@@ -90,6 +90,16 @@ export function layoutPhotoGroup(
     })
   }
   return rows
+}
+
+/**
+ * Rough width of a heading in full-width characters: CJK counts 1, anything
+ * else about half. Templates divide by it to fit a long title on one line.
+ */
+export function textUnits(text: string): number {
+  let units = 0
+  for (const char of text) units += /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(char) ? 1 : 0.55
+  return Math.max(1, Math.round(units * 10) / 10)
 }
 
 /** Target width for an embedded photo: display px × export scale, never up. */

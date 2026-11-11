@@ -22,44 +22,56 @@
   position: relative;
   width: 100%;
   overflow: hidden;
+  padding-top: 46px;
+  background-image: radial-gradient(
+    ellipse 80% 210px at 50% 0,
+    rgba(176, 228, 255, 0.46),
+    transparent 100%
+  );
+}
+
+/* The title stands on the gradient; the photo starts under it and fades in. */
+.blue-hero-copy {
+  position: relative;
+  z-index: 2;
+  padding: 0 18px;
+  text-align: center;
 }
 
 .blue-hero-image {
   display: block;
   width: 100%;
   height: auto;
+  margin-top: -22px;
+  /* The faded tail carries no picture; let the first section move up into it. */
+  margin-bottom: -34px;
   -webkit-mask-image: linear-gradient(
     to bottom,
-    #000000 48%,
-    rgba(0, 0, 0, 0.66) 74%,
+    transparent 0%,
+    #000000 24%,
+    #000000 58%,
+    rgba(0, 0, 0, 0.66) 80%,
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
-    #000000 48%,
-    rgba(0, 0, 0, 0.66) 74%,
+    transparent 0%,
+    #000000 24%,
+    #000000 58%,
+    rgba(0, 0, 0, 0.66) 80%,
     transparent 100%
   );
-}
-
-.blue-hero-copy {
-  position: absolute;
-  top:34px;
-  left: 18px;
-  right: 18px;
-  z-index: 2;
-  text-align: center;
 }
 
 .blue-hero .blue-hero-title {
   display: inline-block;
   margin: 0;
   font-family: "Noto Sans SC", sans-serif;
-  font-size:56px;
+  max-width: 100%;
+  font-size: clamp(30px, calc(486px / var(--long-title-units, 8) - 2px), 56px);
   font-weight: 700;
-  line-height:1.1;
-  letter-spacing:2px;
- white-space:nowrap;
+  line-height: 1.14;
+  letter-spacing: 2px;
   transform: skewX(-9deg);
   background-image: linear-gradient(
     180deg,
@@ -76,13 +88,13 @@
 
 .blue-hero .blue-hero-subtitle {
   display: inline-block;
-  margin:10px 0 0;
+  max-width: 100%;
+  margin: 10px 0 0;
   font-family: "Noto Sans SC", sans-serif;
-  font-size:29px;
+  font-size: clamp(17px, calc(486px / var(--long-subtitle-units, 11) - 3px), 29px);
   font-weight: 700;
-  line-height:1.22;
-  letter-spacing:3px;
- white-space:nowrap;
+  line-height: 1.22;
+  letter-spacing: 3px;
   transform: skewX(-9deg);
   background-image: linear-gradient(
     180deg,
@@ -112,11 +124,6 @@
 }
 
 .blue-hero-plain .blue-hero-copy {
-  position: relative;
-  top: auto;
-  left: auto;
-  right: auto;
-  z-index: 2;
   width: 100%;
 }
 
@@ -147,20 +154,20 @@
 }
 
 .reed-long-preamble {
-  padding:32px 24px 10px;
+  padding: 32px 24px 10px;
   font-size: 12px;
   line-height: 1.8;
 }
 
 .reed-long-section {
   position: relative;
-  padding:42px 24px 32px;
+  padding: 42px 24px 32px;
 }
 
 .reed-long-section-head {
   display: flex;
   align-items: flex-end;
-  gap:4px;
+  gap: 4px;
 }
 
 .reed-long-section-mark {
@@ -182,14 +189,14 @@
   position: relative;
   display: inline-block;
   margin: 0;
-  padding:8px 16px 7px;
+  padding: 8px 16px 7px;
   background: var(--blue-paper);
   color: var(--blue-ink);
   font-family: "Zhuque Fangsong", "Noto Sans SC", serif;
-  font-size:18px;
+  font-size: 18px;
   font-weight: 400;
-  line-height:1.3;
-  letter-spacing:8px;
+  line-height: 1.3;
+  letter-spacing: 8px;
   white-space: nowrap;
   box-shadow: 0 7px 18px rgba(0, 22, 62, 0.22);
 }
@@ -201,9 +208,9 @@
 .reed-long-section-label::before {
   content: "";
   position: absolute;
-  left:10px;
-  top:-3px;
-  width:38px;
+  left: 10px;
+  top: -3px;
+  width: 38px;
   height: 3px;
   background-image: linear-gradient(90deg, #63d0ff, #1d78d6);
 }
@@ -216,8 +223,8 @@
 }
 
 .reed-long-section-body {
-  padding-top:8px;
- padding-left:15px;
+  padding-top: 8px;
+  padding-left: 15px;
   font-size: 11.5px;
   line-height: 1.85;
   color: #f2fbff;
@@ -225,8 +232,8 @@
 
 .reed-long-root .reed-long-lede {
   position: relative;
-  margin:0 0 14px;
-  padding-bottom:8px;
+  margin: 0 0 14px;
+  padding-bottom: 8px;
   font-size: 12px;
   line-height: 1.85;
   letter-spacing: 0.3px;
@@ -237,8 +244,8 @@
   content: "";
   display: block;
   height: 1px;
-  margin-top:8px;
- background-image: linear-gradient(
+  margin-top: 8px;
+  background-image: linear-gradient(
     90deg,
     rgba(196, 238, 255, 0.95) 0%,
     rgba(196, 238, 255, 0.58) 52%,
@@ -348,12 +355,12 @@
 
 .reed-long-photos {
   position: relative;
-  margin-top:12px;
+  margin-top: 12px;
 }
 
 .reed-long-photo-frame {
   width: 100%;
-  padding:12px;
+  padding: 12px;
   border: 1px solid var(--blue-line);
   background: rgba(255, 255, 255, 0.018);
 }
@@ -376,7 +383,7 @@
 .reed-long-photo-next {
   position: absolute;
   left: 50%;
-  bottom:-10px;
+  bottom: -10px;
   width: 11px;
   height: 11px;
   border-right: 1px solid rgba(210, 241, 255, 0.85);
@@ -393,26 +400,26 @@
 
 .blue-foot {
   position: relative;
-  padding:40px 24px 140px;
+  padding: 40px 24px 140px;
   text-align: center;
 }
 
 .blue-foot-rule {
   width: calc(100% - 76px);
   height: 1px;
-  margin:0 auto 20px;
+  margin: 0 auto 20px;
   background-image: linear-gradient(
     90deg,
     rgba(190, 233, 255, 0),
-    rgba(190,233,255,0.42) 22%,
-    rgba(190,233,255,0.42) 78%,
+    rgba(190, 233, 255, 0.42) 22%,
+    rgba(190, 233, 255, 0.42) 78%,
     rgba(190, 233, 255, 0)
   );
 }
 
 .blue-foot-content {
   font-family: "Zhuque Fangsong", "Noto Sans SC", serif;
-  font-size:18px;
+  font-size: 18px;
   font-weight: 400;
   line-height: 1.9;
   letter-spacing: 7px;
@@ -436,7 +443,7 @@
   color: rgba(207, 236, 255, 0.78);
 }
 
-.reed-long-section-body>.reed-long-photos{
- margin-left:-15px;
- width:calc(100% + 15px);
+.reed-long-section-body > .reed-long-photos {
+  margin-left: -15px;
+  width: calc(100% + 15px);
 }

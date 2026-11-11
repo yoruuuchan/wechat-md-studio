@@ -83,6 +83,8 @@ export interface CardTemplatePages {
 export interface CardTemplateManifest {
   format: typeof CARD_TEMPLATE_FORMAT
   formatVersion: typeof CARD_TEMPLATE_FORMAT_VERSION
+  /** Absent in a package means `card`; the parser always fills it in. */
+  kind: 'card'
   id: string
   /**
    * The value written to `data-template` for CSS matching. Defaults to `id`.
@@ -101,10 +103,6 @@ export interface CardTemplateManifest {
   fonts: CardTemplateFont[]
   pages: CardTemplatePages
   styles: string[]
-}
-
-export interface CardTemplateManifest {
-  kind: 'card'
 }
 
 /** A long-image template: same archive, no ratios and two optional fragments. */
@@ -375,7 +373,7 @@ function parseLongMetrics(value: unknown): LongImageMetrics {
     photoGap: number(m.photoGap, 'metrics.photoGap', 0, 60),
     photoInset: number(m.photoInset, 'metrics.photoInset', 0, 80),
   }
-  if (metrics.contentWidth + metrics.padX * 2 > CARD_WIDTH) bad('metrics.contentWidth +2 × padX超出540px画布')
+  if (metrics.contentWidth + metrics.padX * 2 > CARD_WIDTH) bad('metrics.contentWidth + 2 × padX 超出 540px 画布')
   return metrics
 }
 

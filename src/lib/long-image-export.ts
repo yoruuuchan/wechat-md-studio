@@ -113,7 +113,7 @@ async function resamplePhoto(
   canvas.width = targetWidth
   canvas.height = Math.max(1, Math.round((height * targetWidth) / width))
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('no2d context')
+  if (!ctx) throw new Error('no 2d context')
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(image, 0, 0, width, height, 0, 0, canvas.width, canvas.height)
   try {
@@ -254,7 +254,7 @@ let cachedLimits: CanvasLimits | null = null
 
 /**
  * Probe the current browser instead of trusting a platform table. The area
- * probe stops at64 megapixels (256 MB): beyond that we only need to know that
+ * probe stops at 64 megapixels (256 MB): beyond that we only need to know that
  * the page does not fit and must be split.
  */
 export async function detectCanvasLimits(): Promise<CanvasLimits> {
@@ -343,33 +343,10 @@ interface ExportOptions {
   onProgress?: (progress: LongExportProgress) => void
 }
 
-/** html-to-image toBlob always writes PNG; the JPG option needs a canvas pass. */
-async function pngToJpeg(blob: Blob): Promise<Blob> {
-  const url = URL.createObjectURL(blob)
-  try {
-    const image = new Image()
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve()
-      image.onerror = () => reject(new Error('jpeg conversion failed'))
-      image.src = url
-    })
-    const canvas = document.createElement('canvas')
-    canvas.width = image.naturalWidth
-    canvas.height = image.naturalHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('no2d context')
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(image, 0, 0)
-    const out = await canvasBlob(canvas, 'image/jpeg', 0.92)
-    canvas.width = 0
-    canvas.height = 0
-    return out
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
-
+/**
+ * html-to-image's own toBlob always encodes PNG, so take the canvas and encode
+ * it here. JPEG has no alpha: paint a white ground under anything transparent.
+ */
 async function shootNode(
   node: HTMLElement,
   width: number,
@@ -377,21 +354,31 @@ async function shootNode(
   options: ExportOptions,
   fontEmbedCSS: string,
 ): Promise<Blob> {
-  const { toBlob } = await import('html-to-image')
-  const png = await toBlobWithExactFonts(toBlob, node, {
+  const { toCanvas } = await import('html-to-image')
+  const jpg = options.format === 'jpg'
+  const encode = async (target: HTMLElement, settings: Record<string, unknown>): Promise<Blob | null> => {
+    const canvas = await toCanvas(target, settings)
+    try {
+      return await canvasBlob(canvas, jpg ? 'image/jpeg' : 'image/png', 0.92)
+    } finally {
+      canvas.width = 0
+      canvas.height = 0
+    }
+  }
+  const blob = await toBlobWithExactFonts(encode, node, {
     width,
     height,
     pixelRatio: options.scale,
     fontEmbedCSS,
     skipAutoScale: true,
+    ...(jpg ? { backgroundColor: '#ffffff' } : {}),
   })
-  if (!png) throw new Error('long export returned no image')
-  if (options.format === 'png') return png
-  return await pngToJpeg(png)
+  if (!blob) throw new Error('long export returned no image')
+  return blob
 }
 
 /**
- * Clone the preview into a fixed540px stage, render the whole page or tile it
+ * Clone the preview into a fixed 540px stage, render the whole page or tile it
  * at measured block boundaries, and return either one image or a ZIP.
  */
 export async function exportLongImage(
