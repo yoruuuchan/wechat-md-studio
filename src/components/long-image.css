@@ -44,6 +44,13 @@
   margin-bottom: 0.8em;
   padding-left: 1.7em;
 }
+/* The site reset removes list markers; an article needs them back. */
+.reed-long-root ul {
+  list-style: disc;
+}
+.reed-long-root ol {
+  list-style: decimal;
+}
 .reed-long-root li {
   margin-top: 0.35em;
   margin-bottom: 0.35em;

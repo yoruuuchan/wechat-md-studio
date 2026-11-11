@@ -345,7 +345,9 @@ interface ExportOptions {
 
 /**
  * html-to-image's own toBlob always encodes PNG, so take the canvas and encode
- * it here. JPEG has no alpha: paint a white ground under anything transparent.
+ * it here. JPEG has no alpha, so a node that paints no ground of its own gets a
+ * white one. html-to-image applies that colour as the node's own
+ * background-color: giving it to a template that has a ground would repaint it.
  */
 async function shootNode(
   node: HTMLElement,
@@ -356,6 +358,8 @@ async function shootNode(
 ): Promise<Blob> {
   const { toCanvas } = await import('html-to-image')
   const jpg = options.format === 'jpg'
+  const ground = getComputedStyle(node).backgroundColor
+  const bare = ground === 'transparent' || /^rgba\(.*,\s*0\)$/.test(ground)
   const encode = async (target: HTMLElement, settings: Record<string, unknown>): Promise<Blob | null> => {
     const canvas = await toCanvas(target, settings)
     try {
@@ -371,7 +375,7 @@ async function shootNode(
     pixelRatio: options.scale,
     fontEmbedCSS,
     skipAutoScale: true,
-    ...(jpg ? { backgroundColor: '#ffffff' } : {}),
+    ...(jpg && bare ? { backgroundColor: '#ffffff' } : {}),
   })
   if (!blob) throw new Error('long export returned no image')
   return blob

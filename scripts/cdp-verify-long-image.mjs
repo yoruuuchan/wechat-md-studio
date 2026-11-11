@@ -438,6 +438,13 @@ try {
   const exampleRoot = await evaluate(`document.querySelector('.reed-long-root')?.dataset.template || ''`)
   const exampleBackground = await evaluate(`getComputedStyle(document.querySelector('.reed-long-root')).backgroundColor`)
   check('example long template uploads and renders through the same path', Boolean(uploaded) && exampleRoot === 'example-long' && exampleBackground !== 'rgba(0,0,0,0)', { uploaded, exampleRoot, exampleBackground })
+  // A JPG must keep the template's own ground colour (it once came out white).
+  // Sampled at the bottom-left corner, below the footer, where only the ground shows.
+  await setFormat('jpg')
+  await ready()
+  const exampleJpg = await downloadExport('example-jpg', '.jpg')
+  const corner = await evaluate(`(async()=>{const img=new Image();img.crossOrigin='anonymous';img.src=${JSON.stringify(compareUrl(exampleJpg.file))};await img.decode();const c=document.createElement('canvas');c.width=8;c.height=8;const ctx=c.getContext('2d');ctx.drawImage(img,0,8-img.naturalHeight);return [...ctx.getImageData(2,5,1,1).data].slice(0,3)})()`)
+  check('a JPG export keeps the template ground colour', Math.abs(corner[0] - 246) <= 3 && Math.abs(corner[1] - 245) <= 3 && Math.abs(corner[2] - 241) <= 3, corner)
   const saved = await evaluate(`localStorage.getItem('mopai.long-options.v1') || ''`)
   check('the uploaded template is remembered in the long options key', saved.includes(uploaded), saved.slice(0, 180))
 
