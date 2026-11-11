@@ -12,6 +12,7 @@ import {
 import {
   activateCardTemplate, deactivateCardTemplate, fragmentHtml,
   parseCardTemplateSource, renderTemplatePage, type CardTemplateSourceRecord,
+ type LoadedCardTemplate,
 } from './card-template'
 import { currentLang, setLanguage } from './i18n'
 
@@ -322,7 +323,7 @@ describe('parsed template runtime', () => {
   it('parses, activates and fills slots without concatenating HTML', async () => {
     const record = await parseCardTemplateSource(await validZip(), 'test-id')
     expect(record.template).toBe('custom.test-id')
-    const loaded = await activateCardTemplate(record)
+    const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     expect(document.head.querySelector('style[data-card-template-style]')).not.toBeNull()
 
     const coverPage = renderTemplatePage(loaded, {
@@ -357,7 +358,7 @@ describe('parsed template runtime', () => {
         'styles/template.css': 'p { margin: 0; }',
       })
       const record = await parseCardTemplateSource(zip, 'page-count-id')
-      const loaded = await activateCardTemplate(record)
+      const loaded = await activateCardTemplate(record) as LoadedCardTemplate
       const html = fragmentHtml(renderTemplatePage(loaded, {
         kind: 'body', pageIndex: 0, total: 6, title: '', subtitle: '',
         author: 'Yoru', articleTitle: '标题', contentHtml: '<p>正文</p>', height: 720, lang: 'zh',
@@ -379,7 +380,7 @@ describe('parsed template runtime', () => {
       'styles/template.css': 'p { margin: 0; }',
     })
     const record = await parseCardTemplateSource(zip, 'variant-id')
-    const loaded = await activateCardTemplate(record)
+    const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     const ctx = {
       kind: 'cover' as const, pageIndex: 0, total: 2, title: 'T', subtitle: '',
       author: 'A', articleTitle: 'A', height: 720, lang: 'zh' as const,
@@ -397,7 +398,7 @@ describe('parsed template runtime', () => {
         ...base.parsed,
         pages: {
           ...base.parsed.pages,
-          cover: { ...base.parsed.pages.cover, html: '<script>alert(1)</script>' },
+          cover: { ...base.parsed.pages.cover!, html: '<script>alert(1)</script>' },
         },
       },
     }
@@ -417,9 +418,10 @@ describe('parsed template runtime', () => {
     }
     walk(source)
     const record = await parseCardTemplateSource(await zip.generateAsync({ type: 'arraybuffer' }), 'example')
-    expect(record.parsed.manifest.pages.end).toBe('pages/end.html')
+    if (record.parsed.manifest.kind !== 'card') throw new Error('expected a card template')
+ expect(record.parsed.manifest.pages.end).toBe('pages/end.html')
     expect(record.parsed.styles[0].css).toContain('.example-end')
-    const loaded = await activateCardTemplate(record)
+    const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     expect(loaded.summary.name).toContain('示例')
     expect(loaded.packageFontCss).toContain('@font-face')
     expect(loaded.packageFontCss).toContain('data:font/woff2;base64,')

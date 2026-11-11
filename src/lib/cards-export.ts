@@ -129,7 +129,7 @@ const EXACT_FONT_SIZE = '--xhs-export-font-size'
  * other computed property (margins in em, line-height, ...) came from the
  * untouched original.
  */
-function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): void {
+export function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): void {
   const visit = (source: Element, target: Element) => {
     const styled = target as HTMLElement | SVGElement
     styled.style.setProperty(EXACT_FONT_SIZE, getComputedStyle(source).fontSize)
@@ -140,7 +140,7 @@ function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): voi
   nodes.forEach((node, index) => visit(node, snapshots[index]))
 }
 
-async function toBlobWithExactFonts(
+export async function toBlobWithExactFonts(
   toBlob: (node: HTMLElement, options: Record<string, unknown>) => Promise<Blob | null>,
   node: HTMLElement,
   options: Record<string, unknown>,

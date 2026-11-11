@@ -48,7 +48,7 @@ describe('uploaded template storage', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].raw.byteLength).toBeGreaterThan(0)
     expect(rows[0].parsed.manifest.id).toBe('example')
-    expect(rows[0].parsed.pages.cover.html).toContain('data-slot')
+    expect(rows[0].parsed.pages.cover!.html).toContain('data-slot')
     expect(rows[0].parsed.files.some((file) => file.path === 'styles/template.css')).toBe(true)
   })
 

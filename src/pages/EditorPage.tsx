@@ -119,8 +119,14 @@ import {
   DEFAULT_CARD_OPTIONS, loadCardOptions, reconcileCardOptions, saveCardOptions,
 } from '@/lib/card-options'
 import type { CardsStatus, CardsViewHandle } from '@/components/CardsView'
+import type { LongStatus, LongImageViewHandle } from '@/components/LongImageView'
+import {
+ DEFAULT_LONG_OPTIONS, loadLongOptions, reconcileLongOptions, saveLongOptions, type LongOptions,
+} from '@/lib/long-options'
+import { getLoadedLongTemplate } from '@/lib/card-template'
 
 const CardsView = lazy(() => import('@/components/CardsView'))
+const LongImageView = lazy(() => import('@/components/LongImageView'))
 
 function plainTextOf(html: string): string {
   const div = document.createElement('div')
@@ -222,14 +228,22 @@ export default function EditorPage() {
   const [initialLayout] = useState(loadLayout)
   const layoutRef = useRef<Record<string, number>>(initialLayout ?? {})
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
-  const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
+  const [previewMode, setPreviewMode] = useState<'wechat' | 'cards' | 'long'>('wechat')
   /** The embedded composer is up; previewMode stays on article or cards. */
   const [motionOpen, setMotionOpen] = useState(false)
   /** Created on first use and kept mounted, so the composer keeps its work. */
   const [motionMounted, setMotionMounted] = useState(false)
   const [motionReady, setMotionReady] = useState(false)
   const [cardOptions, setCardOptions] = useState<CardOptions>(() => loadCardOptions() ?? DEFAULT_CARD_OPTIONS)
-  const cardTemplates = useCardTemplates({ loadPublic: previewMode === 'cards' })
+  const cardTemplates = useCardTemplates({
+ loadPublic: previewMode === 'cards' || previewMode === 'long',
+ kind: previewMode === 'long' ? 'long' : 'card',
+ })
+ const [longOptions, setLongOptions] = useState<LongOptions>(() => loadLongOptions() ?? DEFAULT_LONG_OPTIONS)
+ const [longStatus, setLongStatus] = useState<LongStatus>({
+ ready: false, busy: false, pending: true, failed: false, error: false,
+ height:0, sections:0, split:0, progress: { phase: 'measure', done:0, total:0 },
+ })
   const [cardsStatus, setCardsStatus] = useState<CardsStatus>({
     ready: false, busy: false, total: 0, failed: false, error: false, progress: { done: 0, total: 0 },
   })
@@ -252,6 +266,7 @@ export default function EditorPage() {
   const editorRef = useRef<EditorHandle>(null)
   const previewRef = useRef<PreviewScrollHandle>(null)
   const cardsViewRef = useRef<CardsViewHandle>(null)
+ const longImageViewRef = useRef<LongImageViewHandle>(null)
   /**
    * Live editor state for the toolbar: the selection, and how deep the undo
    * history is. Reported by EditorPane on every transaction.
@@ -332,6 +347,7 @@ export default function EditorPage() {
   useEffect(() => saveSettings(settings), [settings])
   useEffect(() => applyZoom(settings.zoom), [settings.zoom])
   useEffect(() => saveCardOptions(cardOptions), [cardOptions])
+ useEffect(() => saveLongOptions(longOptions), [longOptions])
   // Wait until uploaded templates are registered before deciding whether the
   // remembered id still exists; a package that is gone (deleted here or not yet
   // synced) returns the selection to Reed.
@@ -340,7 +356,8 @@ export default function EditorPage() {
   // mode its id is still valid, so leave the preference alone rather than
   // treating "not fetched yet" as "removed".
   useEffect(() => {
-    if (cardTemplates.loading) return
+    if (cardTemplates.kind !== 'card') return
+ if (cardTemplates.loading) return
     if (isPublicCardTemplateId(cardOptions.template) &&
       (cardTemplates.publicLoading ||
         (!cardTemplates.publicError && cardTemplates.publicTemplates.length === 0))) return
@@ -354,7 +371,24 @@ export default function EditorPage() {
     cardTemplates.publicTemplates, cardTemplates.publicError, cardOptions.template,
   ])
 
-  // First visit only: let the panes settle, then auto-start the tour. The tour
+  // Long-image selections follow the same rule: a package that is gone falls
+// back to the public blue template, which is also the default.
+ useEffect(() => {
+ if (cardTemplates.kind !== 'long') return
+ if (cardTemplates.loading) return
+ if (cardTemplates.publicLoading ||
+ (!cardTemplates.publicError && cardTemplates.publicTemplates.length ===0)) return
+ const available = new Set([
+ ...cardTemplates.templates.map((item) => item.template),
+ ...cardTemplates.publicTemplates.map((item) => item.template),
+ ])
+ setLongOptions((current) => reconcileLongOptions(current, available))
+ }, [
+ cardTemplates.kind, cardTemplates.loading, cardTemplates.templates, cardTemplates.publicLoading,
+ cardTemplates.publicTemplates, cardTemplates.publicError, longOptions.template,
+ ])
+
+ // First visit only: let the panes settle, then auto-start the tour. The tour
   // points at the three-column furniture, so it only auto-starts on the wide
   // layout; the medium drawer and the phone switcher can still open it from
   // the settings entry by hand.
@@ -1743,10 +1777,10 @@ export default function EditorPage() {
   )
 
   /** Switching modes takes the right column to that mode's own tab. */
-  const changePreviewMode = useCallback((next: 'wechat' | 'cards') => {
+  const changePreviewMode = useCallback((next: 'wechat' | 'cards' | 'long') => {
     setMotionOpen(false)
     setPreviewMode(next)
-    setSideTab(next === 'cards' ? 'card' : 'theme')
+    setSideTab(next === 'wechat' ? 'theme' : 'card')
   }, [])
 
   /** First open creates the iframe; later opens just show it again. */
@@ -1770,14 +1804,22 @@ export default function EditorPage() {
     else setPanelOpen(true)
   }, [phone, medium])
 
-  const previewPaneBody = previewMode === 'cards' ? (
+  const longTemplate = getLoadedLongTemplate(longOptions.template)
+ const longLoadedVersion = cardTemplates.templates.length + cardTemplates.publicTemplates.length + (cardTemplates.loading ?0 :1)
+ const previewPaneBody = previewMode === 'cards' ? (
     <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('cards.measuring')}</div>}>
       <CardsView ref={cardsViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
         sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram}
         options={cardOptions} onStatusChange={setCardsStatus} />
     </Suspense>
-  ) : (
-    <PreviewPane
+ ) : previewMode === 'long' ? (
+ <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('long.measuring')}</div>}>
+ <LongImageView ref={longImageViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''}
+ sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} options={longOptions}
+ template={longTemplate} loadedVersion={longLoadedVersion} onStatusChange={setLongStatus} />
+ </Suspense>
+ ) : (
+ <PreviewPane
       ref={previewRef}
       html={rendered.html}
       stats={rendered.stats}
@@ -1806,6 +1848,15 @@ export default function EditorPage() {
       onCardTemplateUploaded={(summary) => setCardOptions((current) => withTemplate(current, summary.template))}
       onCardTemplateDeleted={(template) => setCardOptions((current) =>
         current.template === template ? withTemplate(current, 'reed') : current)}
+ longOptions={longOptions}
+ onLongOptionsChange={setLongOptions}
+ longBusy={longStatus.busy}
+ onLongTemplateUploaded={(summary) => setLongOptions((current) => ({
+ ...current,
+ template: summary.template,
+ }))}
+ onLongTemplateDeleted={(template) => setLongOptions((current) =>
+ current.template === template ? DEFAULT_LONG_OPTIONS : current)}
       materials={materials}
       titles={parsed.meta.titles}
       cover={parsed.meta.cover}
@@ -1908,6 +1959,11 @@ export default function EditorPage() {
         cardsExporting={cardsStatus.busy}
         cardsProgress={cardsStatus.progress}
         onExportAll={() => cardsViewRef.current?.exportAll()}
+ longReady={longStatus.ready}
+ longExporting={longStatus.busy}
+ longProgress={{ done: longStatus.progress.done, total: longStatus.progress.total }}
+ onExportLong={() => longImageViewRef.current?.export()}
+ onCancelLong={() => longImageViewRef.current?.cancel()}
         phone={phone}
         wide={wide}
       />

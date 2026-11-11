@@ -1,0 +1,25 @@
+{
+ "format": "reed-card-template",
+ "formatVersion":1,
+ "kind": "long",
+ "id": "blue-tech-recap",
+ "name": "蓝色科技活动回顾",
+ "version": "1.0.0",
+ "author": "Reed",
+ "description": "深蓝渐变上的活动回顾长图：满宽头图叠白到浅蓝的粗斜标题，小节用白底标签、手写感宽字距和细描边照片框，落款居中收束。适合成立大会、发布会与线下活动。",
+ "variants": [
+ { "id": "blue", "name": "科技蓝", "dark": true, "tokens": { "accent": "#62C8FF", "text": "#FFFFFF", "muted": "#BBD9F2" } }
+ ],
+ "metrics": {
+ "padX":22,
+ "contentWidth":496,
+ "photoGap":7,
+ "photoInset":11
+ },
+ "fonts": [
+ { "source": "builtin", "family": "Noto Sans SC", "weights": [400,700] },
+ { "source": "builtin", "family": "Zhuque Fangsong", "weights": [400] }
+ ],
+ "pages": { "header": "pages/header.html", "footer": "pages/footer.html" },
+ "styles": ["styles/template.css"]
+}

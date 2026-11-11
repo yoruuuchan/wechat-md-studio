@@ -11,13 +11,13 @@ import {
   downloadCloudCardTemplate, listCloudCardTemplates, uploadCloudCardTemplate,
   type CloudCardTemplateMeta,
 } from '@/lib/card-template-cloud'
-import { CardTemplateError, type CardTemplateSummary } from '@/lib/card-template-format'
+import { CardTemplateError, type CardTemplateSummary, type TemplateKind } from '@/lib/card-template-format'
 import { planCardTemplateSync, type LocalCardTemplateCandidate } from '@/lib/card-template-sync'
 import {
   deleteCardTemplateRecord, listCardTemplateRecords, saveCardTemplateRecord,
 } from '@/lib/card-template-store'
 import {
-  PUBLIC_CARD_TEMPLATES, isPublicCardTemplateId, publicCardTemplateInstanceId,
+  PUBLIC_CARD_TEMPLATES, PUBLIC_LONG_TEMPLATES, isPublicCardTemplateId, publicCardTemplateInstanceId,
 } from '@/lib/public-card-templates'
 
 export interface CardTemplateUploadFailure {
@@ -38,6 +38,7 @@ export interface CardTemplateRemoveResult {
 export type CardTemplateSyncState = 'idle' | 'syncing' | 'synced' | 'failed'
 
 export interface CardTemplateUpload {
+ kind: TemplateKind
   templates: CardTemplateSummary[]
   /** Reed's own templates, loaded from `/card-templates/*.reedcard` in card mode. */
   publicTemplates: CardTemplateSummary[]
@@ -62,7 +63,7 @@ interface PublicLoadResult {
   error: CardTemplateError | null
 }
 
-let publicLoadPromise: Promise<PublicLoadResult> | null = null
+const publicLoadPromises = new Map<TemplateKind, Promise<PublicLoadResult>>()
 
 /**
  * Fetch the nine public packages through the ordinary upload parser. The
@@ -70,29 +71,32 @@ let publicLoadPromise: Promise<PublicLoadResult> | null = null
  * same stylesheet twice. A public instance gets a `public-*` record id, which
  * `customTemplateId` turns into a runtime id distinct from every user upload.
  */
-function loadPublicTemplates(): Promise<PublicLoadResult> {
-  if (publicLoadPromise) return publicLoadPromise
-  publicLoadPromise = (async () => {
-    const templates: CardTemplateSummary[] = []
-    let firstError: CardTemplateError | null = null
-    for (const item of PUBLIC_CARD_TEMPLATES) {
-      try {
-        const response = await fetch(item.pack, { cache: 'no-cache' })
-        if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
-        const raw = await response.arrayBuffer()
-        const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
-        if (record.parsed.manifest.id !== item.id) {
-          throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
-        }
-        const loaded = await activateCardTemplate(record)
-        templates.push(loaded.summary)
-      } catch (itemError) {
-        firstError ??= asError(itemError, 'unknown')
-      }
-    }
-    return { templates, error: firstError }
-  })()
-  return publicLoadPromise
+function loadPublicTemplates(kind: TemplateKind): Promise<PublicLoadResult> {
+ const existing = publicLoadPromises.get(kind)
+ if (existing) return existing
+ const promise = (async () => {
+ const templates: CardTemplateSummary[] = []
+ let firstError: CardTemplateError | null = null
+ const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
+ for (const item of items) {
+ try {
+ const response = await fetch(item.pack, { cache: 'no-cache' })
+ if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
+ const raw = await response.arrayBuffer()
+ const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
+ if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
+ throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
+ }
+ const loaded = await activateCardTemplate(record)
+ templates.push(loaded.summary)
+ } catch (itemError) {
+ firstError ??= asError(itemError, 'unknown')
+ }
+ }
+ return { templates, error: firstError }
+ })()
+ publicLoadPromises.set(kind, promise)
+ return promise
 }
 
 function newId(): string {
@@ -106,8 +110,8 @@ function asError(item: unknown, fallback: 'unknown' | 'storage' | 'cloud'): Card
   return new CardTemplateError(fallback, item instanceof Error ? item.message : String(item))
 }
 
-export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTemplateUpload {
-  const { loadPublic = false } = options
+export function useCardTemplates(options: { loadPublic?: boolean; kind?: TemplateKind } = {}): CardTemplateUpload {
+ const { loadPublic = false, kind = 'card' } = options
   const [templates, setTemplates] = useState<CardTemplateSummary[]>([])
   const [publicTemplates, setPublicTemplates] = useState<CardTemplateSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -158,14 +162,15 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     if (!loadPublic) return
     let alive = true
     setPublicLoading(true)
-    void loadPublicTemplates().then((result) => {
+    setPublicTemplates([])
+ void loadPublicTemplates(kind).then((result) => {
       if (!alive) return
       setPublicTemplates(result.templates)
       setPublicError(result.error)
       setPublicLoading(false)
     })
     return () => { alive = false }
-  }, [loadPublic])
+  }, [loadPublic, kind])
 
   /** Upload one local record and remember the server version it now matches. */
   const pushLocal = useCallback(async (record: CardTemplateSourceRecord): Promise<void> => {
@@ -333,8 +338,9 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     void runSync()
   }, [runSync])
 
-  return {
-    templates,
+ return {
+ kind,
+ templates,
     publicTemplates,
     loading,
     publicLoading,

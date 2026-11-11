@@ -1,0 +1,24 @@
+{
+ "format": "reed-card-template",
+ "formatVersion":1,
+ "kind": "long",
+ "id": "example-long",
+ "name": "示例 ·素白长图",
+ "version": "1.0.0",
+ "author": "Reed",
+ "description": "一个朴素的白底黑字长图示例：头部标题与可选头图、小节标签、等高照片组、居中落款。用来对照格式与测试上传，不依赖任何外部素材。",
+ "variants": [
+ { "id": "paper", "name": "白纸", "dark": false, "tokens": { "accent": "#2F6F5E", "text": "#1E2328", "muted": "#6E756F" } }
+ ],
+ "metrics": {
+ "padX":48,
+ "contentWidth":444,
+ "photoGap":8,
+ "photoInset":8
+ },
+ "fonts": [
+ { "source": "builtin", "family": "Noto Sans SC", "weights": [400,700] }
+ ],
+ "pages": { "header": "pages/header.html", "footer": "pages/footer.html" },
+ "styles": ["styles/template.css"]
+}

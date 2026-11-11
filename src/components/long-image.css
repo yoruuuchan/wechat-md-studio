@@ -1,0 +1,145 @@
+/*
+ * Structural defaults for the engine-generated long-image DOM. Templates own
+ * the visual language; these rules only keep untemplated output readable and
+ * make the semantic classes behave predictably.
+ */
+.reed-long-root {
+  position: relative;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.75;
+  color: #1f2328;
+  text-align: left;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color-scheme: light;
+}
+.reed-long-flow {
+  box-sizing: border-box;
+}
+.reed-long-root *,
+.reed-long-root *::before,
+.reed-long-root *::after {
+  box-sizing: border-box;
+}
+.reed-long-root p {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+.reed-long-root h1,
+.reed-long-root h2,
+.reed-long-root h3 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.35;
+}
+.reed-long-root h3 {
+  font-size: 1.25em;
+}
+.reed-long-root ul,
+.reed-long-root ol {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+  padding-left: 1.7em;
+}
+.reed-long-root li {
+  margin-top: 0.35em;
+  margin-bottom: 0.35em;
+}
+.reed-long-root blockquote {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-top: 0.2em;
+  padding-bottom: 0.2em;
+  padding-left: 1em;
+  border-left: 3px solid currentColor;
+}
+.reed-long-root blockquote p {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+.reed-long-root pre {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-top: 0.8em;
+  padding-right: 1em;
+  padding-bottom: 0.8em;
+  padding-left: 1em;
+  overflow: hidden;
+  font-size: 0.9em;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.reed-long-root code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+.reed-long-root table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  font-size: 0.95em;
+}
+.reed-long-root th,
+.reed-long-root td {
+  padding-top: 0.4em;
+  padding-right: 0.5em;
+  padding-bottom: 0.4em;
+  padding-left: 0.5em;
+  border: 1px solid currentColor;
+}
+.reed-long-root img {
+  max-width: 100%;
+}
+.reed-long-root img[data-long-missing] {
+  display: block;
+  min-height: 80px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 0px,
+    rgba(255, 255, 255, 0.15) 8px,
+    rgba(255, 255, 255, 0.05) 8px,
+    rgba(255, 255, 255, 0.05) 16px
+  );
+}
+.reed-long-photos {
+  position: relative;
+}
+.reed-long-photo-frame {
+  display: flow-root;
+}
+.reed-long-photo-row {
+  display: flex;
+}
+.reed-long-photo {
+  margin: 0;
+  overflow: hidden;
+}
+.reed-long-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.reed-long-divider {
+  border-top: 1px solid currentColor;
+  opacity: 0.3;
+}
+.reed-long-center {
+  text-align: center;
+}
+.reed-long-section-label {
+  font: inherit;
+}
+.reed-long-section-kicker {
+  font: inherit;
+}
+.reed-long-preview {
+  transform-origin: top left;
+  contain: paint;
+  isolation: isolate;
+  overflow: hidden;
+}

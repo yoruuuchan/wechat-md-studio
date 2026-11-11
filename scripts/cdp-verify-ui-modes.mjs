@@ -314,40 +314,15 @@ try {
   const isPlaceholder = (m) => m.disabled && m.label.includes('即将推出')
   const hasMotion = modes.some((m) => m.id === 'motion' && !m.disabled)
   check(
-    'long-image is a visibly disabled placeholder',
-    modes.filter((m) => m.id === 'long').every(isPlaceholder),
-    modes.filter((m) => m.id === 'long'),
-  )
-  if (hasMotion) {
-    check(
-      'motion is a selectable mode when the build packs the composer',
-      modes.filter((m) => m.id === 'motion').every((m) => !m.disabled && m.pressed === 'false'),
-      modes.filter((m) => m.id === 'motion'),
-    )
-  } else {
-    check(
-      'motion is a placeholder when the build has none',
-      modes.filter((m) => m.id === 'motion').every(isPlaceholder),
-      modes.filter((m) => m.id === 'motion'),
-    )
-  }
-  const placeholderBox = await evaluate(`(() => {
-    const r = document.querySelector('[data-preview-mode="long"]').getBoundingClientRect();
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  })()`)
-  await call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...placeholderBox })
-  const placeholderTip = await waitFor(
-    `(() => { const el = document.querySelector('[data-slot="tooltip-content"]'); return el ? el.textContent.trim() : '' })()`,
-    'placeholder coming-soon tooltip',
-    5000,
-  ).catch(() => '')
-  // Radix puts the visible text and a visually hidden copy inside the same
-  // content node, so textContent contains the hint twice.
-  check('hovering a placeholder shows the coming-soon hint', placeholderTip.includes('即将推出'), placeholderTip)
-  await call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 })
-  await click(`document.querySelector('[data-preview-mode="long"]')`)
-  await sleep(250)
-  check('clicking a placeholder does not change mode', await evaluate(`document.querySelector('[data-preview-mode="wechat"]').getAttribute('aria-pressed') === 'true'`))
+ 'long-image is a selectable mode',
+ modes.filter((m) => m.id === 'long').every((m) => !m.disabled && m.pressed === 'false'),
+ modes.filter((m) => m.id === 'long'),
+ )
+ await click(`document.querySelector('[data-preview-mode="long"]')`)
+ await waitFor(`document.querySelector('[data-preview-mode="long"]')?.getAttribute('aria-pressed') === 'true'`, 'long mode selected')
+ await waitFor(`!!document.querySelector('[data-long-view]')`, 'long view mounted')
+ check('choosing long-image switches the workspace', await evaluate(`!!document.querySelector('[data-long-view]')`))
+ await click(`document.querySelector('[data-preview-mode="wechat"]')`)
 
   if (hasMotion) {
     console.log('\n=== motion composer embedded in the editor ===')
@@ -786,8 +761,7 @@ try {
       href: el.getAttribute('href') || '',
     })))()`)
     check(`${width}px: the pill menu lists all four modes`, JSON.stringify(entries.map((entry) => entry.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), entries)
-    const isPlaceholder = (entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')
-    check(`${width}px: long-image is a disabled placeholder in the pill menu`, entries.filter((entry) => entry.id === 'long').every(isPlaceholder), entries)
+ check(`${width}px: long-image is selectable in the pill menu`, entries.filter((entry) => entry.id === 'long').every((entry) => !entry.disabled && !entry.placeholder), entries)
     if (hasMotion) {
       check(
         `${width}px: motion is a selectable mode in the pill menu`,

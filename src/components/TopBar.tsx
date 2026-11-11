@@ -16,7 +16,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { SaveStatus } from '@/components/SaveStatus'
 import type { ArticleSaveStatus } from '@/lib/save-status'
 
-export type EditorMode = 'wechat' | 'cards'
+export type EditorMode = 'wechat' | 'cards' | 'long'
 
 interface Props {
   docs: DocRecord[]
@@ -71,6 +71,12 @@ interface Props {
   cardsExporting: boolean
   cardsProgress: { done: number; total: number }
   onExportAll: () => void
+ /** Long-image export owns progress and cancellation in the primary slot. */
+ longReady: boolean
+ longExporting: boolean
+ longProgress: { done: number; total: number }
+ onExportLong: () => void
+ onCancelLong: () => void
 
   /** Phone merges the mode navigation into the top bar as a pill menu. */
   phone: boolean
@@ -89,7 +95,7 @@ function modeItems(t: Translate, compact: boolean): ModeItem[] {
     { id: 'cards', label: compact ? t('topbar.mode.cardsShort') : t('topbar.mode.cards') },
     // Placeholders are visible and focusable so their "coming soon" hint is
     // reachable by keyboard, but choosing them changes nothing.
-    { id: 'long', label: compact ? t('topbar.mode.longShort') : t('topbar.mode.long'), soon: true },
+    { id: 'long', label: compact ? t('topbar.mode.longShort') : t('topbar.mode.long') },
     // The motion composer is embedded in place, there only when the build
     // packed it (scripts/motion/pack-motion.mjs); otherwise a placeholder too.
     MOTION_URL
@@ -285,7 +291,38 @@ export default function TopBar(p: Props) {
     </button>
   )
 
-  const primaryAction: ReactNode = p.mode === 'cards' ? cardsButton : copyButton
+  const longButton = (
+ <button
+ data-topbar-primary
+ data-long-export-all
+ aria-hidden={p.motion ? true : undefined}
+ onClick={p.onExportLong}
+ disabled={!p.longReady || p.longExporting}
+ title={t('long.export')}
+ className={`ya-btn ya-btn-primary whitespace-nowrap ${p.motion ? 'invisible' : ''} ${p.phone ? '!px-2.5 !text-[12px]' : 'px-4'}`}
+ >
+ {p.longExporting
+ ? t('long.exporting', { done: p.longProgress.done, total: p.longProgress.total })
+ : t('long.export')}
+ </button>
+ )
+
+ const primaryAction: ReactNode = p.mode === 'cards'
+ ? cardsButton
+ : p.mode === 'long' ? (
+ <>
+ {p.longExporting && (
+ <button
+ data-long-export-cancel
+ onClick={p.onCancelLong}
+ className="ya-btn ya-btn-secondary whitespace-nowrap !px-2.5 !text-[12px]"
+ >
+ {t('long.cancel')}
+ </button>
+ )}
+ {longButton}
+ </>
+ ) : copyButton
 
   return (
     <header data-topbar className="ya-glass flex shrink-0 flex-col">

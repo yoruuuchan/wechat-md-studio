@@ -164,11 +164,19 @@ async function realClick(selector) {
 }
 async function chooseLang(lang) {
   await realClick('[data-topbar-more]')
+ // Language moved from更多 into设置 →外观与语言; open that tab when the
+ // toggle is not already on screen.
+ if (!await evaluate(`!!document.querySelector('[data-lang="${lang}"]')`)) {
+ await realClick('[data-more-item="appearance-language"]')
+ }
   await waitFor(`!!document.querySelector('[data-lang="${lang}"]')`)
   await realClick(`[data-lang="${lang}"]`)
   await sleep(500)
   await press('Escape', 'Escape', 27)
   await sleep(300)
+ if (await evaluate(`!!document.querySelector('[data-side-tab="card"]')`)) {
+ await realClick('[data-side-tab="card"]')
+ }
 }
 async function cardsReady(session = sessionId) {
   await waitFor(`document.querySelector('[data-xhs-view]')?.dataset.ready === 'true'`, 45000, session)
@@ -988,12 +996,9 @@ ${templateGroups.map((group) => `<section><h2>${group.label}</h2><div class="gri
   await press('Enter', 'Enter', 13)
   await cardsReady()
   check('card ratio, template and background survive responsive layout changes', await evaluate(`JSON.stringify({ratio:document.querySelector('[data-card-ratio][aria-pressed="true"]')?.dataset.cardRatio,bg:document.querySelector('[data-card-bg][aria-pressed="true"]')?.dataset.cardBg,template:document.querySelector('[data-card-template][aria-pressed="true"]')?.dataset.cardTemplate})===${JSON.stringify(optionsBeforeResize)}`))
-  for (const lang of ['zh','en']) {
-    await evaluate(`document.querySelector('[data-topbar-more]').focus()`)
-    await press('Enter', 'Enter', 13)
-    await waitFor(`!!document.querySelector('[data-lang="${lang}"]')`)
-    await click(`[data-lang="${lang}"]`); await cardsReady()
-    await press('Escape', 'Escape', 27)
+ for (const lang of ['zh','en']) {
+ await chooseLang(lang)
+ await cardsReady()
     const narrow = await evaluate(`(() => {const root=document.querySelector('[data-xhs-view]');const r=root.getBoundingClientRect();const bad=[...root.querySelectorAll('button')].filter(b=>{const x=b.getBoundingClientRect();return x.left<r.left-.5||x.right>r.right+.5});return {bad:bad.map(b=>b.textContent),width:document.documentElement.scrollWidth,viewport:innerWidth}})()`)
     check(lang + ': card controls fit a 390px viewport', !narrow.bad.length && narrow.width <= narrow.viewport, narrow)
     await shot('narrow-' + lang)

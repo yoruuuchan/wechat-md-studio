@@ -5,7 +5,7 @@ import { esc } from './theme-kit'
 import { t } from './i18n'
 import { cardMetrics, type CardBackground, type CardTemplateId } from './cards'
 
-function inline(segs: InlineSeg[]): string {
+export function inline(segs: InlineSeg[]): string {
   return segs.map((seg) => {
     if (seg.text === '\n') return '<br>'
     let text = esc(seg.text)
@@ -19,7 +19,7 @@ function inline(segs: InlineSeg[]): string {
   }).join('')
 }
 
-function listHtml(list: ListBlock): string {
+export function listHtml(list: ListBlock): string {
   const tag = list.ordered ? 'ol' : 'ul'
   return `<${tag}${list.ordered ? ` start="${list.start}"` : ''}>${list.items.map((item, i) =>
     `<li${list.ordered ? ` value="${list.start + i}"` : ''}>${item.parts.map((part) =>
