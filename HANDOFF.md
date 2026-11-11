@@ -981,6 +981,23 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `check`、`lint`（0 errors，保留 1 条既有 exhaustive-deps warning）、`test` 3035 项、`build`、`verify:themes` 全过；CDP：发布前检查 88/88、手机布局 152/152、公式就绪 ALL CHECKS PASSED。
 > 生产包 50,461,274 B，sha256 `36088ab3…`，13×4MB 分块上传且逐块核对，重组整包 hash 一致；`flock` 安装于 2026-11-10 04:56:56 UTC。
 > 三重核对全过：线上 `dist/boot.js` sha256 = 本地 `be2987d1…`，入口 `index-Cb5awqAx.js` / `index-jMgmJ9jY.css` 本地=线上=公网；公网 200，bundle 含新文案与滚动样式。公开仓库增量发布未做。
+>
+> 2026-11-11 部署记录（推文动效搭建台上线）：`03ef0c5`（feat(motion)：顶栏「动效」从占位变成指向 `/motion/` 的链接；
+> 站长的云端草稿接口 `/api/motion-drafts`，新表 `motion_drafts` 启动时自动创建）。说明见 [docs/motion.md](docs/motion.md)。
+> 搭建台本身是仓库外构建的静态页面，`npm run build` 的 `pack:motion` 一步把它复制进 `public/motion/`（不提交）。
+> **以后每次构建都要让这一步找得到搭建台的构建结果**（主 checkout 旁边的 `wechat-motion-lab/out/site`，或 `REED_MOTION_SITE`）：
+> 找不到时构建照常成功，但线上的 `/motion/` 会消失、入口退回「即将推出」。构建输出里 `[pack-motion] N files` 一行是确认。
+> `check`、`lint`、`test` 3044 项、`verify:themes`、`verify:sources`、`build` 全过；本地生产构建上搭建台的浏览器检查 25/25
+> （访客与站长两种「稿子」对话框、存 / 覆盖 / 打开 / 删除、按需载入素材表、本站内容策略下无报错）。
+> `cdp-verify-ui-modes` 111/114：三项不过都是「稿件名至少显示八个汉字」（1536 / 1280 / 960，可用 98px、需要 104px）。
+> 去掉搭建台、按 `95e7892` 的行为重跑，同样三项不过、数字相同，所以不是这次改动带来的，本次没有处理。
+> 生产包 62,792,117 B（比上一版多出的约 12 MB 是搭建台的素材表和字体），sha256 `2ad89c2f…`，15×4MB 分块上传且逐块核对；
+> 安装前备份 `dist-20261111T012846Z-ce16029a` 与同名 `.db`，`flock` 安装，服务于 **2026-11-11 01:28:49 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `4e07fd06…`；入口 `index-Cc4POHHE.js` / `index-1KXwwfIe.css` 本地=线上=公网；
+> `/motion/app.3122687e57.js` 公网与本地逐字节一致；`verify-all.sh` 通过；`card_templates` 9 行不变，`motion_drafts` 已建、0 行。
+> 公网只读冒烟 25/25（`live-smoke.mjs … groups,nits,motion`，`motion` 是这次新加的一组），搭建台页面以访客身份另查 8 项全过。
+> Cloudflare 往 `/motion/` 的 HTML 里同样会加它自己的探测脚本，被内容策略拦下，每次打开一条 CSP 提示，和主页一样，无害。
+> 线上没有用站长账号登录测过：云端草稿的存取只在本地生产构建上验证。
 
 ---
 
