@@ -287,7 +287,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
         <div className="flex justify-center" style={{ display: result ? undefined : 'none' }}>
           <div
             data-long-preview-frame
-            style={{ width: result ? LONG_WIDTH * scale : 0, height: result ? result.height * scale : 0, position: 'relative' }}
+            style={{ width: result ? LONG_WIDTH * scale : 0, height: result ? result.height * scale : 0, position: 'relative', overflow: 'hidden' }}
           >
             <div
               className="reed-long-preview"
