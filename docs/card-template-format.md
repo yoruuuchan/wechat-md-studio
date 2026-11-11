@@ -361,6 +361,8 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 
 照片行的宽高由引擎按原始比例算好并写成内联样式，模板不要改 `.reed-long-photo` 的宽高，只画外框、间距和装饰。
 
+导出时每个块的高度会按预览量到的值固定下来，穿出父元素的外边距在这一步会丢。引擎自己的容器（`.reed-long-preamble`、`.reed-long-section`、`.reed-long-section-body`）已经是 `display: flow-root`；`header` / `footer` 片段的最外层元素请自己留 padding 或写 `display: flow-root`，别让里面的外边距穿出去，否则导出会比预览矮。
+
 引擎在 `.reed-long-root` 上提供这些变量：
 
 | 变量 | 含义 |

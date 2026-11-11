@@ -19,6 +19,17 @@
 .reed-long-flow {
   box-sizing: border-box;
 }
+/*
+ * Margins must not collapse out of the engine's own containers: the exporter
+ * freezes every box at its measured height, and a margin that had collapsed
+ * through a section would be lost there, leaving the export shorter than the
+ * preview.
+ */
+.reed-long-preamble,
+.reed-long-section,
+.reed-long-section-body {
+  display: flow-root;
+}
 .reed-long-root *,
 .reed-long-root *::before,
 .reed-long-root *::after {
