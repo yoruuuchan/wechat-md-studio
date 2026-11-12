@@ -1013,6 +1013,21 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `/motion/theme.js` 公网与本地逐字节一致；`verify-all.sh` 通过；`card_templates` 9 行、`motion_drafts` 0 行，都没变。
 > 公网只读冒烟 28/28（`live-smoke.mjs … groups,nits,motion`；`motion` 一组改成查原地切换、主题实时跟随、手机预览保持白底），
 > 搭建台页面以访客身份另查 18 项全过。线上仍然没有用站长账号登录测过。
+>
+> 2026-11-12 部署记录（长图模式 + 模板配色字体可换 + 新内置字体 + 模板缩略图）：`7cb5fe1`（13 个提交快进合入 master：
+> 长图模式与导出、公用长图模板「蓝色科技活动回顾」；模板颜色 / 字体槽位与读者自选字体；内置无界黑、铁蒺藜体、源流明体、源样明体、
+> 未来荧黑、Anton、Instrument Serif；右栏模板列表改成缩略图；字体下拉框里每个字体用自己的字形显示（Chrome / Edge 135+ 的
+> customizable select，其他浏览器退回原生列表））。说明见 [docs/long-image.md](docs/long-image.md)、[docs/card-template-format.md](docs/card-template-format.md)。
+> `check`、`lint`（0 错误，`EditorPage` 里原有的 2 条警告）、`test` 3096 项、`verify:themes`、`verify:sources`、`build`
+> （`[pack-public] 9 card + 1 long`、`[pack-motion] 328 files`）全过；本地生产构建上的浏览器检查：长图 30/30、模板自定义 25/25、
+> 模板上传、公用卡片 452/452、小红书卡片、`cdp-verify-ui-modes` 128/128（稿件名框加宽后 11-10 起的三项也过了）、`cdp-verify-ui-nits` 134/134、
+> 手机布局 152/152。生产包 118,716,371 B（新增字体切片约 48 MB），sha256 `e3adaf2e…`，29×4MB 分块上传且逐块核对；
+> 安装前备份 `dist-20261112T083047Z-0e526e89` 与同名 `.db`，`flock` 安装，服务于 **2026-11-12 08:30:53 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `03315b3b…`；入口 `index-DR4khLwI.js` / `index-B5YnkUNf.css`；`verify-all.sh` 通过；
+> `card_templates` 9 行、`motion_drafts` 0 行，都没变。
+> 公网冒烟没跑完：家里线路当时很差（4 KB 的文件 12 秒、`ERR_NETWORK_CHANGED`，新资源 Cloudflare 缓存还是 `MISS`），
+> 切到卡片模式超过脚本 60 秒上限，中止前已通过的项全过、没有页面错误；同一时刻从东京服务器取公网资源 0.06–0.09 秒。
+> 同一份构建在本地用 `SMOKE_ORIGIN` 跑 `live-smoke.mjs … groups,nits,motion` 28/28。线上仍然没有用站长账号登录测过。
 
 ---
 
