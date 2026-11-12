@@ -27,6 +27,11 @@ export const CHOOSABLE_FONTS: readonly CatalogFont[] = [
   { family: 'ZCOOL QingKe HuangYou', name: { zh: '站酷庆科黄油体', en: 'ZCOOL QingKe HuangYou' }, sheet: '/fonts/zcool-qingke-huangyou.css', weights: [400] },
   { family: 'ZCOOL KuaiLe', name: { zh: '站酷快乐体', en: 'ZCOOL KuaiLe' }, sheet: '/fonts/zcool-kuaile.css', weights: [400] },
   { family: 'Ma Shan Zheng', name: { zh: '马善政楷书', en: 'Ma Shan Zheng' }, sheet: '/fonts/ma-shan-zheng.css', weights: [400] },
+  { family: 'Unbounded Sans', name: { zh: '无界黑', en: 'Unbounded Sans' }, sheet: '/fonts/unbounded-sans.css', weights: [400] },
+  { family: 'Tiejili SC', name: { zh: '铁蒺藜体', en: 'Tiejili SC' }, sheet: '/fonts/tiejili-sc.css', weights: [400] },
+  { family: 'GenRyuMin2', name: { zh: '源流明体', en: 'GenRyuMin2' }, sheet: '/fonts/genryumin2.css', weights: [700, 900] },
+  { family: 'GenYoMin2', name: { zh: '源样明体', en: 'GenYoMin2' }, sheet: '/fonts/genyomin2.css', weights: [700, 900] },
+  { family: 'Glow Sans SC', name: { zh: '未来荧黑', en: 'Glow Sans SC' }, sheet: '/fonts/glow-sans-sc.css', weights: [900] },
 ]
 
 export function catalogFont(family: string): CatalogFont | undefined {

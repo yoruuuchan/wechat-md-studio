@@ -341,7 +341,7 @@ export default function TopBar(p: Props) {
             data-doc-name-group
             aria-hidden={p.motion ? true : undefined}
             className={`flex min-w-0 items-center rounded-lg transition-colors hover:bg-line-1 ${p.motion ? 'invisible' : ''} ${
-              p.phone ? 'flex-1' : 'flex-1 min-[768px]:w-[8rem] min-[960px]:w-[9rem] min-[768px]:shrink-0'
+              p.phone ? 'flex-1' : 'flex-1 min-[768px]:w-[8rem] min-[960px]:w-[10rem] min-[768px]:shrink-0'
             }`}
           >
             <input

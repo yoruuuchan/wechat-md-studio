@@ -265,6 +265,15 @@ export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = new Ma
   ['ZCOOL QingKe HuangYou', { family: 'ZCOOL QingKe HuangYou', weights: [400] }],
   ['ZCOOL KuaiLe', { family: 'ZCOOL KuaiLe', weights: [400] }],
   ['Ma Shan Zheng', { family: 'Ma Shan Zheng', weights: [400] }],
+  // Display faces for headlines (font-catalog.ts); the serif pair and Glow Sans
+  // ship only the heavy weights headlines use.
+  ['Unbounded Sans', { family: 'Unbounded Sans', weights: [400] }],
+  ['Tiejili SC', { family: 'Tiejili SC', weights: [400] }],
+  ['GenRyuMin2', { family: 'GenRyuMin2', weights: [700, 900] }],
+  ['GenYoMin2', { family: 'GenYoMin2', weights: [700, 900] }],
+  ['Glow Sans SC', { family: 'Glow Sans SC', weights: [900] }],
+  ['Anton', { family: 'Anton', weights: [400] }],
+  ['Instrument Serif', { family: 'Instrument Serif', weights: [400], styles: ['normal', 'italic'] }],
 ])
 
 /** The CSS files that declare the faces above. */
@@ -281,6 +290,11 @@ export const CARD_FONT_SHEETS = [
   '/fonts/zcool-qingke-huangyou.css',
   '/fonts/zcool-kuaile.css',
   '/fonts/ma-shan-zheng.css',
+  '/fonts/unbounded-sans.css',
+  '/fonts/tiejili-sc.css',
+  '/fonts/genryumin2.css',
+  '/fonts/genyomin2.css',
+  '/fonts/glow-sans-sc.css',
 ] as const
 
 const CN_DIGIT = '〇一二三四五六七八九'

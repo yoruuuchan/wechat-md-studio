@@ -138,7 +138,7 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 - `colors` 最多 10 项，`fonts` 最多 4 项；`var` 符合 `^--[a-z][a-z0-9-]{0,47}$`，同一个 `var` 只能出现一次。`--xhs-`、`--long-`、`--reed-` 开头的是引擎保留的，不能开放。`name` 是最多 20 个字符的显示名。
 - 这些变量要声明在作用域根上（卡片是 `.xhs-card`，长图是 `.reed-long-root`），模板 CSS 里只通过 `var(--…)` 使用它们。色块的初始颜色就是从根上读到的值，带透明度的颜色改色相时保留原透明度；根上没有值的显示为「跟随主题」。
 - 读者的选择以内联样式写到卡片根、测量副本 `.xhs-body`（长图是 `.reed-long-root` 和 `.reed-long-flow`）上，所以分页、封面标题适配和导出都按改后的字体测量。
-- 颜色只接受普通颜色值（十六进制、`rgb()`、`hsl()` 等），按变体分别记住；字体按模板记住。字体菜单里是「模板默认」、芦苇自带的 10 款（见第 6 节）和读者自己添加的字体文件；选中后变量的值是 `"字体名", "Noto Sans SC", sans-serif`，缺字回落到思源黑体。
+- 颜色只接受普通颜色值（十六进制、`rgb()`、`hsl()` 等），按变体分别记住；字体按模板记住。字体菜单里是「模板默认」、芦苇自带的 15 款（见第 6 节）和读者自己添加的字体文件；选中后变量的值是 `"字体名", "Noto Sans SC", sans-serif`，缺字回落到思源黑体。
 - 选择存在本机 `localStorage` 的 `mopai.template-custom.v1`，按模板 id 分开；「恢复默认」清掉当前变体的颜色和这个模板的全部字体选择。
 - 读者添加的字体（`.ttf` / `.otf` / `.woff` / `.woff2`，单个最多 40 MB）只存在这台设备浏览器的 IndexedDB `mopai.user-fonts`，不上传。导出时 `.ttf` / `.otf` 用 HarfBuzz（WebAssembly）裁成只含这张图用到的字再嵌入，`.woff` / `.woff2` 整个嵌入。删除字体后，用到它的位置回到模板默认。
 - 不写 `customize` 的模板不显示这块面板。默认 Reed 模板开放「主色」和正文字体。
@@ -264,14 +264,15 @@ JetBrains Mono, EB Garamond, IBM Plex Sans, IBM Plex Mono, Caveat, Orbitron,
 VT323, Space Grotesk, DM Serif Display, Rajdhani, Share Tech Mono,
 Pixelify Sans, Tinos, Instrument Sans, B612 Mono, LXGW WenKai, Smiley Sans,
 ZCOOL XiaoWei, ZCOOL QingKe HuangYou, ZCOOL KuaiLe, Ma Shan Zheng,
-Noto Sans SC Black
+Noto Sans SC Black, Unbounded Sans, Tiejili SC, GenRyuMin2, GenYoMin2,
+Glow Sans SC, Anton, Instrument Serif
 ```
 
-`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 和霞鹜文楷到马善政楷书这六款都只有 400，`Noto Sans SC Black` 只有 900。
+`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 和霞鹜文楷到马善政楷书这六款都只有 400，`Noto Sans SC Black` 只有 900；无界黑 `Unbounded Sans`、铁蒺藜体 `Tiejili SC`、`Anton`、`Instrument Serif`（正体和斜体）只有 400，源流明体 `GenRyuMin2`、源样明体 `GenYoMin2` 有 700 和 900，未来荧黑 `Glow Sans SC` 只有 900。单字重的标题字体用在 800 / 900 的标题上时，浏览器会再假加粗一层；模板可以在根上写 `font-synthesis-weight: none` 关掉。
 
 `Noto Sans SC Black` 是思源黑体的特粗字重。单独起名是为了不影响已有模板里 `Noto Sans SC` 的 800 / 900 粗体（它们仍用 700 字形）；要用特粗标题就在 `fonts` 里引用它，CSS 写 `font-family: "Noto Sans SC Black"; font-weight: 900`。
 
-读者在 `customize` 字体菜单里能选的是其中 10 款中文字体：思源黑体、思源黑体 特粗、思源宋体、朱雀仿宋、霞鹜文楷、得意黑、站酷小薇体、站酷庆科黄油体、站酷快乐体、马善政楷书。它们都是 SIL OFL 1.1 字体，按 Unicode 区段切成小文件，用到哪段才下载哪段；许可证副本在 `public/fonts/OFL-*.txt`，来源见 [渲染与图片](rendering.md)。
+读者在 `customize` 字体菜单里能选的是其中 15 款中文字体：思源黑体、思源黑体 特粗、思源宋体、朱雀仿宋、霞鹜文楷、得意黑、站酷小薇体、站酷庆科黄油体、站酷快乐体、马善政楷书、无界黑、铁蒺藜体、源流明体、源样明体、未来荧黑。它们都是 SIL OFL 1.1 字体，按 Unicode 区段切成小文件，用到哪段才下载哪段；许可证副本在 `public/fonts/OFL-*.txt`，来源见 [渲染与图片](rendering.md)。
 
 ### 包内 woff2
 
