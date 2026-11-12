@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n'
 import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import type { CardTemplateErrorCode, CardTemplateSummary } from '@/lib/card-template-format'
 import type { MsgKey } from '@/lib/i18n'
+import TemplateTile, { TEMPLATE_GRID } from '@/components/TemplateTile'
 
 const ERROR_KEYS: Record<CardTemplateErrorCode, MsgKey> = {
   'archive-too-large': 'cards.templateError.archiveTooLarge',
@@ -31,6 +32,8 @@ interface Props {
   onSelect: (template: string) => void
   onUploaded: (summary: CardTemplateSummary) => void
   onDeleted: (template: string) => void
+  /** The variant a template's thumbnail shows: the current one when selected. */
+  variantFor: (template: string) => string
 }
 
 /**
@@ -40,7 +43,7 @@ interface Props {
  * 管理 button reveals a 删除 next to each own template, so a normal click on a
  * template still selects it.
  */
-export default function MyTemplatesGroup({ state, selected, busy, onSelect, onUploaded, onDeleted }: Props) {
+export default function MyTemplatesGroup({ state, selected, busy, onSelect, onUploaded, onDeleted, variantFor }: Props) {
   const { t } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
   const [manageRequested, setManageRequested] = useState(false)
@@ -180,31 +183,26 @@ export default function MyTemplatesGroup({ state, selected, busy, onSelect, onUp
         )
       ) : (
         <div
-          className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1"
+          className={TEMPLATE_GRID}
           role="group"
           aria-label={`${t('cards.template')} · ${t('cards.templateMine')}`}
         >
           {state.templates.map((item) => (
-            <div
+            <TemplateTile
               key={item.id}
-              data-card-template-item={item.template}
-              data-selected={selected === item.template || undefined}
-              className="inline-flex min-w-0 items-center gap-0.5"
-            >
-              <button
-                data-card-template={item.template}
-                data-card-template-custom="true"
-                aria-pressed={selected === item.template}
-                disabled={busy}
-                className={`ya-tool xhs-option ${selected === item.template ? 'ya-selected' : ''}`}
-                onClick={() => {
-                  if (managing) return
-                  onSelect(item.template)
-                }}
-              >
-                {item.name}
-              </button>
-              {managing && (
+              kind={state.kind === 'long' ? 'long' : 'card'}
+              template={item.template}
+              variant={variantFor(item.template)}
+              name={item.name}
+              selected={selected === item.template}
+              disabled={busy}
+              tileData={{ 'data-card-template-item': item.template, 'data-selected': selected === item.template || undefined }}
+              buttonData={{ 'data-card-template': item.template, 'data-card-template-custom': 'true' }}
+              onClick={() => {
+                if (managing) return
+                onSelect(item.template)
+              }}
+              extra={managing ? (
                 <button
                   data-card-template-delete={item.id}
                   className="ya-link-btn danger shrink-0 !text-[11px]"
@@ -213,8 +211,8 @@ export default function MyTemplatesGroup({ state, selected, busy, onSelect, onUp
                 >
                   {t('cards.templateDelete')}
                 </button>
-              )}
-            </div>
+              ) : null}
+            />
           ))}
         </div>
       )}

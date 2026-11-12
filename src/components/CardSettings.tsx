@@ -14,6 +14,7 @@ import type { CardTemplateSummary } from '@/lib/card-template-format'
 import type { MsgKey } from '@/lib/i18n'
 import { useI18n } from '@/hooks/useI18n'
 import MyTemplatesGroup from '@/components/MyTemplatesGroup'
+import TemplateTile, { TEMPLATE_GRID } from '@/components/TemplateTile'
 import TemplateCustomizer from '@/components/TemplateCustomizer'
 import { getLoadedCardTemplate } from '@/lib/card-template'
 import { PUBLIC_CARD_TEMPLATES, publicCardTemplateFor, publicCardTemplateRuntimeId } from '@/lib/public-card-templates'
@@ -50,6 +51,8 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
   const loaded = getLoadedCardTemplate(template)
   const builtin = isBuiltinCardTemplate(template)
   const groupLabel = 'mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3'
+  // Thumbnails show the current variant for the selected template, else its first.
+  const variantFor = (id: string) => id === template ? bg : (templateVariants(id)[0] ?? bg)
 
   return (
     <div data-card-settings className="space-y-4">
@@ -65,26 +68,27 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
           onSelect={(id) => onOptionsChange(withTemplate(options, id))}
           onUploaded={onTemplateUploaded}
           onDeleted={onTemplateDeleted}
+          variantFor={variantFor}
         />
         <div data-card-template-group="public">
           <p className={groupLabel}>{t('cards.templatePublic')}</p>
-          <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group"
+          <div className={TEMPLATE_GRID} role="group"
             aria-label={`${t('cards.template')} · ${t('cards.templatePublic')}`}>
             {CARD_TEMPLATES.map((id) => (
-              <button key={id} data-card-template={id} aria-pressed={template === id} disabled={busy}
-                className={`ya-tool xhs-option ${template === id ? 'ya-selected' : ''}`} onClick={() => onOptionsChange(withTemplate(options, id))}>{t(`cards.template.${id}` as MsgKey)}</button>
+              <TemplateTile key={id} kind="card" template={id} variant={variantFor(id)}
+                name={t(`cards.template.${id}` as MsgKey)} selected={template === id} disabled={busy}
+                buttonData={{ 'data-card-template': id }}
+                onClick={() => onOptionsChange(withTemplate(options, id))} />
             ))}
             {PUBLIC_CARD_TEMPLATES.map((item) => {
               const runtime = publicCardTemplateRuntimeId(item.id)
               const ready = loadedPublic.has(runtime)
               return (
-                <button key={runtime} data-card-template={runtime} data-card-template-public={item.id}
-                  aria-pressed={template === runtime} disabled={busy || !ready}
+                <TemplateTile key={runtime} kind="card" template={runtime} variant={variantFor(runtime)}
+                  name={item.name} selected={template === runtime} disabled={busy || !ready}
                   title={ready ? item.reference : t('cards.publicTemplatesLoading')}
-                  className={`ya-tool xhs-option ${template === runtime ? 'ya-selected' : ''}`}
-                  onClick={() => onOptionsChange(withTemplate(options, runtime))}>
-                  {item.name}
-                </button>
+                  buttonData={{ 'data-card-template': runtime, 'data-card-template-public': item.id }}
+                  onClick={() => onOptionsChange(withTemplate(options, runtime))} />
               )
             })}
           </div>

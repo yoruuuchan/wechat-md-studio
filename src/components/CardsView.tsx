@@ -1,5 +1,5 @@
 // Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt.
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Doc, SignatureConfig } from '@/lib/types'
@@ -17,29 +17,11 @@ import {
 import { cardEndIsExtraPage, fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
 import { useI18n } from '@/hooks/useI18n'
 import { useResolvedTemplateCustom } from '@/hooks/useTemplateCustom'
+import { BRAND_ACCENT, cardFrameStyle } from '@/lib/card-style'
 import './cards.css'
 
 const PREVIEW_WIDTH = 260
 const PREVIEW_SCALE = PREVIEW_WIDTH / CARD_WIDTH
-// The brand accent stays the same when the application's UI theme changes.
-const BRAND_ACCENT = '#4F6CE8'
-
-/** Reed's five paint jobs; uploaded templates carry their own background in CSS. */
-function background(id: CardBackground, accent: string): CSSProperties {
-  switch (id) {
-    case 'white': return { background: '#ffffff' }
-    case 'paper': return { background: '#fbf7ef' }
-    case 'night': return { background: '#1c1d22' }
-    case 'tint': return { background: `linear-gradient(color-mix(in srgb, ${accent} 9%, transparent), color-mix(in srgb, ${accent} 9%, transparent)), #ffffff` }
-    case 'grid': return {
-      backgroundColor: '#fcfcfa',
-      backgroundImage: 'linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)',
-      backgroundSize: '24px 24px',
-    }
-    default: return { background: '#fbf7ef' }
-  }
-}
-
 type Translate = (key: MsgKey, params?: MsgParams) => string
 interface CoverProps {
   page: Extract<CardPage, { kind: 'cover' }>
@@ -300,20 +282,9 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
                     {...(custom ? { 'data-card-template-source': custom.template } : {})}
                     ref={(el) => { cardsRef.current[i] = el }}
                     {...(customHtml !== null ? { dangerouslySetInnerHTML: { __html: customHtml } } : {})}
-                    style={{
-                      width: CARD_WIDTH, height, '--xhs-accent': accent,
-                      '--xhs-pad-x': `${metrics.padX}px`,
-                      '--xhs-pad-top': `${metrics.padTop}px`,
-                      '--xhs-pad-bottom': `${metrics.padBottom}px`,
-                      '--xhs-content-w': `${metrics.contentWidth}px`,
-                      '--xhs-header-top': `${metrics.headerTop}px`,
-                      '--xhs-footer-bottom': `${metrics.footerBottom}px`,
-                      '--xhs-cover-inset-x': `${metrics.coverInsetX}px`,
-                      '--xhs-cover-inset-y': `${metrics.coverInsetY}px`,
-                      '--xhs-cover-foot-bottom': `${metrics.coverFootBottom}px`,
-                      ...(custom ? {} : background(bg, accent)),
-                      ...picks.vars,
-                    } as CSSProperties}>
+                    style={cardFrameStyle({
+                      template, background: bg, accent, height, width: CARD_WIDTH, custom: Boolean(custom), vars: picks.vars,
+                    })}>
                     {customHtml !== null ? null : page.kind === 'cover'
                       ? <Cover page={page} author={author} height={height} t={t} />
                       : page.kind === 'body'

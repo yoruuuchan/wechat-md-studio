@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/hooks/useI18n'
@@ -338,9 +338,12 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     void runSync()
   }, [runSync])
 
+  // Uploads of both kinds share one registry; each picker lists only its own.
+  const ownTemplates = useMemo(() => templates.filter((item) => item.kind === kind), [templates, kind])
+
   return {
     kind,
-    templates,
+    templates: ownTemplates,
     publicTemplates,
     loading,
     publicLoading,

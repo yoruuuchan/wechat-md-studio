@@ -7,6 +7,7 @@ import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import type { CardTemplateSummary } from '@/lib/card-template-format'
 import { useI18n } from '@/hooks/useI18n'
 import MyTemplatesGroup from '@/components/MyTemplatesGroup'
+import TemplateTile, { TEMPLATE_GRID } from '@/components/TemplateTile'
 import { PUBLIC_LONG_TEMPLATES, publicLongTemplateFor, publicLongTemplateRuntimeId } from '@/lib/public-card-templates'
 
 interface Props {
@@ -32,6 +33,8 @@ export default function LongSettings({
   const loadedPublic = new Set(templates.publicTemplates.map((item) => item.template))
   const loaded = getLoadedLongTemplate(options.template)
   const groupLabel = 'mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3'
+  // Thumbnails show the current variant for the selected template, else its first.
+  const variantFor = (id: string) => id === options.template ? options.variant : (longTemplateVariants(id)[0] ?? options.variant)
 
   return (
     <div data-long-settings className="space-y-4">
@@ -44,26 +47,25 @@ export default function LongSettings({
           onSelect={(id) => onOptionsChange({ ...options, template: id, variant: longTemplateVariants(id)[0] ?? options.variant })}
           onUploaded={onTemplateUploaded}
           onDeleted={onTemplateDeleted}
+          variantFor={variantFor}
         />
         <div data-long-template-group="public">
           <p className={groupLabel}>{t('cards.templatePublic')}</p>
-          <div className="ya-well flex flex-wrap gap-0.5 rounded-xl p-1" role="group"
+          <div className={TEMPLATE_GRID} role="group"
             aria-label={`${t('long.template')} · ${t('cards.templatePublic')}`}>
             {PUBLIC_LONG_TEMPLATES.map((item) => {
               const runtime = publicLongTemplateRuntimeId(item.id)
               const ready = loadedPublic.has(runtime)
               return (
-                <button key={runtime} data-long-template={runtime} data-long-template-public={item.id}
-                  aria-pressed={options.template === runtime} disabled={busy || !ready}
+                <TemplateTile key={runtime} kind="long" template={runtime} variant={variantFor(runtime)}
+                  name={item.name} selected={options.template === runtime} disabled={busy || !ready}
                   title={ready ? item.reference : t('cards.publicTemplatesLoading')}
-                  className={`ya-tool xhs-option ${options.template === runtime ? 'ya-selected' : ''}`}
+                  buttonData={{ 'data-long-template': runtime, 'data-long-template-public': item.id }}
                   onClick={() => onOptionsChange({
                     ...options,
                     template: runtime,
                     variant: longTemplateVariants(runtime)[0] ?? options.variant,
-                  })}>
-                  {item.name}
-                </button>
+                  })} />
               )
             })}
           </div>
