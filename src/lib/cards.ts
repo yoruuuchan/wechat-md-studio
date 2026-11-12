@@ -238,6 +238,8 @@ export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = new Ma
   ['Geist', { family: 'Geist', weights: [400, 700] }],
   ['Geist Mono', { family: 'Geist Mono', weights: [400, 700] }],
   ['Noto Sans SC', { family: 'Noto Sans SC', weights: [400, 700] }],
+  // A separate family, so existing 800/900 text in Noto Sans SC keeps its 700 face.
+  ['Noto Sans SC Black', { family: 'Noto Sans SC Black', weights: [900] }],
   ['Noto Serif SC', { family: 'Noto Serif SC', weights: [400, 700] }],
   ['Zhuque Fangsong', { family: 'Zhuque Fangsong', weights: [400] }],
   ['Inter', { family: 'Inter', weights: [400, 600] }],
@@ -272,6 +274,7 @@ export const CARD_FONT_SHEETS = [
   '/fonts/fonts-templates.css',
   '/fonts/fonts-design.css',
   '/fonts/zhuque-fangsong.css',
+  '/fonts/noto-sans-sc-black.css',
   '/fonts/lxgw-wenkai.css',
   '/fonts/smiley-sans.css',
   '/fonts/zcool-xiaowei.css',

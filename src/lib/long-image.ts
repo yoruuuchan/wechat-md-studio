@@ -295,7 +295,7 @@ export function buildLongDocument(
       continue
     }
     if (section && section.blocks.length === 0 && !section.lede && block.type === 'paragraph') {
-      section.lede = render([block]).replace(/^<p>/, '<p class="reed-long-lede">')
+      section.lede = render([block]).replace(/^<p(?=[\s>])/, '<p class="reed-long-lede"')
       continue
     }
     pendingHtml.push(block)

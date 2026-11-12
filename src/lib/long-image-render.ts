@@ -43,9 +43,35 @@ function tableHtml(block: Extract<Block, { type: 'table' }>): string {
   ).join('')}</tbody></table>`
 }
 
+/**
+ * Two paragraph shapes templates can style without guessing from CSS:
+ * - `lead`: `**导语** 正文…`, a bold run opening a longer paragraph, set as a
+ *   tag with `p[data-lead] > strong:first-child`;
+ * - `label`: `**要点**`, a short paragraph bold throughout, a label line.
+ */
+export function paragraphKind(segs: readonly InlineSeg[]): 'lead' | 'label' | null {
+  const text = segs.map((seg) => seg.text).join('').trim()
+  if (!text) return null
+  if (segs.length > 1 && segs[0].bold === true && segs[0].text.trim() !== '' &&
+    segs.slice(1).some((seg) => !seg.bold && seg.text.trim() !== '')) return 'lead'
+  if ([...text].length <= 16 && segs.every((seg) => seg.bold === true || seg.text.trim() === '')) return 'label'
+  return null
+}
+
+/** True when every item of a list opens with a bold lead-in. */
+export function leadItems(list: Extract<Block, { type: 'list' }>): boolean {
+  return list.items.length > 0 && list.items.every((item) => {
+    const first = item.parts[0]
+    return first !== undefined && first.type !== 'list' && paragraphKind(first.segs) === 'lead'
+  })
+}
+
 function blockHtml(block: Block, options: LongRenderOptions, lines: string[]): string {
   switch (block.type) {
-    case 'paragraph': return `<p>${inline(block.segs)}</p>`
+    case 'paragraph': {
+      const kind = paragraphKind(block.segs)
+      return `<p${kind ? ` data-${kind}` : ''}>${inline(block.segs)}</p>`
+    }
     case 'heading': {
       const tag = block.numbered ? 'h2' : 'h1'
       return `<${tag}>${block.kicker ? `<small>${esc(block.kicker)} · </small>` : ''}${esc(block.title)}</${tag}>`
@@ -54,7 +80,12 @@ function blockHtml(block: Block, options: LongRenderOptions, lines: string[]): s
     case 'center': return `<p class="reed-long-center">${inline(block.segs)}</p>`
     case 'quoteCard': return `<blockquote><p>${inline(block.segs)}</p></blockquote>`
     case 'quoteBox': return `<blockquote>${block.paras.map((paras) => `<p>${inline(paras)}</p>`).join('')}</blockquote>`
-    case 'list': return listHtml(block)
+    case 'list': {
+      // Every item opens with a bold run (`- **10倍** 推理速度提升`): a list of
+      // figures or named steps, which templates may set as tiles or cards.
+      const html = listHtml(block)
+      return leadItems(block) ? html.replace(/^<(ul|ol)/, '<$1 data-lead-items') : html
+    }
     case 'table': return tableHtml(block)
     case 'code': {
       if (block.lang.split(/\s/)[0] === 'mermaid') {
@@ -75,8 +106,14 @@ function renderBlocks(blocks: readonly Block[], options: LongRenderOptions): str
   return blocks.map((block) => blockHtml(block, options, lines)).join('')
 }
 
+/**
+ * A photo's Markdown alt text rides along as a hidden caption. Templates that
+ * want captions show `.reed-long-photo-caption`; the rest never see it.
+ */
 function photoFigure(photo: LongPhoto, options: LongRenderOptions): string {
-  return `<figure class="reed-long-photo"><img src="${esc(options.resolveImage(photo.src))}" alt="" data-long-photo></figure>`
+  const caption = photo.alt.trim()
+  return `<figure class="reed-long-photo"${caption ? ' data-has-caption' : ''}><img src="${esc(options.resolveImage(photo.src))}" alt="" data-long-photo>${
+    caption ? `<figcaption class="reed-long-photo-caption" hidden>${esc(caption)}</figcaption>` : ''}</figure>`
 }
 
 function photosHtml(photos: LongPhoto[], options: LongRenderOptions): string {
@@ -198,14 +235,18 @@ export function layoutLongPhotoGroups(root: HTMLElement, metrics: LongImageMetri
       for (const item of row.items) {
         const figure = figures[figureIndex++]
         if (!figure) continue
+        // A caption the template shows hangs under the photo: the picture
+        // keeps the row height and the figure grows by the caption.
+        const caption = figure.querySelector<HTMLElement>('.reed-long-photo-caption')
+        const captioned = caption !== null && getComputedStyle(caption).display !== 'none'
         figure.style.width = `${item.width}px`
-        figure.style.height = `${item.height}px`
+        figure.style.height = captioned ? 'auto' : `${item.height}px`
         figure.style.margin = '0'
         figure.style.flex = 'none'
         const image = figure.querySelector('img')
         if (image) {
           image.style.width = '100%'
-          image.style.height = '100%'
+          image.style.height = captioned ? `${item.height}px` : '100%'
           image.style.objectFit = 'contain'
           image.style.display = 'block'
         }

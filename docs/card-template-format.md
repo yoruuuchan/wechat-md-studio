@@ -138,7 +138,7 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 - `colors` 最多 10 项，`fonts` 最多 4 项；`var` 符合 `^--[a-z][a-z0-9-]{0,47}$`，同一个 `var` 只能出现一次。`--xhs-`、`--long-`、`--reed-` 开头的是引擎保留的，不能开放。`name` 是最多 20 个字符的显示名。
 - 这些变量要声明在作用域根上（卡片是 `.xhs-card`，长图是 `.reed-long-root`），模板 CSS 里只通过 `var(--…)` 使用它们。色块的初始颜色就是从根上读到的值，带透明度的颜色改色相时保留原透明度；根上没有值的显示为「跟随主题」。
 - 读者的选择以内联样式写到卡片根、测量副本 `.xhs-body`（长图是 `.reed-long-root` 和 `.reed-long-flow`）上，所以分页、封面标题适配和导出都按改后的字体测量。
-- 颜色只接受普通颜色值（十六进制、`rgb()`、`hsl()` 等），按变体分别记住；字体按模板记住。字体菜单里是「模板默认」、芦苇自带的 9 款（见第 6 节）和读者自己添加的字体文件；选中后变量的值是 `"字体名", "Noto Sans SC", sans-serif`，缺字回落到思源黑体。
+- 颜色只接受普通颜色值（十六进制、`rgb()`、`hsl()` 等），按变体分别记住；字体按模板记住。字体菜单里是「模板默认」、芦苇自带的 10 款（见第 6 节）和读者自己添加的字体文件；选中后变量的值是 `"字体名", "Noto Sans SC", sans-serif`，缺字回落到思源黑体。
 - 选择存在本机 `localStorage` 的 `mopai.template-custom.v1`，按模板 id 分开；「恢复默认」清掉当前变体的颜色和这个模板的全部字体选择。
 - 读者添加的字体（`.ttf` / `.otf` / `.woff` / `.woff2`，单个最多 40 MB）只存在这台设备浏览器的 IndexedDB `mopai.user-fonts`，不上传。导出时 `.ttf` / `.otf` 用 HarfBuzz（WebAssembly）裁成只含这张图用到的字再嵌入，`.woff` / `.woff2` 整个嵌入。删除字体后，用到它的位置回到模板默认。
 - 不写 `customize` 的模板不显示这块面板。默认 Reed 模板开放「主色」和正文字体。
@@ -263,12 +263,15 @@ Geist, Geist Mono, Noto Sans SC, Noto Serif SC, Zhuque Fangsong, Inter,
 JetBrains Mono, EB Garamond, IBM Plex Sans, IBM Plex Mono, Caveat, Orbitron,
 VT323, Space Grotesk, DM Serif Display, Rajdhani, Share Tech Mono,
 Pixelify Sans, Tinos, Instrument Sans, B612 Mono, LXGW WenKai, Smiley Sans,
-ZCOOL XiaoWei, ZCOOL QingKe HuangYou, ZCOOL KuaiLe, Ma Shan Zheng
+ZCOOL XiaoWei, ZCOOL QingKe HuangYou, ZCOOL KuaiLe, Ma Shan Zheng,
+Noto Sans SC Black
 ```
 
-`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 和最后六款都只有 400。
+`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 和霞鹜文楷到马善政楷书这六款都只有 400，`Noto Sans SC Black` 只有 900。
 
-读者在 `customize` 字体菜单里能选的是其中 9 款中文字体：思源黑体、思源宋体、朱雀仿宋、霞鹜文楷、得意黑、站酷小薇体、站酷庆科黄油体、站酷快乐体、马善政楷书。它们都是 SIL OFL 1.1 字体，按 Unicode 区段切成小文件，用到哪段才下载哪段；许可证副本在 `public/fonts/OFL-*.txt`，来源见 [渲染与图片](rendering.md)。
+`Noto Sans SC Black` 是思源黑体的特粗字重。单独起名是为了不影响已有模板里 `Noto Sans SC` 的 800 / 900 粗体（它们仍用 700 字形）；要用特粗标题就在 `fonts` 里引用它，CSS 写 `font-family: "Noto Sans SC Black"; font-weight: 900`。
+
+读者在 `customize` 字体菜单里能选的是其中 10 款中文字体：思源黑体、思源黑体 特粗、思源宋体、朱雀仿宋、霞鹜文楷、得意黑、站酷小薇体、站酷庆科黄油体、站酷快乐体、马善政楷书。它们都是 SIL OFL 1.1 字体，按 Unicode 区段切成小文件，用到哪段才下载哪段；许可证副本在 `public/fonts/OFL-*.txt`，来源见 [渲染与图片](rendering.md)。
 
 ### 包内 woff2
 
@@ -391,6 +394,17 @@ ZCOOL XiaoWei, ZCOOL QingKe HuangYou, ZCOOL KuaiLe, Ma Shan Zheng
 ```
 
 照片行的宽高由引擎按原始比例算好并写成内联样式，模板不要改 `.reed-long-photo` 的宽高，只画外框、间距和装饰。
+
+引擎还给正文留了几个钩子，模板用得上就写 CSS，用不上什么都不用做：
+
+| 钩子 | 来自 Markdown | 用法 |
+|---|---|---|
+| `figure.reed-long-photo[data-has-caption] > figcaption.reed-long-photo-caption` | 照片的说明文字 `![说明](…)` | 默认带 `hidden` 不显示。模板写 `.reed-long-photo-caption { display: block }` 就显示在照片下方：照片仍按行高排，`figure` 的高度随说明变高。显示说明时别给 `.reed-long-photo` 加上下内边距或边框，否则会撑出行外 |
+| `p[data-lead]` | 段落以一段加粗开头，后面还有正文：`**导语** 近日……` | 开头的加粗词是 `p[data-lead] > strong:first-child`，可以排成标签 |
+| `p[data-label]` | 整段都是加粗、不超过 16 个字：`**要点**` | 一行小标签，常用来给下面的列表起头 |
+| `ul[data-lead-items]` / `ol[data-lead-items]` | 列表的每一项都以加粗开头：`- **10倍** 推理速度提升` | 可以排成数字卡片或带箭头的步骤卡；每项的加粗部分是 `li > p > strong:first-child` |
+
+这几个属性只按 Markdown 的写法判断，不看文字内容；不满足条件的段落和列表保持原样。
 
 导出时每个块的高度会按预览量到的值固定下来，穿出父元素的外边距在这一步会丢。引擎自己的容器（`.reed-long-preamble`、`.reed-long-section`、`.reed-long-section-body`）已经是 `display: flow-root`；`header` / `footer` 片段的最外层元素请自己留 padding 或写 `display: flow-root`，别让里面的外边距穿出去，否则导出会比预览矮。
 

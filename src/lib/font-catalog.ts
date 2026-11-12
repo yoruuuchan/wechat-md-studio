@@ -18,6 +18,7 @@ export interface CatalogFont {
 
 export const CHOOSABLE_FONTS: readonly CatalogFont[] = [
   { family: 'Noto Sans SC', name: { zh: '思源黑体', en: 'Noto Sans SC' }, sheet: '/fonts/noto-sans-sc-local.css', weights: [400, 700] },
+  { family: 'Noto Sans SC Black', name: { zh: '思源黑体 特粗', en: 'Noto Sans SC Black' }, sheet: '/fonts/noto-sans-sc-black.css', weights: [900] },
   { family: 'Noto Serif SC', name: { zh: '思源宋体', en: 'Noto Serif SC' }, sheet: '/fonts/fonts-local.css', weights: [400, 700] },
   { family: 'Zhuque Fangsong', name: { zh: '朱雀仿宋', en: 'Zhuque Fangsong' }, sheet: '/fonts/zhuque-fangsong.css', weights: [400] },
   { family: 'LXGW WenKai', name: { zh: '霞鹜文楷', en: 'LXGW WenKai' }, sheet: '/fonts/lxgw-wenkai.css', weights: [400] },

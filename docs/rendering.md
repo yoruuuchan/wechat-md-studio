@@ -253,6 +253,8 @@ unicode-range 逐片裁成 99 个 woff2（没有字形的片跳过），CSS 在
 [OFL-ZCOOLKuaiLe.txt](../public/fonts/OFL-ZCOOLKuaiLe.txt)、
 [OFL-MaShanZheng.txt](../public/fonts/OFL-MaShanZheng.txt)。
 
+思源黑体的特粗字重另起名 `Noto Sans SC Black`：用 fontTools 的 `varLib.instancer` 把 Noto Sans SC 可变字体（2.004）固定在 wght=900，再按 [noto-sans-sc-local.css](../public/fonts/noto-sans-sc-local.css) 700 的 unicode-range 切成 101 片（`--no-hinting`，约 4.9 MB，[noto-sans-sc-black.css](../public/fonts/noto-sans-sc-black.css) 按需加载），许可同 [OFL-NotoSansSC.txt](../public/fonts/OFL-NotoSansSC.txt)。
+
 读者自己添加的字体文件只存在浏览器 IndexedDB，不经过服务器。导出 PNG 时，`.ttf` / `.otf`
 由 [font-subset.ts](../src/lib/font-subset.ts) 调用 harfbuzzjs 1.6.4 的 `harfbuzz-subset.wasm`
 裁成只含这张图用到的字再以 data URL 内嵌（25 MB 的文楷裁一段中文约 6 KB）；`.woff` / `.woff2` 整个内嵌。
