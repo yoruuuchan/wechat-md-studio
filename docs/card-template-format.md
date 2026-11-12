@@ -97,7 +97,8 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 | `variants` | 1–16 个变体；`id` 用小写字母、数字、连字符，`name` 显示在“卡片背景”。`dark` 决定导出时是否使用暗色语义变量。`tokens` 只允许 `accent` / `text` / `muted` 三种安全颜色，`accent` 会写入 `--xhs-accent`。 |
 | `metrics` | 分页与封面共用的度量，见下一节。 |
 | `fonts` | 字体声明，见第 6 节。 |
-| `pages` | 三个页面 HTML 的相对路径；`end` 省略时最后一页复用 `body`。 |
+| `customize` | 可选，读者能在右栏改的颜色和字体，见下面的 [customize](#customize)。 |
+| `pages` | 三个页面 HTML 的相对路径。`end` 省略时最后一页复用 `body`；`end` 里放了 `data-slot="content"` 时，它是最后一页正文的外框；没放时，它是正文之后**另加**的一张结尾页（只有标题、作者等），不会吞掉最后一页的正文。 |
 | `styles` | 1–8 个 CSS 相对路径。 |
 
 ### metrics
@@ -116,6 +117,31 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 | `coverSmallScale` | 高度小于 600px 时的标题缩放系数。 |
 
 度量是声明式的：引擎把 `padX` 等写成 `--xhs-pad-x` 等 CSS 变量，并按 `height - padTop - padBottom` 分页。模板不需要重复实现分页。
+
+### customize
+
+模板把自己的几个 CSS 变量开放给读者，右栏「模板」里就会出现对应的色块和字体菜单：
+
+```json
+"customize": {
+  "colors": [
+    { "var": "--accent", "name": "主色" },
+    { "var": "--paper", "name": "底色" }
+  ],
+  "fonts": [
+    { "var": "--display", "name": "标题" },
+    { "var": "--body-font", "name": "正文" }
+  ]
+}
+```
+
+- `colors` 最多 10 项，`fonts` 最多 4 项；`var` 符合 `^--[a-z][a-z0-9-]{0,47}$`，同一个 `var` 只能出现一次。`--xhs-`、`--long-`、`--reed-` 开头的是引擎保留的，不能开放。`name` 是最多 20 个字符的显示名。
+- 这些变量要声明在作用域根上（卡片是 `.xhs-card`，长图是 `.reed-long-root`），模板 CSS 里只通过 `var(--…)` 使用它们。色块的初始颜色就是从根上读到的值，带透明度的颜色改色相时保留原透明度；根上没有值的显示为「跟随主题」。
+- 读者的选择以内联样式写到卡片根、测量副本 `.xhs-body`（长图是 `.reed-long-root` 和 `.reed-long-flow`）上，所以分页、封面标题适配和导出都按改后的字体测量。
+- 颜色只接受普通颜色值（十六进制、`rgb()`、`hsl()` 等），按变体分别记住；字体按模板记住。字体菜单里是「模板默认」、芦苇自带的 9 款（见第 6 节）和读者自己添加的字体文件；选中后变量的值是 `"字体名", "Noto Sans SC", sans-serif`，缺字回落到思源黑体。
+- 选择存在本机 `localStorage` 的 `mopai.template-custom.v1`，按模板 id 分开；「恢复默认」清掉当前变体的颜色和这个模板的全部字体选择。
+- 读者添加的字体（`.ttf` / `.otf` / `.woff` / `.woff2`，单个最多 40 MB）只存在这台设备浏览器的 IndexedDB `mopai.user-fonts`，不上传。导出时 `.ttf` / `.otf` 用 HarfBuzz（WebAssembly）裁成只含这张图用到的字再嵌入，`.woff` / `.woff2` 整个嵌入。删除字体后，用到它的位置回到模板默认。
+- 不写 `customize` 的模板不显示这块面板。默认 Reed 模板开放「主色」和正文字体。
 
 ## 3. 页面与 slot
 
@@ -236,10 +262,13 @@ svg g path circle ellipse rect line polyline polygon text tspan defs clippath
 Geist, Geist Mono, Noto Sans SC, Noto Serif SC, Zhuque Fangsong, Inter,
 JetBrains Mono, EB Garamond, IBM Plex Sans, IBM Plex Mono, Caveat, Orbitron,
 VT323, Space Grotesk, DM Serif Display, Rajdhani, Share Tech Mono,
-Pixelify Sans, Tinos, Instrument Sans, B612 Mono
+Pixelify Sans, Tinos, Instrument Sans, B612 Mono, LXGW WenKai, Smiley Sans,
+ZCOOL XiaoWei, ZCOOL QingKe HuangYou, ZCOOL KuaiLe, Ma Shan Zheng
 ```
 
-`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 只有 400。
+`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 和最后六款都只有 400。
+
+读者在 `customize` 字体菜单里能选的是其中 9 款中文字体：思源黑体、思源宋体、朱雀仿宋、霞鹜文楷、得意黑、站酷小薇体、站酷庆科黄油体、站酷快乐体、马善政楷书。它们都是 SIL OFL 1.1 字体，按 Unicode 区段切成小文件，用到哪段才下载哪段；许可证副本在 `public/fonts/OFL-*.txt`，来源见 [渲染与图片](rendering.md)。
 
 ### 包内 woff2
 
@@ -273,6 +302,8 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 | 变体 | 16 |
 | CSS 文件 | 8 |
 | 字体声明 | 24 |
+| `customize.colors` | 10 |
+| `customize.fonts` | 4 |
 
 超限、坏 manifest、路径穿越、zip 炸弹、非白名单扩展名、危险 HTML/CSS 或包外资源都会让上传失败，界面会给出对应的中文 / 英文提示。解压是流式的：中央目录声明的大小只用于提前判断，实际字节一边解压一边累计，超过单文件或总上限立刻中止并丢弃，声明 1 KB、实际几百 MB 的 zip 不会先被整块解开。
 
@@ -312,7 +343,7 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 | `pages` | 只有 `header` 和 `footer`，都可以不写；小节和照片组由引擎生成 |
 | CSS 作用域根 | `.reed-long-root`（外层）和 `.reed-long-flow`（内容流） |
 
-其余字段（`id`、`renderId`、`name`、`version`、`author`、`description`、`variants`、`fonts`、`styles`）、允许的 HTML、CSS 规则、字体、大小限制和上传存储都与卡片相同。
+其余字段（`id`、`renderId`、`name`、`version`、`author`、`description`、`variants`、`fonts`、`customize`、`styles`）、允许的 HTML、CSS 规则、字体、大小限制和上传存储都与卡片相同。
 
 ### 页面片段与 slot
 

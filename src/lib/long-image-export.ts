@@ -336,6 +336,7 @@ function cutCandidates(root: HTMLElement): number[] {
 interface ExportOptions {
   faces: readonly CardFontFace[]
   packageCss?: string
+  userFonts?: readonly string[]
   scale: number
   format: LongFormat
   filename: string
@@ -402,6 +403,7 @@ export async function exportLongImage(
     const fontEmbedCSS = await cardFontCss(stage.innerText ?? '', {
       faces: options.faces,
       packageCss: options.packageCss,
+      userFonts: options.userFonts,
     })
     const totalHeight = Math.ceil(snapshot.getBoundingClientRect().height)
     if (!(totalHeight > 0)) throw new Error('long image has no content')

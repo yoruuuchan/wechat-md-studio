@@ -40,8 +40,11 @@ export function contentSecurityPolicy() {
     defaultSrc: ["'self'"],
     // The bundle is served from this origin; there are no inline scripts in
     // index.html and no third-party scripts at runtime (MathJax and mermaid
-    // are Vite chunks, not CDN tags).
-    scriptSrc: ["'self'"],
+    // are Vite chunks, not CDN tags). 'wasm-unsafe-eval' lets the bundled
+    // HarfBuzz subsetter compile its own WebAssembly so an uploaded font can be
+    // cut down to the exported glyphs; it does not re-enable eval() or
+    // new Function(), and the module is still a same-origin file.
+    scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
     // 'unsafe-inline' is required and stays: CodeMirror injects <style> at
     // runtime, Radix positions its overlays with style attributes, and both the
     // article preview and the HTML copied into WeChat are inline-style HTML by

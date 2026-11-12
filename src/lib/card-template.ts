@@ -190,7 +190,8 @@ export async function parseCardTemplateSource(raw: ArrayBuffer, id: string): Pro
 /** Re-validate stored sources and make the template available to the card UI. */
 export async function activateCardTemplate(record: CardTemplateSourceRecord): Promise<LoadedTemplate> {
   const { parsed } = record
-  const manifest = parsed.manifest
+  // Packages stored before `customize` existed were parsed without it.
+  const manifest = { ...parsed.manifest, customize: parsed.manifest.customize ?? { colors: [], fonts: [] } }
   const renderId = manifest.renderId
   const files = filesFromParsed(parsed)
   const assetUrls = archiveAssetUrls(files)
@@ -315,6 +316,7 @@ function runtimeOf(loaded: LoadedCardTemplate): CardTemplateRuntime {
     fonts: manifest.fonts.map((font): CardFontFace => font.source === 'builtin'
       ? { family: font.family, weights: font.weights, styles: font.styles }
       : { family: font.family, weights: [font.weight], styles: [font.style] }),
+    customize: manifest.customize ?? { colors: [], fonts: [] },
   }
 }
 
@@ -334,6 +336,7 @@ function runtimeOfLong(loaded: LoadedLongTemplate): LongTemplateRuntime {
     fonts: manifest.fonts.map((font): CardFontFace => font.source === 'builtin'
       ? { family: font.family, weights: font.weights, styles: font.styles }
       : { family: font.family, weights: [font.weight], styles: [font.style] }),
+    customize: manifest.customize ?? { colors: [], fonts: [] },
   }
 }
 
@@ -394,6 +397,16 @@ function parseFragment(html: string): DocumentFragment {
   const template = document.createElement('template')
   template.innerHTML = html
   return template.content
+}
+
+/**
+ * An end page without a content slot is a closing page of its own (title,
+ * author) that follows the article. Using it as the frame of the last body
+ * page would drop that page's text, so it is added after the body pages
+ * instead. An end page that does place the content keeps framing the last page.
+ */
+export function cardEndIsExtraPage(loaded: LoadedCardTemplate): boolean {
+  return Boolean(loaded.manifest.pages.end) && !/data-slot\s*=\s*["']?content["'\s>]/.test(loaded.pages.end)
 }
 
 /**

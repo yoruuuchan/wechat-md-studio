@@ -44,7 +44,7 @@
 
 长图模板沿用 `.reedcard`（zip + `manifest.json`），只是在 manifest 里写 `"kind": "long"`；不写就是原来的卡片。现有的卡片模板文件不用改，`formatVersion` 也不变。因为文件格式相同，上传、本机存储、云端同步、HTML / CSS 安全检查全部复用卡片那条路径。
 
-字段、两个页面片段（`header` / `footer`）、slot、条件属性、引擎生成的 class 和最小示例，见 [卡片模板格式 · 长图模板](card-template-format.md#10-长图模板)。仓库里的完整例子是 [`examples/card-templates/example-long/`](../examples/card-templates/example-long/)。
+字段、两个页面片段（`header` / `footer`）、slot、条件属性、引擎生成的 class 和最小示例，见 [卡片模板格式 · 长图模板](card-template-format.md#10-长图模板)。模板可以用 `customize` 开放几个颜色和字体给读者在右栏改，规则和卡片相同，见 [customize](card-template-format.md#customize)；改动写在 `.reed-long-root` 和 `.reed-long-flow` 上，导出时字体一并内嵌。仓库里的完整例子是 [`examples/card-templates/example-long/`](../examples/card-templates/example-long/)。
 
 应用里按 `kind` 分组：卡片模式的模板列表只出卡片模板，长图模式只出长图模板。把长图模板拖进卡片的「上传」也能收下，只是它出现在长图那边，上传后会有一句提示说明它去了哪边；反过来一样。云端接口不改，服务端不解压。
 

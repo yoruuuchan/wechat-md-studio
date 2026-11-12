@@ -10,6 +10,7 @@ import type { Block, Doc, InlineSeg, SignatureConfig } from './types'
 import type { DiagramResolver, ImageResolver, MathResolver } from './render'
 import type { LongImageMetrics } from './cards'
 import { esc } from './theme-kit'
+import { applyTemplateCustomVars } from './template-custom'
 import { inline, listHtml } from './cards-render'
 import { renderLongTemplatePage, type LoadedLongTemplate } from './card-template'
 import {
@@ -30,6 +31,8 @@ export interface LongRenderOptions {
   resolveImage: ImageResolver
   resolveMath: MathResolver
   resolveDiagram: DiagramResolver
+  /** Reader's colour / font picks (template-custom.ts), written on the roots. */
+  customVars?: Readonly<Record<string, string>>
 }
 
 function tableHtml(block: Extract<Block, { type: 'table' }>): string {
@@ -118,12 +121,14 @@ export function renderLongArticle(
   root.style.setProperty('--long-photo-inset', `${options.metrics.photoInset}px`)
   root.style.setProperty('--long-title-units', String(textUnits(model.title)))
   root.style.setProperty('--long-subtitle-units', String(textUnits(model.subtitle)))
+  applyTemplateCustomVars(root, options.customVars ?? {})
 
   const flow = document.createElement('div')
   flow.className = 'reed-long-flow'
   if (options.templateSource) flow.dataset.cardTemplateSource = options.templateSource
   flow.dataset.variant = options.variant
   flow.dataset.kind = 'long'
+  applyTemplateCustomVars(flow, options.customVars ?? {})
 
   if (model.hasHeader) {
     flow.append(renderLongTemplatePage(loaded, {

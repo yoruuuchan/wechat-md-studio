@@ -6,7 +6,8 @@ import type { Doc, SignatureConfig } from '@/lib/types'
 import type { MathSnapshot } from '@/lib/math'
 import type { DiagramResolver } from '@/lib/render'
 import type { LongOptions } from '@/lib/long-options'
-import { longTemplateFonts } from '@/lib/cards'
+import { longTemplateCustomize, longTemplateFonts } from '@/lib/cards'
+import { ensureFontSheets } from '@/lib/font-catalog'
 import { LONG_WIDTH } from '@/lib/long-image'
 import { renderLongArticle } from '@/lib/long-image-render'
 import { exportLongImage, prepareLongImages, type LongExportProgress } from '@/lib/long-image-export'
@@ -14,6 +15,7 @@ import type { LoadedLongTemplate } from '@/lib/card-template'
 import { resolveImgSrc } from '@/lib/image'
 import { safeFilename } from '@/lib/import-export'
 import { useI18n } from '@/hooks/useI18n'
+import { useResolvedTemplateCustom } from '@/hooks/useTemplateCustom'
 import './long-image.css'
 
 export interface LongStatus {
@@ -79,6 +81,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
   const abortRef = useRef<AbortController | null>(null)
   const [previewWidth, setPreviewWidth] = useState(0)
   const scale = previewWidth > 0 ? Math.min(1, previewWidth / LONG_WIDTH) : 0
+  const picks = useResolvedTemplateCustom(options.template, options.variant, longTemplateCustomize(options.template))
   const articleTitle = useMemo(() => {
     const heading = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
     return heading?.type === 'heading' ? heading.title : title
@@ -127,8 +130,23 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
           resolveImage: resolveImgSrc,
           resolveMath: (tex, display) => math.get(tex, display),
           resolveDiagram,
+          customVars: picks.vars,
         }, template)
         stage.append(root)
+        // Load every face the text will use before anything is measured: the
+        // preview height and the export both come from this layout.
+        const faces = [...longTemplateFonts(options.template), ...picks.faces]
+        await ensureFontSheets(faces.map((face) => face.family))
+        if (document.fonts) {
+          const text = root.textContent ?? ''
+          await Promise.all(faces.flatMap(({ family, weights, styles }) =>
+            weights.flatMap((weight) => (styles ?? ['normal']).map((style) =>
+              document.fonts.load(`${style === 'italic' ? 'italic ' : ''}${weight} 18px "${family}"`, text).catch(() => []),
+            )),
+          ))
+          await document.fonts.ready
+        }
+        controller.signal.throwIfAborted()
         const prepared = await prepareLongImages(root, template.manifest.metrics, {
           scale: options.width / LONG_WIDTH,
           signal: controller.signal,
@@ -169,7 +187,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
     // `previewWidth` is deliberately excluded from the rebuild trigger: the root
     // is laid out at 540px and only the wrapper scale changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, source, lang, template, loadedVersion, options.template, options.variant, options.width, sig, math, resolveDiagram, retry])
+  }, [doc, source, lang, template, loadedVersion, options.template, options.variant, options.width, sig, math, resolveDiagram, retry, picks.key])
 
   useEffect(() => {
     const host = rootRef.current
@@ -187,8 +205,9 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
     try {
       const filename = safeFilename(articleTitle, t('long.template'), '')
       const output = await exportLongImage(root, {
-        faces: longTemplateFonts(options.template),
+        faces: [...longTemplateFonts(options.template), ...picks.faces],
         packageCss: template.packageFontCss,
+        userFonts: picks.userFonts,
         scale: options.width / LONG_WIDTH,
         format: options.format,
         filename,
@@ -213,7 +232,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
       setBusy(false)
       setProgress(IDLE_PROGRESS)
     }
-  }, [articleTitle, busy, options.format, options.template, options.width, pending, result, t, template])
+  }, [articleTitle, busy, options.format, options.template, options.width, pending, picks, result, t, template])
 
   useImperativeHandle(ref, () => ({
     export: () => { setExportCalls((value) => value + 1); void exportImage() },

@@ -1,5 +1,7 @@
 import type { LongOptions } from '@/lib/long-options'
-import { longTemplateVariants } from '@/lib/cards'
+import { longTemplateCustomize, longTemplateRuntime, longTemplateVariants } from '@/lib/cards'
+import { getLoadedLongTemplate } from '@/lib/card-template'
+import TemplateCustomizer from '@/components/TemplateCustomizer'
 import { LONG_EXPORT_WIDTHS, LONG_FORMATS } from '@/lib/long-image'
 import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import type { CardTemplateSummary } from '@/lib/card-template-format'
@@ -28,6 +30,7 @@ export default function LongSettings({
   const variantName = (id: string) => custom?.variants.find((variant) => variant.id === id)?.name ??
     publicMeta?.variants.find((variant) => variant.id === id)?.name ?? id
   const loadedPublic = new Set(templates.publicTemplates.map((item) => item.template))
+  const loaded = getLoadedLongTemplate(options.template)
   const groupLabel = 'mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3'
 
   return (
@@ -88,6 +91,20 @@ export default function LongSettings({
             ))}
           </div>
         </div>
+      )}
+
+      {loaded && (
+        <TemplateCustomizer
+          kind="long"
+          template={options.template}
+          renderId={loaded.renderId}
+          templateSource={loaded.template}
+          variant={options.variant}
+          dark={longTemplateRuntime(options.template)?.variants.find((variant) => variant.id === options.variant)?.dark ?? false}
+          slots={longTemplateCustomize(options.template)}
+          translateNames={false}
+          busy={busy}
+        />
       )}
 
       <div>

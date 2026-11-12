@@ -10,12 +10,13 @@ import { resolveImgSrc } from '@/lib/image'
 import { safeFilename } from '@/lib/import-export'
 import { renderCardArticle } from '@/lib/cards-render'
 import {
-  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, cardTemplateFonts,
+  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, cardTemplateCustomize, cardTemplateFonts,
   coverTitleSize, isDarkVariant, paginateCards,
   type CardBackground, type CardOptions, type CardPage,
 } from '@/lib/cards'
-import { fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
+import { cardEndIsExtraPage, fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
 import { useI18n } from '@/hooks/useI18n'
+import { useResolvedTemplateCustom } from '@/hooks/useTemplateCustom'
 import './cards.css'
 
 const PREVIEW_WIDTH = 260
@@ -132,6 +133,8 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
   const custom = getLoadedCardTemplate(template)
   const dark = isDarkVariant(template, bg)
   const accent = cardAccent(template, bg, themeAccent || BRAND_ACCENT)
+  // Colour and font picks from the side panel; pagination measures with them.
+  const picks = useResolvedTemplateCustom(template, bg, cardTemplateCustomize(template))
   const coverTitle = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
   const articleTitle = coverTitle?.type === 'heading' ? coverTitle.title : title
   const author = doc.meta.author || t('app.name')
@@ -152,9 +155,12 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
           source, height, template, renderTemplate: custom?.renderId, templateSource: custom?.template,
           background: bg, accent, dark, sig, resolveImage: resolveImgSrc,
           resolveMath: (tex, display) => math.get(tex, display), resolveDiagram,
+          customVars: picks.vars,
         })
         const failedImages = await prepareCardImages(article, controller.signal)
-        const layout = await paginateCards(article, { height, template, signal: controller.signal })
+        const layout = await paginateCards(article, {
+          height, template, signal: controller.signal, extraFaces: picks.faces,
+        })
         if (!controller.signal.aborted) {
           setResult({ ...layout, failedImages, height, dark, template, background: bg })
           setPending(false)
@@ -167,7 +173,9 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
       }
     }, 160)
     return () => { controller.abort(); clearTimeout(timer) }
-  }, [doc, source, height, template, bg, accent, dark, sig, math, resolveDiagram, retry, lang, custom?.renderId, custom?.template])
+    // picks.key stands for picks.vars / picks.faces, which change together.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, source, height, template, bg, accent, dark, sig, math, resolveDiagram, retry, lang, custom?.renderId, custom?.template, picks.key])
 
   useLayoutEffect(() => {
     // Ordinary titles keep each template's size ladder. Extremely long H1s are
@@ -194,19 +202,28 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
     }
   }, [result, height, metrics.coverReserve])
 
+  // The article's pages, plus the template's closing page when it is a page
+  // of its own (see cardEndIsExtraPage).
+  const extraEnd = custom ? cardEndIsExtraPage(custom) : false
+  const pages: (CardPage | { kind: 'end' })[] = result
+    ? (extraEnd && result.pages.length ? [...result.pages, { kind: 'end' as const }] : result.pages)
+    : []
+
   const exportCards = async (index?: number) => {
-    if (!result?.pages.length || result.failedImages.length || busy || pending) return
+    if (!result || !pages.length || result.failedImages.length || busy || pending) return
     setBusy(true)
-    setProgress({ done: 0, total: index === undefined ? result.pages.length : 1 })
+    setProgress({ done: 0, total: index === undefined ? pages.length : 1 })
     let exporter: Awaited<ReturnType<typeof import('@/lib/cards-export').createCardExporter>> | undefined
     try {
       const { createCardExporter, downloadCardBlob } = await import('@/lib/cards-export')
-      const nodes = cardsRef.current.slice(0, result.pages.length).filter((node): node is HTMLDivElement => node !== null)
-      if (nodes.length !== result.pages.length) throw new Error('card not mounted')
+      const nodes = cardsRef.current.slice(0, pages.length).filter((node): node is HTMLDivElement => node !== null)
+      if (nodes.length !== pages.length) throw new Error('card not mounted')
       const loaded = getLoadedCardTemplate(result.template)
-      exporter = await createCardExporter(nodes, loaded
-        ? { faces: cardTemplateFonts(result.template), packageCss: loaded.packageFontCss }
-        : result.template)
+      exporter = await createCardExporter(nodes, {
+        faces: [...cardTemplateFonts(result.template), ...picks.faces],
+        packageCss: loaded?.packageFontCss,
+        userFonts: picks.userFonts,
+      })
       const name = safeFilename(articleTitle, t('cards.filename'), '')
       if (index !== undefined) {
         downloadCardBlob(await exporter.shoot(index), `${name}-${String(index + 1).padStart(2, '0')}.png`)
@@ -228,7 +245,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
     }
   }
 
-  const total = result?.pages.length ?? 0
+  const total = pages.length
   const failed = Boolean(result?.failedImages.length)
   const disabled = busy || pending || !total || failed
 
@@ -259,13 +276,13 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
         {result?.scaledBlocks ? <p role="status" className="mb-4 text-xs text-warning-700">{t('cards.scaled', { n: result.scaledBlocks })}</p> : null}
         {result && !total && <p className="text-sm text-ink-2">{t('cards.empty')}</p>}
         <div className="flex flex-wrap justify-center gap-5">
-          {result?.pages.map((page, i) => {
+          {pages.map((page, i) => {
             const customHtml = custom
               ? fragmentHtml(renderTemplatePage(custom, {
                 kind: page.kind === 'cover' ? 'cover'
-                  : custom.manifest.pages.end && i === result.pages.length - 1 ? 'end' : 'body',
+                  : page.kind === 'end' || (custom.manifest.pages.end && !extraEnd && i === pages.length - 1) ? 'end' : 'body',
                 pageIndex: i,
-                total: result.pages.length,
+                total: pages.length,
                 title: page.kind === 'cover' ? page.title : articleTitle,
                 subtitle: page.kind === 'cover' ? page.subtitle : '',
                 author,
@@ -295,10 +312,13 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
                       '--xhs-cover-inset-y': `${metrics.coverInsetY}px`,
                       '--xhs-cover-foot-bottom': `${metrics.coverFootBottom}px`,
                       ...(custom ? {} : background(bg, accent)),
+                      ...picks.vars,
                     } as CSSProperties}>
                     {customHtml !== null ? null : page.kind === 'cover'
                       ? <Cover page={page} author={author} height={height} t={t} />
-                      : <Body page={page} index={i} articleTitle={articleTitle} author={author} total={total} />}
+                      : page.kind === 'body'
+                        ? <Body page={page} index={i} articleTitle={articleTitle} author={author} total={total} />
+                        : null}
                   </div>
                 </div>
               </div>

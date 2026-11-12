@@ -30,6 +30,19 @@
     { "source": "builtin", "family": "Space Grotesk", "weights": [400, 500, 700] },
     { "source": "builtin", "family": "Geist Mono", "weights": [400] }
   ],
+  "customize": {
+    "colors": [
+      { "var": "--accent", "name": "主色" },
+      { "var": "--title-ink", "name": "标题" },
+      { "var": "--body-ink", "name": "正文" },
+      { "var": "--muted", "name": "辅助文字" },
+      { "var": "--paper", "name": "底色" }
+    ],
+    "fonts": [
+      { "var": "--display", "name": "标题" },
+      { "var": "--body-font", "name": "正文" }
+    ]
+  },
   "pages": { "cover": "pages/cover.html", "body": "pages/body.html", "end": "pages/end.html" },
   "styles": ["styles/base.css", "styles/theme.css"]
 }

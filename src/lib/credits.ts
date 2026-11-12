@@ -111,6 +111,18 @@ export const CREDITS: Credit[] = [
     ],
   },
   {
+    name: 'harfbuzzjs',
+    author: 'The harfbuzzjs project authors',
+    repo: 'https://github.com/harfbuzz/harfbuzzjs',
+    license: 'MIT',
+    licenseFile: 'harfbuzzjs-LICENSE.txt',
+    licenseCopyright: 'Copyright (c) 2019-2026 The harfbuzzjs project authors',
+    usage: 'ported',
+    borrowed: [
+      '运行时依赖 harfbuzzjs，锁定 1.6.4；只用其中的 harfbuzz-subset.wasm，在导出卡片 / 长图时按需加载，把读者自己添加的 .ttf / .otf 字体裁成只含图里用到的字再内嵌进 PNG。字体文件不离开浏览器。',
+    ],
+  },
+  {
     name: 'XHS-TextCard',
     author: 'geekfoxcharlie',
     repo: 'https://github.com/geekfoxcharlie/XHS-TextCard',

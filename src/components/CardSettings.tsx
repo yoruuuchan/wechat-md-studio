@@ -2,7 +2,9 @@ import type { CardOptions, CardRatio } from '@/lib/cards'
 import {
   CARD_RATIOS,
   CARD_TEMPLATES,
+  cardTemplateCustomize,
   isBuiltinCardTemplate,
+  isDarkVariant,
   templateRatios,
   templateVariants,
   withTemplate,
@@ -12,6 +14,8 @@ import type { CardTemplateSummary } from '@/lib/card-template-format'
 import type { MsgKey } from '@/lib/i18n'
 import { useI18n } from '@/hooks/useI18n'
 import MyTemplatesGroup from '@/components/MyTemplatesGroup'
+import TemplateCustomizer from '@/components/TemplateCustomizer'
+import { getLoadedCardTemplate } from '@/lib/card-template'
 import { PUBLIC_CARD_TEMPLATES, publicCardTemplateFor, publicCardTemplateRuntimeId } from '@/lib/public-card-templates'
 
 interface Props {
@@ -43,6 +47,8 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
   const templateName = publicTemplate?.name ?? publicMeta?.name ??
     custom?.name ?? (isBuiltinCardTemplate(template) ? t(`cards.template.${template}` as MsgKey) : template)
   const loadedPublic = new Set(templates.publicTemplates.map((item) => item.template))
+  const loaded = getLoadedCardTemplate(template)
+  const builtin = isBuiltinCardTemplate(template)
   const groupLabel = 'mb-1.5 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3'
 
   return (
@@ -120,6 +126,20 @@ export default function CardSettings({ options, onOptionsChange, busy, templates
           ))}
         </div>
       </div>
+
+      {(loaded || builtin) && (
+        <TemplateCustomizer
+          kind="card"
+          template={template}
+          renderId={loaded?.renderId ?? template}
+          templateSource={loaded?.template}
+          variant={bg}
+          dark={isDarkVariant(template, bg)}
+          slots={cardTemplateCustomize(template)}
+          translateNames={builtin}
+          busy={busy}
+        />
+      )}
 
       <p className="text-[11px] leading-relaxed text-ink-3">{t('cards.hint')}</p>
     </div>

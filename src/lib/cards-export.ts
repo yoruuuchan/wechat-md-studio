@@ -3,12 +3,15 @@ import {
   CARD_FONT_SHEETS, CARD_TEMPLATE_FONTS, CARD_WIDTH, type CardFontFace, type CardTemplate, type CardTemplateId,
 } from './cards'
 import { t } from './i18n'
+import { userFontCss } from './user-fonts'
 
 /** Faces the embedder should keep, plus package faces that need no fetch. */
 export interface CardFontEmbedSpec {
   faces: readonly CardFontFace[]
   /** @font-face rules with data: URLs, built from the template archive. */
   packageCss?: string
+  /** Fonts from the reader's computer (user-fonts.ts), embedded as subsets. */
+  userFonts?: readonly string[]
 }
 
 function blobDataUrl(blob: Blob): Promise<string> {
@@ -98,7 +101,8 @@ export async function cardFontCss(
     face.weights.includes(Number(weight)) &&
     (face.styles ?? ['normal']).includes(style as 'normal' | 'italic'),
   )
-  if (!declared.length) return spec.packageCss ?? ''
+  const userCss = await userFontCss(spec.userFonts ?? [], text)
+  if (!declared.length) return [spec.packageCss ?? '', userCss].filter(Boolean).join('\n')
   const rules = await Promise.all(CARD_FONT_SHEETS.map(async (path) => {
     const url = new URL(path, location.href)
     const response = await fetch(url)
@@ -116,7 +120,7 @@ export async function cardFontCss(
       return rule.replace(/url\([^)]+\)/, `url("${data}")`)
     }))
   }))
-  return [...rules.flat().filter(Boolean), spec.packageCss ?? ''].filter(Boolean).join('\n')
+  return [...rules.flat().filter(Boolean), spec.packageCss ?? '', userCss].filter(Boolean).join('\n')
 }
 
 const EXACT_FONT_SIZE = '--xhs-export-font-size'

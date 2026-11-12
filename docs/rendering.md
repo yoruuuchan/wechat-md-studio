@@ -236,5 +236,28 @@ unicode-range 逐片裁成 99 个 woff2（没有字形的片跳过），CSS 在
 卡片分页预载与 PNG 内嵌都读 [cards.ts](../src/lib/cards.ts) 的 `CARD_TEMPLATE_FONTS`，
 两处不会各写一份字体白名单。
 
+模板右栏「字体」菜单另有六款可选中文字体，同样用
+[slice-by-ranges.py](../scripts/fonts/slice-by-ranges.py) 按 Noto Serif SC 700 的 unicode-range
+裁成 woff2（`--no-hinting`，去掉 TrueType 微调指令，合计约 25 MB，按需只下载用到的片）：
+霞鹜文楷 LXGW WenKai 1.522（101 片，[lxgw-wenkai.css](../public/fonts/lxgw-wenkai.css)）、
+得意黑 Smiley Sans 2.0.1（100 片）、站酷小薇体 ZCOOL XiaoWei 1.000（93 片）、
+站酷庆科黄油体 ZCOOL QingKe HuangYou 1.000（93 片）、站酷快乐体 ZCOOL KuaiLe 2.001（94 片）、
+马善政楷书 Ma Shan Zheng 2.003（93 片），CSS 分别在 `public/fonts/` 下同名文件。
+这六款不进全局样式表，读者选中时才由 [font-catalog.ts](../src/lib/font-catalog.ts) 的
+`ensureFontSheets` 插入 `<link>`；朱雀仿宋也改由它在预览里按需加载（此前只在导出时内嵌，预览靠回落）。
+许可副本（版权行取自各字体 name 表，正文为 SIL OFL 1.1）：
+[OFL-LXGWWenKai.txt](../public/fonts/OFL-LXGWWenKai.txt)、
+[OFL-SmileySans.txt](../public/fonts/OFL-SmileySans.txt)、
+[OFL-ZCOOLXiaoWei.txt](../public/fonts/OFL-ZCOOLXiaoWei.txt)、
+[OFL-ZCOOLQingKeHuangYou.txt](../public/fonts/OFL-ZCOOLQingKeHuangYou.txt)、
+[OFL-ZCOOLKuaiLe.txt](../public/fonts/OFL-ZCOOLKuaiLe.txt)、
+[OFL-MaShanZheng.txt](../public/fonts/OFL-MaShanZheng.txt)。
+
+读者自己添加的字体文件只存在浏览器 IndexedDB，不经过服务器。导出 PNG 时，`.ttf` / `.otf`
+由 [font-subset.ts](../src/lib/font-subset.ts) 调用 harfbuzzjs 1.6.4 的 `harfbuzz-subset.wasm`
+裁成只含这张图用到的字再以 data URL 内嵌（25 MB 的文楷裁一段中文约 6 KB）；`.woff` / `.woff2` 整个内嵌。
+WebAssembly 需要 CSP 的 `script-src 'wasm-unsafe-eval'`，它只放行 wasm 编译，JavaScript 的 `eval` 仍被禁止
+（[security-headers.ts](../api/lib/security-headers.ts)）。
+
 主题移植损耗与许可审计见 [THEME-SOURCES](../THEME-SOURCES.md)；借鉴与未采用的机制见
 [References](https://wechat.yoru-and-akari.dev/references) / [credits 数据](../src/lib/credits.ts)。

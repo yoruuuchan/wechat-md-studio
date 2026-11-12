@@ -4,6 +4,7 @@ import type { DiagramResolver, ImageResolver, MathResolver } from './render'
 import { esc } from './theme-kit'
 import { t } from './i18n'
 import { cardMetrics, type CardBackground, type CardTemplateId } from './cards'
+import { applyTemplateCustomVars } from './template-custom'
 
 export function inline(segs: InlineSeg[]): string {
   return segs.map((seg) => {
@@ -44,6 +45,8 @@ export function renderCardArticle(doc: Doc, options: {
   resolveImage: ImageResolver
   resolveMath: MathResolver
   resolveDiagram: DiagramResolver
+  /** Reader's colour / font picks; pagination must measure with them. */
+  customVars?: Readonly<Record<string, string>>
 }): HTMLElement {
   const root = document.createElement('section')
   const metrics = cardMetrics(options.template)
@@ -53,6 +56,7 @@ export function renderCardArticle(doc: Doc, options: {
   root.dataset.variant = options.background
   root.style.width = `${metrics.contentWidth}px`
   root.style.setProperty('--xhs-accent', options.accent)
+  applyTemplateCustomVars(root, options.customVars ?? {})
   root.dataset.night = String(options.dark)
   const lines = options.source.replace(/\r\n?/g, '\n').split('\n')
   const maxImageHeight = Math.floor((options.height - metrics.padTop - metrics.padBottom) * 0.72)

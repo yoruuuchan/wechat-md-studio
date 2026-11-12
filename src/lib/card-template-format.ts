@@ -32,6 +32,8 @@ export const CARD_TEMPLATE_LIMITS = {
   imageBytes: 2 * 1024 * 1024,
   variants: 16,
   styles: 8,
+  customColors: 10,
+  customFonts: 4,
   fonts: 24,
   title: 120,
 } as const
@@ -66,6 +68,24 @@ export interface CardTemplatePackageFont {
 }
 
 export type CardTemplateFont = CardTemplateBuiltinFont | CardTemplatePackageFont
+
+/**
+ * What a reader may change without editing the package: CSS custom properties
+ * the template already reads for colours and font stacks. The engine writes a
+ * picked value onto the card page / long-image root as an inline declaration,
+ * so the property must be declared on that root (or inherited from it).
+ */
+export interface TemplateCustomizeSlot {
+  /** A custom property name such as `--accent`. */
+  var: string
+  /** Shown beside the swatch or font menu. */
+  name: string
+}
+
+export interface TemplateCustomize {
+  colors: TemplateCustomizeSlot[]
+  fonts: TemplateCustomizeSlot[]
+}
 
 /** Long images have no fixed page: header and footer are both optional. */
 export interface LongTemplatePages {
@@ -103,6 +123,7 @@ export interface CardTemplateManifest {
   fonts: CardTemplateFont[]
   pages: CardTemplatePages
   styles: string[]
+  customize: TemplateCustomize
 }
 
 /** A long-image template: same archive, no ratios and two optional fragments. */
@@ -121,6 +142,7 @@ export interface LongTemplateManifest {
   fonts: CardTemplateFont[]
   pages: LongTemplatePages
   styles: string[]
+  customize: TemplateCustomize
 }
 
 /** Every `.reedcard` manifest, discriminated by `kind`. */
@@ -364,6 +386,37 @@ function parseFonts(value: unknown, files: ReadonlySet<string>): CardTemplateFon
   })
 }
 
+const CUSTOM_VAR_RE = /^--[a-z][a-z0-9-]{0,47}$/
+/** Engine-owned properties: metrics and accents the renderer writes itself. */
+const RESERVED_VAR_RE = /^--(xhs|long|reed)-/
+
+function parseCustomizeSlots(value: unknown, where: string, max: number, seen: Set<string>): TemplateCustomizeSlot[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) bad(`${where} 必须是数组`)
+  if (value.length > max) bad(`${where} 最多 ${max} 项`)
+  return value.map((entry, index) => {
+    const slot = record(entry, `${where}[${index}]`)
+    onlyKeys(slot, ['var', 'name'], `${where}[${index}]`)
+    const name = text(slot.var, `${where}[${index}].var`, 49)
+    if (!CUSTOM_VAR_RE.test(name)) bad(`${where}[${index}].var 必须是 --小写字母开头的变量名`)
+    if (RESERVED_VAR_RE.test(name)) bad(`${where}[${index}].var 不能用引擎保留的 ${name}`)
+    if (seen.has(name)) bad(`customize 里的变量重复: ${name}`)
+    seen.add(name)
+    return { var: name, name: text(slot.name, `${where}[${index}].name`, 20) }
+  })
+}
+
+function parseCustomize(value: unknown): TemplateCustomize {
+  if (value === undefined) return { colors: [], fonts: [] }
+  const c = record(value, 'customize')
+  onlyKeys(c, ['colors', 'fonts'], 'customize')
+  const seen = new Set<string>()
+  return {
+    colors: parseCustomizeSlots(c.colors, 'customize.colors', CARD_TEMPLATE_LIMITS.customColors, seen),
+    fonts: parseCustomizeSlots(c.fonts, 'customize.fonts', CARD_TEMPLATE_LIMITS.customFonts, seen),
+  }
+}
+
 function parseLongMetrics(value: unknown): LongImageMetrics {
   const m = record(value, 'metrics')
   onlyKeys(m, ['padX', 'contentWidth', 'photoGap', 'photoInset'], 'metrics')
@@ -385,7 +438,7 @@ export function parseCardTemplateManifest(
   const kind = m.kind === undefined ? 'card' : oneOf(m.kind, TEMPLATE_KINDS, 'kind')
   onlyKeys(m, [
     'format', 'formatVersion', 'kind', 'id', 'renderId', 'name', 'version', 'author', 'description',
-    'ratios', 'defaultRatio', 'variants', 'metrics', 'fonts', 'pages', 'styles',
+    'ratios', 'defaultRatio', 'variants', 'metrics', 'fonts', 'pages', 'styles', 'customize',
   ], 'manifest')
   if (m.format !== CARD_TEMPLATE_FORMAT) bad(`format 必须是 ${CARD_TEMPLATE_FORMAT}`)
   if (m.formatVersion !== CARD_TEMPLATE_FORMAT_VERSION) bad(`formatVersion 必须是 ${CARD_TEMPLATE_FORMAT_VERSION}`)
@@ -421,6 +474,7 @@ export function parseCardTemplateManifest(
     variants,
     fonts,
     styles,
+    customize: parseCustomize(m.customize),
   } as const
 
   if (kind === 'long') {

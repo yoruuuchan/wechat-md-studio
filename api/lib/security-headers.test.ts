@@ -37,7 +37,10 @@ describe('contentSecurityPolicy', () => {
     const policy = contentSecurityPolicy()
     expect(policy.imgSrc).toContain('https:')
     expect(policy.connectSrc).toEqual(["'self'", 'https://img.example.test'])
-    expect(policy.scriptSrc).toEqual(["'self'"])
+    // WebAssembly compilation for the font subsetter, never eval() or inline code.
+    expect(policy.scriptSrc).toEqual(["'self'", "'wasm-unsafe-eval'"])
+    expect(policy.scriptSrc).not.toContain("'unsafe-eval'")
+    expect(policy.scriptSrc).not.toContain("'unsafe-inline'")
     expect(policy.defaultSrc).toEqual(["'self'"])
     expect(policy.objectSrc).toEqual(["'none'"])
     expect(policy.frameAncestors).toEqual(["'none'"])
@@ -72,7 +75,8 @@ describe('contentSecurityPolicy', () => {
   it('keeps scripts locked to this origin, with no escape hatch', () => {
     const csp = JSON.stringify(contentSecurityPolicy())
     expect(csp).toContain("'self'")
-    expect(csp).not.toContain('unsafe-eval')
+    // 'wasm-unsafe-eval' (WebAssembly only) is allowed; JavaScript eval is not.
+    expect(csp).not.toMatch(/(?<!wasm-)unsafe-eval/)
     expect(csp).not.toContain('unsafe-hashes')
   })
 
@@ -111,7 +115,7 @@ describe('the response headers', () => {
     expect(csp).toContain("base-uri 'self'")
     expect(csp).toContain("form-action 'self'")
     expect(csp).toContain("frame-ancestors 'none'")
-    expect(csp).not.toContain('unsafe-eval')
+    expect(csp).not.toMatch(/(?<!wasm-)unsafe-eval/)
   })
 
   it('allows only same-origin framing of the motion page', async () => {
