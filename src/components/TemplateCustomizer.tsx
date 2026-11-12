@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/hooks/useI18n'
 import { useTemplateCustomStore, useUserFonts } from '@/hooks/useTemplateCustom'
 import type { TemplateCustomizeRuntime } from '@/lib/cards'
 import type { MsgKey } from '@/lib/i18n'
-import { CHOOSABLE_FONTS } from '@/lib/font-catalog'
+import { CHOOSABLE_FONTS, ensureFontSheets, type CatalogFont } from '@/lib/font-catalog'
 import {
   dropUserFontPicks, resetTemplateCustom, setCustomColor, setCustomFont, templateCustom,
   updateTemplateCustomStore, type FontPick,
@@ -80,6 +80,14 @@ function probeColors(props: Props): Record<string, string> {
 
 const UPLOAD = '__upload'
 
+/** Each menu entry is written in its own face, at a weight the family has. */
+function catalogStyle(font: CatalogFont): CSSProperties {
+  return { fontFamily: `"${font.family}"`, fontWeight: font.weights.includes(400) ? 400 : font.weights[0] }
+}
+
+// The menu shows every family, so its sheets load when the reader reaches for it.
+const loadMenuFonts = () => { void ensureFontSheets(CHOOSABLE_FONTS.map((font) => font.family)) }
+
 function pickValue(pick: FontPick | undefined): string {
   if (!pick) return ''
   return pick.source === 'builtin' ? `builtin:${pick.family}` : `user:${pick.id}`
@@ -99,6 +107,14 @@ export default function TemplateCustomizer(props: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const uploadTarget = useRef<string | null>(null)
   const label = (name: string) => translateNames ? t(name as MsgKey) : name
+  const pickStyle = (pick: FontPick | undefined): CSSProperties | undefined => {
+    if (pick?.source === 'builtin') {
+      const font = CHOOSABLE_FONTS.find((item) => item.family === pick.family)
+      return font ? catalogStyle(font) : undefined
+    }
+    const font = pick ? userFonts.find((item) => item.id === pick.id) : undefined
+    return font ? { fontFamily: `"${font.family}"` } : undefined
+  }
 
   // The template's stylesheet is in the document once it is activated; read
   // its colours whenever the template or variant changes.
@@ -223,18 +239,23 @@ export default function TemplateCustomizer(props: Props) {
             {slots.fonts.map((slot) => (
               <label key={slot.var} className="flex items-center gap-2 text-[12px] text-ink-2">
                 <span className="w-14 shrink-0 truncate">{label(slot.name)}</span>
-                <select data-customize-font={slot.var} className="ya-input !h-8 min-w-0 flex-1 !px-2 !text-[12px]" disabled={busy}
+                <select data-customize-font={slot.var} data-font-menu
+                  className="ya-input !h-8 min-w-0 flex-1 !px-2 !text-[12px]" disabled={busy}
+                  style={pickStyle(custom.fonts[slot.var])}
                   value={pickValue(custom.fonts[slot.var])}
+                  onPointerDown={loadMenuFonts} onFocus={loadMenuFonts}
                   onChange={(event) => chooseFont(slot.var, event.target.value)}>
                   <option value="">{t('customize.fontDefault')}</option>
                   <optgroup label={t('customize.fontIncluded')}>
                     {CHOOSABLE_FONTS.map((font) => (
-                      <option key={font.family} value={`builtin:${font.family}`}>{font.name[lang]}</option>
+                      <option key={font.family} value={`builtin:${font.family}`} style={catalogStyle(font)}>{font.name[lang]}</option>
                     ))}
                   </optgroup>
                   {userFonts.length > 0 && (
                     <optgroup label={t('customize.fontMine')}>
-                      {userFonts.map((font) => <option key={font.id} value={`user:${font.id}`}>{font.name}</option>)}
+                      {userFonts.map((font) => (
+                        <option key={font.id} value={`user:${font.id}`} style={{ fontFamily: `"${font.family}"` }}>{font.name}</option>
+                      ))}
                     </optgroup>
                   )}
                   <option value={UPLOAD}>{t('customize.fontUpload')}</option>

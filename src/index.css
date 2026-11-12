@@ -467,6 +467,46 @@ body {
   box-shadow: var(--shadow-inset);
   transition: box-shadow var(--dur-fast) var(--ease-out);
 }
+/* Font menus: where the browser draws the list inside the page (customizable
+   select), each option shows in its own face. Elsewhere the list stays native. */
+@supports (appearance: base-select) {
+  select[data-font-menu],
+  select[data-font-menu]::picker(select) { appearance: base-select; }
+  select[data-font-menu] { display: flex; align-items: center; }
+  select[data-font-menu]::picker-icon { color: var(--ink-3); font-size: 10px; }
+  select[data-font-menu]::picker(select) {
+    max-height: min(60vh, 440px);
+    margin-top: 4px;
+    padding: 4px;
+    border: 1px solid var(--line-2);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    color: var(--ink-1);
+    box-shadow: var(--shadow-pop);
+  }
+  select[data-font-menu] option {
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 16px;
+    line-height: 1.35;
+  }
+  select[data-font-menu] > option { font-family: var(--font-ui); font-size: 13px; color: var(--ink-2); }
+  select[data-font-menu] option:hover,
+  select[data-font-menu] option:focus-visible { background: var(--bg-sunken); outline: none; }
+  select[data-font-menu] option:checked { color: var(--primary-600); }
+  select[data-font-menu] option::checkmark { font-size: 12px; }
+  /* The group name is drawn from the optgroup's own font settings. */
+  select[data-font-menu] optgroup {
+    padding-top: 6px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+  }
+  select[data-font-menu] optgroup option { font-weight: 400; letter-spacing: normal; color: var(--ink-1); }
+  select[data-font-menu] optgroup option:checked { color: var(--primary-600); }
+}
 .ya-input::placeholder { color: var(--ink-4); }
 .ya-input:focus { box-shadow: var(--shadow-inset), var(--shadow-focus); }
 
