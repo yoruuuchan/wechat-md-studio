@@ -47,7 +47,7 @@
 
 **让 AI 起稿。** 点击编辑器里的「AI 帮我写」，复制提示词或 [写作 Skill](skills/wechat-typesetter/SKILL.md) 地址，交给 ChatGPT、Claude、Codex、OpenCode 等常用 AI。生成的 Markdown 粘回芦苇，继续人工校对、换主题、整理图片即可。无法联网读取 Skill 的 AI，也可以直接使用弹窗的「复制完整 Skill」。
 
-**让 AI 画图表。** 点击「AI 画图表」，可以先看架构图、流程图和柱状图示例，再把提示词及 [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill 地址交给自己的 AI；拿到 PNG 后上传插入文章。此入口提供操作说明，不会在芦苇网页内调用生成模型。
+**让 AI 画图表。** 点击「AI 画图表」，可以先看架构图、流程图和柱状图示例，再把提示词及 [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill 地址交给自己的 AI（中文适配作者 patrick-xin，MIT；基于 Cathryn Lavery 的 [英文原版](https://github.com/cathrynlavery/diagram-design)）；拿到 PNG 后上传插入文章。此入口提供操作说明，不会在芦苇网页内调用生成模型。
 
 **让 Agent 直接改当前文章。** 在「设置 → 高级功能 → AI 直接编辑当前稿件」创建 Remote MCP 连接。支持匿名使用，授权限定到当前稿件；Agent 可以读取写作规则和正文、写回修改，浏览器实时同步。版本冲突会暂停覆盖并交给你选择。[查看 Remote MCP 接入说明](docs/remote-mcp.md)。
 
