@@ -5,6 +5,11 @@
 #
 # The tarball is left in place so a re-run does not need a re-upload; pass
 # --clean to remove it afterwards.
+#
+# The new dist is copied beside the running one and swapped in by rename, so
+# the old release stays whole until the new one has passed the health check.
+# If the service does not come up healthy, the previous dist is put back, the
+# service restarted on it, and the script exits non-zero with FAILED.
 set -euo pipefail
 
 RELEASE="${1:-/tmp/mopai-release.tar.gz}"
@@ -38,34 +43,77 @@ if [ -n "$ENTRY" ] && grep -q "jsxDEV" "/tmp/mopai-extract/dist/public/$ENTRY"; 
   fi
 fi
 
-echo "== install into /opt/mopai/app =="
-sudo rm -rf /opt/mopai/app/dist
-sudo cp -r /tmp/mopai-extract/dist /opt/mopai/app/dist
-sudo mkdir -p /opt/mopai/app/data
-sudo chown -R mopai:mopai /opt/mopai/app
-sudo chmod 750 /opt/mopai/app/data
+# Overridable only so the swap and rollback can be exercised away from the server.
+APP=${MOPAI_APP_DIR:-/opt/mopai/app}
+echo "== install into $APP =="
+sudo rm -rf "$APP/dist.new" "$APP/dist.prev"
+sudo cp -r /tmp/mopai-extract/dist "$APP/dist.new"
+if [ -d "$APP/dist" ]; then sudo mv "$APP/dist" "$APP/dist.prev"; fi
+sudo mv "$APP/dist.new" "$APP/dist"
+sudo mkdir -p "$APP/data"
+sudo chown -R mopai:mopai "$APP"
+sudo chmod 750 "$APP/data"
 echo "app dir:"
-sudo ls -la /opt/mopai/app
+sudo ls -la "$APP"
 echo "dist:"
-sudo ls -la /opt/mopai/app/dist
+sudo ls -la "$APP/dist"
+
+ROUTES="/ /login /api/trpc/auth.me"
+route_code() {
+  curl -4 -sS -m 10 -H "Accept: text/html" -o /dev/null -w "%{http_code}" "http://127.0.0.1:3100$1" 2>/dev/null || echo 000
+}
+
+# Restart, then wait up to 30 s for the unit to be active and every route to
+# answer 200. Prints the final state of each; returns non-zero if any failed.
+restart_and_check() {
+  # restart, not "enable --now": the unit is already running and would
+  # otherwise keep serving the previous bundle from memory
+  sudo systemctl restart mopai.service
+  local healthy=1 route
+  for _ in $(seq 1 15); do
+    sleep 2
+    sudo systemctl is-active --quiet mopai.service || continue
+    healthy=0
+    for route in $ROUTES; do
+      [ "$(route_code "$route")" = 200 ] || healthy=1
+    done
+    [ "$healthy" = 0 ] && break
+  done
+  echo "service: $(sudo systemctl is-active mopai.service || true)"
+  for route in $ROUTES; do echo "GET $route -> $(route_code "$route")"; done
+  return "$healthy"
+}
 
 echo "== enable and restart app =="
 sudo systemctl enable mopai.service
-# restart, not "enable --now": the unit is already running and would otherwise
-# keep serving the previous bundle from memory
-sudo systemctl restart mopai.service
-sleep 5
-sudo systemctl is-active mopai.service || true
-echo "--- status ---"
-sudo systemctl status mopai.service --no-pager -l | head -25 || true
-echo "--- recent logs ---"
-sudo journalctl -u mopai.service -n 40 --no-pager || true
-
 echo "== local health check =="
-curl -4 -sS -m 10 -o /dev/null -w "GET / -> %{http_code}\n" http://127.0.0.1:3100/ || true
-curl -4 -sS -m 10 -H "Accept: text/html" -o /dev/null -w "GET /login -> %{http_code}\n" http://127.0.0.1:3100/login || true
-curl -4 -sS -m 10 -o /dev/null -w "GET /api/trpc/auth.me -> %{http_code}\n" http://127.0.0.1:3100/api/trpc/auth.me || true
+if restart_and_check; then
+  echo "--- status ---"
+  sudo systemctl status mopai.service --no-pager -l | head -25 || true
+  echo "--- recent logs ---"
+  sudo journalctl -u mopai.service -n 40 --no-pager || true
+  sudo rm -rf "$APP/dist.prev"
+  echo "== clean extract dir =="
+  rm -rf /tmp/mopai-extract
+  echo done
+  exit 0
+fi
 
-echo "== clean extract dir =="
-rm -rf /tmp/mopai-extract
-echo done
+echo "--- recent logs of the failed release ---" >&2
+sudo journalctl -u mopai.service -n 60 --no-pager >&2 || true
+if [ -d "$APP/dist.prev" ]; then
+  echo "== rolling back to the previous dist ==" >&2
+  sudo rm -rf "$APP/dist.failed"
+  sudo mv "$APP/dist" "$APP/dist.failed"
+  sudo mv "$APP/dist.prev" "$APP/dist"
+  if restart_and_check; then
+    echo "FAILED: the new release did not pass the health check; the previous release is back and healthy." >&2
+    echo "  The failed build is kept at $APP/dist.failed for inspection." >&2
+  else
+    echo "FAILED: the new release did not pass the health check, and the previous release did not come back healthy either." >&2
+    echo "  Restore from /opt/mopai/backups (newest dist-* and mopai-*.db) by hand." >&2
+  fi
+else
+  echo "FAILED: the new release did not pass the health check and there was no previous dist to restore." >&2
+fi
+exit 1

@@ -34,12 +34,12 @@ README / README_EN 的界面截图共用 `docs/images/`。下文历史部署记�
 
 harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 
-1. **工作目录**：不管哪棵树、哪个分支，npm 命令（check/build/test/CDP）都在其 `app/` 子目录里跑。新 worktree 建好后要在其 `app/` 里 `npm ci`，并从主工作区复制 `app/.env`（gitignore 不随仓库走）。
+1. **工作目录**：不管哪棵树、哪个分支，npm 命令（check/build/test/CDP）都在应用根目录（含 `package.json` 的那一层）里跑：公开仓库 `wechat-md-studio` 是仓库根目录，本地伞仓库是其中的 `app/`。新 worktree 建好后在应用根目录 `npm ci`，需要站长密钥的检查另建一次性的 `.env`（gitignore 不随仓库走，用完删掉）。
 2. **端口错开**：本地测试服与 CDP 调试端口不能撞车。主工作区用 `PORT=3200` + CDP `9333`；第二棵树用 `PORT=3201` + CDP `9334`（CDP 脚本接受端口参数或改文件内常量）。测试数据库按惯例用环境变量覆盖成独立文件（`DATABASE_URL=file:./data/test-xxx.db`），绝不共享。
 3. **部署只许从 master 执行，且同一时刻只留一个会话在部署**：线上只有一个。功能在分支上验证全绿（check + verify:themes + test + CDP）后合回 `master`，由主工作区统一构建、scp、`install.sh`；主工作区被并行会话占用或弄脏时，改从**目标 commit 的干净 worktree** 构建（`git worktree add <tmp> <commit>`，2026-10-10 起的等效做法）。分支上的人不碰服务器。
 4. **合并顺序**：分支开工前先 `git merge master` 同步；交付在分支上提交，回合由主工作区执行，冲突按功能归属取舍。
 5. **合并前先 `git status -sb` 确认主工作区停在哪个分支**——并行会话会把它切到自己的分支，此时 `--ff-only` 落在的是那个分支而不是 master（2026-10-10 实例：merge 落在 `codex/ai-writing-mcp` 上，master 原地没动；事后用带旧值校验的 `git update-ref refs/heads/master <new> <old>` 补真快进）。事后 `git log -1 master` 回查。
-6. **`update-ref` 前进 master 后主工作区不会自动跟随**——它仍停在旧检出，`git status` 会把新旧差异显示成一大片「已暂存」的改动，看着像回滚、其实只是没同步（2026-10-10 实例：rebrand 合并后主工作区冻结在 `92d7511`，两天后才发现）。拿主工作区构建/提交前先同步：`git restore --source=HEAD --staged --worktree -- .`（只重置 tracked 文件，零丢失）。
+6. **`update-ref` 前进 master 后主工作区不会自动跟随**——它仍停在旧检出，`git status` 会把新旧差异显示成一大片「已暂存」的改动，看着像回滚、其实只是没同步（2026-10-10 实例：rebrand 合并后主工作区冻结在 `92d7511`，两天后才发现）。拿主工作区构建/提交前先同步：`git restore --source=HEAD --staged --worktree -- .`。它把所有已跟踪文件的暂存区和工作区都改回 HEAD，未跟踪文件不受影响；只有在差异全部来自那次 `update-ref`、主工作区没有自己未提交的改动时才不丢东西。拿不准就先 `git diff HEAD > <备份>.patch` 或在临时分支上提交一次，再执行。
 
 - Node.js 24（当前开发与验收版本，使用内置 `node:sqlite`），`npm ci` 装依赖
 - `.env` 从 `.env.example` 复制（`.env` 已被 gitignore，**永远不要提交**）
@@ -175,8 +175,10 @@ ssh cc-tokyo-01 "sha256sum /tmp/mopai-$TAG.tar.gz"   # 必须等于本机 sha256
 ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$TAG.tar.gz"
 ```
 
-`scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 装到 /opt/mopai/app → **restart** → 健康检查），
-它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。
+`scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 新 dist 复制到旁边再换名替换 → **restart** → 健康检查），
+它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。健康检查要求服务处于 active、`/`、`/login`、`/api/trpc/auth.me` 30 秒内都回 200；
+通过才删旧版本、打印 `done`。不通过就把旧 dist 换回来重启，打印 `FAILED: …` 并以非零状态退出，失败的那份留在 `/opt/mopai/app/dist.failed`；
+旧版本也起不来时会明说，改从 `/opt/mopai/backups` 手动恢复（2026-11-13 起，之前的版本一路 `|| true`，失败也打印 `done`）。
 
 **家里这条线路对 30 MB+ 的单次 scp 会稳定重置**（`FATAL: send() failed, 10054`，2026-10-09 当天连试三次全挂，
 有一次还挂在连接上不退出）。别干等重试，按 network-ops 的分块办法：`split -b 4M` 切块 → 逐块 `scp`
