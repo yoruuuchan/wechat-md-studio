@@ -28,15 +28,9 @@ Built by Yoru and continuously refined through everyday use. The interface suppo
 
 WeChat articles, Xiaohongshu cards and long images share **one Markdown source**; switch modes in the top bar to present it differently. Interactive stories use their own visual composer, integrated into the same editor workspace.
 
-## Why use Reed?
+For example, after writing an event recap, you can choose a WeChat theme and paste the result into WeChat; switch to Xiaohongshu cards to paginate it, pick a template and export a set of images; then switch to long-image mode to arrange the event photos into a vertical recap. **It's still one Markdown document**, so you don't have to maintain three versions of the same text.
 
-- **Separate content from presentation.** Your document stays ordinary Markdown. Change the WeChat theme, switch card templates or generate a long image without rewriting the source.
-- **Choose by looking.** Compare up to three WeChat themes using the same draft. Card and long-image templates have thumbnails rendered by the actual layout engine.
-- **Make templates your own.** Supported card and long-image templates expose color and title/body font controls. Choose among 15 bundled Chinese fonts or add font files of your own; image export handles the selected fonts.
-- **Fewer steps from draft to publication.** Paste rich text from Word or the web, import Markdown / DOCX, and edit against a live preview. WeChat output uses inline styles, with preflight checks for unfinished diagrams, empty image placeholders and inaccessible image URLs.
-- **Bring your own AI.** The writing dialog shares a public Skill; the diagram dialog points to an external diagram Skill. No model API key is needed in Reed. For direct edits, authorize an agent via document-scoped Remote MCP.
-- **Take your work with you.** Drafts stay in your browser by default and can be exported as Markdown, HTML or a complete backup. No account is required. The site owner also has a cloud draft library.
-- **Open source with attribution.** Reed is AGPL-3.0-or-later licensed, and adapted themes retain author, license and source metadata.
+Try up to three WeChat themes side by side with your own draft. Card and long-image templates also have visual previews, editable colors and fonts, and support for importing your own templates.
 
 ## Start in three steps
 
