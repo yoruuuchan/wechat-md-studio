@@ -1028,6 +1028,17 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 公网冒烟没跑完：家里线路当时很差（4 KB 的文件 12 秒、`ERR_NETWORK_CHANGED`，新资源 Cloudflare 缓存还是 `MISS`），
 > 切到卡片模式超过脚本 60 秒上限，中止前已通过的项全过、没有页面错误；同一时刻从东京服务器取公网资源 0.06–0.09 秒。
 > 同一份构建在本地用 `SMOKE_ORIGIN` 跑 `live-smoke.mjs … groups,nits,motion` 28/28。线上仍然没有用站长账号登录测过。
+>
+> 2026-11-13 部署记录（外部审计里会出错的 6 条）：`1405dc6`（1 个提交快进合入 master）。慢网下同一篇不再同时发两次保存
+> （误报冲突）；上传模板里的 `<img src>` 不再被删；长图读图改用正文解析器的图片语法，代码块和注释里的图片示例不算照片；
+> 模板同步对已确认的副本只比服务器时间；没有二级标题的长图分张时在段落边界切。
+> `check`、`lint`（0 错误，原有 2 条警告）、`test` 3102 项、`verify:themes`、`verify:sources`、`build`（`[pack-public] 9 card + 1 long`、
+> `[pack-motion] 328 files`）全过；浏览器检查：新增慢网保存 9/9（旧版本 4/9）、稿件同步、保存状态 29/29（修了三个过时选择器）、
+> 长图 30/30、模板自定义 25/25、模板上传、公用卡片 452/452、小红书卡片、`cdp-verify-ui-modes` 128/128、`cdp-verify-ui-nits` 134/134、
+> 手机布局 152/152。生产包 118,721,440 B，sha256 `355512eb…`，29×4MB 分块上传且逐块核对；安装前备份 `dist-20261113T025419Z-fd69e63d`
+> 与同名 `.db`，`flock` 安装，服务于 **2026-11-13 02:54:27 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `03315b3b…`（服务端代码没变）；入口 `index-mIjKMC7K.js` / `index-B5YnkUNf.css`；
+> `verify-all.sh` 通过；`card_templates` 14 行（站长上传了 5 套）、`motion_drafts` 0 行。公网只读冒烟 28/28。
 
 ---
 
