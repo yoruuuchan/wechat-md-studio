@@ -13,9 +13,9 @@ Reed is a free, open-source writing and typesetting tool that runs in your brows
 
 Built by Yoru and continuously refined through everyday use. The interface supports Chinese and English. You can start editing and exporting without installation or signing in. If you find it useful, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is appreciated.
 
-| Light interface · akari | Dark interface · yoru |
+| Editor workspace | Theme library |
 |:--:|:--:|
-| ![Reed's Markdown editor, WeChat article preview and media sidebar](docs/images/reed-wechat-editor.png) | ![Reed in dark mode with a white article preview](docs/images/editor-yoru.png) |
+| ![Reed editor with Markdown, WeChat preview and theme sidebar](docs/images/reed-wechat-editor.png) | ![Reed theme library with 227 themes, filters and previews](docs/images/reed-theme-library.png) |
 
 ## What you can make
 
@@ -70,8 +70,6 @@ An [Agent REST API and Python client](docs/agent-api.md) are also available for 
 - **Agent REST API**: a separate API and dependency-free Python client for pushing a draft, opening it for human editing and reading it back. Writes carry the hash from the read, so a stale version is rejected instead of silently overwritten. This interface accesses the site owner's cloud documents, requires an Agent token, and needs browser login for its editor links. See [Agent API](docs/agent-api.md).
 
 Every theme card renders the same sample article, so comparisons show the theme rather than different content. Switch to the current article to trial it, or put up to three candidates side by side; trying and comparing never edit the article or save a theme. Source project, color and license information stay on each card; the author appears under the card's source details.
-
-![Theme library with filters and real rendered previews](docs/images/reed-theme-library.png)
 
 A closer look at the default `golden` theme, including first-line indentation, numbered headings, highlights, link footnotes, pull quotes and quotation boxes:
 
