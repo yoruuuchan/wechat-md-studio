@@ -631,6 +631,41 @@ try {
     afterReupload: afterReupload.items.map((item) => item.id),
   }
 
+  // A guest copy, then a signed-in upload of the same package, then one delete:
+  // the second upload must replace the first copy, so the delete leaves no
+  // older duplicate behind to come back after a reload or the next sync.
+  const deviceC = await freshBrowserProfile()
+  await setDraft(deviceC)
+  await openCards(deviceC)
+  await upload(exampleZip, deviceC)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 1`, 45000, deviceC)
+  await login(deviceC)
+  await send('Page.reload', {}, deviceC)
+  await waitFor('!!window.__mopaiCodemirror', 45000, deviceC)
+  await setDraft(deviceC)
+  await openCards(deviceC)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, deviceC)
+  await upload(exampleZip, deviceC)
+  // Nothing visible changes when the upload replaces the copy, so give it time.
+  await sleep(3000)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, deviceC)
+  check('uploading a package that is already here replaces it instead of adding a copy',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 1`, deviceC),
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length`, deviceC))
+  await evaluate(`window.confirm = () => true`, deviceC)
+  await enterTemplateManage(deviceC)
+  await click('[data-card-template-delete]', deviceC)
+  await waitFor(`document.querySelectorAll('[data-card-template-item]').length === 0`, 45000, deviceC)
+  await send('Page.reload', {}, deviceC)
+  await waitFor('!!window.__mopaiCodemirror', 45000, deviceC)
+  await setDraft(deviceC)
+  await openCards(deviceC)
+  await waitFor(`document.querySelector('[data-card-template-sync]')?.dataset.cardTemplateSync === 'synced'`, 45000, deviceC)
+  check('after one delete and a reload the template does not come back here',
+    await evaluate(`document.querySelectorAll('[data-card-template-item]').length === 0`, deviceC))
+  check('nor in the cloud', !(await cloudItems(deviceC)).some((item) => item.id === 'example-daylight'),
+    (await cloudItems(deviceC)).map((item) => item.id))
+
   check('no uncaught page exceptions', exceptions.length === 0, exceptions.length)
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 5))
   evidence.passed = checks.every((item) => item.passed)

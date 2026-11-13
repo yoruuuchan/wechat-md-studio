@@ -282,7 +282,21 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
       try {
         if (file.size > 8 * 1024 * 1024) throw new CardTemplateError('archive-too-large', String(file.size))
         const raw = await file.arrayBuffer()
-        const record = await parseCardTemplateSource(raw, newId())
+        let record = await parseCardTemplateSource(raw, newId())
+        // One local copy per manifest id. Uploading a package that is already
+        // here replaces that copy and keeps its key (a template chosen in the
+        // picker stays chosen); a second copy would survive a later delete and
+        // come back on reload or through the next sync.
+        const copies = (await listCardTemplateRecords())
+          .filter((item) => item.parsed.manifest.id === record.parsed.manifest.id)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+        if (copies.length) {
+          record = await parseCardTemplateSource(raw, copies[0].id)
+          for (const stale of copies.slice(1)) {
+            deactivateCardTemplate(stale.template)
+            await deleteCardTemplateRecord(stale.id)
+          }
+        }
         const loaded = await activateCardTemplate(record)
         try {
           await saveCardTemplateRecord(record)
@@ -316,7 +330,8 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     setError(null)
     setFailures([])
     try {
-      const record = await listCardTemplateRecords().then((rows) => rows.find((row) => row.id === id))
+      const rows = await listCardTemplateRecords()
+      const record = rows.find((row) => row.id === id)
       if (record && authenticated) {
         try {
           await deleteCloudCardTemplate(record.parsed.manifest.id)
@@ -325,8 +340,14 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
           return { ok: false, localOnly: false }
         }
       }
-      if (record) deactivateCardTemplate(record.template)
-      await deleteCardTemplateRecord(id)
+      // The cloud deletes by manifest id, so every local copy of it goes too;
+      // copies stored before uploads replaced each other may still be here.
+      const copies = record ? rows.filter((row) => row.parsed.manifest.id === record.parsed.manifest.id) : []
+      for (const copy of copies) {
+        deactivateCardTemplate(copy.template)
+        await deleteCardTemplateRecord(copy.id)
+      }
+      if (!record) await deleteCardTemplateRecord(id)
       refresh()
       return { ok: true, localOnly: !authenticated }
     } catch (item) {
