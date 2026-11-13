@@ -12,9 +12,9 @@
 
 由 Yoru 开发，持续在真实创作中使用与完善。支持中文 / English 界面；不用安装，也无需登录即可开始编辑、排版和导出。喜欢这个项目，欢迎点个 [Star](https://github.com/yoruuuchan/wechat-md-studio)。
 
-| 亮色界面 · akari | 深色界面 · yoru |
+| 编辑器界面 | 模板库 |
 |:--:|:--:|
-| ![芦苇：Markdown 编辑、公众号预览与素材侧栏](docs/images/reed-wechat-editor.png) | ![芦苇深色界面，正文预览仍保持白底](docs/images/editor-yoru.png) |
+| ![芦苇编辑器：Markdown、公众号预览与主题侧栏](docs/images/reed-wechat-editor.png) | ![芦苇模板库：227 套主题筛选与预览](docs/images/reed-theme-library.png) |
 
 ## 芦苇能做什么
 
@@ -69,8 +69,6 @@
 - **Agent REST API**：保留独立的 REST API 和零依赖 Python 客户端，支持推稿 → 网页精修 → 读回结果，使用 hash 防止静默覆盖。它访问站长的云端稿件，需要单独配置 Agent 令牌，打开编辑链接需要浏览器登录；接入见 [Agent API](docs/agent-api.md)。
 
 模板库中的卡片都渲染同一份样稿，方便横向比较；也可以切到当前文章试排，把最多 3 套候选并排比较。试排和对比都不会改正文或保存主题，只有明确的「应用」才写入；来源项目、色系与许可证直接列在卡片上，作者点开「来源」查看。
-
-![主题库：筛选模板并查看真实渲染结果](docs/images/reed-theme-library.png)
 
 默认 `golden` 主题的正文特写：首行缩进、章节编号、重点、链接脚注、金句卡和引文框。
 
