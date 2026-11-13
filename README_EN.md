@@ -3,66 +3,56 @@
 # Reed · 芦苇
 
 > “Man is but a reed, the most feeble thing in nature; but he is a thinking reed.”
-> — Blaise Pascal, [Pensées, §347](https://www.gutenberg.org/files/18269/18269-h/18269-h.htm#SECTION_VI)
+> — Blaise Pascal, [Pensées, `347](https://www.gutenberg.org/files/18269/18269-h/18269-h.htm#SECTION_VI)
 
-**A Markdown writing and typesetting workspace for WeChat Official Accounts, built for humans and AI to work on the same draft.**
+**Turn one Markdown document into a WeChat article, Xiaohongshu image cards or a long-form event recap. Build interactive WeChat stories in the same workspace, too.**
 
-Use Reed as a complete WeChat article editor, ask the AI you already use to draft or revise an article, or connect your own agent through MCP and let it work directly on the current document. You still finish the article in the browser: review the text, shape the structure, handle images, choose the presentation, and copy the result into WeChat.
+Reed is a free, open-source writing and typesetting tool that runs in your browser. Write your content, choose a format, adjust layouts, fonts and images, then copy it into WeChat or export finished images. Work on your own, use your favorite AI to draft, or connect an agent through MCP to edit the current article directly.
 
-However much AI is involved, the source remains ordinary Markdown: readable, editable, exportable, and independent of any model or writing platform.
+**[Open Reed](https://wechat.yoru-and-akari.dev)** · [Explore WeChat themes](https://wechat.yoru-and-akari.dev/themes) · [AI writing Skill](https://wechat.yoru-and-akari.dev/skill.md)
 
-**[Open Reed →](https://wechat.yoru-and-akari.dev)**
+Built by Yoru and continuously refined through everyday use. The interface supports Chinese and English. You can start editing and exporting without installation or signing in. If you find it useful, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is appreciated.
 
-[Theme library](https://wechat.yoru-and-akari.dev/themes) · [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) · [Acknowledgements](https://wechat.yoru-and-akari.dev/references)
-
-Made by Yoru, as a personal project that is continuously used and improved. The interface switches between Chinese and English (Chinese by default, remembered per browser); browsers at 1200px and wider get three draggable columns; 640–1199px shows Edit and Preview side by side, with Images & settings in a right-hand drawer; phones switch between Edit / Preview / Images & settings one pane at a time. A five-step tour runs on the first wide-screen visit and can be replayed from settings. If Reed is useful to you, a [GitHub Star](https://github.com/yoruuuchan/wechat-md-studio) is welcome.
-
-| Light · akari | Dark · yoru |
+| Light interface · akari | Dark interface · yoru |
 |:--:|:--:|
-| ![Reed with Markdown, a WeChat article preview and an image panel](docs/images/editor-akari.png) | ![Reed in dark mode, with the article kept on white paper](docs/images/editor-yoru.png) |
+| ![Reed's Markdown editor, WeChat article preview and media sidebar](docs/images/editor-akari.png) | ![Reed in dark mode with a white article preview](docs/images/editor-yoru.png) |
 
-## Why Reed
+## What you can make
 
-- **Your document stays yours.** Markdown is the single content source. AI, browser editing, preview, copy and export all work around the same draft.
-- **Bring your own AI.** The public Skill can be given to ChatGPT, Claude, Codex, OpenCode or any other AI that can read text or links. Reed itself does not require a model API for this workflow.
-- **Humans keep the final mile.** AI can draft, organize and revise; you can continue in the real editor to review the wording, reshape sections, handle images, switch themes and decide what actually gets published.
-- **Typesetting is inspectable.** All 227 themes consume the same semantic AST and rendering pipeline, so they can be compared against the same content. Author, license and provenance information stay attached to adapted themes.
-- **The output is made for WeChat.** Preview, full-document copy, selection copy and article HTML export share the same renderer and produce fully inline HTML for WeChat Official Accounts.
+| Mode | What you can do | Output |
+|---|---|---|
+| **WeChat Official Account articles** | Live Markdown typesetting; 227 themes, filtering and side-by-side comparison; cropped images, equations, tables, diagrams, quotes, galleries and carousels | **Paste rich text into WeChat**, or export inline-styled article HTML |
+| **Xiaohongshu image cards** | Automatically paginate an article and create its cover; choose built-in and public templates, aspect ratios and backgrounds; preview template thumbnails, customize colors and fonts, import `.reedcard` templates | **1080px PNGs** or a ZIP of the complete set |
+| **Long-form event recaps** | Arrange a vertical story from headings, cover photos, sections and photo groups; automatically align consecutive photos in equal-height rows; customize template colors and fonts | **1080 / 1440px JPG or PNG**, split into multiple images when necessary |
+| **Interactive WeChat stories** | Visually arrange text, icons, emoji and illustrations, with five scroll, touch, swipe and reveal interaction patterns | **Copy into WeChat** with interactive behavior |
 
-## Three ways to work
+WeChat articles, Xiaohongshu cards and long images share **one Markdown source**; switch modes in the top bar to present it differently. Interactive stories use their own visual composer, integrated into the same editor workspace.
 
-### 1. Write and typeset it yourself
+## Why use Reed?
 
-Markdown is on the left, the live article preview in the middle, and the current mode's theme or card template followed by images and settings on the right. The most prominent control in the top bar switches between **WeChat article** and **Xiaohongshu cards**. Choose a theme, revise the structure, upload and crop images, adjust credits, copy the entire article as rich text, or select a passage in the preview and copy only that part.
+- **Separate content from presentation.** Your document stays ordinary Markdown. Change the WeChat theme, switch card templates or generate a long image without rewriting the source.
+- **Choose by looking.** Compare up to three WeChat themes using the same draft. Card and long-image templates have thumbnails rendered by the actual layout engine.
+- **Make templates your own.** Supported card and long-image templates expose color and title/body font controls. Choose among 15 bundled Chinese fonts or add font files of your own; image export handles the selected fonts.
+- **Fewer steps from draft to publication.** Paste rich text from Word or the web, import Markdown / DOCX, and edit against a live preview. WeChat output uses inline styles, with preflight checks for unfinished diagrams, empty image placeholders and inaccessible image URLs.
+- **Bring your own AI.** The writing dialog shares a public Skill; the diagram dialog points to an external diagram Skill. No model API key is needed in Reed. For direct edits, authorize an agent via document-scoped Remote MCP.
+- **Take your work with you.** Drafts stay in your browser by default and can be exported as Markdown, HTML or a complete backup. No account is required. The site owner also has a cloud draft library.
+- **Open source with attribution.** Reed is AGPL-3.0-or-later licensed, and adapted themes retain author, license and source metadata.
 
-Routine drafts are stored locally in your browser by default. Editing, typesetting, image uploads, copying and exports work without login. Hosted images are transferred into WeChat when you paste the article; check WeChat's own preview before publishing.
+## Start in three steps
 
-### 2. Give your AI Reed's writing rules
+1. **Bring your content:** [Open Reed](https://wechat.yoru-and-akari.dev), type or paste Markdown, import Markdown / DOCX, or paste rich text from Word or a web page.
+2. **Pick a format:** Switch between WeChat articles, Xiaohongshu cards and long images in the top bar. Choose a theme or template, then adjust images, colors and typography. Switch to **Motion** for interactive content.
+3. **Copy or export:** Paste WeChat articles into the WeChat editor; download PNG / JPG cards or long images; copy interactive stories into WeChat. Export the source document whenever you need it.
 
-Open **AI 帮我写** (“Help me write”) in the editor and send your topic, audience, source material and desired length to the AI you already use. The public [Writing Skill](https://wechat.yoru-and-akari.dev/skill.md) describes Reed's Markdown dialect, article structures, image references and writing precautions.
+## Create with AI
 
-If your AI can open links, send it the Skill URL. Otherwise, copy the full Skill text. Paste the generated Markdown back into Reed and continue editing. The interface provides three ready-made actions: **copy prompt, copy Skill URL, and copy full Skill**. No login, AI brand selection or model API configuration is required.
+**Draft with your own AI.** Open **AI 帮我写** (Help me write), copy the prompt or the [writing Skill](skills/wechat-typesetter/SKILL.md) URL, and pass it to ChatGPT, Claude, Codex, OpenCode or another AI. Paste the Markdown it produces back into Reed for editing, styling and image handling. If your AI cannot open links, use the dialog's full-Skill copy action. The writing Skill is currently written in Chinese.
 
-The website, public endpoint and MCP tool all expose [the same repository Skill](skills/wechat-typesetter/SKILL.md). The Skill is currently in Chinese; its syntax examples are the shared reference.
+**Make diagrams with your own AI.** Open **AI 画图表** (Diagram with AI) to see sample architecture diagrams, flowcharts and charts. Copy a prompt and the external [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill URL, then upload the resulting PNG into your article. Reed provides the handoff, not an in-app image-generation model.
 
-The editor also offers **AI 画图表** (“Diagram with AI”), which works exactly the same way: hand the content to the AI you already use and let it read the [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill (by patrick-xin, MIT; its Chinese typography rules build on the English original [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) by Cathryn Lavery), choose the diagram type that fits and export a PNG suited to an article illustration. The dialog opens with three finished examples, so the output is visible before you commit. Here the two actions are **copy Skill URL** and **copy prompt** — Reed calls no model API and neither hosts nor changes that Skill. Drop the finished PNG into the editor or upload it from the toolbar, and it lands in the media library at your cursor.
+**Let an agent edit the current article.** Under **Settings → Advanced → AI directly edits current document**, create a Remote MCP connection. It works without signing in, is authorized per document, and lets the agent read the Skill and draft and write changes back to the browser. Concurrent edits are resolved explicitly. [Remote MCP guide](docs/remote-mcp.md).
 
-### 3. Let your own AI / agent edit the current document
-
-Open **设置 → 高级功能 → AI 直接编辑当前稿件** (“Settings → Advanced → Let AI edit this document”) and create a **Remote MCP** connection. Guests can use it too. Reed provides a Streamable HTTP endpoint and Bearer authorization header; configure them in a compatible MCP client and the agent can read the writing Skill, read this document and update its Markdown directly.
-
-Authorization is scoped to one visitor and one document. AI edits appear automatically in the open browser, while browser edits sync back to the temporary collaboration copy. Every write carries the hash of the version it read; the article name and body are both part of that version. Stale writes are rejected; if both sides have unsynced changes, the browser pauses synchronization and lets you keep both versions, keep the local version or use the AI version. Revoking access or letting the connection expire leaves the complete local draft intact.
-
-```mermaid
-flowchart LR
-  S[Public writing Skill] --> A[AI / Agent]
-  A -->|Draft Markdown| D[Current document]
-  H[Human editing and typesetting] <--> D
-  A <-->|Remote MCP| D
-  D --> P[Paste into WeChat]
-```
-
-[Remote MCP documentation](docs/remote-mcp.md) covers client configuration, the three MCP tools, synchronization and authorization lifetime. A native OpenCode client has been tested end to end. Other clients use their own standard HTTP MCP setup. ChatGPT connectors may require a separate OAuth adapter; the core server uses document-scoped Bearer authorization.
+An [Agent REST API and Python client](docs/agent-api.md) are also available for the site owner's cloud documents: push a draft, refine it in the browser, then read back the result.
 
 ## Editor and typesetting
 
