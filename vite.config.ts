@@ -31,5 +31,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    // Font slices stay separate files: the browser fetches only the
+    // unicode-range slices the text uses, while an inlined slice would be
+    // downloaded with the entry stylesheet whether it is used or not.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/i.test(file) ? false : undefined),
   },
 });

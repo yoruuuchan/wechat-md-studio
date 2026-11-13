@@ -39,22 +39,54 @@ export function catalogFont(family: string): CatalogFont | undefined {
 }
 
 /**
- * Stylesheets src/index.css already imports. Everything else is linked on
- * first use so the editor's first paint does not parse a dozen 100 KB sheets.
+ * Stylesheets src/index.css imports: the interface fonts (Geist, Geist Mono,
+ * Noto Sans SC) and Noto Serif SC 700. Everything else is linked on first use
+ * so the editor's first paint does not parse a dozen 100 KB sheets.
  */
-const GLOBAL_SHEETS = new Set([
+export const GLOBAL_FONT_SHEETS: ReadonlySet<string> = new Set([
   '/fonts/fonts-local.css',
   '/fonts/noto-sans-sc-local.css',
-  '/fonts/fonts-templates.css',
-  '/fonts/fonts-design.css',
 ])
 
-/** Families whose @font-face rules live in a sheet that is loaded on demand. */
-const ON_DEMAND_SHEETS = new Map(
-  CHOOSABLE_FONTS.filter((font) => !GLOBAL_SHEETS.has(font.sheet)).map((font) => [font.family, font.sheet]),
-)
+/**
+ * The two shared sheets that templates and article themes draw on, with the
+ * families each declares. font-catalog.test.ts reads the CSS files and fails
+ * when this list and the sheets disagree.
+ */
+export const SHARED_FONT_SHEETS: Readonly<Record<string, readonly string[]>> = {
+  '/fonts/fonts-templates.css': [
+    'Caveat', 'EB Garamond', 'IBM Plex Mono', 'IBM Plex Sans', 'Inter', 'JetBrains Mono', 'Noto Serif SC',
+  ],
+  '/fonts/fonts-design.css': [
+    'Anton', 'B612 Mono', 'Bebas Neue', 'Chakra Petch', 'DM Serif Display', 'DotGothic16', 'Instrument Sans',
+    'Instrument Serif', 'JetBrains Mono', 'Major Mono Display', 'Orbitron', 'Pixelify Sans', 'Press Start 2P',
+    'Rajdhani', 'Share Tech Mono', 'Space Grotesk', 'Tinos', 'VT323',
+  ],
+}
 
-export const ON_DEMAND_FONT_SHEETS: readonly string[] = [...new Set(ON_DEMAND_SHEETS.values())]
+/**
+ * Family → the on-demand sheets declaring it. One family can sit in several
+ * sheets with different weights (Noto Serif SC 700 is global, 400 is in the
+ * template sheet; JetBrains Mono 400 and 700 are in different sheets).
+ */
+const ON_DEMAND_SHEETS = new Map<string, string[]>()
+function addSheet(family: string, sheet: string) {
+  if (GLOBAL_FONT_SHEETS.has(sheet)) return
+  const sheets = ON_DEMAND_SHEETS.get(family) ?? []
+  if (!sheets.includes(sheet)) sheets.push(sheet)
+  ON_DEMAND_SHEETS.set(family, sheets)
+}
+for (const font of CHOOSABLE_FONTS) addSheet(font.family, font.sheet)
+for (const [sheet, families] of Object.entries(SHARED_FONT_SHEETS)) {
+  for (const family of families) addSheet(family, sheet)
+}
+
+export const ON_DEMAND_FONT_SHEETS: readonly string[] = [...new Set([...ON_DEMAND_SHEETS.values()].flat())]
+
+/** The on-demand sheets a family needs; empty for global and unknown families. */
+export function fontSheetsFor(family: string): readonly string[] {
+  return ON_DEMAND_SHEETS.get(family) ?? []
+}
 
 const linked = new Map<string, Promise<void>>()
 
@@ -66,9 +98,12 @@ const linked = new Map<string, Promise<void>>()
 export function ensureFontSheets(families: Iterable<string>): Promise<void> {
   if (typeof document === 'undefined') return Promise.resolve()
   const pending: Promise<void>[] = []
+  // Sheet → the first family that asked for it (kept on the link for checks).
+  const sheets = new Map<string, string>()
   for (const family of families) {
-    const sheet = ON_DEMAND_SHEETS.get(family)
-    if (!sheet) continue
+    for (const sheet of fontSheetsFor(family)) if (!sheets.has(sheet)) sheets.set(sheet, family)
+  }
+  for (const [sheet, family] of sheets) {
     let ready = linked.get(sheet)
     if (!ready) {
       ready = new Promise<void>((resolve) => {
@@ -89,4 +124,27 @@ export function ensureFontSheets(families: Iterable<string>): Promise<void> {
     pending.push(ready)
   }
   return Promise.all(pending).then(() => undefined)
+}
+
+/**
+ * Families named in `font-family` declarations of rendered HTML or CSS. Theme
+ * output is inline styles, so this reads both `style="font-family: …"` and
+ * entity-quoted names (`&quot;EB Garamond&quot;`).
+ */
+export function fontFamiliesIn(markup: string): Set<string> {
+  const families = new Set<string>()
+  // Decode quote entities first: the `;` in `&quot;` would end the value.
+  const text = markup.replace(/&quot;|&#34;|&#39;|&#x27;/g, '"')
+  for (const match of text.matchAll(/font-family\s*:\s*([^;"}>]*(?:"[^"]*"[^;"}>]*)*)/gi)) {
+    for (const part of match[1].split(',')) {
+      const name = part.trim().replace(/^["']|["']$/g, '').trim()
+      if (name) families.add(name)
+    }
+  }
+  return families
+}
+
+/** Link the on-demand sheets for every family the markup uses. */
+export function ensureFontSheetsFor(markup: string): Promise<void> {
+  return ensureFontSheets(fontFamiliesIn(markup))
 }

@@ -45,6 +45,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 稿件删除 / 撤销 / 回收站 | `node scripts/cdp-verify-draft-recovery.mjs 4101 9701` | 登录前后新稿的删除、立即撤销、撤销期结束后回收站恢复与刷新持久化、彻底删除；云端稿件的撤销 / 回收站；未同步正文与改名的删除、撤销及刷新恢复；remove / restore 故障注入 |
 | 本机正文读取失败 | `node scripts/cdp-verify-storage-read-failure.mjs 4102 9702` | 一次 / 持续 `getAll` 失败、IndexedDB 打开失败、真实缺失正文、云端 stub、主动清空、旧版迁移失败；每项都核对 IndexedDB 原件未被空串覆盖 |
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
+| 按需字体表 | `node scripts/cdp-verify-theme-fonts.mjs 4133 9733` | 首屏样式不含模板 / 设计字体表的字体、不内联字体文件、界面字体仍是网页字体；逐个切到设计主题与手写主题，在预览里读 Chrome 实际渲染字体，确认按需加载的字体真正生效 |
 | 慢网云端保存 | `node scripts/cdp-verify-slow-cloud-save.mjs 4131 9731` | 每次保存请求拖慢 2.5 秒、分段连续输入：不误报冲突、同一篇同时最多一个保存在路上、云端拿到全部内容；零延迟对照 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
@@ -64,7 +65,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[draft-recovery](../scripts/cdp-verify-draft-recovery.mjs)、
 [storage-read-failure](../scripts/cdp-verify-storage-read-failure.mjs)、
-[save-status](../scripts/cdp-verify-save-status.mjs)、[slow-cloud-save](../scripts/cdp-verify-slow-cloud-save.mjs)、
+[save-status](../scripts/cdp-verify-save-status.mjs)、[slow-cloud-save](../scripts/cdp-verify-slow-cloud-save.mjs)、[theme-fonts](../scripts/cdp-verify-theme-fonts.mjs)、
 [guest-save-guidance](../scripts/cdp-verify-guest-save-guidance.mjs)、
 [mobile-panes](../scripts/cdp-verify-mobile-panes.mjs)、
 [public-cards](../scripts/cdp-verify-public-cards.mjs)、

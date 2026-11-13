@@ -9,7 +9,9 @@
  * editor or the rest of the page. No template code is ever executed.
  */
 import DOMPurify from 'dompurify'
-import JSZip from 'jszip'
+// Type only: the zip library is fetched when a package is first opened, so
+// it stays out of the editor's entry bundle.
+import type JSZip from 'jszip'
 import {
   CARD_TEMPLATE_LIMITS, CardTemplateError, extensionOf, isAllowedTemplatePath,
   normalizeTemplatePath, parseCardTemplateManifest,
@@ -122,9 +124,11 @@ export async function openCardTemplateArchive(data: ArrayBuffer): Promise<CardTe
   if (data.byteLength > CARD_TEMPLATE_LIMITS.archiveBytes) {
     throw new CardTemplateError('archive-too-large', `${data.byteLength} bytes`)
   }
+  // Outside the try: a failed chunk download is a network error, not a bad zip.
+  const { default: Zip } = await import('jszip')
   let zip: JSZip
   try {
-    zip = await JSZip.loadAsync(data)
+    zip = await Zip.loadAsync(data)
   } catch (error) {
     throw new CardTemplateError('bad-zip', error instanceof Error ? error.message : String(error))
   }

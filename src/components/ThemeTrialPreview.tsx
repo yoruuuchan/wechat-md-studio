@@ -9,6 +9,7 @@ import { resolveImgSrc } from '@/lib/image'
 import type { SignatureConfig } from '@/lib/types'
 import type { ParsedTrialDoc } from '@/hooks/useTrialArticle'
 import { useI18n } from '@/hooks/useI18n'
+import { ensureFontSheetsFor } from '@/lib/font-catalog'
 
 type Sig = SignatureConfig
 
@@ -81,6 +82,8 @@ export function ThemeTrialPreview({
       (code) => diagrams.get(code) ?? null,
     ).html
   }, [impl, doc, sig, math, diagrams])
+  // Themes may name a family from a sheet that is not on the first paint.
+  useEffect(() => { if (html) void ensureFontSheetsFor(html) }, [html])
 
   useLayoutEffect(() => {
     const el = innerRef.current

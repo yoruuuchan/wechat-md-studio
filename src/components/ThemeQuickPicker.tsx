@@ -5,6 +5,7 @@ import { loadAllThemes } from '@/lib/theme-api'
 import type { ThemeCatalogEntry } from '@/lib/theme-meta'
 import { useThemeFavorites } from '@/hooks/useThemeFavorites'
 import { useI18n } from '@/hooks/useI18n'
+import { ensureFontSheetsFor } from '@/lib/font-catalog'
 
 const QUICK_PER_CAT = 6
 const QUICK_FAVORITES = 6
@@ -92,6 +93,9 @@ export default function ThemeQuickPicker({ themeId, onTheme, renderPreview, onOp
     }
     return out
   }, [quickThemes, displayedIds, renderPreview])
+  const previewMarkup = useMemo(() => Object.values(quickPreviews).join(''), [quickPreviews])
+  // Themes may name a family from a sheet that is not on the first paint.
+  useEffect(() => { if (previewMarkup) void ensureFontSheetsFor(previewMarkup) }, [previewMarkup])
 
   const quickTile = (th: ThemeCatalogEntry) => {
     const preview = quickPreviews[th.id]

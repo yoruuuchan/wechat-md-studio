@@ -58,7 +58,8 @@ README / README_EN 的界面截图共用 `docs/images/`，界面结构或品牌�
 
 - 延续语义 AST → Theme 的边界和已有测试确认的行为。成熟模块优先复用当前实现，特别是 parser、裁切、富文本转换与上传链路。
 - 微信正文输出服从 renderer 与 `verify:themes`：单一根 `section`、内联样式、文字 leaf 包装，图片短引用必须解析。具体标签、样式、公式及比例规则见 [渲染说明](docs/rendering.md) 和验证脚本。
-- 主题注册、来源、License 与 attribution 使用现有统一数据源；`themes-imported/` 是生成物，修改 importer 后重生成，保留完整 metadata 与许可副本。首屏只读 metadata 目录，主题实现通过 `theme-api.ts` 按来源加载；新增主题时让 importer 一并生成 catalog / loaders，不要在页面里重新 import 完整注册表。
+- 主题注册、来源、License 与 attribution 使用现有统一数据源；`themes-imported/` 是生成物，修改 importer 后重生成，保留完整 metadata 与许可副本。自研 / 手写 / 设计主题的目录 `themes-local-catalog.ts` 也是生成物，改了这些主题的 id、名称、描述、分类、ui 或 meta 后跑 `npm run gen:local-themes`（过期时 `theme-local-catalog.test.ts` 会失败）；只有自研主题随首屏加载，手写与设计主题和导入主题一样按需加载。
+- 首屏样式只引入界面字体表（`fonts-local.css`、`noto-sans-sc-local.css`）；模板与设计字体表由 [font-catalog.ts](src/lib/font-catalog.ts) 在主题输出、模板或字体选择用到时按需链接，新增字体表时同步 `SHARED_FONT_SHEETS` 或 `CHOOSABLE_FONTS`（`font-catalog.test.ts` 会核对）。字体文件不内联进 CSS。首屏只读 metadata 目录，主题实现通过 `theme-api.ts` 按来源加载；新增主题时让 importer 一并生成 catalog / loaders，不要在页面里重新 import 完整注册表。
 - 保存、同步、图片处理与 Agent API 的失败必须显式、可诊断。保留保存状态、上传警告与冲突结果；`savedAt` 表示归档，内容 hash / `baseHash` 表示并发版本。存储协议、升级与覆盖语义见 [稿件说明](docs/documents.md) 和 [Agent API](docs/agent-api.md)。
 - 并行开发使用独立 worktree / branch。开工时确认主线和其他开发线状态；修改 `EditorPage`、Theme 总注册表、schema 等共享入口前确认文件分工与合并顺序。端口、数据库、图床隔离和统一部署流程见 [HANDOFF](HANDOFF.md)。
 - 凭证只进被忽略的本机配置或环境变量；验收使用独立数据与 mock / 本地图床。生产发布和真实环境变更按 HANDOFF 执行。

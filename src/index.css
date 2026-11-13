@@ -1,7 +1,8 @@
 @import url("/fonts/fonts-local.css");
 @import url("/fonts/noto-sans-sc-local.css");
-@import url("/fonts/fonts-templates.css");
-@import url("/fonts/fonts-design.css");
+/* fonts-templates.css and fonts-design.css are linked on first use by
+   src/lib/font-catalog.ts (templates, cards and article themes that name
+   one of their families), not on the editor's first paint. */
 
 @tailwind base;
 @tailwind components;
