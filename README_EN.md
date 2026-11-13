@@ -3,7 +3,7 @@
 # Reed · 芦苇
 
 > “Man is but a reed, the most feeble thing in nature; but he is a thinking reed.”
-> — Blaise Pascal, [Pensées, `347](https://www.gutenberg.org/files/18269/18269-h/18269-h.htm#SECTION_VI)
+> — Blaise Pascal, [Pensées, §347](https://www.gutenberg.org/files/18269/18269-h/18269-h.htm#SECTION_VI)
 
 **Turn one Markdown document into a WeChat article, Xiaohongshu image cards or a long-form event recap. Build interactive WeChat stories in the same workspace, too.**
 
@@ -48,7 +48,7 @@ WeChat articles, Xiaohongshu cards and long images share **one Markdown source**
 
 **Draft with your own AI.** Open **AI 帮我写** (Help me write), copy the prompt or the [writing Skill](skills/wechat-typesetter/SKILL.md) URL, and pass it to ChatGPT, Claude, Codex, OpenCode or another AI. Paste the Markdown it produces back into Reed for editing, styling and image handling. If your AI cannot open links, use the dialog's full-Skill copy action. The writing Skill is currently written in Chinese.
 
-**Make diagrams with your own AI.** Open **AI 画图表** (Diagram with AI) to see sample architecture diagrams, flowcharts and charts. Copy a prompt and the external [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill URL, then upload the resulting PNG into your article. Reed provides the handoff, not an in-app image-generation model.
+**Make diagrams with your own AI.** Open **AI 画图表** (Diagram with AI) to see sample architecture diagrams, flowcharts and charts. Copy a prompt and the external [diagram-design-zh](https://github.com/patrick-xin/diagram-design-zh) Skill URL (Chinese adaptation by patrick-xin, MIT, based on [Cathryn Lavery's original](https://github.com/cathrynlavery/diagram-design)), then upload the resulting PNG into your article. Reed provides the handoff, not an in-app image-generation model.
 
 **Let an agent edit the current article.** Under **Settings → Advanced → AI directly edits current document**, create a Remote MCP connection. It works without signing in, is authorized per document, and lets the agent read the Skill and draft and write changes back to the browser. Concurrent edits are resolved explicitly. [Remote MCP guide](docs/remote-mcp.md).
 
