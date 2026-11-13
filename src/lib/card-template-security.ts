@@ -217,6 +217,9 @@ const ALLOWED_ATTR = [
   'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity',
   'preserveaspectratio', 'text-anchor', 'dominant-baseline', 'font-family',
   'font-size', 'font-weight', 'aria-hidden', 'aria-label',
+  // URL attribute, but scanHtml checks it against the package before this
+  // list is consulted; DOMPurify needs it listed or every <img> loses it.
+  'src',
 ]
 
 const URL_ATTRS = new Set(['src', 'href', 'xlink:href', 'poster', 'data', 'action', 'formaction'])

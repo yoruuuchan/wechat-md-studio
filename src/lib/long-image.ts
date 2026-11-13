@@ -7,6 +7,9 @@
  * the last standalone `---`.
  */
 import type { Block, Doc } from './types'
+import { commentRanges, isInComment } from './comments'
+import { fencedRanges, isInFence } from './fences'
+import { imageOnlyLine } from './parse'
 
 export const LONG_WIDTH = 540
 export const LONG_EXPORT_WIDTHS = [1080, 1440] as const
@@ -137,21 +140,30 @@ type BuildBlock = Block | RawPhotosBlock
 /**
  * Runs of image-only source lines. Markdown merges these into one paragraph
  * and Reed's AST intentionally drops inline images, so the long engine reads
- * the same lines back at the source level.
+ * the same lines back at the source level, with the parser's own image
+ * grammar, and skips lines inside code fences and HTML comments, which are
+ * examples, not photos.
  */
 export function scanPhotoRuns(source: string): { start: number; end: number; photos: LongPhoto[] }[] {
-  const lines = source.replace(/\r\n?/g, '\n').split('\n')
+  const text = source.replace(/\r\n?/g, '\n')
+  const fences = fencedRanges(text)
+  const comments = commentRanges(text, fences)
+  const lines = text.split('\n')
   const runs: { start: number; end: number; photos: LongPhoto[] }[] = []
   let current: { start: number; end: number; photos: LongPhoto[] } | null = null
+  let offset = 0
   for (let index = 0; index < lines.length; index++) {
-    const text = lines[index].trim()
-    const match = /^!\[([^\]]*)\]\((.+)\)$/.exec(text)
-    if (!match) {
-      if (text && current) { runs.push(current); current = null }
+    const line = lines[index]
+    const lineStart = offset
+    offset += line.length + 1
+    const hidden = isInFence(fences, lineStart) || isInComment(comments, lineStart)
+    const images = hidden ? null : imageOnlyLine(line)
+    if (!images) {
+      if ((hidden || line.trim()) && current) { runs.push(current); current = null }
       continue
     }
     if (!current) current = { start: index, end: index + 1, photos: [] }
-    current.photos.push({ alt: match[1].trim(), src: match[2].trim() })
+    for (const image of images) current.photos.push({ alt: image.alt, src: image.src })
     current.end = index + 1
   }
   if (current) runs.push(current)

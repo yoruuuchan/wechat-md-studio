@@ -286,7 +286,7 @@ try {
   await expectState('saved', 'unarchived', first.id)
   check('signed-in unarchived work is not mislabeled as synced or failed', (await status()).cloud === 'unarchived')
   holdCloud = true
-  await click(`[...document.querySelectorAll('header button')].find(button=>button.textContent.trim()==='保存到草稿箱')`)
+  await click(`document.querySelector('[data-save-draft-quick]')`)
   await expectState(null, 'saving', first.id)
   for (let i = 0; i < 50 && !held.length; i++) await sleep(100)
   check('a real pending archive request is shown as cloud saving', held.length > 0)
@@ -364,7 +364,13 @@ try {
     await closeDetails()
   }
 
-  await click(`document.querySelector('button[data-lang="en"]')`)
+  // The language and theme switches now live in the settings tab, opened from
+  // 更多 → 外观与语言, the same path the i18n check takes.
+  await click(`document.querySelector('[data-topbar-more]')`)
+  await waitFor(`!!document.querySelector('[data-more-item="appearance-language"]')`, 'more menu')
+  await click(`document.querySelector('[data-more-item="appearance-language"]')`)
+  await waitFor(`!!document.querySelector('[data-settings-item="language"] [data-lang="en"]')`, 'settings tab')
+  await evaluate(`document.querySelector('[data-settings-item="language"] [data-lang="en"]').click()`)
   await waitFor(`document.documentElement.lang==='en'`, 'English language')
   await openDetails()
   // The single "Export backup" action became two explicit ones (Markdown and
@@ -373,7 +379,7 @@ try {
   check('English save details contain translated states and actions', await evaluate(`document.querySelector('[data-save-details]').innerText.includes('Saved locally')&&document.querySelector('[data-save-details]').innerText.includes('Download Markdown')&&document.querySelector('[data-save-details]').innerText.includes('Download full backup')`))
   await screenshot('save-details-light-en.png')
   await closeDetails()
-  await click(`document.querySelector('button[title="Dark"]')`)
+  await evaluate(`document.querySelector('button[title="Dark"]').click()`)
   await waitFor(`document.documentElement.dataset.theme==='yoru'`, 'dark theme')
   await openDetails()
   check('save details remain legible in dark mode', await evaluate(`document.documentElement.classList.contains('dark')&&getComputedStyle(document.querySelector('[data-save-details]')).color!==getComputedStyle(document.querySelector('[data-save-details]')).backgroundColor`))

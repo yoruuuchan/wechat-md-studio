@@ -199,6 +199,8 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     if (meta.sha256 !== digest) {
       throw new CardTemplateCloudError(0, 'checksum_mismatch', meta.id)
     }
+    // Server time, as pushLocal does, so later comparisons never mix clocks.
+    record.updatedAt = meta.uploadedAt
     record.cloudUploadedAt = meta.uploadedAt
     await activateCardTemplate(record)
     await saveCardTemplateRecord(record)

@@ -313,7 +313,12 @@ export function computeTileCuts(
   return cuts
 }
 
-function cutCandidates(root: HTMLElement): number[] {
+/**
+ * Block edges a tile may end on: every flow child, the blocks inside each
+ * section body and inside the preamble (the text before the first H2, which
+ * is the whole article when there is no H2), and every photo row.
+ */
+export function cutCandidates(root: HTMLElement): number[] {
   const base = root.getBoundingClientRect().top
   const out: number[] = []
   const add = (element: Element) => {
@@ -324,11 +329,12 @@ function cutCandidates(root: HTMLElement): number[] {
   const flow = root.querySelector<HTMLElement>('.reed-long-flow') ?? root
   for (const child of Array.from(flow.children)) {
     add(child)
-    if (child.classList.contains('reed-long-section')) {
-      const body = child.querySelector<HTMLElement>('.reed-long-section-body')
-      if (body) for (const block of Array.from(body.children)) add(block)
-      for (const row of Array.from(child.querySelectorAll('.reed-long-photo-row'))) add(row)
-    }
+    const body = child.classList.contains('reed-long-section')
+      ? child.querySelector<HTMLElement>('.reed-long-section-body')
+      : child.classList.contains('reed-long-preamble') ? child as HTMLElement : null
+    if (!body) continue
+    for (const block of Array.from(body.children)) add(block)
+    for (const row of Array.from(child.querySelectorAll('.reed-long-photo-row'))) add(row)
   }
   return out
 }

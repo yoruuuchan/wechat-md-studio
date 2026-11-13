@@ -254,6 +254,16 @@ describe('HTML whitelist', () => {
     })
   }
 
+  it('keeps package images and inline image data on <img>', () => {
+    const files = new Map([['pages/logo.png', { path: 'pages/logo.png', bytes: new Uint8Array([1, 2, 3]) }]])
+    const withAsset = { files, resolve: (path: string) => path === 'pages/logo.png' ? 'data:image/png;base64,AQID' : null }
+    const packaged = sanitizeTemplateHtml('<img src="logo.png" alt="logo">', 'pages/cover.html', withAsset)
+    expect(packaged).toContain('src="data:image/png;base64,AQID"')
+    expect(packaged).toContain('alt="logo"')
+    const inline = sanitizeTemplateHtml('<img src="data:image/png;base64,AQID" alt="dot">', 'pages/cover.html', context)
+    expect(inline).toContain('src="data:image/png;base64,AQID"')
+  })
+
   it('keeps declarative slots and basic SVG shapes', () => {
     const html = '<div class="xhs-cover"><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"></circle></svg><h1 data-slot="title" data-fit-cover-title></h1></div>'
     const clean = sanitizeTemplateHtml(html, 'pages/cover.html', context)

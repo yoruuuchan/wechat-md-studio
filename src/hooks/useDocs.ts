@@ -134,6 +134,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const deepLinkDone = useRef(false)
   const saveTimer = useRef<number | null>(null)
   const pendingRef = useRef<Set<string>>(new Set())
+  // Articles with a save on the wire. A second save of the same article must
+  // wait for the first answer: it would carry the base hash from before the
+  // first save, and the server would refuse it as a conflict with ourselves.
+  const inFlightRef = useRef<Set<string>>(new Set())
   // 最近一次已落库的内容，用来判断是否真的需要再写一次
   const lastSavedRef = useRef<Map<string, SyncedDocument>>(new Map())
   const docsRef = useRef<DocRecord[]>([])
@@ -692,14 +696,19 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     async (ids: string[]) => {
       if (!enabled) return
       // 只把已经进过草稿箱的、且真的握着正文的稿件同步上去
+      // An article still waiting for its previous save is skipped here; when
+      // that answer lands it updates baseHash, the debounce effect runs again
+      // and picks up whatever was typed meanwhile.
       const targets = docs.filter(
         (d) =>
           ids.includes(d.id) &&
           d.savedAt !== null &&
           d.contentLoaded !== false &&
-          !conflicts.has(d.id),
+          !conflicts.has(d.id) &&
+          !inFlightRef.current.has(d.id),
       )
       if (!targets.length) return
+      for (const d of targets) inFlightRef.current.add(d.id)
       setSyncState('saving')
       markCloudWrites(targets.map((d) => d.id), 1)
       const found: [string, ConflictCurrent][] = []
@@ -748,6 +757,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
         setSyncState('error')
         setNotice(t('docs.syncFailed'))
       } finally {
+        for (const d of targets) inFlightRef.current.delete(d.id)
         markCloudWrites(targets.map((d) => d.id), -1)
       }
     },

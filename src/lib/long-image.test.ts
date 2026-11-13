@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseMarkdown } from './parse'
 import type { Block, Doc, InlineSeg } from './types'
 import {
-  buildLongDocument, layoutPhotoGroup, photoRowSizes, resampledPhotoWidth, textUnits,
+  buildLongDocument, layoutPhotoGroup, photoRowSizes, resampledPhotoWidth, scanPhotoRuns, textUnits,
 } from './long-image'
 
 const at = (line: number): { line: number; lineEnd: number } => ({ line, lineEnd: line + 1 })
@@ -175,6 +175,44 @@ describe('long-image mapping from the real parser', () => {
     expect(group?.type === 'photos' && group.photos.map((photo) => photo.src)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
     expect(model.hasFooter).toBe(true)
     expect(model.footer).toContain('共同走过这一年。')
+  })
+
+  it('does not take image examples in code fences or comments as photos', () => {
+    const md = [
+      '# 标题', '', '```md', '![示例](example.jpg)', '![示例](example2.jpg)', '```', '',
+      '<!-- ![草稿](draft.jpg) -->', '',
+      '## 一节', '', '说明', '', '![a](a.jpg)', '![b](b.jpg)', '',
+    ].join('\n')
+    expect(scanPhotoRuns(md).flatMap((run) => run.photos.map((photo) => photo.src))).toEqual(['a.jpg', 'b.jpg'])
+    const model = buildLongDocument(parseMarkdown(md), md, render)
+    expect(model.cover).toBe('')
+    const group = model.sections[0].blocks.find((block) => block.type === 'photos')
+    expect(group?.type === 'photos' && group.photos.map((photo) => photo.src)).toEqual(['a.jpg', 'b.jpg'])
+  })
+
+  it('reads image lines with the article grammar: titles, brackets, <…> targets, two per line', () => {
+    const md = [
+      '![a](a.jpg "活动照片")',
+      '![图[1]](b.jpg)',
+      '![c](<my photo.jpg>)',
+      '![d](d.jpg) ![e](e.jpg)',
+      '',
+      '正文',
+    ].join('\n')
+    const runs = scanPhotoRuns(md)
+    expect(runs).toHaveLength(1)
+    expect(runs[0].photos).toEqual([
+      { alt: 'a', src: 'a.jpg' },
+      { alt: '图[1]', src: 'b.jpg' },
+      { alt: 'c', src: 'my%20photo.jpg' },
+      { alt: 'd', src: 'd.jpg' },
+      { alt: 'e', src: 'e.jpg' },
+    ])
+  })
+
+  it('ends a photo run at a line that holds more than images', () => {
+    const runs = scanPhotoRuns('![a](a.jpg)\n![b](b.jpg) 配文\n![c](c.jpg)')
+    expect(runs.map((run) => run.photos.map((photo) => photo.src))).toEqual([['a.jpg'], ['c.jpg']])
   })
 })
 
