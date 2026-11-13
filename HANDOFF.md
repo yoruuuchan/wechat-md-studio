@@ -1041,6 +1041,21 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > 与同名 `.db`，`flock` 安装，服务于 **2026-11-13 02:54:27 UTC** 重启。
 > 核对：线上 `dist/boot.js` sha256 = 本地 `03315b3b…`（服务端代码没变）；入口 `index-mIjKMC7K.js` / `index-B5YnkUNf.css`；
 > `verify-all.sh` 通过；`card_templates` 14 行（站长上传了 5 套）、`motion_drafts` 0 行。公网只读冒烟 28/28。
+>
+> 2026-11-13 部署记录（审计第二轮：首屏瘦身、安装脚本、三个小毛病）：`0e0441a`（3 个提交快进合入 master）。首屏样式只带界面字体，
+> 模板 / 设计字体表按需链接，字体文件不再内联（入口 CSS gzip 313→152 KB，`@font-face` 827→447）；手写与设计主题、JSZip 按需加载
+> （入口 JS gzip 690→648 KB）；安装脚本换名替换 dist，健康检查不过就回滚并以 `FAILED` 非零退出；MCP 资源在授权失效时回 -32002
+> 和工具一致的原因；同一模板包重复上传替换原副本，删除清掉同 id 的所有本地副本。
+> `check`、`lint`（0 错误，原有 2 条警告）、`test` 3114 项、`verify:themes`、`verify:sources`、`build`（`[pack-public] 9 card + 1 long`、
+> `[pack-motion] 328 files`）全过；安装脚本用桩命令模拟 9/9（健康升级、失败回滚、回滚也失败、首装失败）；浏览器检查：新增按需字体
+> 16/16、模板上传（新增重复上传与删除后不复活三项，旧代码第一项失败）、长图 30/30、模板自定义 25/25、公用卡片 452/452、小红书卡片、
+> 手机布局 152/152、保存状态 29/29、`ui-modes` 128/128、`ui-nits` 134/134、主题试用、深色主题。`themes9`（9 套模板时代的过时检查）、
+> `i18n` 的反馈邮件两项（本地无邮件服务）、`selection-copy` 的复制按钮一项、`theme-library` 的 15 套 `maxWidth` 在线上版本 `1405dc6`
+> 上逐项相同，不是本次引入。生产包 108,311,568 B，sha256 `e9905a98…`，26×4MB 分块上传且逐块核对；安装前备份
+> `dist-20261113T043825Z-08a52fe6` 与同名 `.db`，`flock` 安装（首次由新安装脚本执行，健康检查一次通过），服务于
+> **2026-11-13 04:38:34 UTC** 重启。核对：线上 `dist/boot.js` sha256 = 本地 `8b6c5717…`；入口 `index-DAhpae6w.js` / `index-IQv0KQSl.css`，
+> 线上实传 gzip 649,064 B / 150,664 B；`/fonts/fonts-design.css`、`/fonts/fonts-templates.css` 及其字体文件 200；无 `dist.prev` /
+> `dist.new` / `dist.failed` 残留；`verify-all.sh` 通过；`card_templates` 14 行、`motion_drafts` 0 行。公网只读冒烟 28/28。
 
 ---
 
