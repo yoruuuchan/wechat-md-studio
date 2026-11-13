@@ -301,12 +301,12 @@ export default function EditorPage() {
     activeId,
     setActiveId,
     activeDoc,
-    activeLoading,
-    activeError,
-    activeBodyError,
+    contentReadable,
+    contentReadiness,
+    contentReadinessFor,
+    retryContent,
     retryLocalBodies,
     retryingLocal,
-    retryHydrate,
     activeConflict,
     resolveConflictKeepLocal,
     resolveConflictUseRemote,
@@ -324,7 +324,12 @@ export default function EditorPage() {
     removeDoc,
     undoRemove,
     saveCurrentToDrafts,
-  } = useDocs({ enabled: isAuthenticated, deepLinkId, onDeepLinkSettled: clearDeepLink })
+  } = useDocs({
+    enabled: isAuthenticated,
+    deepLinkId,
+    onDeepLinkSettled: clearDeepLink,
+    authPending: authLoading || authFetching,
+  })
 
   const remoteMcp = useRemoteMcp({ docs, activeId, setDocs })
   const remoteConflictKey = remoteMcp.conflict ? `${activeId}:${remoteMcp.conflict.hash}` : null
@@ -491,6 +496,8 @@ export default function EditorPage() {
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null)
   /** What the check was opened for, clicked through once the author agrees. */
   const pendingPublish = useRef<PublishAction | null>(null)
+  /** The article that check belongs to; a switch makes the findings stale. */
+  const pendingPublishDoc = useRef<string | null>(null)
 
   const renderThemePreview = useCallback(
     (previewTheme: Theme) => renderDoc(parsed, previewTheme, settings.sig, resolveImgSrc).html,
@@ -575,6 +582,20 @@ export default function EditorPage() {
   docsRef.current = docs
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
+  /**
+   * Read the body state at the moment an action runs, not the render it was
+   * requested in: the publish check can stay open while the author switches
+   * articles, logs out or a fetch fails. The callback is refreshed on every
+   * render, so a late click sees the latest hydration / session facts.
+   */
+  const contentReadinessRef = useRef(contentReadinessFor)
+  contentReadinessRef.current = contentReadinessFor
+  const blockedBodyReason = (): string | null => {
+    const doc = docsRef.current.find((d) => d.id === activeIdRef.current) ?? null
+    const readiness = contentReadinessRef.current(doc)
+    if (readiness.readable) return null
+    return t(readiness.reasonKey ?? 'docs.bodyLoading')
+  }
   /** One timer owns the copy confirmation; repeat clicks replace it. */
   const copiedTimerRef = useRef<number | null>(null)
   const clearCopiedTimer = useCallback(() => {
@@ -819,8 +840,9 @@ export default function EditorPage() {
     const docId = activeIdRef.current
     clearCopiedTimer()
     setCopied(false)
-    if (activeBodyError) {
-      toast.error(activeBodyError)
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      toast.error(blocked)
       return
     }
     const { article, snapshot } = currentArticle()
@@ -843,6 +865,13 @@ export default function EditorPage() {
   const handleCopy = () => void startPublish('copy')
 
   const exportHtml = (kind: 'clean' | 'page', allowUnfinished: boolean, notices?: PreflightReport) => {
+    // A download is the last irreversible step here; the placeholder check is
+    // therefore repeated even when the caller already looked a moment ago.
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      toast.error(blocked)
+      return
+    }
     const { article, doc, snapshot } = currentArticle()
     const name = doc?.name || t('io.fallbackArticle')
     const { html } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
@@ -880,8 +909,11 @@ export default function EditorPage() {
    * away is how an unfinished formula used to reach the clipboard.
    */
   const startPublish = (kind: PublishAction) => {
-    if (kind === 'copy' && activeBodyError) {
-      toast.error(activeBodyError)
+    // Content, not just rendering: a body this browser does not hold must never
+    // reach the clipboard or a file, whatever the menus say.
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      toast.error(blocked)
       return
     }
     const { article, snapshot } = currentArticle()
@@ -898,6 +930,7 @@ export default function EditorPage() {
       if (snapshot.status(f.tex, f.display) === 'pending') void mathRenderer.warm(f.tex, f.display)
     }
     pendingPublish.current = kind
+    pendingPublishDoc.current = activeIdRef.current
     setPreflightReport(report)
   }
 
@@ -914,6 +947,26 @@ export default function EditorPage() {
   const confirmPublish = ({ allowUnfinished }: { allowUnfinished: boolean }) => {
     const kind = pendingPublish.current
     if (!kind) return
+    // The panel belongs to the article it was opened on. Switching articles
+    // while it was up means these findings no longer describe the open one:
+    // start the check over instead of copying the new article behind old advice.
+    if (pendingPublishDoc.current !== activeIdRef.current) {
+      pendingPublish.current = null
+      pendingPublishDoc.current = null
+      setPreflightReport(null)
+      startPublish(kind)
+      return
+    }
+    // The body can have gone away while the panel was open (a retry failed, a
+    // logout kept a stub). Check again here, not only when the click opened it.
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      pendingPublish.current = null
+      pendingPublishDoc.current = null
+      setPreflightReport(null)
+      toast.error(blocked)
+      return
+    }
     if (!allowUnfinished) {
       const { article, snapshot } = currentArticle()
       const fresh = buildPreflightReport(article, snapshot)
@@ -940,13 +993,17 @@ export default function EditorPage() {
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
     // Copying or exporting the placeholder would hand the author an empty
     // article. The bundle path has its own check in hydrateAllForExport.
-    if (kind !== 'bundle' && activeBodyError) {
-      toast.error(activeBodyError)
-      return
+    if (kind !== 'bundle') {
+      const blocked = blockedBodyReason()
+      if (blocked) {
+        toast.error(blocked)
+        return
+      }
     }
     if (kind === 'markdown') {
-      const name = activeDoc?.name || t('io.fallbackArticle')
-      const f = toMarkdownFile(name, activeDoc?.content || '')
+      const doc = docsRef.current.find((d) => d.id === activeIdRef.current)
+      const name = doc?.name || t('io.fallbackArticle')
+      const f = toMarkdownFile(name, doc?.content ?? '')
       downloadFile(f.filename, f.content, f.mime)
       toast.success(t('editor.toast.exportedMarkdown'), { description: t('editor.toast.exportedMarkdownDesc') })
       return
@@ -1721,31 +1778,35 @@ export default function EditorPage() {
       </div>
       <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} scrollable={phone} />
       <div className="min-h-0 flex-1">
-        {activeBodyError ? (
+        {contentReadiness.state !== 'ready' ? (
+          // No body, no editor: an empty CodeMirror would look like an empty
+          // article the author could type into and then save over the real one.
           <div
-            data-local-body-error
+            data-body-state={contentReadiness.state}
+            data-local-body-error={contentReadiness.retry === 'local' ? true : undefined}
+            role={contentReadiness.state === 'loading' ? 'status' : undefined}
             className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
           >
-            <p className="text-[13px] text-ink-2">{activeBodyError}</p>
-            <button
-              data-local-retry
-              onClick={() => void retryLocalBodies()}
-              disabled={retryingLocal}
-              className="ya-btn ya-btn-secondary"
-            >
-              {t('common.retry')}
-            </button>
-          </div>
-        ) : activeLoading || activeError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            {activeLoading ? (
-              <p className="text-[13px] text-ink-3">{t('editor.loadingDoc')}</p>
+            {contentReadiness.state === 'loading' ? (
+              <p data-body-loading className="text-[13px] text-ink-3">
+                {t('docs.bodyLoading')}
+              </p>
             ) : (
               <>
-                <p className="text-[13px] text-ink-2">{activeError}</p>
-                <button onClick={retryHydrate} className="ya-btn ya-btn-secondary">
-                  {t('common.retry')}
-                </button>
+                <p data-body-state-reason className="text-[13px] text-ink-2">
+                  {t(contentReadiness.reasonKey ?? 'docs.bodyLoading')}
+                </p>
+                {contentReadiness.retry && (
+                  <button
+                    data-body-retry={contentReadiness.retry}
+                    data-local-retry={contentReadiness.retry === 'local' ? true : undefined}
+                    onClick={retryContent}
+                    disabled={retryingLocal}
+                    className="ya-btn ya-btn-secondary"
+                  >
+                    {t('common.retry')}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1891,7 +1952,12 @@ export default function EditorPage() {
         docs={docs}
         activeId={activeId}
         docName={activeDoc?.name || ''}
-        onRename={(name) => updateActive({ name })}
+        onRename={(name) => {
+          // Renaming an unloaded article would be overwritten by the body that
+          // arrives later; the input is disabled too, this is the belt.
+          if (!contentReadiness.readable) return
+          updateActive({ name })
+        }}
         onSelectDoc={setActiveId}
         onCreateDoc={() => addDoc()}
         onCreateSample={() => addSampleDoc()}
@@ -1912,7 +1978,8 @@ export default function EditorPage() {
           })
         }}
         saveStatus={saveStatus}
-        readable={Boolean(activeDoc && activeDoc.contentLoaded !== false)}
+        readable={contentReadable}
+        readableReason={contentReadiness.readable ? null : t(contentReadiness.reasonKey ?? 'docs.bodyLoading')}
         retryingLocal={retryingLocal}
         onRetryLocal={() => void retryLocalBodies()}
         onRetryCloud={() => void retryCloudSave()}

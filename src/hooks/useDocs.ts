@@ -21,6 +21,7 @@ import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merg
 import { BUNDLE_IMPORT_BATCH_SIZE } from '@/lib/import-export'
 import { LOCAL_RESTORE, mergeLocalCommit, type LocalDocRecord, type LocalRestoreBase } from '@/lib/local-docs'
 import { articleSaveStatus, sameLocalReceipt, type LocalSaveReceipt } from '@/lib/save-status'
+import { bodyReadiness } from '@/lib/body-readiness'
 import { useI18n } from '@/hooks/useI18n'
 
 export type SyncState = 'loading' | 'synced' | 'saving' | 'local' | 'error'
@@ -64,6 +65,11 @@ interface Options {
    */
   deepLinkId?: string | null
   onDeepLinkSettled?: (found: boolean) => void
+  /**
+   * Authentication is still resolving. A retained stub is not "unavailable"
+   * while this is true: the session that can fetch it may still arrive.
+   */
+  authPending?: boolean
 }
 
 /**
@@ -80,7 +86,7 @@ interface Options {
  * 正文按需加载：列表只给元数据，打开哪篇才拉哪篇的正文（contentLoaded=false
  * 的 stub 不参与编辑和自动保存，也不会写进本地缓存）。
  */
-export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
+export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = false }: Options) {
   const { t } = useI18n()
   const [docs, setDocs] = useState<DocRecord[]>([])
   const [activeId, setActiveId] = useState('')
@@ -107,7 +113,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const [conflicts, setConflicts] = useState<Map<string, ConflictCurrent>>(new Map())
   /** Id of the article whose body is being fetched, if any. */
   const [hydrating, setHydrating] = useState<string | null>(null)
-  const [hydrateError, setHydrateError] = useState<{ id: string; message: string } | null>(null)
+  const [hydrateError, setHydrateError] = useState<{ id: string } | null>(null)
   /** A manual retry of the local body store is in flight. */
   const [retryingLocal, setRetryingLocal] = useState(false)
   /** Bumped after a successful local retry so a paused cloud merge runs again. */
@@ -620,7 +626,7 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
           ),
         )
       } catch {
-        setHydrateError({ id, message: t('docs.hydrateFailed') })
+        setHydrateError({ id })
       } finally {
         setHydrating(null)
       }
@@ -1293,6 +1299,32 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     if (doc && doc.contentLoaded === false) void hydrateDoc(doc.id)
   }, [hydrateDoc])
 
+  /**
+   * The one answer to "does this browser hold the open article's text?".
+   * A changed hydrate / auth value recomputes it; a caller that needs the fact
+   * at the moment an action runs passes the document it is acting on.
+   */
+  const contentReadinessFor = useCallback(
+    (doc: DocRecord | null) =>
+      bodyReadiness({
+        doc,
+        hydrating: Boolean(doc && hydrating === doc.id),
+        loadFailed: Boolean(doc && hydrateError?.id === doc.id),
+        enabled,
+        authPending,
+      }),
+    [hydrating, hydrateError, enabled, authPending],
+  )
+
+  /** Retry whichever read can actually bring the body back. */
+  const retryContent = useCallback(() => {
+    const current = docsRef.current.find((doc) => doc.id === activeIdRef.current)
+    if (!current) return
+    const readiness = contentReadinessFor(current)
+    if (readiness.retry === 'local') void retryLocalBodies()
+    else if (readiness.retry === 'cloud') retryHydrate()
+  }, [contentReadinessFor, retryLocalBodies, retryHydrate])
+
   const trashDocs = useMemo(() => {
     if (!enabled) return localTrash
     const cloud = (trashQuery.data ?? []).map(
@@ -1323,14 +1355,9 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
   const hasUnsavedChanges = Boolean(activeDoc && dirtyIds.has(activeDoc.id))
   const neverSaved = Boolean(activeDoc && activeDoc.savedAt === null)
   const activeConflict = activeDoc ? conflicts.get(activeDoc.id) ?? null : null
-  // A body that failed to read, or is really absent, must not be edited as if
-  // it were an empty article: the editor shows this instead of the text.
-  const activeBodyError =
-    activeDoc &&
-    activeDoc.contentLoaded === false &&
-    (activeDoc.bodyState === 'read-failed' || activeDoc.bodyState === 'missing')
-      ? t(activeDoc.bodyState === 'read-failed' ? 'docs.bodyReadFailed' : 'docs.bodyMissing')
-      : null
+  // The body's trustworthiness, not the article's name or the cloud's state:
+  // every editor surface that reads, edits or hands out `content` starts here.
+  const contentReadiness = contentReadinessFor(activeDoc)
 
   const saveStatus = activeDoc ? articleSaveStatus({
     doc: activeDoc,
@@ -1368,15 +1395,12 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled }: Options) {
     activeId,
     setActiveId,
     activeDoc,
-    activeLoading: Boolean(activeDoc && activeDoc.contentLoaded === false && hydrating === activeDoc.id),
-    activeError:
-      activeDoc && hydrateError?.id === activeDoc.id && activeDoc.contentLoaded === false
-        ? hydrateError.message
-        : null,
-    activeBodyError,
+    contentReadable: contentReadiness.readable,
+    contentReadiness,
+    contentReadinessFor,
+    retryContent,
     retryLocalBodies,
     retryingLocal,
-    retryHydrate,
     activeConflict,
     resolveConflictKeepLocal,
     resolveConflictUseRemote,

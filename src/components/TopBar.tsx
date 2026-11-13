@@ -29,7 +29,10 @@ interface Props {
   onCreateSample: () => void
   onDeleteDoc: (id: string) => void
   saveStatus: ArticleSaveStatus | null
+  /** The browser holds the open article's real body; actions that hand it out work. */
   readable: boolean
+  /** Why a blocked action cannot run yet; null once the body has loaded. */
+  readableReason?: string | null
   retryingLocal: boolean
   onRetryLocal: () => void
   onRetryCloud: () => void
@@ -238,15 +241,18 @@ export default function TopBar(p: Props) {
   const { t } = useI18n()
 
   const copyLabel = p.wide ? t('topbar.copy') : t('topbar.copyShort')
+  const blockedReason = p.readable ? null : p.readableReason ?? t('docs.bodyLoading')
   const copyButton = (
     <button
       data-onboarding="copy"
       data-topbar-primary
       data-copied={p.copied ? 'true' : undefined}
+      data-copy-blocked={p.readable ? undefined : 'true'}
       aria-hidden={p.motion ? true : undefined}
+      disabled={!p.readable}
       onClick={p.onCopy}
-      title={t('topbar.copy')}
-      aria-label={p.copied ? t('common.copied') : copyLabel}
+      title={blockedReason ?? t('topbar.copy')}
+      aria-label={!p.readable && blockedReason ? blockedReason : p.copied ? t('common.copied') : copyLabel}
       className={`ya-btn whitespace-nowrap ${p.motion ? 'invisible' : ''} ${p.copied ? 'ya-btn-copied' : 'ya-btn-primary'} ${p.phone ? '!px-1 !text-[12px]' : 'px-4'}`}
     >
       {/* Both labels sit in one grid cell, so the button keeps the wider
@@ -325,7 +331,7 @@ export default function TopBar(p: Props) {
     ) : copyButton
 
   return (
-    <header data-topbar className="ya-glass flex shrink-0 flex-col">
+    <header data-topbar data-content-readable={p.readable ? 'true' : 'false'} className="ya-glass flex shrink-0 flex-col">
       <div data-topbar-main className={`flex h-14 items-center ${p.phone ? 'gap-1.5 px-2' : 'gap-2 px-3'}`}>
         {/* Left: brand, article name and the save state. At 640px the longer
             English labels do not fit beside a fixed-width name column, so below
@@ -348,9 +354,10 @@ export default function TopBar(p: Props) {
               data-doc-name
               value={p.docName}
               onChange={(e) => p.onRename(e.target.value)}
+              disabled={!p.readable}
               placeholder={t('common.unnamedDoc')}
-              className={`w-full min-w-0 bg-transparent py-1 text-[13px] text-ink-1 text-ellipsis outline-none placeholder:text-ink-4 ${p.phone ? '!px-0' : 'px-1.5'}`}
-              title={t('topbar.docNameTitle')}
+              className={`w-full min-w-0 bg-transparent py-1 text-[13px] text-ink-1 text-ellipsis outline-none placeholder:text-ink-4 disabled:cursor-not-allowed disabled:text-ink-4 ${p.phone ? '!px-0' : 'px-1.5'}`}
+              title={blockedReason ?? t('topbar.docNameTitle')}
             />
             <DropdownMenu>
               <DropdownMenuTrigger className="shrink-0 rounded-r-lg px-1.5 py-1 outline-none" title={t('topbar.switchDoc')}>
@@ -477,13 +484,13 @@ export default function TopBar(p: Props) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <p className="ya-eyebrow px-2 pb-1 pt-1.5">{t('topbar.export')}</p>
-              <DropdownMenuItem data-more-item="export-markdown" data-export="markdown" onSelect={() => p.onExport('markdown')} className="rounded-lg">
+              <DropdownMenuItem data-more-item="export-markdown" data-export="markdown" data-export-blocked={p.readable ? undefined : 'true'} disabled={!p.readable} title={blockedReason ?? undefined} onSelect={() => p.onExport('markdown')} className="rounded-lg">
                 {t('topbar.export.markdown')}
               </DropdownMenuItem>
-              <DropdownMenuItem data-more-item="export-clean" data-export="clean" onSelect={() => p.onExport('clean')} className="rounded-lg">
+              <DropdownMenuItem data-more-item="export-clean" data-export="clean" data-export-blocked={p.readable ? undefined : 'true'} disabled={!p.readable} title={blockedReason ?? undefined} onSelect={() => p.onExport('clean')} className="rounded-lg">
                 {t('topbar.export.clean')}
               </DropdownMenuItem>
-              <DropdownMenuItem data-more-item="export-page" data-export="page" onSelect={() => p.onExport('page')} className="rounded-lg">
+              <DropdownMenuItem data-more-item="export-page" data-export="page" data-export-blocked={p.readable ? undefined : 'true'} disabled={!p.readable} title={blockedReason ?? undefined} onSelect={() => p.onExport('page')} className="rounded-lg">
                 {t('topbar.export.page')}
               </DropdownMenuItem>
               <DropdownMenuItem data-more-item="export-bundle" data-export="bundle" onSelect={() => p.onExport('bundle')} className="rounded-lg">
