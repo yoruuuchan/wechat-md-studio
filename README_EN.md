@@ -15,7 +15,7 @@ Built by Yoru and continuously refined through everyday use. The interface suppo
 
 | Light interface · akari | Dark interface · yoru |
 |:--:|:--:|
-| ![Reed's Markdown editor, WeChat article preview and media sidebar](docs/images/editor-akari.png) | ![Reed in dark mode with a white article preview](docs/images/editor-yoru.png) |
+| ![Reed's Markdown editor, WeChat article preview and media sidebar](docs/images/reed-wechat-editor.png) | ![Reed in dark mode with a white article preview](docs/images/editor-yoru.png) |
 
 ## What you can make
 
@@ -27,6 +27,13 @@ Built by Yoru and continuously refined through everyday use. The interface suppo
 | **Interactive WeChat stories** | Visually arrange text, icons, emoji and illustrations, with five scroll, touch, swipe and reveal interaction patterns | **Copy into WeChat** with interactive behavior |
 
 WeChat articles, Xiaohongshu cards and long images share **one Markdown source**; switch modes in the top bar to present it differently. Interactive stories use their own visual composer, integrated into the same editor workspace.
+### Screenshots from the live site
+
+| Xiaohongshu cards: pagination and templates | Long images: layout and export settings |
+|:--:|:--:|
+| ![Reed's Xiaohongshu card mode with automatic pagination and template thumbnails](docs/images/reed-xiaohongshu-cards.png) | ![Reed's long-image mode with blue event recap template and export settings](docs/images/reed-long-image.png) |
+
+![Motion composer with visual canvas, elements and interaction sequence](docs/images/reed-motion-composer.png)
 
 For example, after writing an event recap, you can choose a WeChat theme and paste the result into WeChat; switch to Xiaohongshu cards to paginate it, pick a template and export a set of images; then switch to long-image mode to arrange the event photos into a vertical recap. **It's still one Markdown document**, so you don't have to maintain three versions of the same text.
 
@@ -64,7 +71,7 @@ An [Agent REST API and Python client](docs/agent-api.md) are also available for 
 
 Every theme card renders the same sample article, so comparisons show the theme rather than different content. Switch to the current article to trial it, or put up to three candidates side by side; trying and comparing never edit the article or save a theme. Source project, color and license information stay on each card; the author appears under the card's source details.
 
-![Theme library with filters and real rendered previews](docs/images/theme-library.png)
+![Theme library with filters and real rendered previews](docs/images/reed-theme-library.png)
 
 A closer look at the default `golden` theme, including first-line indentation, numbered headings, highlights, link footnotes, pull quotes and quotation boxes:
 
