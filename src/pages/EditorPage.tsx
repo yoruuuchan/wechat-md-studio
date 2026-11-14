@@ -1901,6 +1901,7 @@ export default function EditorPage() {
       themeId={settings.themeId}
       onTheme={(id) => setSettings((s) => ({ ...s, themeId: id }))}
       renderPreview={renderThemePreview}
+      themePanelVisible={!phone || pane === 'side'}
       onOpenThemes={() => navigate('/themes')}
       cardOptions={cardOptions}
       onCardOptionsChange={setCardOptions}
