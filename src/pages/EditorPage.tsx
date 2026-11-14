@@ -69,7 +69,7 @@ import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import PaneSwitcher, { type EditorPaneId } from '@/components/PaneSwitcher'
-import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
+import { useDocs, UNDO_DELETE_MS, type BundleCloudResult } from '@/hooks/useDocs'
 import { useRemoteMcp } from '@/hooks/useRemoteMcp'
 import AiWritingDialog from '@/components/AiWritingDialog'
 import AiDiagramDialog from '@/components/AiDiagramDialog'
@@ -93,7 +93,6 @@ import {
   MAX_BUNDLE_BYTES,
   bundleFilename,
   docxToDocxImport,
-  mergeBundleDocs,
   parseBundle,
   parseMarkdownFile,
   safeFilename,
@@ -324,6 +323,8 @@ export default function EditorPage() {
     removeDoc,
     undoRemove,
     saveCurrentToDrafts,
+    importBundle,
+    retryBundleImport,
   } = useDocs({
     enabled: isAuthenticated,
     deepLinkId,
@@ -1060,6 +1061,61 @@ export default function EditorPage() {
     })
   }
 
+  /**
+   * The account half of a bundle import, reported on its own.
+   *
+   * The local count was already toasted when the articles appeared in the
+   * library; these messages only ever describe what reached the server, so a
+   * successful local import can never read like a successful sync.
+   */
+  function reportBundleCloud(cloud: BundleCloudResult) {
+    if (cloud.status === 'signed-out') {
+      toast.info(t('editor.toast.bundleCloudSignedOut'))
+      return
+    }
+    if (cloud.status === 'not-ready') {
+      toast.warning(t('editor.toast.bundleCloudNotReady'))
+      return
+    }
+    const done = cloud.imported + cloud.existing
+    if (cloud.failed > 0) {
+      toast.warning(t('editor.toast.bundleCloudPartial', { ok: done, failed: cloud.failed }), {
+        description: t('editor.toast.bundleCloudPartialDesc'),
+        duration: 9000,
+        action: cloud.failedIds.length
+          ? { label: t('common.retry'), onClick: () => void retryBundleCloud(cloud.failedIds) }
+          : undefined,
+      })
+      return
+    }
+    if (cloud.conflicts > 0) {
+      toast.warning(t('editor.toast.bundleCloudConflict', { n: cloud.conflicts }), {
+        description: t('editor.toast.bundleCloudConflictDesc'),
+        duration: 9000,
+      })
+      return
+    }
+    if (cloud.imported === 0) {
+      toast.info(t('editor.toast.bundleCloudAlreadyThere', { n: cloud.existing }))
+      return
+    }
+    toast.success(t('editor.toast.bundleCloudDone', { n: cloud.imported }), {
+      description: cloud.existing
+        ? t('editor.toast.bundleCloudExisting', { n: cloud.existing })
+        : undefined,
+    })
+  }
+
+  /** Re-send only the ids an earlier import could not confirm. */
+  async function retryBundleCloud(ids: string[]) {
+    const cloud = await retryBundleImport(ids)
+    if (cloud.status === 'signed-out' || cloud.status === 'not-ready' || cloud.failed > 0 || cloud.conflicts > 0) {
+      reportBundleCloud(cloud)
+      return
+    }
+    toast.success(t('editor.toast.bundleRetryDone', { n: cloud.imported + cloud.existing }))
+  }
+
   const handleImportFile = async (file: File, kind: 'markdown' | 'docx' | 'bundle') => {
     setImporting(true)
     try {
@@ -1092,16 +1148,18 @@ export default function EditorPage() {
         toast.error(t('editor.toast.bundleUnreadable'), { description: result.reason, duration: 9000 })
         return
       }
-      // Ids are kept as they are: an existing article always wins, and the
-      // cloud import uses insert-only batches after the local library settles.
-      const merged = mergeBundleDocs(docs, result.docs)
-      setDocs(merged.docs)
+      // Ids are kept as they are: an existing article always wins and is never
+      // uploaded again. The truly new ids then go to the account through the
+      // insert-only import batches once the login merge has completed; the local
+      // result is toasted here and the cloud result separately below it.
+      const receipt = await importBundle(result.docs)
       if (result.settings) setSettings((s) => ({ ...s, ...result.settings! }))
-      toast.success(t('editor.toast.importedCount', { n: merged.added }), {
-        description: merged.skipped
-          ? t('editor.toast.importedSkipped', { n: merged.skipped })
+      toast.success(t('editor.toast.importedCount', { n: receipt.added }), {
+        description: receipt.skipped
+          ? t('editor.toast.importedSkipped', { n: receipt.skipped })
           : undefined,
       })
+      reportBundleCloud(receipt.cloud)
     } catch (e) {
       toast.error(t('editor.toast.importFailed'), { description: e instanceof Error ? e.message : t('editor.toast.importUnknown') })
     } finally {

@@ -3,12 +3,15 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
+  BUNDLE_IMPORT_BATCH_SIZE,
   BUNDLE_MIME,
   BUNDLE_VERSION,
   MAX_BUNDLE_BYTES,
   MAX_BUNDLE_DOCS,
   MARKDOWN_MIME,
   bundleFilename,
+  bundleImportBatches,
+  classifyBundleImportHashes,
   docxToDocxImport,
   mergeBundleDocs,
   parseBundle,
@@ -17,6 +20,7 @@ import {
   toBundle,
   toMarkdownFile,
 } from './import-export'
+import { documentHash } from './content-hash'
 import type { DocRecord } from './store'
 
 // ---------- fixtures ----------
@@ -559,6 +563,143 @@ describe('parseBundle', () => {
     expect(merged.skipped).toBe(1)
     expect(merged.docs.map((d) => d.id)).toEqual(['new-id', 'same-id'])
     expect(merged.docs.find((d) => d.id === 'same-id')).toEqual(existing)
+  })
+})
+
+// ---------- bundle → cloud import ----------
+
+describe('mergeBundleDocs', () => {
+  it('reports only the truly new ids, in bundle order, and never touches local bodies', () => {
+    const existing = [
+      doc({ id: 'kept-id', name: '本机标题', content: '本机正文不能丢 ==保留==' }),
+      doc({ id: 'local-only', name: '只在本地', content: '本地独有正文' }),
+    ]
+    const incoming = [
+      doc({ id: 'new-second', name: '新增二', content: '新增正文二' }),
+      doc({ id: 'kept-id', name: '备份标题', content: '备份正文覆盖' }),
+      doc({ id: 'new-first', name: '新增一', content: '新增正文一' }),
+      doc({ id: 'local-only', name: '备份里的本地稿', content: '备份正文覆盖' }),
+    ]
+
+    const merged = mergeBundleDocs(existing, incoming)
+
+    // The upload list is exactly these two, in the order the backup listed them.
+    expect(merged.addedDocs.map((d) => d.id)).toEqual(['new-second', 'new-first'])
+    expect(merged.addedDocs.map((d) => d.content)).toEqual(['新增正文二', '新增正文一'])
+    expect(merged.added).toBe(2)
+    expect(merged.skipped).toBe(2)
+
+    // Fresh articles lead the library; local records follow untouched.
+    expect(merged.docs.map((d) => d.id)).toEqual([
+      'new-second',
+      'new-first',
+      'kept-id',
+      'local-only',
+    ])
+    expect(merged.docs.find((d) => d.id === 'kept-id')).toEqual(existing[0])
+    expect(merged.docs.find((d) => d.id === 'kept-id')?.content).toBe('本机正文不能丢 ==保留==')
+    expect(merged.docs.find((d) => d.id === 'local-only')?.content).toBe('本地独有正文')
+  })
+
+  it('is a no-op when the backup only repeats ids already on this device', () => {
+    const existing = [doc({ id: 'replayed', name: '已存在', content: '本机最新正文' })]
+    const merged = mergeBundleDocs(existing, [
+      doc({ id: 'replayed', name: '旧备份', content: '旧正文' }),
+    ])
+
+    expect(merged.addedDocs).toEqual([])
+    expect(merged.added).toBe(0)
+    expect(merged.skipped).toBe(1)
+    expect(merged.docs).toEqual(existing)
+  })
+
+  it('adds nothing when the backup carries no articles', () => {
+    const existing = [doc()]
+    const merged = mergeBundleDocs(existing, [])
+    expect(merged.addedDocs).toEqual([])
+    expect(merged.added).toBe(0)
+    expect(merged.skipped).toBe(0)
+    expect(merged.docs).toEqual(existing)
+  })
+})
+
+describe('bundleImportBatches', () => {
+  it('splits a 205-article import into 100 / 100 / 5', () => {
+    const items = Array.from({ length: 205 }, (_, i) => `doc-${i}`)
+    const batches = bundleImportBatches(items)
+
+    expect(BUNDLE_IMPORT_BATCH_SIZE).toBe(100)
+    expect(batches.map((b) => b.length)).toEqual([100, 100, 5])
+    // Order is preserved: a batch is a slice of the original list.
+    expect(batches.flat()).toEqual(items)
+  })
+
+  it('returns no request for an empty import', () => {
+    expect(bundleImportBatches([])).toEqual([])
+  })
+
+  it('splits exactly on the batch boundary and keeps a short final chunk', () => {
+    const make = (n: number) => Array.from({ length: n }, (_, i) => i)
+
+    expect(bundleImportBatches(make(1)).map((b) => b.length)).toEqual([1])
+    expect(bundleImportBatches(make(100)).map((b) => b.length)).toEqual([100])
+    expect(bundleImportBatches(make(101)).map((b) => b.length)).toEqual([100, 1])
+    expect(bundleImportBatches(make(200)).map((b) => b.length)).toEqual([100, 100])
+    for (const batch of bundleImportBatches(make(205))) {
+      expect(batch.length).toBeLessThanOrEqual(BUNDLE_IMPORT_BATCH_SIZE)
+      expect(batch.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('classifyBundleImportHashes', () => {
+  const storedDoc = doc({ id: 'stored-1', name: '同稿', content: '同稿正文 ==重点==' })
+  const conflictDoc = doc({ id: 'conflict-1', name: '同名稿', content: '本机这一版' })
+  const missingDoc = doc({ id: 'missing-1', name: '没回执', content: '服务端没给 hash' })
+
+  it('separates stored, conflict and unknown by comparing the returned hash', async () => {
+    const storedHash = await documentHash(storedDoc.name, storedDoc.content)
+    const otherHash = await documentHash(conflictDoc.name, '云端存的另一版')
+    const hashes = {
+      [storedDoc.id]: storedHash,
+      [conflictDoc.id]: otherHash,
+    }
+
+    const result = await classifyBundleImportHashes(
+      [storedDoc, conflictDoc, missingDoc],
+      hashes,
+    )
+
+    expect(result).toBeInstanceOf(Map)
+    expect(result.size).toBe(3)
+    expect(result.get('stored-1')).toEqual({ status: 'stored', hash: storedHash })
+    expect(result.get('conflict-1')).toEqual({ status: 'conflict', hash: otherHash })
+    // No hash came back for this id, so nothing may be claimed either way.
+    expect(result.get('missing-1')).toEqual({ status: 'unknown', hash: null })
+
+    // The conflict token is the server's row, not this body's — the caller
+    // must not adopt it as a compare-and-swap base for the incoming text.
+    expect(otherHash).not.toBe(await documentHash(conflictDoc.name, conflictDoc.content))
+  })
+
+  it('treats a renamed article with the same body as a conflict', async () => {
+    // The lock token covers name + content, so a rename is a different document.
+    const renamed = doc({ id: 'renamed-1', name: '本机新标题', content: '同一份正文' })
+    const serverHash = await documentHash('云端旧标题', '同一份正文')
+    const result = await classifyBundleImportHashes([renamed], { 'renamed-1': serverHash })
+    expect(result.get('renamed-1')).toEqual({ status: 'conflict', hash: serverHash })
+  })
+
+  it('ignores server hashes for ids that were not part of this import', async () => {
+    const result = await classifyBundleImportHashes([storedDoc], {
+      'stored-1': await documentHash(storedDoc.name, storedDoc.content),
+      'not-in-bundle': 'fedcba9876543210',
+    })
+    expect(result.has('not-in-bundle')).toBe(false)
+  })
+
+  it('returns an empty map for an empty import', async () => {
+    expect(await classifyBundleImportHashes([], {})).toEqual(new Map())
   })
 })
 

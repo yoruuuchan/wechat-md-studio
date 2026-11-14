@@ -22,6 +22,12 @@
 //      local copy nor claim a restore that did not happen.
 //   D. unsynced cloud articles: body/name changes survive a completed remove,
 //      undo, and a reload into the bin; cloud status waits for a real write.
+//   E. the login merge on a stale cache: device B moves the row into the cloud
+//      bin, or purges it, while device A still holds the archived copy; after
+//      A signs in again the article is an unarchived working copy (never
+//      "synced"), ordinary autosave never writes it back, the body stays local,
+//      and only an explicit "save to drafts" restores/archives it — a second
+//      profile then sees it in the drafts box.
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -515,6 +521,28 @@ const hasToast = (text) => evaluate(`[...document.querySelectorAll('[data-sonner
 /** True once the login merge has settled: the save status has left loading/signed-out. */
 const mergeSettled = () => evaluate(cloudSettledExpr(true))
 
+/**
+ * The local index is written by an effect after the state it mirrors, so a
+ * restore can show on screen before it reaches localStorage. Waiting for the
+ * durable record keeps these checks about the outcome, not about a race.
+ */
+const waitIndexLive = async (id) => {
+  for (let i = 0; i < 40; i++) {
+    const entry = await indexEntryById(id)
+    if (entry && entry.deletedAt === null) return entry
+    await sleep(200)
+  }
+  return indexEntryById(id)
+}
+
+const waitIsLive = async (name) => {
+  for (let i = 0; i < 40; i++) {
+    if (await isLive(name)) return true
+    await sleep(200)
+  }
+  return false
+}
+
 const isLive = (name) =>
   evaluate(`(() => {
     try {
@@ -558,6 +586,124 @@ async function unsyncedEdit(name, content) {
   await sleep(120)
 }
 
+/**
+ * A plain HTTP session, signed in with the owner key. "Device B" and "a second
+ * profile" are both separate cookie jars talking to the same account, which is
+ * exactly what another device looks like to this app.
+ */
+async function httpLogin() {
+  const res = await fetch(`${APP}/api/trpc/auth.login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { accessKey: ACCESS_KEY } }),
+  })
+  const setCookie = res.headers.get('set-cookie') || ''
+  const match = /mopai_sid=([^;]+)/.exec(setCookie)
+  const body = await res.json()
+  if (!match || body?.result?.data?.json?.success !== true) {
+    throw new Error(`HTTP login failed: ${setCookie} ${JSON.stringify(body)}`)
+  }
+  return { value: match[1], cookie: `mopai_sid=${match[1]}` }
+}
+
+async function trpcPost(session, procedure, input) {
+  const res = await fetch(`${APP}/api/trpc/${procedure}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: session.cookie },
+    body: JSON.stringify({ json: input }),
+  })
+  const text = await res.text()
+  let json = null
+  try {
+    json = JSON.parse(text)
+  } catch {
+    /* not JSON */
+  }
+  return { status: res.status, json, text, value: json?.result?.data?.json ?? null }
+}
+
+async function trpcGet(session, procedure, input) {
+  const query = input === undefined ? '' : `?input=${encodeURIComponent(JSON.stringify({ json: input }))}`
+  const res = await fetch(`${APP}/api/trpc/${procedure}${query}`, { headers: { cookie: session.cookie } })
+  const text = await res.text()
+  let json = null
+  try {
+    json = JSON.parse(text)
+  } catch {
+    /* not JSON */
+  }
+  return { status: res.status, json, text, value: json?.result?.data?.json ?? null }
+}
+
+/**
+ * Record every tRPC POST the page makes, so "autosave never wrote this article"
+ * is proven from the bytes on the wire rather than inferred from the UI.
+ * Installed per navigation: a reload creates a fresh window.
+ */
+async function recordTrpcRequests() {
+  await evaluate(`(() => {
+    if (window.__r01RequestsInstalled) return true
+    window.__r01RequestsInstalled = true
+    window.__r01NativeFetchForRecord = window.fetch
+    window.__r01Requests = []
+    window.fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : (input && input.url) || ''
+      const method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase()
+      if (method === 'POST' && url.includes('/api/trpc/')) {
+        window.__r01Requests.push({ url, body: init && typeof init.body === 'string' ? init.body : '' })
+      }
+      return window.__r01NativeFetchForRecord(input, init)
+    }
+    return true
+  })()`)
+}
+
+/** POSTs whose batched procedure list contains exactly docs.save and whose body names this id. */
+const saveRequestsFor = (id) =>
+  evaluate(`(() => {
+    const procedures = (url) => ((url.split('/api/trpc/')[1] || '').split('?')[0].split(','))
+    return JSON.stringify((window.__r01Requests || []).filter((r) => procedures(r.url).includes('docs.save') && r.body.includes(${JSON.stringify(id)})))
+  })()`)
+
+/** Open the drafts box in a brand-new browser profile that only carries the session cookie. */
+async function secondProfileSeesDrafts(name, session) {
+  const context = await send('Target.createBrowserContext')
+  const target = await send('Target.createTarget', { url: 'about:blank', browserContextId: context.browserContextId })
+  const second = (await send('Target.attachToTarget', { targetId: target.targetId, flatten: true })).sessionId
+  try {
+    await send('Page.enable', {}, second)
+    await send('Network.enable', {}, second)
+    await send('Runtime.enable', {}, second)
+    await send(
+      'Network.setCookie',
+      { name: 'mopai_sid', value: session.value, url: `${APP}/`, path: '/', httpOnly: true },
+      second,
+    )
+    await send('Page.navigate', { url: `${APP}/drafts` }, second)
+    for (let i = 0; i < 80; i++) {
+      const seen = await send(
+        'Runtime.evaluate',
+        { expression: `document.body.innerText.includes(${JSON.stringify(name)})`, returnByValue: true },
+        second,
+      )
+      if (seen.result.value === true) return true
+      await sleep(250)
+    }
+    return false
+  } finally {
+    try {
+      await send('Target.closeTarget', { targetId: target.targetId })
+    } catch {
+      /* already closed */
+    }
+    try {
+      await send('Target.disposeBrowserContext', { browserContextId: context.browserContextId })
+    } catch {
+      /* already disposed */
+    }
+  }
+}
+
 try {
   await waitUp()
   ws = new WebSocket(await wsUrl())
@@ -595,7 +741,7 @@ try {
   const outUndoClicked = await clickUndo()
   check('undo was clicked', outUndoClicked)
   check('the article and its body are back in the editor', await editorShows(SIGNED_OUT_NAME, SIGNED_OUT_TEXT))
-  const outBack = await indexEntryById(signedOutId)
+  const outBack = await waitIndexLive(signedOutId)
   check('the index records it live again', outBack && outBack.deletedAt === null, JSON.stringify(outBack))
 
   section('signed out: after the undo window the bin still has it')
@@ -606,7 +752,7 @@ try {
   const outBinHasIt = await evaluate(`document.body.innerText.includes(${JSON.stringify(SIGNED_OUT_NAME)})`)
   check('the bin lists the deleted article', outBinHasIt)
   check('restore from the bin works', await restoreFromBin(SIGNED_OUT_NAME))
-  const outRestored = await indexEntryById(signedOutId)
+  const outRestored = await waitIndexLive(signedOutId)
   check('the restored record is live', outRestored && outRestored.deletedAt === null, JSON.stringify(outRestored))
   check('the restored body is intact', (await bodyText(signedOutId)) === SIGNED_OUT_TEXT)
   await goEditor()
@@ -679,7 +825,7 @@ try {
   const inUndoClicked = await clickUndo()
   check('undo was clicked', inUndoClicked)
   check('the article and its only body are back in the editor', await editorShows(SIGNED_IN_NAME, SIGNED_IN_TEXT))
-  const inBack = await indexEntryById(signedInId)
+  const inBack = await waitIndexLive(signedInId)
   check('the index records it live again', inBack && inBack.deletedAt === null, JSON.stringify(inBack))
 
   section('signed in: after the undo window the bin still has it')
@@ -689,7 +835,7 @@ try {
   await goDrafts()
   check('the bin lists the local-only article while signed in', await evaluate(`document.body.innerText.includes(${JSON.stringify(SIGNED_IN_NAME)})`))
   check('restore from the bin works', await restoreFromBin(SIGNED_IN_NAME))
-  const inRestored = await indexEntryById(signedInId)
+  const inRestored = await waitIndexLive(signedInId)
   check('the restored record is live', inRestored && inRestored.deletedAt === null, JSON.stringify(inRestored))
   check('the restored body is intact', (await bodyText(signedInId)) === SIGNED_IN_TEXT)
   await goEditor({ signedIn: true })
@@ -708,7 +854,7 @@ try {
   await unblockProcedures()
   check('undo is still offered', await clickUndo())
   check('undo brings the only copy back without the network', await editorShows(SIGNED_IN_FAIL_NAME, SIGNED_IN_FAIL_TEXT))
-  check('the local bin no longer holds a copy', await isLive(SIGNED_IN_FAIL_NAME))
+  check('the local bin no longer holds a copy', await waitIsLive(SIGNED_IN_FAIL_NAME))
 
   section('signed in: a reload keeps a local-only article recoverable')
   // A fresh article: the one restored above was picked up by the login merge
@@ -740,8 +886,10 @@ try {
   section('cloud article: delete, undo, and the bin')
   await goEditor({ signedIn: true })
   const cloudId = await createArticle(CLOUD_NAME, CLOUD_TEXT)
+  // The named action also lives in the save-status popover; the quick button
+  // next to the trigger is the always-visible explicit "save to drafts" door.
   const saveClicked = await evaluate(`(() => {
-    const btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '保存到草稿箱')
+    const btn = document.querySelector('[data-save-draft-quick]')
     if (!btn) return false
     btn.click()
     return true
@@ -868,6 +1016,128 @@ try {
   const finallySaved = (await agent('GET', `/api/agent/docs/${reloadCloudId}`)).json
   check('the reopened article writes the recovered name and body to the account',
     finallySaved?.name === reloadLocalName && finallySaved?.content === reloadLocalText)
+
+  // ================= E. the login merge on a stale cache =================
+  // Device B changes the account (bin or purge) while device A still holds the
+  // old archived copy. Device A then signs in again on that cache. Two paths,
+  // reported separately: they take different branches of the merge.
+  const deviceB = await httpLogin()
+
+  for (const path of ['trash', 'purge']) {
+    const name = `R01 merge ${path} 稿`
+    const content = `R01_MERGE_${path.toUpperCase()}_BODY must stay on device A.`
+    const edited = `${content}\n\nR01_LOCAL_EDIT_${path.toUpperCase()}_ must never autosave.`
+    section(`login merge: the cloud row is ${path === 'trash' ? 'in the account bin' : 'purged'} on device B`)
+
+    await goEditor({ signedIn: true })
+    const id = await archivedArticle(name, content)
+    const cachedEntry = await indexEntryById(id)
+    check(`${path}: device A's stale cache holds the archived copy`,
+      cachedEntry && cachedEntry.savedAt !== null, JSON.stringify(cachedEntry))
+    check(`${path}: device A's stale cache holds its body`, (await bodyText(id)) === content,
+      String(await bodyText(id)).slice(0, 60))
+
+    const removal = await trpcPost(deviceB, path === 'trash' ? 'docs.remove' : 'docs.purge', { id })
+    check(`${path}: device B ${path === 'trash' ? 'moved' : 'purged'} the row`,
+      removal.status === 200 && removal.value?.ok === true, removal.text.slice(0, 200))
+    check(`${path}: the account no longer lists it as live`, await accountDocGone(name))
+    if (path === 'trash') {
+      const bin = await trpcGet(deviceB, 'docs.trash')
+      check('trash: device B sees the row in its bin',
+        (bin.value ?? []).some((row) => row.id === id), bin.text.slice(0, 200))
+    }
+
+    // Device A: sign back in on the cache that still says "archived".
+    await send('Network.enable', {}, sessionId)
+    await send('Network.clearBrowserCookies', {}, sessionId)
+    await send('Page.navigate', { url: `${APP}/login` }, sessionId)
+    if (!(await waitFor(`!!document.querySelector('input[type=password]')`, 15000))) {
+      throw new Error(`the login form never mounted (B01 ${path})`)
+    }
+    await evaluate(`(async () => {
+      const input = document.querySelector('input[type=password]')
+      const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      set.call(input, ${JSON.stringify(ACCESS_KEY)})
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(r => setTimeout(r, 120))
+      document.querySelector('button[type=submit]').click()
+      return true
+    })()`)
+    if (!(await waitFor(`!!document.querySelector('input[placeholder="未命名稿件"]')`, 20000))) {
+      throw new Error(`the editor never mounted after the B01 login (${path})`)
+    }
+    if (!(await waitFor(cloudSettledExpr(true), 25000))) {
+      throw new Error(`the login merge never settled (B01 ${path})`)
+    }
+    const noticeText = path === 'trash' ? '回收站' : '在云端已经没有了'
+    check(`${path}: the merge notice says where the body really is`,
+      await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')].some(e => e.innerText.includes(${JSON.stringify(noticeText)}))`, 8000),
+      (await toastTexts()).join(' | '))
+
+    let entry = null
+    for (let i = 0; i < 40; i++) {
+      entry = await indexEntryById(id)
+      if (entry && entry.savedAt === null) break
+      await sleep(150)
+    }
+    check(`${path}: the merge turned the archived copy into an unarchived working copy`,
+      entry && entry.savedAt === null, JSON.stringify(entry))
+    check(`${path}: the body survived the login merge`, (await bodyText(id)) === content,
+      String(await bodyText(id)).slice(0, 80))
+
+    await openArticle(name)
+    check(`${path}: the article opens from the library with its body`, await editorShows(name, content))
+    const beforeEdit = await evaluate(`document.querySelector('[data-save-status]')?.dataset.cloudState ?? null`)
+    check(`${path}: the save status never claims cloud-synced`, beforeEdit !== 'synced', String(beforeEdit))
+
+    await recordTrpcRequests()
+    await unsyncedEdit(name, edited)
+    await sleep(2200)
+    const savePosts = JSON.parse(await saveRequestsFor(id))
+    check(`${path}: ordinary autosave never writes this article to the account`,
+      savePosts.length === 0, JSON.stringify(savePosts))
+    if (path === 'trash') {
+      check('trash: nothing brought the trashed row back',
+        (await trpcGet(deviceB, 'docs.get', { id })).value?.doc === null)
+      const binAfter = await trpcGet(deviceB, 'docs.trash')
+      check('trash: the account row is still in the bin',
+        (binAfter.value ?? []).some((row) => row.id === id))
+    } else {
+      const workingRow = (await trpcGet(deviceB, 'docs.get', { id })).value?.doc
+      check('purge: the merge re-uploaded it as a working copy',
+        Boolean(workingRow) && workingRow.savedAt === null, JSON.stringify(workingRow))
+      check('purge: the local edit did not overwrite the cloud copy',
+        workingRow?.content === content, JSON.stringify(workingRow).slice(0, 200))
+    }
+
+    // Only the owner's explicit "save to drafts" restores/archives it.
+    const clickedSave = await evaluate(`(() => {
+      const button = document.querySelector('[data-save-draft-quick]')
+      if (!button) return false
+      button.click()
+      return true
+    })()`)
+    check(`${path}: the explicit save-to-drafts button is there`, clickedSave)
+    check(`${path}: saving to the drafts box reports success`,
+      await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')].some(e => e.innerText.includes('已保存到草稿箱'))`, 15000),
+      (await toastTexts()).join(' | '))
+    check(`${path}: the editor then marks it archived`,
+      await waitFor(`document.querySelector('[data-save-status]')?.dataset.cloudState === 'synced'`, 15000),
+      String(await evaluate(`document.querySelector('[data-save-status]')?.dataset.cloudState ?? null`)))
+
+    const archivedRow = (await trpcGet(deviceB, 'docs.get', { id })).value?.doc
+    check(`${path}: the account now holds an archived row`,
+      Boolean(archivedRow) && archivedRow.savedAt !== null, JSON.stringify(archivedRow))
+    check(`${path}: the archived body is the edited local text`,
+      archivedRow?.content === edited, JSON.stringify(archivedRow).slice(0, 200))
+    if (path === 'trash') {
+      const binFinal = await trpcGet(deviceB, 'docs.trash')
+      check('trash: the row left the bin', !(binFinal.value ?? []).some((row) => row.id === id))
+    }
+    check(`${path}: the body is still complete on device A`, (await bodyText(id)) === edited)
+    check(`${path}: a second profile sees it in the drafts box`,
+      await secondProfileSeesDrafts(name, deviceB))
+  }
 
   check('the production editor remains identifiable and nonblank',
     await evaluate(`location.origin === ${JSON.stringify(APP)} && document.title.includes('芦苇') && !!document.querySelector('.cm-content')`))

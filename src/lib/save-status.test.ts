@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { articleSaveStatus, type LocalSaveReceipt } from './save-status'
+import { articleSaveStatus, unarchiveAfterMissing, type LocalSaveReceipt } from './save-status'
 import type { DocRecord } from './store'
 
 const doc = (id: string, extra: Partial<DocRecord> = {}): DocRecord => ({
@@ -57,6 +57,19 @@ describe('current article save status', () => {
   })
   it('shows an unarchived signed-in article without claiming a cloud failure', () => {
     expect(state(doc('a'), { enabled: true, cloudLoadFailed: true }).cloud).toBe('unarchived')
+  })
+  it('drops the archive claim and its save base when the row vanishes mid-save', () => {
+    const archived = doc('a', { name: '被删的稿', content: '本机正文', savedAt: 50, baseHash: 'base-1' })
+    const downgraded = unarchiveAfterMissing(archived)
+    expect(downgraded).toMatchObject({
+      id: 'a',
+      name: '被删的稿',
+      content: '本机正文',
+      savedAt: null,
+      baseHash: null,
+    })
+    // The body survives, but nothing may read "synced" until saving again.
+    expect(state(downgraded, { enabled: true }).cloud).toBe('unarchived')
   })
   it('keeps an explicit failed archive attempt actionable', () => {
     expect(state(doc('a'), { enabled: true, cloudFailed: true }).cloud).toBe('error')

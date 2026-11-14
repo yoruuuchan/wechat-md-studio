@@ -72,6 +72,27 @@ Agent 更新的 400 / 409 / `force` 语义见 [Agent API](agent-api.md)。
 - 本机独有稿件上传成工作稿；云端独有稿件保留 metadata stub，打开后再拉正文。
 - 同 id、同内容合并；同 id、不同内容保留云端原 id，本机版另存新 id 并归档，提示用户。
 - 云端回收站稿件视为已存在，避免从旧本地缓存复活；旧缓存缺 hash 时按内容补比较。
+- 本机 `savedAt` 非空、但云端已 purge（列表和回收站都没有）或行在回收站的两条分支，都合并成
+  `savedAt=null` 的本机工作稿：正文、名称与显式恢复所需的 `baseHash` 保留，但不登记成已同步版本，
+  合并后的保存状态不显示「已同步」。purge 的那份用同一条规范化记录进入 insert-only 上传队列。
+- 工作稿不参与普通自动保存，回收站行不会被自动写回；只有用户明确「保存到草稿箱」才恢复 / 归档
+  （回收站行走 restore，已 purge 的走 insert），随后在草稿箱与第二台设备可见。
+- 合并提示如实说明「正文仍在本机、不在可见草稿箱」，不把尚未确认的上传说成已完成。
+- 「保存到草稿箱」途中若稿件已被另一台设备彻底删除，服务端返回 `missing`：本机正文与名称保留，
+  `savedAt` / `baseHash` 归零并明确提示需要再保存一次；不自动重新插入（不复活回收站行），
+  也不报「已保存到草稿箱」成功。
+
+登录合并（reconcile）完成后导入整包备份，不重跑整库合并：
+
+- 只把本次导入真正新增的 id 交给 `docs.importLocal` 分批上传，每批 `BUNDLE_IMPORT_BATCH_SIZE`（100）篇；
+  本机已有的同 id 保留原正文，也不进入上传集合。
+- 新上传的是工作稿，`savedAt=null`；本机状态与服务端一致，不把备份里的旧 `savedAt` 当成已归档，
+  只有明确「保存到草稿箱」才归档。
+- 成功批次回写服务端返回的 hash 作为 `baseHash`，并更新本机已同步基线，界面不误报待同步。
+  回写的 hash 与本机按名称 + 正文算出的 hash 不一致，说明这个 id 在服务端属于另一篇内容：
+  `importLocal` 保持 insert-only，不覆盖服务端、不丢失本机正文，进入既有冲突处理，autosave 不会静默覆盖。
+- 中间批次失败时，已成功批次的状态如实保留，失败稿件正文完整留在本机；界面分开报告本机导入成功数
+  与云端成功 / 跳过 / 失败数，并只对未完成项提供重试。
 
 `docs.save` 是 update-only；新稿走 `saveToDrafts` / `importLocal`，避免删除后迟到的自动保存重新插入稿件。
 删除按稿件实际所在位置保存可恢复副本，Agent 无删除入口：
@@ -117,7 +138,7 @@ CodeMirror 的 `Ctrl/⌘ + Space` 与行首触发字符提供方言补全；图�
 | 富文本粘贴 | [rich-paste.ts](../src/lib/rich-paste.ts) 区分 Markdown、IDE 代码、代码块和图片占位；清理 Office HTML，再用 Turndown 转公众号方言；粘贴的外链图片不自动上传 |
 | Markdown 导入 / 导出 | [import-export.ts](../src/lib/import-export.ts) 保留方言与原始正文，导入仅剥 BOM；不做通用 Markdown round-trip |
 | DOCX 导入 | 动态加载 mammoth → HTML → 复用 `htmlToDialect`；抽出图片、命名占位后上传 / 回填，失败保留占位并显示张数 |
-| 整包备份 | JSON 包含稿件与可选主题 / 署名设置；先 `hydrateAllForExport` 补全所有正文，拉取失败拒绝导出空稿；图片字节不打包，引用仍依赖图床生命周期。单文件上限 64 MiB / 10,000 篇；更大的库需拆包。登录后云端导入按每批 100 篇执行，已有 id 保留原正文 |
+| 整包备份 | JSON 包含稿件与可选主题 / 署名设置；先 `hydrateAllForExport` 补全所有正文，拉取失败拒绝导出空稿；图片字节不打包，引用仍依赖图床生命周期。单文件上限 64 MiB / 10,000 篇；更大的库需拆包。登录且登录合并（reconcile）完成后，云端导入只把本次真正新增的 id 按每批 100 篇（`BUNDLE_IMPORT_BATCH_SIZE`）交给 `docs.importLocal`，不重跑整库合并；已有 id 保留原正文、不上传，导入的是 `savedAt=null` 工作稿；成功批次回写 hash，同 id 不同内容保持 insert-only 并进入既有冲突处理，失败批次保留本机正文且只重试未完成项。上传与冲突细节见「同步与并发」 |
 | HTML 导出 / 复制 | [clipboard.ts](../src/lib/clipboard.ts) 提供干净正文与完整预览页；富文本复制优先 HTML + plain 双通道，失败可改用导出 |
 
 逻辑测试在 [import-export.test.ts](../src/lib/import-export.test.ts)、

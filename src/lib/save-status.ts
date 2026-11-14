@@ -17,6 +17,17 @@ export function sameSavedVersion(a: SavedVersion | undefined, b: SavedVersion): 
   return a?.name === b.name && a.content === b.content
 }
 
+/**
+ * The reply to an explicit save can say `missing`: the row was purged on another
+ * device between the server's read and its compare-and-swap. The local body
+ * stays, but the article is no longer in the archive, and the old save base no
+ * longer describes any row — both claims are dropped, so nothing reads "synced"
+ * and the next successful archive still starts from an explicit action.
+ */
+export function unarchiveAfterMissing<T extends Pick<DocRecord, 'savedAt' | 'baseHash'>>(doc: T): T {
+  return { ...doc, savedAt: null, baseHash: null }
+}
+
 export function sameLocalReceipt(a: LocalSaveReceipt | undefined, b: DocRecord): boolean {
   return Boolean(a && a.id === b.id && sameSavedVersion(a, b) &&
     a.updatedAt === b.updatedAt && a.localRevision === b.localRevision &&
