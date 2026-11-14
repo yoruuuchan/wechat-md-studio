@@ -1260,7 +1260,8 @@ export const en: Record<MsgKey, Msg> = {
   // ---- login merge ----
   'merge.copyName': '{name} (local version)',
   'merge.diverged': '“{name}” has one version in the cloud and one here: the cloud keeps the original name, and “{copy}” went into the drafts box — compare them and delete the one you do not want',
-  'merge.cloudGone': '“{name}” is gone from the cloud; this local copy came back as a working draft',
+  'merge.cloudGone': '“{name}” is gone from the cloud: the body is still on this device and is being resynced as an unarchived working copy; it is not in the visible drafts box, and saving it to drafts archives it',
+  'merge.trashed': '“{name}” is in the cloud bin: the body is still on this device and the article is now an unarchived working copy; it is not in the visible drafts box, and saving it to drafts restores and archives it',
 
   // ---- import / export ----
   'io.bundleName': 'wechat-backup_{date}_{n}articles',

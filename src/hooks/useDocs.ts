@@ -529,8 +529,17 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
       // flagged as a local edit ahead of the cloud, whose autosave base is the
       // cloud hash that is already stamped on them.
       const unsynced = new Set(plan.unsynced)
+      const unarchived = new Set(plan.unarchived)
       for (const d of shown) {
         if (d.contentLoaded === false) continue
+        if (unarchived.has(d.id)) {
+          // Purged from, or sitting in, the cloud bin: the body is held and sent
+          // (purged) or restorable (trashed), but it is not a confirmed synced
+          // version. Leaving the snapshot out keeps every status off "synced"
+          // until the owner explicitly saves it to drafts.
+          lastSavedRef.current.delete(d.id)
+          continue
+        }
         if (unsynced.has(d.id)) continue
         lastSavedRef.current.set(d.id, syncedSnapshot(d))
       }
@@ -1065,6 +1074,10 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
       return next
     })
 
+    // Only an archived article is autosaved. Working copies — never saved, or
+    // downgraded by the merge because the row is purged/trashed — stay local
+    // until the owner explicitly saves them to drafts: an ordinary autosave
+    // must never write into a trashed row or claim a drafts-box copy.
     const syncable = dirty.filter((d) => d.savedAt !== null)
     if (!syncable.length) {
       pendingRef.current.clear()
