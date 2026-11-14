@@ -49,10 +49,12 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 正文未就绪时的动作拦截 | `node scripts/cdp-verify-body-gating.mjs 4134 9734` | `docs.get` 延迟 / 失败、登出后保留 stub：编辑区显示加载、失败可重试、未登录显示原因，没有空白 CodeMirror；顶栏复制、改名、单篇 Markdown / HTML 导出被禁用并给出原因；实际断言剪贴板与下载为空、无成功提示，正文到达后编辑 / 复制 / 导出恢复；弹检查窗期间切稿不会用旧结论交出稿件；切换稿件不残留另一篇的回执；截图为三种阻断状态与加载完成 |
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
 | 按需字体表 | `node scripts/cdp-verify-theme-fonts.mjs 4133 9733` | 首屏样式不含模板 / 设计字体表的字体、不内联字体文件、界面字体仍是网页字体；逐个切到设计主题与手写主题，在预览里读 Chrome 实际渲染字体，确认按需加载的字体真正生效 |
+| 编辑器字体回退 | `node scripts/cdp-verify-editor-fonts.mjs 4128 9728 [输出目录] [标签]` | 1440px 下分别探测编辑器中文字、拉丁、数字、中英文标点的 Chrome 实际渲染字体（中文须为打包的 Noto Sans SC 且 isCustomFont，拉丁保持 Geist Mono、无系统回退），并留明暗两态截图；自带应用、mock 图床与 Chrome，证据 JSON 与截图写入输出目录 |
 | 慢网云端保存 | `node scripts/cdp-verify-slow-cloud-save.mjs 4131 9731` | 每次保存请求拖慢 2.5 秒、分段连续输入：不误报冲突、同一篇同时最多一个保存在路上、云端拿到全部内容；零延迟对照 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
 | 响应式编辑器布局 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 1536/1280px 三栏、1100/960/768/700px 编辑 + 预览两栏、320/390/430px 单面板；每档无横向滚动与被裁切 / 重叠的顶栏控件（手机是顶栏里的模式胶囊，不再有单独模式行）；768px 抽屉可开可关（按钮 / Esc / 点外部）、内容与宽屏右栏一致（含模式专属的「主题 / 模板」标签）、关闭再开保留标签页、封面大标题可见；切面板后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；弹窗、中英文、明暗主题（从「设置」标签切换）、触控与键盘、软键盘视口收缩；按档位截图并生成 index.html |
+| 手机素材 / 发布检查跳转 | `node scripts/cdp-verify-mobile-jump.mjs 4128 9728 [输出目录] [标签]` | 390px / 320px 点素材行后可见面板切回编辑、光标落在图片源行，发布前检查的跳转同样回到编辑面板与对应行；1536px宽屏跳转与三栏布局不变；每档留修复前后截图与证据 JSON，自带应用、mock 图床与 Chrome |
 | 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；双标签竞态（另一标签页新建本机未归档引用后，点击清理会重新扫描、把最新引用作为 `alsoKeep` 发送，受保护图仍返回 skipped 且图床没收到 DELETE、账本保留，另一张正常删除）；点击时本机读取失败停止批量清理、不发 DELETE、给出错误与重试，恢复后重试真正完成清理；中英文文案 |
 | 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
@@ -130,6 +132,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 |---|---|
 | 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` |
 | 主题库当前稿试排 / 对比 | [cdp-verify-theme-trial.mjs](../scripts/cdp-verify-theme-trial.mjs)：`node scripts/cdp-verify-theme-trial.mjs <url> [CDP端口] [证据目录]`；种一篇带标题 / 表格 / 单图 / 轮播 / 公式的本机稿，核对试排 HTML 与编辑器预览逐字节一致、1–3 套候选不写正文 / 主题、应用后返回保留筛选与滚动、已加载正文不提示缺失、缺失正文回退样稿，并在英文、390px 和明暗模式下复验标题 / 署名对比度、字体、标题与控件不重叠及正文白底 |
+| 主题快切加载与性能对照 | [cdp-measure-theme-quick-picker.mjs](../scripts/cdp-measure-theme-quick-picker.mjs)：`node scripts/cdp-measure-theme-quick-picker.mjs 4128 9728 verify-out/theme-quick-picker before` / `... after --assert`；自起应用、mock 图床与 Chrome，量测 1600×1000 与 390px 下快切器实际请求的主题包、首屏缩略图数量、10 字输入的 DOM mutation、主预览延迟、滚动加载与切主题；同环境跑 before / after 两份 JSON 与截图，`--assert` 时按 A08 阈值判失败；依赖先 `npm run build` |
 | 首次加载体积与分块 | [cdp-measure-initial-load.mjs](../scripts/cdp-measure-initial-load.mjs)：`node scripts/cdp-measure-initial-load.mjs <url> [CDP端口] [输出文件]`；同环境记录入口资源、transfer / decoded 字节、FCP / DCL / load、长任务与编辑器可交互耗时，以及模板库首卡片 / 首预览 / 全部卡片时间 |
 | 分块失败与重试 | [cdp-verify-u05-load-failure.mjs](../scripts/cdp-verify-u05-load-failure.mjs)：`node scripts/cdp-verify-u05-load-failure.mjs <url> [CDP端口]`；路由分块被阻断时的可见错误页与重试、当前主题 pack 被阻断时正文不丢且可重试、离线 SPA 导航的错误页与恢复 |
 | 字体实际呈现 | [cdp-verify-u05-fonts.mjs](../scripts/cdp-verify-u05-fonts.mjs)：`node scripts/cdp-verify-u05-fonts.mjs <url> [CDP端口]`；Geist / Noto Sans SC 真实可用、导入主题的 Noto Serif SC 在标题实际生效、已移除的 Zen Kaku 不再有 @font-face |

@@ -29,6 +29,7 @@ interface Props {
   themeId: string
   onTheme: (id: string) => void
   renderPreview: (theme: Theme) => string
+  themePanelVisible: boolean
   onOpenThemes: () => void
   cardOptions: CardOptions
   onCardOptionsChange: (options: CardOptions) => void
@@ -147,6 +148,8 @@ export default function SidePanel(p: Props) {
     <li key={m.no} className="rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
       <div className="flex items-center gap-2">
         <button
+          data-material-jump={m.no}
+          data-material-line={m.line}
           onClick={() => p.onJump(m.line)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           title={t('panel.row.jumpTitle')}
@@ -199,12 +202,13 @@ export default function SidePanel(p: Props) {
         </div>
 
         {p.mode === 'wechat' ? (
-          <TabsContent value="theme" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+          <TabsContent value="theme" data-theme-scroll className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
             <ThemeQuickPicker
               themeId={p.themeId}
               onTheme={p.onTheme}
               renderPreview={p.renderPreview}
               onOpenThemes={p.onOpenThemes}
+              visible={p.themePanelVisible}
             />
           </TabsContent>
         ) : (
