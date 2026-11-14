@@ -172,8 +172,8 @@ export function scanPhotoRuns(source: string): { start: number; end: number; pho
 
 /**
  * Split the AST into the long-image model. `render` converts non-photo blocks
- * to HTML; `renderPhotos` is used only for a photo run that lands in the
- * footer, where the section photo-group markup is not available.
+ * to HTML; `renderPhotos` builds photo-group markup for the closing block,
+ * where the section photo markup is not available.
  */
 export function buildLongDocument(
   doc: Doc,
@@ -336,9 +336,18 @@ export function buildLongDocument(
     preamble,
     sections,
     footer: footerBlocks.length
-      ? footerBlocks.map((block) => block.type === 'rawPhotos'
-        ? renderPhotos(block.photos)
-        : render([block])).join('')
+      ? footerBlocks.map((block) => {
+        // A QR code, logo or signature picture in the closing block is a
+        // photo like any other. Image blocks and multi-image containers have
+        // no renderer in the body markup, so they would silently disappear if
+        // they went through `render`; give them the footer's photo-group markup
+        // so they reach image preparation and the export pipeline too.
+        if (block.type === 'rawPhotos') return renderPhotos(block.photos)
+        if (block.type === 'image' || block.type === 'gallery' || block.type === 'carousel') {
+          return renderPhotos(photoItems(block))
+        }
+        return render([block])
+      }).join('')
       : '',
     hasFooter: footerBlocks.length > 0,
   }

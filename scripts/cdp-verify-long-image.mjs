@@ -572,6 +572,52 @@ try {
     return {mean:sum/(w*h*3),bad:bad/(w*h),w,h}})()`)
   check('A04 repeated-build screenshots are pixel-identical', a04Compare.mean < 1 && a04Compare.bad < 0.005, a04Compare)
 
+  // ---- A05: closing-block photos reach the preview and the exported pixels --
+  const footerDoc = [
+    '# 落款图片', '', '副标题', '',
+    section('一节', '说明一', 0, 2),
+    '---', '',
+    `![二维码](${photoUrl(20)})`, '',
+    ':::gallery 2', `![联署](${photoUrl(21)})`, `![Logo](${photoUrl(22)})`, ':::', '',
+    ':::carousel 4:3', `![合影](${photoUrl(23)})`, `![花絮](${photoUrl(24)})`, ':::', '',
+    '共同走过这一年。',
+  ].join('\n')
+  await setMarkdown(footerDoc, false)
+  await longLayout()
+  await waitFor(`(document.querySelector('[data-long-preview-root] .blue-hero-title')?.textContent||'').includes('落款图片')`, 'footer long build', 60000)
+  await ready()
+  const footerProbe = await evaluate(`(()=>{const content=document.querySelector('.blue-foot-content');if(!content)return null;
+    const groups=[...content.querySelectorAll('.reed-long-photos')];
+    return {counts:groups.map((g)=>g.getAttribute('data-photo-count')),
+      figures:content.querySelectorAll('.reed-long-photo').length,images:content.querySelectorAll('img').length,
+      blocked:document.querySelector('[data-long-view]')?.dataset.longExportBlocked==='true'}})()`)
+  check('A05 closing block renders one single image, a gallery and a carousel in order',
+    Boolean(footerProbe) && footerProbe.counts.join(',') === '1,2,2' && footerProbe.figures === 5 &&
+    footerProbe.images === 5 && !footerProbe.blocked, footerProbe)
+  await evaluate(`(()=>{const s=document.querySelector('[data-long-scroller]');if(s)s.scrollTop=s.scrollHeight;return true})()`)
+  await sleep(300)
+  await shot('a05-footer-preview')
+
+  await setFormat('png')
+  await ready()
+  const a05Png = await downloadExport('a05-footer', '.png')
+  const a05FooterBox = await evaluate(`(()=>{const root=document.querySelector('[data-long-preview-root]')?.firstElementChild;
+    const foot=root?.querySelector('.blue-foot');if(!root||!foot)return null;
+    const rr=root.getBoundingClientRect();const fr=foot.getBoundingClientRect();
+    return {y:(fr.top-rr.top)/rr.width*1080,height:fr.height/rr.width*1080}})()`)
+  const a05Ink = await evaluate(`(async()=>{
+    const img=new Image();img.crossOrigin='anonymous';img.src=${JSON.stringify(compareUrl(a05Png.file))};await img.decode();
+    const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+    const box=${JSON.stringify(a05FooterBox)};const y=Math.max(0,Math.round(box.y));const h=Math.max(1,Math.min(img.naturalHeight-y,Math.round(box.height)));
+    const data=ctx.getImageData(0,y,img.naturalWidth,h).data;
+    const targets=[[70,143,150],[176,94,87],[92,116,166],[133,128,74],[52,118,174]];
+    const hits=targets.map(()=>0);
+    for(let i=0;i<data.length;i+=4){for(let t=0;t<targets.length;t++){const p=targets[t];
+      if(Math.abs(data[i]-p[0])<=30&&Math.abs(data[i+1]-p[1])<=30&&Math.abs(data[i+2]-p[2])<=30){hits[t]++;break}}}
+    return {hits,box:{y,h,exportHeight:img.naturalHeight}}})()`)
+  check('A05 the exported closing block actually contains the QR/logo photo pixels',
+    a05Ink.hits.every((hit) => hit > 300), a05Ink)
+
   const realErrors = errors.filter((item) => !/missing\.png|404|Failed to load resource/.test(item))
   check('no console errors or uncaught exceptions', realErrors.length === 0, realErrors.slice(0, 6))
 } finally {

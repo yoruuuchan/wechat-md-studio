@@ -3,6 +3,7 @@ import { parseMarkdown } from './parse'
 import type { Block, Doc, InlineSeg } from './types'
 import {
   buildLongDocument, layoutPhotoGroup, photoRowSizes, resampledPhotoWidth, scanPhotoRuns, textUnits,
+  type LongPhoto,
 } from './long-image'
 
 const at = (line: number): { line: number; lineEnd: number } => ({ line, lineEnd: line + 1 })
@@ -320,6 +321,66 @@ describe('repeated builds keep the input AST intact', () => {
     expect(buildLongDocument(parsed, markdown, render).cover).toBe('a.jpg')
     expect(parsed.blocks).toHaveLength(blocks)
     expect(JSON.stringify(parsed.blocks.find((block) => block.type === 'image'))).toBe(image)
+  })
+})
+
+describe('footer photos', () => {
+  function footerOf(markdown: string) {
+    const calls: LongPhoto[][] = []
+    const model = buildLongDocument(parseMarkdown(markdown), markdown, render, (photos) => {
+      calls.push(photos.map((photo) => ({ ...photo })))
+      return `<div class="footer-photos">${photos.map((photo) => `${photo.src}|${photo.alt}`).join(',')}</div>`
+    })
+    return { model, calls }
+  }
+
+  it('keeps a single footer image instead of dropping it', () => {
+    const { model, calls } = footerOf(['# 标题', '', '副标题', '', '---', '', '![二维码](qr.jpg)'].join('\n'))
+    expect(model.footer).toContain('qr.jpg|二维码')
+    expect(calls).toEqual([[{ src: 'qr.jpg', alt: '二维码' }]])
+  })
+
+  it('keeps consecutive footer image lines in source order', () => {
+    const { model } = footerOf([
+      '# 标题', '', '副标题', '', '---', '',
+      '![二维码](qr.jpg)', '![Logo](logo.jpg)', '![联署](sign.jpg)',
+    ].join('\n'))
+    expect(model.footer).toContain('qr.jpg|二维码,logo.jpg|Logo,sign.jpg|联署')
+  })
+
+  it('keeps a footer gallery in source order', () => {
+    const { model } = footerOf([
+      '# 标题', '', '副标题', '', '---', '',
+      ':::gallery 2', '![联署](sign.jpg)', '![Logo](logo.jpg)', ':::',
+    ].join('\n'))
+    expect(model.footer).toContain('sign.jpg|联署,logo.jpg|Logo')
+  })
+
+  it('keeps a footer carousel in source order', () => {
+    const { model } = footerOf([
+      '# 标题', '', '副标题', '', '---', '',
+      ':::carousel 4:3', '![合影](group.jpg)', '![花絮](bts.jpg)', ':::',
+    ].join('\n'))
+    expect(model.footer).toContain('group.jpg|合影,bts.jpg|花絮')
+  })
+
+  it('leaves code-fence and comment image examples out of the footer', () => {
+    const { model, calls } = footerOf([
+      '# 标题', '', '副标题', '', '---', '',
+      '```md', '![示例](example.jpg)', '```', '',
+      '<!-- ![草稿](draft.jpg) -->', '',
+      '![正式](qr.jpg)',
+    ].join('\n'))
+    expect(calls).toEqual([[{ src: 'qr.jpg', alt: '正式' }]])
+    expect(model.footer).toContain('qr.jpg')
+    expect(model.footer).not.toContain('example.jpg')
+    expect(model.footer).not.toContain('draft.jpg')
+  })
+
+  it('renders non-photo footer blocks through the normal renderer', () => {
+    const { model, calls } = footerOf(['# 标题', '', '副标题', '', '---', '', '共同走过这一年。'].join('\n'))
+    expect(model.footer).toContain('<p>共同走过这一年。</p>')
+    expect(calls).toEqual([])
   })
 })
 
