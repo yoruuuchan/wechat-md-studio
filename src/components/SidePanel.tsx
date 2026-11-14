@@ -148,6 +148,8 @@ export default function SidePanel(p: Props) {
     <li key={m.no} className="rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
       <div className="flex items-center gap-2">
         <button
+          data-material-jump={m.no}
+          data-material-line={m.line}
           onClick={() => p.onJump(m.line)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           title={t('panel.row.jumpTitle')}

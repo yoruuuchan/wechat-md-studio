@@ -982,12 +982,19 @@ export default function EditorPage() {
     runPublish(kind, allowUnfinished)
   }
 
+  /**
+   * Take the author to a line in the editor. On a phone the editor can be the
+   * hidden pane, so locating the line without showing that pane looks like the
+   * button did nothing.
+   */
+  const jumpToEditorLine = useCallback((line: number) => {
+    editorRef.current?.jumpToLine(line)
+    if (phone) setPane('editor')
+  }, [phone])
+
   const jumpToLocation = (location: PreflightLocation) => {
     setPreflightReport(null)
-    if (location.line !== undefined) {
-      editorRef.current?.jumpToLine(location.line)
-    }
-    if (phone) setPane('editor')
+    if (location.line !== undefined) jumpToEditorLine(location.line)
   }
 
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
@@ -1928,7 +1935,7 @@ export default function EditorPage() {
       onSyncScrollChange={(v) => setSettings((s) => ({ ...s, syncScroll: v }))}
       zoom={settings.zoom}
       onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
-      onJump={(line) => editorRef.current?.jumpToLine(line)}
+      onJump={jumpToEditorLine}
       onCopyTitle={(title) => {
         void copyPlain(title).then((ok) => {
           if (ok) toast.success(t('editor.toast.titleCopied'))
