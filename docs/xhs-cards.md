@@ -56,4 +56,4 @@ node scripts/cdp-verify-card-template-upload.mjs 3281 9398
 pwsh scripts/compare-card-png.ps1 -Baseline verify-out/xhs/<基线目录> -Current verify-out/xhs/<本次目录>
 ```
 
-封面和正文页都按 `mean < 2`、`bad < 0.025` 比对 DOM 截图与导出 PNG。默认模板在克隆阶段使用预览的精确计算字号，导出的断行与预览一致；上传模板走同一条管线。
+封面和正文页都按 `mean < 2`、`bad < 0.025` 比对 DOM 截图与导出 PNG。默认模板在克隆阶段使用预览的精确计算字号，导出的断行与预览一致；上传模板走同一条管线。并发导出（卡片与长图重叠、或两张卡片同时导出）共用同一份精确字号补丁：补丁只安装一次、按在途导出计数，最后一个结束后原型严格还原；[单元测试](../src/lib/cards-export.test.ts)与 [浏览器脚本](../scripts/cdp-verify-export-concurrency.mjs)对照并发与顺序导出的像素，并断言原型恢复。

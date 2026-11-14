@@ -144,12 +144,29 @@ export function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[
   nodes.forEach((node, index) => visit(node, snapshots[index]))
 }
 
-export async function toBlobWithExactFonts(
-  toBlob: (node: HTMLElement, options: Record<string, unknown>) => Promise<Blob | null>,
-  node: HTMLElement,
-  options: Record<string, unknown>,
-): Promise<Blob | null> {
+let exactFontUsers = 0
+let nativeSetProperty: CSSStyleDeclaration['setProperty'] | null = null
+
+/**
+ * Install the substitution once and count the exports sharing it.
+ *
+ * Saving and restoring the prototype per call made overlapping exports fight
+ * over it: the first export to finish restored the native method underneath the
+ * other one, which then lost its exact sizes, and the last one wrote the first
+ * export's wrapper back onto the prototype, where it stayed for the session.
+ *
+ * The wrapper itself is stateless - it reads the marker off whichever node is
+ * being cloned - so one installation serves every overlap. Count the users and
+ * restore the exact method captured at the first install when the last one
+ * leaves, including exception and cancel paths.
+ */
+function acquireExactFontPatch(): void {
+  if (exactFontUsers > 0) {
+    exactFontUsers += 1
+    return
+  }
   const original = CSSStyleDeclaration.prototype.setProperty
+  nativeSetProperty = original
   CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
     if (name === 'font-size') {
       const exact = this.getPropertyValue(EXACT_FONT_SIZE)
@@ -157,10 +174,27 @@ export async function toBlobWithExactFonts(
     }
     return original.call(this, name, value, priority)
   }
+  exactFontUsers = 1
+}
+
+function releaseExactFontPatch(): void {
+  if (exactFontUsers === 0) return
+  exactFontUsers -= 1
+  if (exactFontUsers > 0 || nativeSetProperty === null) return
+  CSSStyleDeclaration.prototype.setProperty = nativeSetProperty
+  nativeSetProperty = null
+}
+
+export async function toBlobWithExactFonts(
+  toBlob: (node: HTMLElement, options: Record<string, unknown>) => Promise<Blob | null>,
+  node: HTMLElement,
+  options: Record<string, unknown>,
+): Promise<Blob | null> {
+  acquireExactFontPatch()
   try {
     return await toBlob(node, options)
   } finally {
-    CSSStyleDeclaration.prototype.setProperty = original
+    releaseExactFontPatch()
   }
 }
 
