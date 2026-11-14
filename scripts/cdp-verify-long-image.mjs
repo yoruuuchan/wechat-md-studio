@@ -481,6 +481,231 @@ try {
   const lightZh = await uiState('akari', 'zh')
   check('long mode renders in light Chinese UI without overflow', !lightZh.dark && lightZh.lang.startsWith('zh') && /模板/.test(lightZh.text) && !lightZh.overflow, { dark: lightZh.dark, lang: lightZh.lang, text: lightZh.text.slice(0, 80), overflow: lightZh.overflow })
 
+  // ---- A04: repeated long builds must not mutate the parsed AST -----------
+  // A gallery cover: its first item becomes the header photo and the rest the
+  // preamble photo group. Every later build (mode switch, width change, another
+  // preview) must read the same a/b/c from the untouched parsed document.
+  const galleryDoc = [
+    '# 画廊长图', '', '副标题', '',
+    ':::gallery 3 4:3', `![a](${photoUrl(0)})`, `![b](${photoUrl(1)})`, `![c](${photoUrl(2)})`, ':::', '',
+    section('一节', '说明', 3, 2),
+    '---', '', '落款文字',
+  ].join('\n')
+  const longProbe = () => evaluate(`(()=>{
+    const root=document.querySelector('[data-long-preview-root]')?.firstElementChild;
+    if(!root)return null;
+    const hash=(s)=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(16)+':'+s.length};
+    const cover=root.querySelector('.blue-hero-image')?.getAttribute('src')||'';
+    const groups=[...root.querySelectorAll('.reed-long-photos')];
+    const first=groups[0];
+    const photos=first?[...first.querySelectorAll('.reed-long-photo')]:[];
+    return {cover:cover?hash(cover):'',groups:groups.length,count:first?.getAttribute('data-photo-count')||'',
+      photoDigests:photos.map(f=>hash(f.querySelector('img')?.getAttribute('src')||'')),
+      geometry:photos.map(f=>{const r=f.getBoundingClientRect();return [Math.round(r.width),Math.round(r.height)]})}})()`)
+  const previewTopClip = async () => {
+    await evaluate(`(()=>{const s=document.querySelector('[data-long-scroller]');if(s)s.scrollTop=0;return true})()`)
+    await sleep(200)
+    return evaluate(`(()=>{const el=document.querySelector('[data-long-preview-frame]');if(!el)return null;const r=el.getBoundingClientRect();return {x:Math.max(0,Math.round(r.left)),y:Math.max(0,Math.round(r.top)),width:Math.max(1,Math.min(Math.round(r.width),520)),height:Math.max(1,Math.min(600,Math.round(r.height))),scale:2}})()`)
+  }
+  const sameProbe = (a, b) => Boolean(a?.cover) && a.cover === b?.cover &&
+    a.count === b?.count && a.groups === b?.groups &&
+    JSON.stringify(a?.photoDigests) === JSON.stringify(b?.photoDigests) &&
+    JSON.stringify(a?.geometry) === JSON.stringify(b?.geometry)
+
+  await setMarkdown(galleryDoc, false)
+  await longLayout()
+  await waitFor(`(document.querySelector('[data-long-preview-root] .blue-hero-title')?.textContent||'').includes('画廊长图')`, 'gallery long build', 60000)
+  await ready()
+  if (await evaluate(`document.querySelector('[data-long-width="1080"]')?.getAttribute('aria-pressed') !== 'true'`)) await setWidth(1080)
+  await ready()
+  const a04Build1 = await longProbe()
+  check('A04 first build uses the gallery first item and one two-photo group', Boolean(a04Build1?.cover) && a04Build1.count === '2' && a04Build1.groups === 2, a04Build1)
+  const a04Shot1 = await shot('a04-build-1-1080', await previewTopClip())
+
+  // Force a fresh renderDoc from the same parsed doc: switch to the article
+  // preview and change the theme. With the old mutation the gallery would lose
+  // its first photo here. Prefer a first-paint theme so its implementation is
+  // already cached and the re-render lands immediately.
+  await click('[data-preview-mode="wechat"]')
+  await waitFor(`!!document.querySelector('[data-preview-article]')`, 'wechat preview after long')
+  await waitFor(`document.querySelectorAll('[data-theme-quick]').length > 0`, 'theme quick picker', 30000)
+  const a04Theme = await evaluate(`(()=>{
+    const current=document.querySelector('[data-theme-quick].ya-selected')?.getAttribute('data-theme-quick')||'';
+    const self=['minimal','steady','golden'].map((id)=>document.querySelector('[data-theme-quick="'+id+'"]')).find((el)=>el&&el.getAttribute('data-theme-quick')!==current);
+    const any=[...document.querySelectorAll('[data-theme-quick]')].find((el)=>el.getAttribute('data-theme-quick')!==current);
+    const chosen=self||any;
+    return {current,other:chosen?.getAttribute('data-theme-quick')||''}})()`)
+  if (a04Theme.other) await click(`[data-theme-quick="${a04Theme.other}"]`)
+  await sleep(700)
+  const a04GalleryImages = await evaluate(`[...document.querySelectorAll('[data-preview-article] img')].filter((img)=>(img.getAttribute('src')||'').includes('/photos/p0')).length`)
+  check('A04 article re-render still has all three gallery photos', a04Theme.other !== '' && a04GalleryImages === 3, { theme: a04Theme, images: a04GalleryImages })
+
+  // Mode round-trip rebuilds the long page from the same parsed AST.
+  await openLong()
+  await ready()
+  const a04Build2 = await longProbe()
+  check('A04 a mode-switch rebuild keeps cover and photo group', sameProbe(a04Build1, a04Build2), { before: a04Build1, after: a04Build2 })
+
+  // Width change rebuilds at another export scale.
+  await setWidth(1440)
+  await ready()
+  const a04Build3 = await longProbe()
+  check('A04 the 1440 rebuild keeps the same cover, photo group and geometry', Boolean(a04Build3?.cover) && a04Build3.count === '2' &&
+    JSON.stringify(a04Build3.geometry) === JSON.stringify(a04Build1.geometry) && a04Build3.groups === a04Build1.groups, a04Build3)
+  await shot('a04-build-3-1440', await previewTopClip())
+
+  // Back to 1080: the fourth build must render byte-identical photos.
+  await setWidth(1080)
+  await ready()
+  const a04Build4 = await longProbe()
+  check('A04 four builds later the gallery mapping is unchanged', sameProbe(a04Build1, a04Build4), { before: a04Build1, after: a04Build4 })
+  await shot('a04-build-4-1080', await previewTopClip())
+
+  const a04Compare = await evaluate(`(async()=>{
+    const load=async src=>{const img=new Image();img.crossOrigin='anonymous';img.src=src;await img.decode();return img};
+    const [a,b]=await Promise.all([load(${JSON.stringify(compareUrl(a04Shot1))}),load(${JSON.stringify(compareUrl(path.join(output,'a04-build-4-1080.png')))})]);
+    const w=Math.min(a.naturalWidth,b.naturalWidth);const h=Math.min(a.naturalHeight,b.naturalHeight);
+    const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(a,0,0);const p=ctx.getImageData(0,0,w,h).data;
+    ctx.clearRect(0,0,w,h);ctx.drawImage(b,0,0);const q=ctx.getImageData(0,0,w,h).data;
+    let sum=0,bad=0;for(let i=0;i<p.length;i+=4){let max=0;for(let j=0;j<3;j++){const d=Math.abs(p[i+j]-q[i+j]);sum+=d;max=Math.max(max,d)}if(max>16)bad++}
+    return {mean:sum/(w*h*3),bad:bad/(w*h),w,h}})()`)
+  check('A04 repeated-build screenshots are pixel-identical', a04Compare.mean < 1 && a04Compare.bad < 0.005, a04Compare)
+
+  // ---- A05: closing-block photos reach the preview and the exported pixels --
+  const footerDoc = [
+    '# 落款图片', '', '副标题', '',
+    section('一节', '说明一', 0, 2),
+    '---', '',
+    `![二维码](${photoUrl(20)})`, '',
+    ':::gallery 2', `![联署](${photoUrl(21)})`, `![Logo](${photoUrl(22)})`, ':::', '',
+    ':::carousel 4:3', `![合影](${photoUrl(23)})`, `![花絮](${photoUrl(24)})`, ':::', '',
+    '共同走过这一年。',
+  ].join('\n')
+  await setMarkdown(footerDoc, false)
+  await longLayout()
+  await waitFor(`(document.querySelector('[data-long-preview-root] .blue-hero-title')?.textContent||'').includes('落款图片')`, 'footer long build', 60000)
+  await ready()
+  const footerProbe = await evaluate(`(()=>{const content=document.querySelector('.blue-foot-content');if(!content)return null;
+    const groups=[...content.querySelectorAll('.reed-long-photos')];
+    return {counts:groups.map((g)=>g.getAttribute('data-photo-count')),
+      figures:content.querySelectorAll('.reed-long-photo').length,images:content.querySelectorAll('img').length,
+      blocked:document.querySelector('[data-long-view]')?.dataset.longExportBlocked==='true'}})()`)
+  check('A05 closing block renders one single image, a gallery and a carousel in order',
+    Boolean(footerProbe) && footerProbe.counts.join(',') === '1,2,2' && footerProbe.figures === 5 &&
+    footerProbe.images === 5 && !footerProbe.blocked, footerProbe)
+  await evaluate(`(()=>{const s=document.querySelector('[data-long-scroller]');if(s)s.scrollTop=s.scrollHeight;return true})()`)
+  await sleep(300)
+  await shot('a05-footer-preview')
+
+  await setFormat('png')
+  await ready()
+  const a05Png = await downloadExport('a05-footer', '.png')
+  const a05FooterBox = await evaluate(`(()=>{const root=document.querySelector('[data-long-preview-root]')?.firstElementChild;
+    const foot=root?.querySelector('.blue-foot');if(!root||!foot)return null;
+    const rr=root.getBoundingClientRect();const fr=foot.getBoundingClientRect();
+    return {y:(fr.top-rr.top)/rr.width*1080,height:fr.height/rr.width*1080}})()`)
+  const a05Ink = await evaluate(`(async()=>{
+    const img=new Image();img.crossOrigin='anonymous';img.src=${JSON.stringify(compareUrl(a05Png.file))};await img.decode();
+    const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+    const box=${JSON.stringify(a05FooterBox)};const y=Math.max(0,Math.round(box.y));const h=Math.max(1,Math.min(img.naturalHeight-y,Math.round(box.height)));
+    const data=ctx.getImageData(0,y,img.naturalWidth,h).data;
+    const targets=[[70,143,150],[176,94,87],[92,116,166],[133,128,74],[52,118,174]];
+    const hits=targets.map(()=>0);
+    for(let i=0;i<data.length;i+=4){for(let t=0;t<targets.length;t++){const p=targets[t];
+      if(Math.abs(data[i]-p[0])<=30&&Math.abs(data[i+1]-p[1])<=30&&Math.abs(data[i+2]-p[2])<=30){hits[t]++;break}}}
+    return {hits,box:{y,h,exportHeight:img.naturalHeight}}})()`)
+  check('A05 the exported closing block actually contains the QR/logo photo pixels',
+    a05Ink.hits.every((hit) => hit > 300), a05Ink)
+
+  // ---- B04: cancellation delivers nothing and every resource is released ----
+  // Count the exact resources the preparation opens, instead of guessing from
+  // a heap snapshot. Interrupted rebuilds and cancelled exports must balance.
+  await evaluate(`(()=>{
+    window.__longRes={urls:0,revoked:0,bitmaps:0,closed:0};
+    const co=URL.createObjectURL.bind(URL), ro=URL.revokeObjectURL.bind(URL);
+    URL.createObjectURL=(blob)=>{window.__longRes.urls++;return co(blob)};
+    URL.revokeObjectURL=(url)=>{window.__longRes.revoked++;return ro(url)};
+    const cb=window.createImageBitmap?window.createImageBitmap.bind(window):null;
+    if(cb){window.createImageBitmap=async(...args)=>{window.__longRes.bitmaps++;const bm=await cb(...args);
+      const close=bm.close.bind(bm);bm.close=()=>{window.__longRes.closed++;return close()};return bm}};
+    // Make each sequential photo fetch slow enough that the next width change
+    // genuinely interrupts preparation.
+    window.__rawFetch=window.fetch.bind(window);
+    window.fetch=(input,init)=>{const url=typeof input==='string'?input:(input&&input.url)||'';
+      if(url.includes('/photos/')){return new Promise((resolve,reject)=>{setTimeout(()=>{window.__rawFetch(input,init).then(resolve,reject)},120)})}
+      return window.__rawFetch(input,init)};
+    return true})()`)
+  await setMarkdown(doc, false)
+  await longLayout()
+  await ready()
+  for (let i = 0; i < 20; i++) {
+    await click(`[data-long-width="${i % 2 === 0 ? 1440 : 1080}"]`)
+    await sleep(260)
+  }
+  await ready()
+  await sleep(1500)
+  await evaluate(`(()=>{window.fetch=window.__rawFetch;return true})()`)
+  const longRes = await evaluate(`window.__longRes`)
+  check('B04 twenty interrupted rebuilds release every object URL and bitmap',
+    longRes.urls <= longRes.revoked && longRes.bitmaps === longRes.closed && longRes.bitmaps > 0,
+    { ...longRes, urlsOutstanding: Math.max(0, longRes.urls - longRes.revoked), bitmapsOutstanding: longRes.bitmaps - longRes.closed })
+
+  // A long single export cancelled mid-render must not download a file. The
+  // click happens as soon as the cancel control is on screen: cancelling is
+  // what the user does while the canvas render is running.
+  await setWidth(1440)
+  await ready()
+  const cancelSingleDir = path.join(exportsDir, 'cancel-single')
+  fs.rmSync(cancelSingleDir, { recursive: true, force: true }); fs.mkdirSync(cancelSingleDir, { recursive: true })
+  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: cancelSingleDir, eventsEnabled: true })
+  await evaluate(`document.querySelectorAll('[data-sonner-toast]').forEach((el)=>{el.remove()})`)
+  const cancelBefore = await evaluate(`document.querySelector('[data-long-view]')?.dataset.longLastExport || ''`)
+  await click('[data-long-export-all]')
+  await waitFor(`!!document.querySelector('[data-long-export-cancel]')`, 'cancel control', 30000)
+  const cancelClicked = await evaluate(`(()=>{const el=document.querySelector('[data-long-export-cancel]');
+    if(!el)return {clicked:false,reason:'gone'};if(el.disabled)return {clicked:false,reason:'disabled'};el.click();return {clicked:true}})()`)
+  await waitFor(`!document.querySelector('[data-long-export-cancel]')`, 'cancelled single export settles', 180000)
+  await sleep(800)
+  const cancelSingleFiles = fs.readdirSync(cancelSingleDir).filter((file) => !file.endsWith('.crdownload'))
+  const cancelToasts = await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((el)=>({type:el.dataset.type||'',text:el.textContent||''}))`)
+  const cancelAfter = await evaluate(`document.querySelector('[data-long-view]')?.dataset.longLastExport || ''`)
+  await shot('b04-canceled')
+  check('B04 a cancelled single export delivers no file, no success state and a cancel message',
+    cancelClicked.clicked && cancelSingleFiles.length === 0 && !cancelToasts.some((item) => item.type === 'success') &&
+    cancelToasts.some((item) => /取消/.test(item.text)) && cancelAfter === cancelBefore,
+    { cancel: cancelClicked, files: cancelSingleFiles, toasts: cancelToasts, lastExportBefore: cancelBefore, lastExportAfter: cancelAfter })
+
+  // The split/ZIP path must behave the same when cancelled between tiles.
+  await evaluate(`localStorage.setItem('mopai.long-canvas-limit.v1',JSON.stringify({maxEdge:3000,maxArea:3000*1080}))`)
+  await setWidth(1080)
+  await setFormat('jpg')
+  await ready()
+  const cancelSplitDir = path.join(exportsDir, 'cancel-split')
+  fs.rmSync(cancelSplitDir, { recursive: true, force: true }); fs.mkdirSync(cancelSplitDir, { recursive: true })
+  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: cancelSplitDir, eventsEnabled: true })
+  await evaluate(`document.querySelectorAll('[data-sonner-toast]').forEach((el)=>{el.remove()})`)
+  await click('[data-long-export-all]')
+  await waitFor(`!!document.querySelector('[data-long-export-cancel]')`, 'split cancel control', 30000)
+  await sleep(250)
+  const splitCancelClicked = await evaluate(`(()=>{const el=document.querySelector('[data-long-export-cancel]');
+    if(!el)return {clicked:false,reason:'gone'};if(el.disabled)return {clicked:false,reason:'disabled'};el.click();return {clicked:true}})()`)
+  await waitFor(`!document.querySelector('[data-long-export-cancel]')`, 'cancelled split export settles', 180000)
+  await sleep(800)
+  const cancelSplitFiles = fs.readdirSync(cancelSplitDir).filter((file) => !file.endsWith('.crdownload'))
+  const cancelSplitToasts = await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((el)=>({type:el.dataset.type||'',text:el.textContent||''}))`)
+  check('B04 a cancelled split export delivers no ZIP and reports cancellation',
+    splitCancelClicked.clicked && cancelSplitFiles.length === 0 && !cancelSplitToasts.some((item) => item.type === 'success') &&
+    cancelSplitToasts.some((item) => /取消/.test(item.text)),
+    { cancel: splitCancelClicked, files: cancelSplitFiles, toasts: cancelSplitToasts })
+  await evaluate(`localStorage.removeItem('mopai.long-canvas-limit.v1')`)
+
+  // Normal export still works after the cancelled attempts.
+  await setFormat('png')
+  await ready()
+  const recovery = await downloadExport('b04-recovery', '.png')
+  check('B04 a normal export still downloads after cancelled attempts', fs.existsSync(recovery.file), recovery.name)
+
   const realErrors = errors.filter((item) => !/missing\.png|404|Failed to load resource/.test(item))
   check('no console errors or uncaught exceptions', realErrors.length === 0, realErrors.slice(0, 6))
 } finally {

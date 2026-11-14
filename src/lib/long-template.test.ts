@@ -9,6 +9,8 @@ import {
   parseCardTemplateSource, renderLongTemplatePage,
 } from './card-template'
 import { sanitizeTemplateCss } from './card-template-security'
+import { renderLongArticle } from './long-image-render'
+import { parseMarkdown } from './parse'
 
 const metrics = { padX: 22, contentWidth: 496, photoGap: 7, photoInset: 11 }
 const header = '<header class="long-head" data-when-cover="true"><img data-slot="cover" alt=""><h1 data-slot="title"></h1><p data-slot="subtitle"></p></header><header class="long-plain" data-when-cover="false"><h1 data-slot="title"></h1></header>'
@@ -148,5 +150,42 @@ describe('long template runtime', () => {
     })
     expect(card).toContain('.xhs-card[data-card-template-source="custom.x"]')
     expect(card).not.toContain('reed-long')
+  })
+})
+
+describe('long footer photos', () => {
+  it('puts footer image and gallery photos in the root so preparation and export see them', async () => {
+    const record = await parseCardTemplateSource(await zip(), 'long-footer-photos')
+    const loaded = await activateCardTemplate(record)
+    const markdown = [
+      '# 落款图片', '', '副标题', '',
+      '## 一节', '', '说明', '',
+      '---', '',
+      '![二维码](qr.jpg)', '',
+      ':::gallery 2', '![联署](sign.jpg)', '![Logo](logo.jpg)', ':::',
+    ].join('\n')
+    const { root, model } = renderLongArticle(parseMarkdown(markdown), {
+      source: markdown,
+      lang: 'zh',
+      template: loaded.template,
+      renderTemplate: loaded.renderId,
+      variant: 'paper',
+      dark: false,
+      metrics,
+      sig: { layout: '排版', proof: '校对', review: '审核' },
+      resolveImage: (src) => src,
+      resolveMath: () => null,
+      resolveDiagram: () => null,
+    }, loaded as never)
+    expect(model.hasFooter).toBe(true)
+    expect(model.footer).toContain('qr.jpg')
+    const footer = root.querySelector('.long-foot [data-slot="content"]')
+    expect(footer).not.toBeNull()
+    expect([...(footer?.querySelectorAll('img') ?? [])].map((img) => img.getAttribute('src')))
+      .toEqual(['qr.jpg', 'sign.jpg', 'logo.jpg'])
+    // The same figure/group markup sections use, so layoutLongPhotoGroups and
+    // prepareLongImages handle the closing block exactly like the body.
+    expect(root.querySelectorAll('[data-slot="content"] .reed-long-photo')).toHaveLength(3)
+    deactivateCardTemplate(record.template)
   })
 })

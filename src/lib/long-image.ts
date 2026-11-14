@@ -172,8 +172,8 @@ export function scanPhotoRuns(source: string): { start: number; end: number; pho
 
 /**
  * Split the AST into the long-image model. `render` converts non-photo blocks
- * to HTML; `renderPhotos` is used only for a photo run that lands in the
- * footer, where the section photo-group markup is not available.
+ * to HTML; `renderPhotos` builds photo-group markup for the closing block,
+ * where the section photo markup is not available.
  */
 export function buildLongDocument(
   doc: Doc,
@@ -183,9 +183,17 @@ export function buildLongDocument(
 ): LongDocument {
   const blocks: BuildBlock[] = [...doc.blocks]
   for (const run of scanPhotoRuns(source)) {
-    const represented = blocks.some((block) =>
-      (block.type === 'image' || block.type === 'gallery' || block.type === 'carousel') &&
-      block.line >= run.start && block.line < run.end)
+    const represented = blocks.some((block) => {
+      if (block.type === 'image') return block.line >= run.start && block.line < run.end
+      // A gallery/carousel container starts before the image-only lines it
+      // holds, so its span rather than its first line proves the run is
+      // accounted for. Without this the same photos were added twice: once by
+      // the block and once as a raw run.
+      if (block.type === 'gallery' || block.type === 'carousel') {
+        return block.items.length > 0 && block.line < run.end && block.lineEnd > run.start
+      }
+      return false
+    })
     const overlapped = blocks.some((block) =>
       block.type === 'paragraph' && block.line < run.end && block.lineEnd > run.start)
     if (represented || overlapped) continue
@@ -241,7 +249,10 @@ export function buildLongDocument(
           if (index < footerAt) footerAt--
           bodyEnd--
         } else {
-          block.items = block.items.slice(1)
+          // Replace the local copy: `doc.blocks` and the parsed block must stay
+          // untouched so a second build (mode switch, width change, another
+          // preview) still sees the same first photo as the cover.
+          blocks[index] = { ...block, items: block.items.slice(1) }
         }
         break
       }
@@ -252,7 +263,9 @@ export function buildLongDocument(
           if (index < footerAt) footerAt--
           bodyEnd--
         } else {
-          block.photos = block.photos.slice(1)
+          // rawPhotos is created here, but keep the same local-replacement rule
+          // so the build never writes through a block it may be handed back.
+          blocks[index] = { ...block, photos: block.photos.slice(1) }
         }
         break
       }
@@ -323,9 +336,18 @@ export function buildLongDocument(
     preamble,
     sections,
     footer: footerBlocks.length
-      ? footerBlocks.map((block) => block.type === 'rawPhotos'
-        ? renderPhotos(block.photos)
-        : render([block])).join('')
+      ? footerBlocks.map((block) => {
+        // A QR code, logo or signature picture in the closing block is a
+        // photo like any other. Image blocks and multi-image containers have
+        // no renderer in the body markup, so they would silently disappear if
+        // they went through `render`; give them the footer's photo-group markup
+        // so they reach image preparation and the export pipeline too.
+        if (block.type === 'rawPhotos') return renderPhotos(block.photos)
+        if (block.type === 'image' || block.type === 'gallery' || block.type === 'carousel') {
+          return renderPhotos(photoItems(block))
+        }
+        return render([block])
+      }).join('')
       : '',
     hasFooter: footerBlocks.length > 0,
   }

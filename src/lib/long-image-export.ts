@@ -138,75 +138,85 @@ export async function prepareLongImages(
   const failed: string[] = []
   const originalSrc = new Map<HTMLImageElement, string>()
   const objectUrls: string[] = []
+  const decoded: (ImageBitmap | HTMLImageElement)[] = []
   const blobs = new Map<HTMLImageElement, { blob: Blob; image: ImageBitmap | HTMLImageElement }>()
   let done = 0
-  for (const img of images) {
-    options.signal.throwIfAborted()
-    const src = img.getAttribute('src') ?? ''
-    if (!src) continue
-    originalSrc.set(img, src)
-    try {
-      const blob = src.startsWith('data:image/') ? dataUrlBlob(src) : await fetchBlob(src, options.signal)
-      const image = await decode(blob)
-      const { width, height } = naturalSize(image)
-      img.dataset.naturalWidth = String(width)
-      img.dataset.naturalHeight = String(height)
-      const url = URL.createObjectURL(blob)
-      objectUrls.push(url)
-      img.src = url
-      await img.decode()
-      blobs.set(img, { blob, image })
-    } catch {
+  try {
+    for (const img of images) {
       options.signal.throwIfAborted()
-      failed.push(src)
-      // A failed blob read must not blank a picture the browser can still show;
-      // keep the original src and only mark it when decoding fails too.
+      const src = img.getAttribute('src') ?? ''
+      if (!src) continue
+      originalSrc.set(img, src)
       try {
+        const blob = src.startsWith('data:image/') ? dataUrlBlob(src) : await fetchBlob(src, options.signal)
+        const image = await decode(blob)
+        decoded.push(image)
+        const { width, height } = naturalSize(image)
+        img.dataset.naturalWidth = String(width)
+        img.dataset.naturalHeight = String(height)
+        const url = URL.createObjectURL(blob)
+        objectUrls.push(url)
+        img.src = url
+        await img.decode()
+        blobs.set(img, { blob, image })
+      } catch {
+        options.signal.throwIfAborted()
+        failed.push(src)
+        // A failed blob read must not blank a picture the browser can still show;
+        // keep the original src and only mark it when decoding fails too.
+        try {
+          await img.decode()
+        } catch {
+          img.dataset.longMissing = 'true'
+        }
+      } finally {
+        done++
+        options.onProgress?.(done, images.length)
+      }
+    }
+    layoutLongPhotoGroups(root, metrics)
+    done = 0
+    for (const img of images) {
+      options.signal.throwIfAborted()
+      const entry = blobs.get(img)
+      if (!entry) continue
+      try {
+        const { width, height } = naturalSize(entry.image)
+        const figure = img.closest<HTMLElement>('.reed-long-photo')
+        let displayWidth = metrics.contentWidth
+        if (figure) {
+          const value = Number.parseFloat(figure.style.width)
+          if (Number.isFinite(value) && value > 0) displayWidth = value
+        } else {
+          const rect = img.getBoundingClientRect()
+          if (rect.width > 0) displayWidth = rect.width
+        }
+        const target = resampledPhotoWidth(displayWidth, options.scale, width)
+        const out = await resamplePhoto(entry.blob, entry.image, width, height, target)
+        img.src = await blobDataUrl(out)
         await img.decode()
       } catch {
-        img.dataset.longMissing = 'true'
+        // An abort must not turn into a picture-missing warning; rethrow first.
+        options.signal.throwIfAborted()
+        // Keep the last readable src: the preview stays honest and the export is
+        // blocked by `failed`, not blanked.
+        failed.push(originalSrc.get(img) ?? img.getAttribute('src') ?? '')
+      } finally {
+        done++
+        options.onProgress?.(done, images.length)
       }
-    } finally {
-      done++
-      options.onProgress?.(done, images.length)
     }
-  }
-  layoutLongPhotoGroups(root, metrics)
-  done = 0
-  for (const img of images) {
-    options.signal.throwIfAborted()
-    const entry = blobs.get(img)
-    if (!entry) continue
-    try {
-      const { width, height } = naturalSize(entry.image)
-      const figure = img.closest<HTMLElement>('.reed-long-photo')
-      let displayWidth = metrics.contentWidth
-      if (figure) {
-        const value = Number.parseFloat(figure.style.width)
-        if (Number.isFinite(value) && value > 0) displayWidth = value
-      } else {
-        const rect = img.getBoundingClientRect()
-        if (rect.width > 0) displayWidth = rect.width
-      }
-      const target = resampledPhotoWidth(displayWidth, options.scale, width)
-      const out = await resamplePhoto(entry.blob, entry.image, width, height, target)
-      img.src = await blobDataUrl(out)
-      await img.decode()
-    } catch {
-      options.signal.throwIfAborted()
-      // Keep the last readable src: the preview stays honest and the export is
-      // blocked by `failed`, not blanked.
-      failed.push(originalSrc.get(img) ?? img.getAttribute('src') ?? '')
-    } finally {
-      done++
-      options.onProgress?.(done, images.length)
+    return { failed }
+  } finally {
+    // Every path — success, a decode error or an abort in either loop — closes
+    // the bitmaps it opened and revokes the object URLs it created. Leaving this
+    // only at the happy-path tail leaked images on every edit that interrupted
+    // preparation.
+    for (const image of decoded) {
+      if ('close' in image) image.close()
     }
+    for (const url of objectUrls) URL.revokeObjectURL(url)
   }
-  for (const { image } of blobs.values()) {
-    if ('close' in image) image.close()
-  }
-  for (const url of objectUrls) URL.revokeObjectURL(url)
-  return { failed }
 }
 
 const DEFAULT_LIMITS: CanvasLimits = { maxEdge: 32767, maxArea: 64 * 1024 * 1024 }
@@ -426,8 +436,10 @@ export async function exportLongImage(
     if (cuts.length === 2) {
       options.onProgress?.({ phase: 'render', done: 0, total: 1 })
       const blob = await shootNode(snapshot, LONG_WIDTH, totalHeight, options, fontEmbedCSS)
+      // A cancel during the render must not produce a downloadable image.
+      options.signal.throwIfAborted()
       options.onProgress?.({ phase: 'render', done: 1, total: 1 })
-      return {
+      const result: LongExportResult = {
         blob,
         filename: `${options.filename}.${options.format}`,
         split: false,
@@ -436,6 +448,8 @@ export async function exportLongImage(
         height: Math.round(totalHeight * options.scale),
         limits,
       }
+      options.signal.throwIfAborted()
+      return result
     }
 
     const count = cuts.length - 1
@@ -457,6 +471,8 @@ export async function exportLongImage(
       stage.append(tile)
       try {
         const blob = await shootNode(tile, LONG_WIDTH, height, options, fontEmbedCSS)
+        // Checked per tile: a cancel mid-way leaves no partial ZIP behind.
+        options.signal.throwIfAborted()
         zip.file(`${options.filename}-${index + 1}of${count}.${options.format}`, await blob.arrayBuffer())
       } finally {
         tile.remove()
@@ -465,8 +481,9 @@ export async function exportLongImage(
     }
     options.onProgress?.({ phase: 'zip', done: 0, total: 1 })
     const blob = await zip.generateAsync({ type: 'blob' })
+    options.signal.throwIfAborted()
     options.onProgress?.({ phase: 'zip', done: 1, total: 1 })
-    return {
+    const result: LongExportResult = {
       blob,
       filename: `${options.filename}.zip`,
       split: true,
@@ -475,6 +492,8 @@ export async function exportLongImage(
       height: Math.round(totalHeight * options.scale),
       limits,
     }
+    options.signal.throwIfAborted()
+    return result
   } finally {
     stage.remove()
   }
