@@ -18,7 +18,13 @@ import {
   type PersistenceStatus,
 } from '@/lib/store'
 import { conflictCopyName, planMerge, type RemoteDocMeta } from '@/lib/docs-merge'
-import { BUNDLE_IMPORT_BATCH_SIZE } from '@/lib/import-export'
+import {
+  BUNDLE_IMPORT_BATCH_SIZE,
+  bundleImportBatches,
+  classifyBundleImportHashes,
+  mergeBundleDocs,
+  type BundleCloudHashCheck,
+} from '@/lib/import-export'
 import { LOCAL_RESTORE, mergeLocalCommit, type LocalDocRecord, type LocalRestoreBase } from '@/lib/local-docs'
 import { articleSaveStatus, sameLocalReceipt, type LocalSaveReceipt } from '@/lib/save-status'
 import { bodyReadiness } from '@/lib/body-readiness'
@@ -52,6 +58,46 @@ export interface ConflictCurrent {
   deletedAt: number | null
   source: string | null
   hash: string
+}
+
+/** Where a bundle import stands relative to the account. */
+export type BundleCloudStatus =
+  /** No session: the articles only reached this browser. */
+  | 'signed-out'
+  /** The login merge has not completed (or failed), so nothing was pushed. */
+  | 'not-ready'
+  /** Every new article is confirmed in the cloud. */
+  | 'done'
+  /** Some batches landed, the rest stayed local and can be retried. */
+  | 'partial'
+  /** Nothing reached the cloud; everything stayed local and can be retried. */
+  | 'failed'
+
+/**
+ * The cloud half of one bundle import, reported separately from the local half:
+ * an import that added 205 articles locally may still have uploaded none of
+ * them, and the owner is told both numbers.
+ */
+export interface BundleCloudResult {
+  status: BundleCloudStatus
+  /** Rows the insert-only import actually created. */
+  imported: number
+  /** Ids the account already stored with this exact name+body. */
+  existing: number
+  /** Ids the account already stored with different content; nothing overwritten. */
+  conflicts: number
+  /** New articles still local-only because their batch failed or never ran. */
+  failed: number
+  /** The unfinished ids, so a retry resent only those. */
+  failedIds: string[]
+}
+
+export interface BundleImportResult {
+  /** Articles this import added to the browser, in bundle order. */
+  added: number
+  /** Incoming articles whose id this browser already held and kept untouched. */
+  skipped: number
+  cloud: BundleCloudResult
 }
 
 interface Options {
@@ -130,6 +176,13 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
   // Authentication resolves after the editor mounts. Starting "settled" for
   // the anonymous first render would hide a later cloud-list failure forever.
   const [settled, setSettled] = useState(false)
+  /**
+   * Readable synchronously by an import that started before the first merge
+   * landed: the import pushes only after that merge, never in the middle of it.
+   */
+  const settledRef = useRef(false)
+  settledRef.current = settled
+  const settleWaiters = useRef<Array<() => void>>([])
 
   const utils = trpc.useUtils()
   const bootedRef = useRef(false)
@@ -371,6 +424,16 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
     setNotice(t('docs.loadCloudFailed'))
   }, [enabled, settled, listQuery.isError, t])
 
+  // A bundle imported while the login merge is still running waits for it: the
+  // import's own upload set must be the ids the merge left out, not a second
+  // pass over the same library.
+  useEffect(() => {
+    if (!settled) return
+    const waiting = settleWaiters.current
+    settleWaiters.current = []
+    for (const resolve of waiting) resolve()
+  }, [settled])
+
   // 2b. 云端元数据到达 → 合并（local-only 上传、diverged 另存、其余按 id 对齐）
   useEffect(() => {
     if (!enabled || !listQuery.isSuccess || reconciledRef.current || reconcilingRef.current) return
@@ -538,6 +601,222 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
         reconcilingRef.current = false
       })
   }, [enabled, listQuery.isSuccess, listQuery.data, trashQuery.isLoading, trashQuery.data, importMutation, saveToDraftsMutation, utils, t, localRetryVersion])
+
+  /** Resolve as soon as the login merge has settled; the timeout only avoids hanging a click forever. */
+  const waitForSettled = useCallback(async (timeoutMs = 20_000): Promise<boolean> => {
+    if (settledRef.current) return true
+    return new Promise<boolean>((resolve) => {
+      let done = false
+      const finish = (value: boolean) => {
+        if (done) return
+        done = true
+        resolve(value)
+      }
+      settleWaiters.current.push(() => finish(true))
+      window.setTimeout(() => finish(settledRef.current), timeoutMs)
+    })
+  }, [])
+
+  /**
+   * Push the articles a bundle import just added, after the login merge.
+   *
+   * The merge is what tells "the account does not have this id yet" from "this
+   * browser does not have it yet", so an import waits for it instead of racing
+   * it. The upload itself reuses the same insert-only route and the same 100-row
+   * batches the merge uses; it deliberately does not merge the library again.
+   *
+   * Each batch is judged by the hash the server sends back: only a hash equal to
+   * this browser's own name+body hash proves the row is this article. An id the
+   * account already owned with different content is never overwritten, never
+   * marked synced and never given a compare-and-swap base; it becomes an
+   * ordinary conflict so the owner chooses, and autosave cannot silently replace
+   * the server's version. A failed batch stops the run, keeps every remaining
+   * article local, and reports the exact ids a retry has to send.
+   */
+  const pushBundleToCloud = useCallback(
+    async (incoming: DocRecord[]): Promise<BundleCloudResult> => {
+      const empty: BundleCloudResult = {
+        status: 'done',
+        imported: 0,
+        existing: 0,
+        conflicts: 0,
+        failed: 0,
+        failedIds: [],
+      }
+      if (!incoming.length) return empty
+      if (!enabled) return { ...empty, status: 'signed-out' }
+
+      const ready = await waitForSettled()
+      if (!ready || !reconciledRef.current) {
+        // Without the merge the account's existing ids are unknown; pushing now
+        // could upload an id only to learn afterwards it was taken. Keep the
+        // working copies local and say so, without a retry that cannot succeed.
+        return { ...empty, status: 'not-ready' }
+      }
+
+      let imported = 0
+      let existing = 0
+      let conflicts = 0
+      const failedIds: string[] = []
+      const batches = bundleImportBatches(incoming)
+
+      for (let index = 0; index < batches.length; index++) {
+        const batch = batches[index]
+        const batchIds = batch.map((d) => d.id)
+        let reply: { imported: number; hashes: Record<string, string> }
+        markCloudWrites(batchIds, 1)
+        try {
+          reply = await importMutation.mutateAsync({
+            docs: batch.map((d) => ({
+              id: d.id,
+              name: d.name,
+              content: d.content,
+              updatedAt: d.updatedAt,
+              baseHash: null,
+            })),
+          })
+        } catch {
+          markCloudResult(batchIds, true)
+          failedIds.push(...batchIds)
+          // Everything after this batch never left the browser either.
+          const rest = batches.slice(index + 1).flat()
+          const restIds = rest.map((d) => d.id)
+          failedIds.push(...restIds)
+          markCloudResult(restIds, true)
+          break
+        } finally {
+          markCloudWrites(batchIds, -1)
+        }
+
+        imported += reply.imported
+        const checks = await classifyBundleImportHashes(batch, reply.hashes)
+        const stored: Array<{ doc: DocRecord; hash: string }> = []
+        const conflicted: Array<{ doc: DocRecord; hash: string }> = []
+        const unknownDocs: DocRecord[] = []
+        for (const doc of batch) {
+          const check: BundleCloudHashCheck | undefined = checks.get(doc.id)
+          if (!check || check.status === 'unknown' || !check.hash) {
+            unknownDocs.push(doc)
+          } else if (check.status === 'conflict') {
+            conflicted.push({ doc, hash: check.hash })
+          } else {
+            stored.push({ doc, hash: check.hash })
+          }
+        }
+        if (unknownDocs.length) {
+          // No hash is not proof of storage; leave these local and retryable.
+          const unknownIds = unknownDocs.map((d) => d.id)
+          failedIds.push(...unknownIds)
+          markCloudResult(unknownIds, true)
+        }
+        // The route reports how many rows it inserted; the rest of the batch was
+        // already in the account, either identical (existing) or different.
+        existing += Math.max(0, batch.length - reply.imported - conflicted.length - unknownDocs.length)
+        conflicts += conflicted.length
+
+        if (stored.length) {
+          const storedIds = stored.map(({ doc }) => doc.id)
+          for (const { doc, hash } of stored) {
+            // The account holds this exact document now. It is still a working
+            // copy: `savedAt` stays null until the owner explicitly archives it,
+            // and the two sides of the status read the same snapshot.
+            lastSavedRef.current.set(doc.id, syncedSnapshot(doc))
+            setDocs((ds) =>
+              ds.map((x) => (x.id === doc.id ? { ...x, baseHash: hash, savedAt: null } : x)),
+            )
+          }
+          markCloudResult(storedIds, false)
+        }
+
+        for (const { doc, hash } of conflicted) {
+          // Insert-only held: the server row is untouched. Drop any stale "this
+          // side equals the cloud" claim and hand both versions to the existing
+          // conflict flow instead of adopting the server hash as a save base.
+          lastSavedRef.current.delete(doc.id)
+          setDocs((ds) =>
+            ds.map((x) => (x.id === doc.id ? { ...x, savedAt: null, baseHash: null } : x)),
+          )
+          markCloudResult([doc.id], false)
+          try {
+            const server = await utils.docs.get.fetch({ id: doc.id })
+            if (!server.doc) continue
+            const row = server.doc
+            setConflicts((previous) => {
+              const next = new Map(previous)
+              next.set(doc.id, {
+                id: row.id,
+                name: row.name,
+                content: row.content,
+                updatedAt: row.updatedAt,
+                savedAt: row.savedAt,
+                deletedAt: null,
+                source: row.source ?? null,
+                hash,
+              })
+              return next
+            })
+          } catch {
+            // The local copy and the conflict count still tell the truth; the
+            // server version is previewed after a successful read.
+          }
+        }
+      }
+
+      const failed = failedIds.length
+      return {
+        status: failed === 0 ? 'done' : failed === incoming.length ? 'failed' : 'partial',
+        imported,
+        existing,
+        conflicts,
+        failed,
+        failedIds,
+      }
+    },
+    [enabled, importMutation, utils, waitForSettled, markCloudWrites, markCloudResult],
+  )
+
+  /**
+   * Import a validated backup into this browser, then (when the login merge has
+   * completed) push only the ids this import actually added.
+   *
+   * The two results stay separate on purpose: "205 articles imported" is about
+   * this browser and must never stand in for "205 articles in the account".
+   */
+  const importBundle = useCallback(
+    async (incoming: DocRecord[]): Promise<BundleImportResult> => {
+      const merged = mergeBundleDocs(docsRef.current, incoming)
+      // A signed-in import is a cloud working copy from the start. The backup's
+      // old `savedAt` belongs to another account (or another time); carrying it
+      // over would show an archived article the server never archived.
+      const addedDocs = enabled
+        ? merged.addedDocs.map((d) => ({ ...d, savedAt: null, baseHash: null }))
+        : merged.addedDocs
+      if (addedDocs.length) {
+        setDocs((current) => {
+          const held = new Set(current.map((d) => d.id))
+          const fresh = addedDocs.filter((d) => !held.has(d.id))
+          return fresh.length ? [...fresh, ...current] : current
+        })
+      }
+      const cloud: BundleCloudResult = enabled && addedDocs.length
+        ? await pushBundleToCloud(addedDocs)
+        : { status: enabled ? 'done' : 'signed-out', imported: 0, existing: 0, conflicts: 0, failed: 0, failedIds: [] }
+      return { added: addedDocs.length, skipped: merged.skipped, cloud }
+    },
+    [enabled, pushBundleToCloud],
+  )
+
+  /** The one retry path: resend only the ids an earlier run could not confirm. */
+  const retryBundleImport = useCallback(
+    async (ids: string[]): Promise<BundleCloudResult> => {
+      const wanted = new Set(ids)
+      const pending = docsRef.current.filter(
+        (d) => wanted.has(d.id) && d.contentLoaded !== false && d.bodyState === undefined,
+      )
+      return pushBundleToCloud(pending)
+    },
+    [pushBundleToCloud],
+  )
 
   // 3. 本地缓存始终跟着写一份（每次改动都写，纯本地，不碰网络）；
   //    只有真正拿到正文的稿件会进缓存，纯元数据的 stub 不写。
@@ -1425,6 +1704,8 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
     restoreDoc,
     purgeDoc,
     saveCurrentToDrafts,
+    importBundle,
+    retryBundleImport,
     refresh,
   }
 }

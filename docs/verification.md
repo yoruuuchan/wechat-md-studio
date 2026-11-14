@@ -41,7 +41,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 公用卡片模板 | `node scripts/cdp-verify-public-cards.mjs 3281 9398 [模板id,...]` | 九套公用模板全部经上传同款解析与激活；公众号模式不请求包、进入卡片模式才加载；逐个变体检查封面 / 正文 / 结尾页溢出、每个变体 × 三比例的装饰扫描（含 `::before` / `::after` 的细短横线与装饰破折号）、3:4 封面 + 正文导出、1:1 / 9:16 封面导出、DOM / PNG 像素一致（mean < 2、bad < 0.025）、封面标题墨色与标题 / 正文对比度；记住公用模板选择并在刷新后恢复；证据在 `verify-out/public-cards/` |
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
-| 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱 |
+| 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱；登录合并后导入 205 篇整包备份实际分 100/100/5 三批且全部可读、已有 id 不重传、同 id 不同内容冲突不覆盖、第二批失败后重试只补未完成项 |
 | 稿件删除 / 撤销 / 回收站 | `node scripts/cdp-verify-draft-recovery.mjs 4101 9701` | 登录前后新稿的删除、立即撤销、撤销期结束后回收站恢复与刷新持久化、彻底删除；云端稿件的撤销 / 回收站；未同步正文与改名的删除、撤销及刷新恢复；remove / restore 故障注入 |
 | 本机正文读取失败 | `node scripts/cdp-verify-storage-read-failure.mjs 4102 9702` | 一次 / 持续 `getAll` 失败、IndexedDB 打开失败、真实缺失正文、云端 stub、主动清空、旧版迁移失败；每项都核对 IndexedDB 原件未被空串覆盖 |
 | 正文未就绪时的动作拦截 | `node scripts/cdp-verify-body-gating.mjs 4134 9734` | `docs.get` 延迟 / 失败、登出后保留 stub：编辑区显示加载、失败可重试、未登录显示原因，没有空白 CodeMirror；顶栏复制、改名、单篇 Markdown / HTML 导出被禁用并给出原因；实际断言剪贴板与下载为空、无成功提示，正文到达后编辑 / 复制 / 导出恢复；弹检查窗期间切稿不会用旧结论交出稿件；切换稿件不残留另一篇的回执；截图为三种阻断状态与加载完成 |
