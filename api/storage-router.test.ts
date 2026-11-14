@@ -12,7 +12,8 @@ process.env.IMG_BASE_URL = 'https://img.example.test'
 process.env.IMG_ADMIN_KEY = 'test-admin-key'
 
 const { storageRouter } = await import('./storage-router')
-const { createVisitorResolver } = await import('./lib/visitor')
+const { createVisitorResolver, visitorKey } = await import('./lib/visitor')
+const { ANON_OWNER_ID } = await import('./lib/anon-quota')
 const { getDb } = await import('./queries/connection')
 const { files, docs } = await import('../db/schema')
 
@@ -35,10 +36,32 @@ const caller = storageRouter.createCaller({
   user,
 })
 
+/** An anonymous visitor of this browser, the owner of the images below. */
+const VISITOR_ID = 'c'.repeat(32)
+function visitorCaller(id = VISITOR_ID) {
+  const headers = new Headers({ cookie: `mopai_vid=${id}` })
+  return storageRouter.createCaller({
+    req: new Request('http://test/', { headers }),
+    resHeaders: new Headers(),
+    clientIp: '203.0.113.11',
+    visitorIdentity: createVisitorResolver(headers, new Headers()),
+  })
+}
+const anonCaller = visitorCaller()
+
 let seq = 0
 async function addFile(size = 1024): Promise<string> {
   const key = `key-${++seq}`
   await getDb().insert(files).values({ key, ownerId: user.id, name: `mopai/${key}.png`, size, visitor: null })
+  return key
+}
+
+/** An anonymous upload, owned by the browser that sent `VISITOR_ID`. */
+async function addAnonFile(size = 1024, visitor = VISITOR_ID): Promise<string> {
+  const key = `anon-${++seq}`
+  await getDb()
+    .insert(files)
+    .values({ key, ownerId: ANON_OWNER_ID, name: `mopai/v/${key}.png`, size, visitor: visitorKey(visitor) })
   return key
 }
 
@@ -169,6 +192,88 @@ describe('cleaning up orphans', () => {
     expect(res.deleted).toBe(1)
     expect(calls).toEqual([b])
     expect(await rowExists(a)).toBe(true)
+  })
+
+  it('keeps an image the browser still references, and never asks the worker to delete it', async () => {
+    // The check that matters is not just "the ledger row survives": the object
+    // must not receive a DELETE at all, or a worker that deletes anyway would
+    // leave a row pointing at nothing.
+    const kept = await addFile(1111)
+    const free = await addFile(2222)
+    const calls = mockWorker(ok)
+
+    const res = await caller.removeOrphans({ keys: [kept, free], alsoKeep: [kept] })
+    expect(res).toEqual({ deleted: 1, freedBytes: 2222, skipped: [kept], failed: [] })
+    expect(calls).toEqual([free])
+    expect(await rowExists(kept)).toBe(true)
+    expect(await rowExists(free)).toBe(false)
+  })
+
+  it('combines the local keep-list with the cloud article references', async () => {
+    const cloud = await addFile(10)
+    const local = await addFile(20)
+    const free = await addFile(30)
+    await getDb()
+      .insert(docs)
+      .values({
+        id: 'doc-keep',
+        ownerId: user.id,
+        name: '稿件',
+        content: `![配图](img:${cloud})`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    const calls = mockWorker(ok)
+
+    const res = await caller.removeOrphans({ keys: [cloud, local, free], alsoKeep: [local] })
+    expect(res.skipped.sort()).toEqual([cloud, local].sort())
+    expect(res.deleted).toBe(1)
+    expect(res.freedBytes).toBe(30)
+    expect(calls).toEqual([free])
+    expect(await rowExists(cloud)).toBe(true)
+    expect(await rowExists(local)).toBe(true)
+  })
+
+  it('treats a keep key that is not in the ledger as harmless', async () => {
+    // A stale local index can name an image that was already deleted. It must
+    // neither block the batch nor count as a skip.
+    const mine = await addFile(64)
+    const calls = mockWorker(ok)
+
+    const res = await caller.removeOrphans({ keys: [mine], alsoKeep: ['never-uploaded'] })
+    expect(res).toEqual({ deleted: 1, freedBytes: 64, skipped: [], failed: [] })
+    expect(calls).toEqual([mine])
+  })
+
+  it('will not delete an image another account owns, keep-list or not', async () => {
+    const foreign = `foreign-${++seq}`
+    await getDb().insert(files).values({ key: foreign, ownerId: 99, name: 'x', size: 10, visitor: null })
+    const calls = mockWorker(ok)
+
+    const res = await caller.removeOrphans({ keys: [foreign], alsoKeep: [foreign] })
+    expect(res).toEqual({ deleted: 0, freedBytes: 0, skipped: [], failed: [] })
+    expect(calls).toEqual([])
+    expect(await rowExists(foreign)).toBe(true)
+  })
+
+  it('applies the keep-list to anonymous uploads and stays inside one visitor', async () => {
+    const kept = await addAnonFile(100)
+    const free = await addAnonFile(200)
+    const anotherBrowsers = await addAnonFile(300, 'd'.repeat(32))
+    const calls = mockWorker(ok)
+
+    const res = await anonCaller.removeOrphans({ keys: [kept, free, anotherBrowsers], alsoKeep: [kept] })
+    expect(res.skipped).toEqual([kept])
+    expect(res.deleted).toBe(1)
+    expect(res.freedBytes).toBe(200)
+    expect(calls).toEqual([free])
+    expect(await rowExists(kept)).toBe(true)
+    expect(await rowExists(anotherBrowsers)).toBe(true)
+    // Another browser cannot reach the same images, even by guessing keys.
+    const other = visitorCaller('e'.repeat(32))
+    const denied = await other.removeOrphans({ keys: [kept], alsoKeep: [] })
+    expect(denied.deleted).toBe(0)
+    expect(await rowExists(kept)).toBe(true)
   })
 
   it('answers an empty request without calling the worker', async () => {
