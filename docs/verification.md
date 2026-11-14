@@ -36,7 +36,9 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 |---|---|---|
 | 小红书卡片 | `node scripts/cdp-verify-xhs-cards.mjs 3201 9334` | SAMPLE_DOC / 中文长文、右栏「模板」里的三比例 × 默认模板五背景、默认模板 × 各自变体的封面 + 前两页导出与像素对比（3:4）、封面标题 / 副标题 / 第 3 页正文对比度、默认模板每个变体 × 三比例的装饰扫描（封面 / 正文 / 结尾的 1–16px 短横线与正文外短句 / 伪元素中的装饰破折号）、PNG 尺寸与 ZIP 张数、明暗 / 中英界面、图片读取失败、卡片视图下改稿时卡片与阅读位置保持、CDP 实际字体；本地 mock 图床、独立 `data/test-xhs.db`，证据在 `verify-out/xhs/`，模板小样在 `verify-out/templates/` |
 | 模板颜色与字体 | `node scripts/cdp-verify-template-custom.mjs 3295 9405` | 公用卡片模板 Editorial White：右栏列出模板开放的 5 个颜色和 2 个字体；色块初值等于模板自己的颜色；改主色 / 底色后每张卡片生效；选霞鹜文楷后按需插入它的样式表、封面标题实际渲染为霞鹜文楷而正文仍是模板字体，导出内嵌该字体且 PNG 随之变化；刷新后选择仍在；从本机添加字体（测试用 node_modules 里 KaTeX 的 TTF）后标题用上它、导出以子集内嵌（小于原文件）、刷新仍在、删除后回到模板默认；「恢复默认」；默认 Reed 模板的主色与正文字体（得意黑）且不漏到编辑器界面；没有内容 slot 的结尾页加在正文之后而不吞正文；长图预览按需加载朱雀仿宋；无 CSP / WebAssembly 报错与页面报错。自带本地文件服务与独立 `data/test-custom-cdp.db`，证据在 `verify-out/template-custom/` |
+|公用模板并行加载 /失败重试 | `node scripts/cdp-verify-public-template-retry.mjs 4113 9713` | CDP 给每个 `.reedcard`请求注入 220 ms 延迟并记录请求起点：九个包的起点跨度 ≤300 ms、列表仍按目录顺序；swiss-grid 首次失败时其余 8 套可用且错误行与重试可见；点击重试发出 9 个新请求、样式表仍为 9 条（不重复注册）、不刷新页面补全 9 套、当前选择不变；长图 kind 同样失败 → 重试成功。证据在 `verify-out/public-template-retry/`（含 timeline.json 与截图），独立 `data/audit-a10.db` |
 | 长图 | `node scripts/cdp-verify-long-image.mjs 3295 9405` | 中性测试稿（5 节、24 张占位照片、横竖混排、列表与引用、落款）：公用蓝色模板经上传加载器装载、CDP 实际字体、1080 / 1440 的 JPG / PNG 尺寸、预览 DOM 与导出 PNG 的三段像素对比、标题与小节标签的墨色、渐变接缝、强制小上限时的分张 ZIP、空稿 / 只有标题 / 没有图 / 读图失败、示例长图模板上传 → 刷新仍在 → 删除回默认、明暗与中英界面、console 报错；自带本地图床与独立 `data/test-long-cdp.db`，证据在 `verify-out/long/` |
+|并发导出的精确字号 | `node scripts/cdp-verify-export-concurrency.mjs 4113 9713` | 同一张密集中文卡片上同时发起两个导出，再顺序导出两次作对照：并发与顺序导出的像素差满足 mean <2、bad <0.025；导出期间断言补丁已安装（读同一份精确字号），重叠结束与顺序结束后的 `CSSStyleDeclaration.prototype.setProperty`都严格等于启动时的原生方法；对照 PNG、页面截图与 metrics.json在 `verify-out/export-concurrency/`，数据库 `data/audit-b03.db` |
 | 上传卡片模板 | `node scripts/cdp-verify-card-template-upload.mjs 3281 9398 [输出目录]` | 只用仓库里的示例模板：`.reedcard` 打包、空 / 有内容两态、多文件上传（含坏包逐项拒绝，报错就在「我的」组内）、上传后进入选择器与「我的」组、选中渲染、单张 PNG 与整包 ZIP、预览 DOM / PNG 像素一致、刷新后仍在、恶意包被拒绝并显示提示、管理状态下删除及刷新后不再出现、删除选中模板回退默认；站长登录后自动上云、全新浏览器 profile 登录后自动下载、登录删除两边消失、访客看不到同步；`data/test-card-template.db` 与本地 mock 图床，证据默认在 `verify-out/card-template-upload/` |
 | 公用卡片模板 | `node scripts/cdp-verify-public-cards.mjs 3281 9398 [模板id,...]` | 九套公用模板全部经上传同款解析与激活；公众号模式不请求包、进入卡片模式才加载；逐个变体检查封面 / 正文 / 结尾页溢出、每个变体 × 三比例的装饰扫描（含 `::before` / `::after` 的细短横线与装饰破折号）、3:4 封面 + 正文导出、1:1 / 9:16 封面导出、DOM / PNG 像素一致（mean < 2、bad < 0.025）、封面标题墨色与标题 / 正文对比度；记住公用模板选择并在刷新后恢复；证据在 `verify-out/public-cards/` |
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
@@ -61,6 +63,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
 | 侧栏单图回填 | `node scripts/cdp-verify-single-slot-upload.mjs 4106 9706 4206` | 侧栏单图占位 / 替换精确回填、同 alt 多占位、自动与手动裁切、多选只传第一张并提示、切稿与上传中文字保留、编辑器工具栏 / 拖入 / 粘贴仍按发起位置新增 |
 | 公式就绪 / 复制与 HTML 导出 | `node scripts/cdp-verify-math-readiness.mjs 4113 9713 4213` | MathJax 慢加载、断网、坏公式、改公式、切稿、Mermaid 并存时，复制与干净正文 / 预览页导出先开「发布前检查」；未完成公式与图表不能默认通过，确认后才复制真实 SVG |
+| 卡片 /长图公式与图表就绪 | `node scripts/cdp-verify-graphics-gate.mjs 4113 9713 4213` | 卡片与长图在慢 MathJax、坏公式、延迟 Mermaid、Mermaid 失败时按钮禁用、无下载、可见原因与重试；就绪后恢复导出并真的产生下载；证据截图在 `verify-out/graphics-gate/`，独立 `data/audit-a06.db` 与本地图床 |
 | 发布前检查 | `node scripts/cdp-verify-publish-preflight.mjs 4127 9727` | 纯文字稿一键通过；空图片位 / 本机内网地址 / 外链地址 / 坏公式 / 未完成图表各自可定位与可定位跳转；提醒需显式勾选、阻断项只能显式绕过；复制用点击那一刻的最新稿件；Markdown 与整包备份不受阻断；慢网、图床报错、切稿、键盘操作与中英文 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
@@ -72,6 +75,9 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 [mobile-panes](../scripts/cdp-verify-mobile-panes.mjs)、
 [public-cards](../scripts/cdp-verify-public-cards.mjs)、
 [math-readiness](../scripts/cdp-verify-math-readiness.mjs)、
+[graphics-gate](../scripts/cdp-verify-graphics-gate.mjs)、
+[public-template-retry](../scripts/cdp-verify-public-template-retry.mjs)、
+[export-concurrency](../scripts/cdp-verify-export-concurrency.mjs)、
 [publish-preflight](../scripts/cdp-verify-publish-preflight.mjs)、
 [materials-states](../scripts/cdp-verify-materials-states.mjs)、
 [diagram](../scripts/cdp-verify-diagram.mjs)、

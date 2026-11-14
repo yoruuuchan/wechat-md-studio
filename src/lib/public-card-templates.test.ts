@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import JSZip from 'jszip'
+import { CardTemplateError } from './card-template-format'
 import { parseCardTemplateSource } from './card-template'
+import { loadPublicTemplatePackages } from './public-template-loader'
 import {
   PUBLIC_CARD_TEMPLATES, isPublicCardTemplateId, publicCardTemplateFor,
   publicCardTemplateInstanceId, publicCardTemplateRuntimeId,
@@ -88,5 +90,76 @@ describe('public card templates', () => {
       expect(record.parsed.pages.body!.html).not.toContain('data-slot="brand"')
       expect(record.parsed.styles).toHaveLength(2)
     }
+  })
+})
+
+describe('public template loader', () => {
+  const catalog = [
+    { id: 'a', pack: '/a.reedcard' },
+    { id: 'b', pack: '/b.reedcard' },
+    { id: 'c', pack: '/c.reedcard' },
+  ]
+
+  it('starts every request before the first parse, then parses in catalog order', async () => {
+    let releaseFirst!: () => void
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const starts: string[] = []
+    const installs: string[] = []
+    let active =0
+    let maxActive =0
+    const pending = loadPublicTemplatePackages({
+      catalog,
+      fetchPack: async (pack) => {
+        starts.push(pack)
+        if (pack === '/a.reedcard') await firstGate
+        // b finishes last, so only catalog order can keep a, b, c stable.
+        if (pack === '/b.reedcard') await new Promise((resolve) => setTimeout(resolve,5))
+        return new ArrayBuffer(1)
+      },
+      install: async (item) => {
+        installs.push(item.id)
+        active +=1
+        maxActive = Math.max(maxActive, active)
+        await Promise.resolve()
+        active -=1
+        return item.id
+      },
+    })
+    await Promise.resolve()
+    expect(starts).toEqual(['/a.reedcard', '/b.reedcard', '/c.reedcard'])
+    expect(installs).toEqual([])
+    releaseFirst()
+    const result = await pending
+    expect(result.templates).toEqual(['a', 'b', 'c'])
+    expect(result.error).toBeNull()
+    expect(maxActive).toBe(1)
+  })
+
+  it('keeps the packages that loaded when one request fails', async () => {
+    const result = await loadPublicTemplatePackages({
+      catalog,
+      fetchPack: async (pack) => {
+        if (pack === '/b.reedcard') throw new TypeError('network down')
+        return new ArrayBuffer(1)
+      },
+      install: async (item) => item.id,
+    })
+    expect(result.templates).toEqual(['a', 'c'])
+    expect(result.error).toBeInstanceOf(CardTemplateError)
+    expect(result.error?.code).toBe('unknown')
+  })
+
+  it('reports the first install failure in catalog order and keeps the rest', async () => {
+    const result = await loadPublicTemplatePackages({
+      catalog,
+      fetchPack: async () => new ArrayBuffer(1),
+      install: async (item) => {
+        if (item.id === 'a') throw new CardTemplateError('bad-manifest', 'a')
+        if (item.id === 'b') throw new CardTemplateError('missing-file', 'b')
+        return item.id
+      },
+    })
+    expect(result.templates).toEqual(['c'])
+    expect(result.error?.code).toBe('bad-manifest')
   })
 })

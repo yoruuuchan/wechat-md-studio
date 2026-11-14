@@ -77,6 +77,7 @@ TeX 包白名单、MathJax Safe 与序列化 SVG 消毒共同限制可进入正�
 公式还在渲染时提示等待，不交付 TeX 占位；编译失败时说明是哪个公式，改好即可恢复，也可以由作者明确选择按源稿继续；
 MathJax 组件本身加载失败会单独说明并可重试。Markdown 与整包备份始终导出源稿，切稿后状态按当前稿件重算。
 2026-10-29 用 [浏览器脚本](../scripts/cdp-verify-math-readiness.mjs) 在限速、断网、坏公式与 Mermaid 并存下复验。
+卡片和长图导出共用同一份就绪事实（[graphics-readiness.ts](../src/lib/graphics-readiness.ts)）：公式或图表还在处理时按钮禁用并说明是等待还是失败，失败给出现有重试路径；2026-11-14 用 [浏览器脚本](../scripts/cdp-verify-graphics-gate.mjs) 在慢 MathJax、坏公式、延迟 Mermaid 与 Mermaid 失败下复验，确认禁用期间没有下载、就绪后恢复。
 2026-10-07 的微信实粘记录支持保留 `ex` 尺寸与 `currentColor`，只在 wrapper 明确颜色，
 不手算 `ex → px`；对应 [math.test.ts](../src/lib/math.test.ts) 与 [浏览器脚本](../scripts/cdp-verify-math.mjs)。
 

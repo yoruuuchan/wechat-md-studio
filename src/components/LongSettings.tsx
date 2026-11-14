@@ -76,9 +76,11 @@ export default function LongSettings({
           </p>
         ) : null}
         {templates.publicError ? (
-          <p data-long-public-error className="mt-2 text-[11px] text-error-700" role="status">
-            {t('cards.publicTemplatesFailed')}
-          </p>
+          <div data-long-public-error className="mt-2 text-[11px] text-error-700" role="status">
+            <p>{t('cards.publicTemplatesFailed')}</p>
+            <button type="button" data-public-templates-retry className="ya-link-btn mt-1"
+              onClick={templates.retryPublic}>{t('common.retry')}</button>
+          </div>
         ) : null}
       </div>
 

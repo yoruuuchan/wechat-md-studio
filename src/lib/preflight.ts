@@ -61,6 +61,8 @@ export interface DiagramState {
   code: string
   line: number
   state: 'ready' | 'pending' | 'failed'
+  /** Why it failed, as the toast reported it; the cards and long views show it. */
+  detail?: string
 }
 
 export interface PreflightInput {

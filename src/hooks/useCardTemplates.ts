@@ -19,6 +19,7 @@ import {
 import {
   PUBLIC_CARD_TEMPLATES, PUBLIC_LONG_TEMPLATES, isPublicCardTemplateId, publicCardTemplateInstanceId,
 } from '@/lib/public-card-templates'
+import { loadPublicTemplatePackages } from '@/lib/public-template-loader'
 
 export interface CardTemplateUploadFailure {
   file: string
@@ -55,6 +56,8 @@ export interface CardTemplateUpload {
   upload: (files: File[]) => Promise<CardTemplateUploadResult>
   remove: (id: string) => Promise<CardTemplateRemoveResult>
   retrySync: () => void
+  /** Re-fetch the public packages after a partial load; loaded ones stay available meanwhile. */
+  retryPublic: () => void
   clearError: () => void
 }
 
@@ -74,27 +77,24 @@ const publicLoadPromises = new Map<TemplateKind, Promise<PublicLoadResult>>()
 function loadPublicTemplates(kind: TemplateKind): Promise<PublicLoadResult> {
   const existing = publicLoadPromises.get(kind)
   if (existing) return existing
-  const promise = (async () => {
-    const templates: CardTemplateSummary[] = []
-    let firstError: CardTemplateError | null = null
-    const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
-    for (const item of items) {
-      try {
-        const response = await fetch(item.pack, { cache: 'no-cache' })
-        if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
-        const raw = await response.arrayBuffer()
-        const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
-        if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
-          throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
-        }
-        const loaded = await activateCardTemplate(record)
-        templates.push(loaded.summary)
-      } catch (itemError) {
-        firstError ??= asError(itemError, 'unknown')
+  const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
+  const promise = loadPublicTemplatePackages({
+    catalog: items,
+    // Network half: every package at once instead of one after another.
+    fetchPack: async (pack) => {
+      const response = await fetch(pack, { cache: 'no-cache' })
+      if (!response.ok) throw new CardTemplateError('missing-file', `${pack} (${response.status})`)
+      return response.arrayBuffer()
+    },
+    // CPU half: parse and activate in catalog order, one at a time.
+    install: async (item, raw) => {
+      const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
+      if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
+        throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
       }
-    }
-    return { templates, error: firstError }
-  })()
+      return (await activateCardTemplate(record)).summary
+    },
+  })
   publicLoadPromises.set(kind, promise)
   return promise
 }
@@ -158,11 +158,13 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     return () => { alive = false }
   }, [refresh])
 
+  /** Incremented by retryPublic: it is what re-runs the loader for a fresh attempt. */
+  const [publicAttempt, setPublicAttempt] = useState(0)
   useEffect(() => {
     if (!loadPublic) return
     let alive = true
     setPublicLoading(true)
-    setPublicTemplates([])
+    setPublicError(null)
     void loadPublicTemplates(kind).then((result) => {
       if (!alive) return
       setPublicTemplates(result.templates)
@@ -170,7 +172,7 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
       setPublicLoading(false)
     })
     return () => { alive = false }
-  }, [loadPublic, kind])
+  }, [loadPublic, kind, publicAttempt])
 
   /** Upload one local record and remember the server version it now matches. */
   const pushLocal = useCallback(async (record: CardTemplateSourceRecord): Promise<void> => {
@@ -356,6 +358,12 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     }
   }, [authenticated, refresh])
 
+  /** Drop the cached partial result for this kind and fetch every package again. */
+  const retryPublic = useCallback(() => {
+    publicLoadPromises.delete(kind)
+    setPublicAttempt((value) => value + 1)
+  }, [kind])
+
   const retrySync = useCallback(() => {
     setSync('idle')
     void runSync()
@@ -379,6 +387,7 @@ export function useCardTemplates(options: { loadPublic?: boolean; kind?: Templat
     upload,
     remove,
     retrySync,
+    retryPublic,
     clearError: () => { setError(null); setFailures([]) },
   }
 }
