@@ -34,11 +34,14 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Motion build entry checks
+        run: npm run verify:motion
+
       - name: Theme red-line verification
         run: npm run verify:themes
 
       - name: Theme source and credit verification
         run: npm run verify:sources
 
-      - name: Production build
+      - name: Development build (motion optional)
         run: npm run build

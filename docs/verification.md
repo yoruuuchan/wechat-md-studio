@@ -11,12 +11,14 @@
 npm run check
 npm test
 npm run verify:themes
-npm run build
+npm run build # 开发构建，可以省略 /motion/
+npm run build:release # 正式发布构建，必须有搭建台页面
+npm run verify:motion # 动效打包正反两路
 ```
 
 - `check`：TypeScript 项目检查；`test`：Vitest，覆盖 parser、存储、导入导出、API 等相邻测试。
 - `verify:themes`：全主题渲染、微信正文规则、metadata / 许可文件、图片短引用、比例、图片操作、SQLite 驱动契约；成功输出 `ALL CHECKS PASSED`。
-- `build`：Vite 前端 `dist/public/` + esbuild 服务端 `dist/boot.js`。`vite preview` 只预览前端，不能替代带 API 的服务验收。
+- `build`：Vite 前端 `dist/public/` + esbuild 服务端 `dist/boot.js`；开发 / 普通 CI 构建，可以没有 `/motion/`（顶栏动效退回占位）。`build:release` 是正式发布入口，要求搭建台页面存在，构建后核对 `dist/public/motion/index.html`。`verify:motion` 用临时 fixture 检查两条打包路径。`vite preview` 只预览前端，不能替代带 API 的服务验收。
 
 主题验证同时输出 `verify-out/*_clean.html` 与 `*_preview.html`；可通过 `MOPAI_VERIFY_OUT` 指定目录。
 新增主题 / 来源时用 `npm run import:themes` 重生成，再复算主题统计与检查许可证文件，见

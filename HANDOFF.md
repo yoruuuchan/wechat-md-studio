@@ -163,7 +163,7 @@ bash scripts/cf-open-public.sh           # 执行
 # 本地：包名带 commit 短哈希，临时目录用 mktemp——绝不用固定名
 TAG=$(git rev-parse --short HEAD)
 OUT=$(mktemp -d)
-npm run build
+npm run build:release
 tar -czf "$OUT/mopai-$TAG.tar.gz" dist
 
 # 传上去：先传脚本本身（仓库版），再传包
@@ -174,6 +174,8 @@ scp "$OUT/mopai-$TAG.tar.gz" cc-tokyo-01:/tmp/mopai-$TAG.tar.gz
 ssh cc-tokyo-01 "sha256sum /tmp/mopai-$TAG.tar.gz"   # 必须等于本机 sha256sum 的输出
 ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$TAG.tar.gz"
 ```
+
+正式发布必须用 `npm run build:release`：它先要求找得到搭建台的构建结果（`REED_MOTION_SITE` 或主 checkout 旁的 `wechat-motion-lab/out/site`），缺失或页面无效时在 Vite 前非零退出，不会先删上一份 `public/motion/`；构建结束还会核对 `dist/public/motion/index.html` 并打印文件数。只做开发构建、可以没有 `/motion/` 时仍用 `npm run build`（顶栏动效退回占位），但它不能当作正式发布。
 
 `scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 新 dist 复制到旁边再换名替换 → **restart** → 健康检查），
 它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。健康检查要求服务处于 active、`/`、`/login`、`/api/trpc/auth.me` 30 秒内都回 200；
