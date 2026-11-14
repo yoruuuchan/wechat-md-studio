@@ -618,6 +618,94 @@ try {
   check('A05 the exported closing block actually contains the QR/logo photo pixels',
     a05Ink.hits.every((hit) => hit > 300), a05Ink)
 
+  // ---- B04: cancellation delivers nothing and every resource is released ----
+  // Count the exact resources the preparation opens, instead of guessing from
+  // a heap snapshot. Interrupted rebuilds and cancelled exports must balance.
+  await evaluate(`(()=>{
+    window.__longRes={urls:0,revoked:0,bitmaps:0,closed:0};
+    const co=URL.createObjectURL.bind(URL), ro=URL.revokeObjectURL.bind(URL);
+    URL.createObjectURL=(blob)=>{window.__longRes.urls++;return co(blob)};
+    URL.revokeObjectURL=(url)=>{window.__longRes.revoked++;return ro(url)};
+    const cb=window.createImageBitmap?window.createImageBitmap.bind(window):null;
+    if(cb){window.createImageBitmap=async(...args)=>{window.__longRes.bitmaps++;const bm=await cb(...args);
+      const close=bm.close.bind(bm);bm.close=()=>{window.__longRes.closed++;return close()};return bm}};
+    // Make each sequential photo fetch slow enough that the next width change
+    // genuinely interrupts preparation.
+    window.__rawFetch=window.fetch.bind(window);
+    window.fetch=(input,init)=>{const url=typeof input==='string'?input:(input&&input.url)||'';
+      if(url.includes('/photos/')){return new Promise((resolve,reject)=>{setTimeout(()=>{window.__rawFetch(input,init).then(resolve,reject)},120)})}
+      return window.__rawFetch(input,init)};
+    return true})()`)
+  await setMarkdown(doc, false)
+  await longLayout()
+  await ready()
+  for (let i = 0; i < 20; i++) {
+    await click(`[data-long-width="${i % 2 === 0 ? 1440 : 1080}"]`)
+    await sleep(260)
+  }
+  await ready()
+  await sleep(1500)
+  await evaluate(`(()=>{window.fetch=window.__rawFetch;return true})()`)
+  const longRes = await evaluate(`window.__longRes`)
+  check('B04 twenty interrupted rebuilds release every object URL and bitmap',
+    longRes.urls <= longRes.revoked && longRes.bitmaps === longRes.closed && longRes.bitmaps > 0,
+    { ...longRes, urlsOutstanding: Math.max(0, longRes.urls - longRes.revoked), bitmapsOutstanding: longRes.bitmaps - longRes.closed })
+
+  // A long single export cancelled mid-render must not download a file. The
+  // click happens as soon as the cancel control is on screen: cancelling is
+  // what the user does while the canvas render is running.
+  await setWidth(1440)
+  await ready()
+  const cancelSingleDir = path.join(exportsDir, 'cancel-single')
+  fs.rmSync(cancelSingleDir, { recursive: true, force: true }); fs.mkdirSync(cancelSingleDir, { recursive: true })
+  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: cancelSingleDir, eventsEnabled: true })
+  await evaluate(`document.querySelectorAll('[data-sonner-toast]').forEach((el)=>{el.remove()})`)
+  const cancelBefore = await evaluate(`document.querySelector('[data-long-view]')?.dataset.longLastExport || ''`)
+  await click('[data-long-export-all]')
+  await waitFor(`!!document.querySelector('[data-long-export-cancel]')`, 'cancel control', 30000)
+  const cancelClicked = await evaluate(`(()=>{const el=document.querySelector('[data-long-export-cancel]');
+    if(!el)return {clicked:false,reason:'gone'};if(el.disabled)return {clicked:false,reason:'disabled'};el.click();return {clicked:true}})()`)
+  await waitFor(`!document.querySelector('[data-long-export-cancel]')`, 'cancelled single export settles', 180000)
+  await sleep(800)
+  const cancelSingleFiles = fs.readdirSync(cancelSingleDir).filter((file) => !file.endsWith('.crdownload'))
+  const cancelToasts = await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((el)=>({type:el.dataset.type||'',text:el.textContent||''}))`)
+  const cancelAfter = await evaluate(`document.querySelector('[data-long-view]')?.dataset.longLastExport || ''`)
+  await shot('b04-canceled')
+  check('B04 a cancelled single export delivers no file, no success state and a cancel message',
+    cancelClicked.clicked && cancelSingleFiles.length === 0 && !cancelToasts.some((item) => item.type === 'success') &&
+    cancelToasts.some((item) => /取消/.test(item.text)) && cancelAfter === cancelBefore,
+    { cancel: cancelClicked, files: cancelSingleFiles, toasts: cancelToasts, lastExportBefore: cancelBefore, lastExportAfter: cancelAfter })
+
+  // The split/ZIP path must behave the same when cancelled between tiles.
+  await evaluate(`localStorage.setItem('mopai.long-canvas-limit.v1',JSON.stringify({maxEdge:3000,maxArea:3000*1080}))`)
+  await setWidth(1080)
+  await setFormat('jpg')
+  await ready()
+  const cancelSplitDir = path.join(exportsDir, 'cancel-split')
+  fs.rmSync(cancelSplitDir, { recursive: true, force: true }); fs.mkdirSync(cancelSplitDir, { recursive: true })
+  await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: cancelSplitDir, eventsEnabled: true })
+  await evaluate(`document.querySelectorAll('[data-sonner-toast]').forEach((el)=>{el.remove()})`)
+  await click('[data-long-export-all]')
+  await waitFor(`!!document.querySelector('[data-long-export-cancel]')`, 'split cancel control', 30000)
+  await sleep(250)
+  const splitCancelClicked = await evaluate(`(()=>{const el=document.querySelector('[data-long-export-cancel]');
+    if(!el)return {clicked:false,reason:'gone'};if(el.disabled)return {clicked:false,reason:'disabled'};el.click();return {clicked:true}})()`)
+  await waitFor(`!document.querySelector('[data-long-export-cancel]')`, 'cancelled split export settles', 180000)
+  await sleep(800)
+  const cancelSplitFiles = fs.readdirSync(cancelSplitDir).filter((file) => !file.endsWith('.crdownload'))
+  const cancelSplitToasts = await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map((el)=>({type:el.dataset.type||'',text:el.textContent||''}))`)
+  check('B04 a cancelled split export delivers no ZIP and reports cancellation',
+    splitCancelClicked.clicked && cancelSplitFiles.length === 0 && !cancelSplitToasts.some((item) => item.type === 'success') &&
+    cancelSplitToasts.some((item) => /取消/.test(item.text)),
+    { cancel: splitCancelClicked, files: cancelSplitFiles, toasts: cancelSplitToasts })
+  await evaluate(`localStorage.removeItem('mopai.long-canvas-limit.v1')`)
+
+  // Normal export still works after the cancelled attempts.
+  await setFormat('png')
+  await ready()
+  const recovery = await downloadExport('b04-recovery', '.png')
+  check('B04 a normal export still downloads after cancelled attempts', fs.existsSync(recovery.file), recovery.name)
+
   const realErrors = errors.filter((item) => !/missing\.png|404|Failed to load resource/.test(item))
   check('no console errors or uncaught exceptions', realErrors.length === 0, realErrors.slice(0, 6))
 } finally {

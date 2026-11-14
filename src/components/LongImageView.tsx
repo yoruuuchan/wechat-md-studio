@@ -214,7 +214,12 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
         signal: controller.signal,
         onProgress: setProgress,
       })
+      // A cancel racing the last render step must not deliver a file or a
+      // success toast. Re-check after the export settles and once more after the
+      // lazy import, immediately before handing the blob to the browser.
+      controller.signal.throwIfAborted()
       const { downloadCardBlob } = await import('@/lib/cards-export')
+      controller.signal.throwIfAborted()
       downloadCardBlob(output.blob, output.filename)
       setLastExport({ filename: output.filename, size: output.blob.size, tiles: output.tiles })
       setLastError('')
