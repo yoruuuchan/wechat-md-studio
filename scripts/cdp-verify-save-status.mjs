@@ -93,7 +93,9 @@ try {
   let holdCloud = false
   let failCloud = false
   let failInitialRead = false
+  let missingCloud = false
   const held = []
+  const missingServed = []
   ws.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data)
     if (pending.has(message.id)) {
@@ -111,7 +113,19 @@ try {
       const methods = new URL(request.request.url).pathname.split('/api/trpc/')[1]?.split(',') ?? []
       pausedMethods.push(methods.join(','))
       const call = (method, params) => send(method, params, message.sessionId).catch((error) => consoleErrors.push(error.message))
-      if (failInitialRead && methods.some((method) => method === 'docs.list' || method === 'docs.trash')) {
+      if (missingCloud && methods.includes('docs.saveToDrafts')) {
+        // The legal reply the server sends when the row vanished between its
+        // read and the swap: success envelope, `missing`, no savedAt, no hash.
+        missingServed.push(methods.join(','))
+        void call('Fetch.fulfillRequest', {
+          requestId: request.requestId,
+          responseCode: 200,
+          responseHeaders: [{ name: 'content-type', value: 'application/json' }],
+          body: Buffer.from(JSON.stringify({
+            result: { data: { json: { ok: true, savedAt: null, conflict: false, hash: null, missing: true } } },
+          })).toString('base64'),
+        })
+      } else if (failInitialRead && methods.some((method) => method === 'docs.list' || method === 'docs.trash')) {
         void call('Fetch.failRequest', { requestId: request.requestId, errorReason: 'InternetDisconnected' })
       } else if (failCloud && methods.some((method) => method === 'docs.save' || method === 'docs.saveToDrafts')) {
         void call('Fetch.failRequest', { requestId: request.requestId, errorReason: 'InternetDisconnected' })
@@ -217,6 +231,32 @@ try {
   const release = async () => {
     for (const request of held.splice(0)) await send('Fetch.continueRequest', { requestId: request.requestId }, request.sessionId)
   }
+  /** A plain signed-in HTTP session, i.e. another device acting on the same account. */
+  const sessionLogin = async () => {
+    const response = await fetch(`${origin}/api/trpc/auth.login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ json: { accessKey: key } }),
+    })
+    const setCookie = response.headers.get('set-cookie') || ''
+    const match = /mopai_sid=([^;]+)/.exec(setCookie)
+    const body = await response.json()
+    if (!match || body?.result?.data?.json?.success !== true) throw new Error(`device login failed: ${setCookie} ${JSON.stringify(body)}`)
+    return `mopai_sid=${match[1]}`
+  }
+  const trpc = async (cookie, procedure, input) => {
+    const response = await fetch(`${origin}/api/trpc/${procedure}`, {
+      method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ json: input }),
+    })
+    const text = await response.text()
+    if (!response.ok) throw new Error(`${procedure} failed: ${response.status} ${text.slice(0, 200)}`)
+    return JSON.parse(text)?.result?.data?.json ?? null
+  }
+  const trpcGet = async (cookie, procedure, input) => {
+    const query = input === undefined ? '' : `?input=${encodeURIComponent(JSON.stringify({ json: input }))}`
+    const response = await fetch(`${origin}/api/trpc/${procedure}${query}`, { headers: { cookie } })
+    const text = await response.text()
+    if (!response.ok) throw new Error(`${procedure} failed: ${response.status} ${text.slice(0, 200)}`)
+    return JSON.parse(text)?.result?.data?.json ?? null
+  }
 
   await call('Page.navigate', { url: origin })
   await ready()
@@ -310,6 +350,60 @@ try {
   await expectState(null, 'pending', first.id)
   await expectState('saved', 'synced', first.id)
   check('a name-only edit gets its own local and cloud save proof', (await stored(first.id)).metadata.name === 'U01 A renamed' && (await api('GET', `/api/agent/docs/${first.id}`)).name === 'U01 A renamed')
+
+  // ================= B02: the row is purged while an explicit save is in flight =================
+  // The race cannot be produced by timing reliably, so the server's legal
+  // missing reply is injected at the browser's Fetch layer. The real purge on
+  // device B then proves nothing re-inserts the row on its own.
+  const deviceB = await sessionLogin()
+  const raceName = 'U02 保存途中被彻底删除'
+  const raceBody = 'U02_BODY_BEFORE_MISSING must survive the purge race.'
+  const race = await api('POST', '/api/agent/docs', { name: raceName, content: raceBody })
+  await call('Page.navigate', { url: `${origin}/?doc=${race.id}` })
+  await ready()
+  await expectState('saved', 'synced', race.id)
+  check('the purge-race fixture is archived and readable',
+    (await stored(race.id))?.content === raceBody && (await api('GET', `/api/agent/docs/${race.id}`)).savedAt !== null)
+
+  missingCloud = true
+  await click(`document.querySelector('[data-save-draft-quick]')`)
+  await expectState(null, 'unarchived', race.id)
+  check('the legal missing reply was actually served', missingServed.length > 0, JSON.stringify(missingServed))
+  check('no success toast claims it reached the drafts box',
+    !(await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].some(e => e.innerText.includes('已保存到草稿箱'))`)),
+    await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map(e=>e.innerText).join(' | ')`))
+  check('the failure names the purge and asks for another save',
+    await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].some(e => e.innerText.includes('另一台设备彻底删除') && e.innerText.includes('再点一次'))`),
+    await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map(e=>e.innerText).join(' | ')`))
+  check('the article reads unarchived, never synced', (await status()).cloud === 'unarchived')
+  check('the local body is untouched',
+    (await stored(race.id))?.content === raceBody &&
+      (await evaluate(`window.__mopaiCodemirror.state.doc.toString()===${JSON.stringify(raceBody)}`)))
+  check('the downgrade dropped the archive timestamp and save base',
+    JSON.parse(await evaluate(`(() => { const raw=localStorage.getItem('mopai.index.v2'); const doc=JSON.parse(raw).docs.find(d=>d.id===${JSON.stringify(race.id)}); return JSON.stringify(doc) })()`)).savedAt === null)
+  const injectedRow = await api('GET', `/api/agent/docs/${race.id}`)
+  check('the injected reply did not secretly write anything', injectedRow.content === raceBody && injectedRow.savedAt !== null)
+
+  missingCloud = false
+  await trpc(deviceB, 'docs.purge', { id: race.id })
+  check('device B really purged the row', (await trpcGet(deviceB, 'docs.get', { id: race.id }))?.doc === null)
+  await sleep(1500)
+  check('nothing re-inserted the purged row on its own', (await trpcGet(deviceB, 'docs.get', { id: race.id }))?.doc === null)
+
+  await click(`document.querySelector('[data-save-draft-quick]')`)
+  check('the next explicit save archives it again',
+    await waitFor(`[...document.querySelectorAll('[data-sonner-toast]')].some(e => e.innerText.includes('已保存到草稿箱'))`, 15_000),
+    await evaluate(`[...document.querySelectorAll('[data-sonner-toast]')].map(e=>e.innerText).join(' | ')`))
+  await expectState('saved', 'synced', race.id)
+  const rearchived = await api('GET', `/api/agent/docs/${race.id}`)
+  check('the account holds a fresh archived row with the complete body',
+    Boolean(rearchived) && rearchived.savedAt !== null && rearchived.content === raceBody)
+  check('the local body is still complete after re-archiving', (await stored(race.id))?.content === raceBody)
+
+  // Back to the article the rest of the suite drives.
+  await call('Page.navigate', { url: `${origin}/?doc=${first.id}` })
+  await ready()
+  await expectState('saved', 'synced', first.id)
 
   // Fail only cloud writes. Freezing the whole browser's network also blocks
   // the Runtime domain, which hides the status that this check needs to read.

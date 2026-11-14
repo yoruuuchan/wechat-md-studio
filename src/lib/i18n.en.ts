@@ -1240,6 +1240,7 @@ export const en: Record<MsgKey, Msg> = {
   'docs.saveBodyUnavailable': 'This article’s body has not been read from local storage; saving is paused — retry above first',
   'docs.saveConflictFirst': 'This article was edited elsewhere: pick a resolution in the dialog first',
   'docs.saveConflictToast': 'This article was edited elsewhere; the cloud version was not overwritten — choose which one to keep in the dialog',
+  'docs.saveMissing': '“{name}” was just purged on another device, so the cloud no longer has this row. The body is still on this device and the article is now an unarchived working copy; save it to drafts again to archive it',
   'docs.saveFailed': 'Saving failed; check the network',
   'docs.deleteSyncFailed': 'The delete did not reach the cloud; the article is back in your list',
   'docs.deleteSyncKeptLocal': 'The delete did not reach the cloud; a local copy stays in the recycle bin',

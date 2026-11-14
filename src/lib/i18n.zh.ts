@@ -1208,6 +1208,7 @@ export const zh = {
   'docs.saveBodyUnavailable': '这篇的正文还没从本机读出来，保存已暂停；先在上方重试',
   'docs.saveConflictFirst': '这篇在别处被改过：先在弹窗里选一个处理方式',
   'docs.saveConflictToast': '这篇在别处被改过：云端的版本没有被覆盖，弹窗里选一下保留哪边',
+  'docs.saveMissing': '「{name}」刚被另一台设备彻底删除了，云端已经没有这一行。正文仍在本机，已改为未归档工作稿；再点一次「保存到草稿箱」才会重新归档',
   'docs.saveFailed': '保存失败，检查一下网络',
   'docs.deleteSyncFailed': '删除没同步到云端，稿件已放回列表',
   'docs.deleteSyncKeptLocal': '删除没同步到云端，本机回收站里保留了这篇稿件',

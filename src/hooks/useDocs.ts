@@ -26,7 +26,7 @@ import {
   type BundleCloudHashCheck,
 } from '@/lib/import-export'
 import { LOCAL_RESTORE, mergeLocalCommit, type LocalDocRecord, type LocalRestoreBase } from '@/lib/local-docs'
-import { articleSaveStatus, sameLocalReceipt, type LocalSaveReceipt } from '@/lib/save-status'
+import { articleSaveStatus, sameLocalReceipt, unarchiveAfterMissing, type LocalSaveReceipt } from '@/lib/save-status'
 import { bodyReadiness } from '@/lib/body-readiness'
 import { useI18n } from '@/hooks/useI18n'
 
@@ -1144,6 +1144,21 @@ export function useDocs({ enabled, deepLinkId, onDeepLinkSettled, authPending = 
         return {
           ok: false as const,
           message: t('docs.saveConflictToast'),
+        }
+      }
+      if (res.missing) {
+        // The row was purged on another device between the server's read and
+        // its swap. Inserting here would silently resurrect a delete the owner
+        // made elsewhere, so the body stays a local working copy: no archive
+        // timestamp, no compare-and-swap base, and one more explicit save is
+        // what puts it back in the drafts box.
+        lastSavedRef.current.delete(doc.id)
+        markCloudResult([doc.id], false)
+        setDocs((ds) => ds.map((d) => (d.id === doc.id ? unarchiveAfterMissing(d) : d)))
+        setSyncState('local')
+        return {
+          ok: false as const,
+          message: t('docs.saveMissing', { name: doc.name || t('common.unnamedDoc') }),
         }
       }
       lastSavedRef.current.set(doc.id, syncedSnapshot(doc))
