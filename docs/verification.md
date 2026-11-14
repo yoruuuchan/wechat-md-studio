@@ -61,6 +61,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
 | 侧栏单图回填 | `node scripts/cdp-verify-single-slot-upload.mjs 4106 9706 4206` | 侧栏单图占位 / 替换精确回填、同 alt 多占位、自动与手动裁切、多选只传第一张并提示、切稿与上传中文字保留、编辑器工具栏 / 拖入 / 粘贴仍按发起位置新增 |
 | 公式就绪 / 复制与 HTML 导出 | `node scripts/cdp-verify-math-readiness.mjs 4113 9713 4213` | MathJax 慢加载、断网、坏公式、改公式、切稿、Mermaid 并存时，复制与干净正文 / 预览页导出先开「发布前检查」；未完成公式与图表不能默认通过，确认后才复制真实 SVG |
+| 卡片 /长图公式与图表就绪 | `node scripts/cdp-verify-graphics-gate.mjs 4113 9713 4213` | 卡片与长图在慢 MathJax、坏公式、延迟 Mermaid、Mermaid 失败时按钮禁用、无下载、可见原因与重试；就绪后恢复导出并真的产生下载；证据截图在 `verify-out/graphics-gate/`，独立 `data/audit-a06.db` 与本地图床 |
 | 发布前检查 | `node scripts/cdp-verify-publish-preflight.mjs 4127 9727` | 纯文字稿一键通过；空图片位 / 本机内网地址 / 外链地址 / 坏公式 / 未完成图表各自可定位与可定位跳转；提醒需显式勾选、阻断项只能显式绕过；复制用点击那一刻的最新稿件；Markdown 与整包备份不受阻断；慢网、图床报错、切稿、键盘操作与中英文 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
@@ -72,6 +73,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 [mobile-panes](../scripts/cdp-verify-mobile-panes.mjs)、
 [public-cards](../scripts/cdp-verify-public-cards.mjs)、
 [math-readiness](../scripts/cdp-verify-math-readiness.mjs)、
+[graphics-gate](../scripts/cdp-verify-graphics-gate.mjs)、
 [publish-preflight](../scripts/cdp-verify-publish-preflight.mjs)、
 [materials-states](../scripts/cdp-verify-materials-states.mjs)、
 [diagram](../scripts/cdp-verify-diagram.mjs)、

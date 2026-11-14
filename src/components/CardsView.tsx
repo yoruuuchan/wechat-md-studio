@@ -4,6 +4,8 @@ import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Doc, SignatureConfig } from '@/lib/types'
 import type { MathSnapshot } from '@/lib/math'
+import type { DiagramState } from '@/lib/preflight'
+import { graphicsReadiness } from '@/lib/graphics-readiness'
 import type { DiagramResolver } from '@/lib/render'
 import type { MsgKey, MsgParams } from '@/lib/i18n'
 import { resolveImgSrc } from '@/lib/image'
@@ -17,6 +19,7 @@ import {
 import { cardEndIsExtraPage, fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
 import { useI18n } from '@/hooks/useI18n'
 import { useResolvedTemplateCustom } from '@/hooks/useTemplateCustom'
+import GraphicsReadinessNotice from '@/components/GraphicsReadinessNotice'
 import { BRAND_ACCENT, cardFrameStyle } from '@/lib/card-style'
 import './cards.css'
 
@@ -92,13 +95,18 @@ interface Props {
   sig: SignatureConfig
   math: MathSnapshot
   resolveDiagram: DiagramResolver
+  /** Diagram facts owned by the editor; the views reuse them instead of counting twice. */
+  diagramStates?: readonly DiagramState[]
+  /** Retry paths the editor already owns; the failure hint offers them. */
+  onRetryMath?: () => void
+  onRetryDiagrams?: () => void
   options: CardOptions
   /** Top bar owns the ZIP button; this keeps its disabled/progress state true. */
   onStatusChange?: (status: CardsStatus) => void
 }
 
 const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
-  { doc, source, title, accent: themeAccent, sig, math, resolveDiagram, options, onStatusChange },
+  { doc, source, title, accent: themeAccent, sig, math, resolveDiagram, diagramStates = [], onRetryMath, onRetryDiagrams, options, onStatusChange },
   ref,
 ) {
   const { t, lang } = useI18n()
@@ -117,6 +125,8 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
   const accent = cardAccent(template, bg, themeAccent || BRAND_ACCENT)
   // Colour and font picks from the side panel; pagination measures with them.
   const picks = useResolvedTemplateCustom(template, bg, cardTemplateCustomize(template))
+  // A card is only exportable once every formula SVG and diagram PNG exists.
+  const graphics = graphicsReadiness(doc.blocks, math, diagramStates)
   const coverTitle = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
   const articleTitle = coverTitle?.type === 'heading' ? coverTitle.title : title
   const author = doc.meta.author || t('app.name')
@@ -192,7 +202,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
     : []
 
   const exportCards = async (index?: number) => {
-    if (!result || !pages.length || result.failedImages.length || busy || pending) return
+    if (!result || !pages.length || result.failedImages.length || busy || pending || !graphics.ready) return
     setBusy(true)
     setProgress({ done: 0, total: index === undefined ? pages.length : 1 })
     let exporter: Awaited<ReturnType<typeof import('@/lib/cards-export').createCardExporter>> | undefined
@@ -229,7 +239,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
 
   const total = pages.length
   const failed = Boolean(result?.failedImages.length)
-  const disabled = busy || pending || !total || failed
+  const disabled = busy || pending || !total || failed || !graphics.ready
 
   useImperativeHandle(ref, () => ({ exportAll: () => void exportCards() }))
 
@@ -238,7 +248,9 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
   }, [onStatusChange, disabled, busy, total, failed, error, progress])
 
   return (
-    <div data-onboarding="preview" data-xhs-view data-ready={!pending && !error && result !== null} className="flex h-full min-w-0 flex-col">
+    <div data-onboarding="preview" data-xhs-view data-ready={!pending && !error && result !== null}
+      data-cards-math={graphics.math.state} data-cards-diagram={graphics.diagrams.state}
+      className="flex h-full min-w-0 flex-col">
       {/* The preview keeps only the card summary; templates, ratios,
           backgrounds and the ZIP action live in the side panel and top bar. */}
       <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-line-1 px-4">
@@ -255,6 +267,7 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
           <ul className="mt-1 list-inside list-disc break-all">{result.failedImages.map((src) => <li key={src}>{src}</li>)}</ul>
           <button className="ya-link-btn" onClick={() => setRetry((n) => n + 1)}>{t('common.retry')}</button>
         </div> : null}
+        <GraphicsReadinessNotice kind="cards" graphics={graphics} onRetryMath={onRetryMath} onRetryDiagrams={onRetryDiagrams} />
         {result?.scaledBlocks ? <p role="status" className="mb-4 text-xs text-warning-700">{t('cards.scaled', { n: result.scaledBlocks })}</p> : null}
         {result && !total && <p className="text-sm text-ink-2">{t('cards.empty')}</p>}
         <div className="flex flex-wrap justify-center gap-5">

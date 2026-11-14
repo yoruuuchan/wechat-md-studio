@@ -407,6 +407,12 @@ export const zh = {
   'preflight.externalImage.detail': '{src}：跨站图片不允许在这里读取，所以无法验证它能不能被微信转存；发出前请自己确认这个地址打得开。',
   'preflight.renderer.title': '排版提醒',
   'preflight.renderer.detail': '来自渲染器的提醒。',
+  // ---- 卡片 / 长图的公式与图表就绪门禁 ----
+  'graphics.mathPending': '公式还在渲染（{n} 个），完成后才能导出。',
+  'graphics.mathFailed': '公式没能编译：{tex}。改好公式后才能导出。',
+  'graphics.mathEngineFailed': '公式引擎没加载成功，导出会带上 TeX 源码。检查网络后重试。',
+  'graphics.diagramPending': '图表还在生成图片（{n} 个），完成后才能导出。',
+  'graphics.diagramFailed': '图表没生成图片（{n} 个）：{reason}。修好 Mermaid 源码后重试。',
   'editor.toast.docxImagesFailed': '{n} 张图片没传上去，正文里留了占位',
   'editor.toast.imported': '已导入「{name}」',
   'editor.toast.importedImages': '含 {n} 张图片',

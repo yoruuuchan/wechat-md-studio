@@ -64,6 +64,7 @@ CSS 的作用域根是 `.reed-long-root`；`position: fixed` / `sticky`、脚本
 - 右栏「模板」复用卡片面板的结构：「我的 / 公用」两组、上传、管理、同步状态。长图公用模板和卡片公用模板走同一个加载器，只是 `kind` 不同。
 - 宽度 1080 / 1440，默认 1080；格式 JPG / PNG，默认 JPG。
 - 顶栏主按钮在长图模式下是「导出长图」；导出中显示进度、可取消。
+- 公式和 Mermaid 图表没就绪时同样暂停导出：卡片与长图共用一份就绪事实，失败时写明原因并给出重试；`data-long-math`、`data-long-diagram` 与 `[data-graphics-warning]` 供验收脚本读取状态。
 - 预览根节点 `[data-long-view]` 带 `data-long-layout`（`pending` / `ready` / `empty` / `error`）和 `data-long-export-blocked`，供验收脚本判断状态。
 
 ## 6. 公用模板「蓝色科技活动回顾」

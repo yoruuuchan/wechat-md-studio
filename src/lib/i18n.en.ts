@@ -413,6 +413,12 @@ export const en: Record<MsgKey, Msg> = {
   'preflight.externalImage.detail': '{src}: a cross-origin image cannot be read from here, so whether WeChat can re-host it is unverified. Open the address yourself before publishing.',
   'preflight.renderer.title': 'Layout note',
   'preflight.renderer.detail': 'A note from the renderer.',
+  // ---- cards / long image graphics readiness ----
+  'graphics.mathPending': '{n} formula(s) are still rendering; the export waits for them.',
+  'graphics.mathFailed': 'A formula did not compile: {tex}. Fix it before exporting.',
+  'graphics.mathEngineFailed': 'The math engine did not load, so the export would carry TeX source. Check the network and retry.',
+  'graphics.diagramPending': '{n} diagram(s) are still being generated; the export waits for them.',
+  'graphics.diagramFailed': 'A diagram did not become an image ({n}): {reason}. Fix the Mermaid source and retry.',
   'editor.toast.docxImagesFailed': (p) => `${p.n} images could not be uploaded; placeholders were left in the text`,
   'editor.toast.imported': 'Imported “{name}”',
   'editor.toast.importedImages': (p) => `with ${Number(p.n) === 1 ? '1 image' : `${p.n} images`}`,

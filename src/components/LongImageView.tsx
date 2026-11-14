@@ -4,6 +4,8 @@ import {
 import { toast } from 'sonner'
 import type { Doc, SignatureConfig } from '@/lib/types'
 import type { MathSnapshot } from '@/lib/math'
+import type { DiagramState } from '@/lib/preflight'
+import { graphicsReadiness } from '@/lib/graphics-readiness'
 import type { DiagramResolver } from '@/lib/render'
 import type { LongOptions } from '@/lib/long-options'
 import { longTemplateCustomize, longTemplateFonts } from '@/lib/cards'
@@ -16,6 +18,7 @@ import { resolveImgSrc } from '@/lib/image'
 import { safeFilename } from '@/lib/import-export'
 import { useI18n } from '@/hooks/useI18n'
 import { useResolvedTemplateCustom } from '@/hooks/useTemplateCustom'
+import GraphicsReadinessNotice from '@/components/GraphicsReadinessNotice'
 import './long-image.css'
 
 export interface LongStatus {
@@ -46,6 +49,11 @@ interface Props {
   sig: SignatureConfig
   math: MathSnapshot
   resolveDiagram: DiagramResolver
+  /** Diagram facts owned by the editor; the views reuse them instead of counting twice. */
+  diagramStates?: readonly DiagramState[]
+  /** Retry paths the editor already owns; the failure hint offers them. */
+  onRetryMath?: () => void
+  onRetryDiagrams?: () => void
   options: LongOptions
   /** The activated package; undefined until the public/uploaded zip is ready. */
   template: LoadedLongTemplate | undefined
@@ -56,7 +64,7 @@ interface Props {
 const IDLE_PROGRESS: LongExportProgress = { phase: 'measure', done: 0, total: 0 }
 
 const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageView(
-  { doc, source, title, sig, math, resolveDiagram, options, template, loadedVersion, onStatusChange },
+  { doc, source, title, sig, math, resolveDiagram, diagramStates = [], onRetryMath, onRetryDiagrams, options, template, loadedVersion, onStatusChange },
   ref,
 ) {
   const { t, lang } = useI18n()
@@ -82,6 +90,8 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
   const [previewWidth, setPreviewWidth] = useState(0)
   const scale = previewWidth > 0 ? Math.min(1, previewWidth / LONG_WIDTH) : 0
   const picks = useResolvedTemplateCustom(options.template, options.variant, longTemplateCustomize(options.template))
+  // A long image is only exportable once every formula SVG and diagram PNG exists.
+  const graphics = graphicsReadiness(doc.blocks, math, diagramStates)
   const articleTitle = useMemo(() => {
     const heading = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
     return heading?.type === 'heading' ? heading.title : title
@@ -197,7 +207,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
 
   const exportImage = useCallback(async () => {
     const root = rootRef.current?.firstElementChild as HTMLElement | null
-    if (!root || !template || !result || result.failedImages.length || pending || busy) return
+    if (!root || !template || !result || result.failedImages.length || pending || busy || !graphics.ready) return
     const controller = new AbortController()
     abortRef.current = controller
     setBusy(true)
@@ -232,7 +242,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
       setBusy(false)
       setProgress(IDLE_PROGRESS)
     }
-  }, [articleTitle, busy, options.format, options.template, options.width, pending, picks, result, t, template])
+  }, [articleTitle, busy, graphics.ready, options.format, options.template, options.width, pending, picks, result, t, template])
 
   useImperativeHandle(ref, () => ({
     export: () => { setExportCalls((value) => value + 1); void exportImage() },
@@ -242,7 +252,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
   const failed = Boolean(result?.failedImages.length)
   const empty = result !== null && result.height <= 0
   const layoutReady = Boolean(result) && !pending && !error && !empty
-  const ready = layoutReady && !failed
+  const ready = layoutReady && !failed && graphics.ready
 
   useEffect(() => {
     onStatusChange?.({
@@ -260,6 +270,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
     <div data-long-view data-ready={ready && !busy ? 'true' : undefined}
       data-long-layout={layoutReady ? 'ready' : empty ? 'empty' : error ? 'error' : 'pending'}
       data-long-export-blocked={failed ? 'true' : undefined}
+      data-long-math={graphics.math.state} data-long-diagram={graphics.diagrams.state}
       data-long-pending={pending ? 'true' : undefined}
       data-long-error={error ? 'true' : undefined}
       data-long-height={result?.height ?? undefined}
@@ -302,6 +313,7 @@ const LongImageView = forwardRef<LongImageViewHandle, Props>(function LongImageV
             <button className="ya-link-btn" onClick={() => setRetry((value) => value + 1)}>{t('common.retry')}</button>
           </div>
         ) : null}
+        <GraphicsReadinessNotice kind="long" graphics={graphics} onRetryMath={onRetryMath} onRetryDiagrams={onRetryDiagrams} />
         {empty && <p className="text-sm text-ink-2">{t('long.empty')}</p>}
         <div className="flex justify-center" style={{ display: result ? undefined : 'none' }}>
           <div

@@ -9,6 +9,7 @@
 - 正文在隐藏容器内以 540px 宽实测，导出为两倍像素：1080×1440、1080×1080、1080×1920。
 - 段落按句拆，过长的单句再分段；代码按行、列表按项、表格按行拆开。拆开的表格重复表头，有序列表的每个条目保留自己的序号。
 - 图片先读取并嵌入，确保分页和 PNG 使用相同的图片。跨域限制、浏览器安全策略或坏链接导致读取失败时，视图列出地址并暂停导出；修好后点击重试。未填图片位以明确的占位文字呈现。
+- 公式和 Mermaid 图表是异步就绪的：还在渲染、TeX 编译失败或图表没生成图片时暂停导出，视图写明是等待还是失败、失败原因与重试入口，不会把 TeX / Mermaid 源码烘焙进 PNG。根节点用 `data-cards-math`、`data-cards-diagram`（`ready` / `pending` / `failed`）和 `[data-graphics-warning]` 暴露同一状态；就绪后沿用原有重排与导出，导出图和预览一致。
 - 个别无法再拆且高于整页的内容（如巨大表格单元格、单条嵌套列表）会缩小并提示，可拆短源稿来保持正常字号。
 - 背景独立于界面明暗设置。「主色浅底」使用当前文章主题的 `ui.accent`，不可用时使用 Reed 的品牌色 `#4F6CE8`。
 - 字体按模板走：默认用 Noto Sans SC / Geist / Geist Mono。上传模板可以按名字引用仓库内置的字体（Noto Serif SC、Zhuque Fangsong、EB Garamond、Inter、JetBrains Mono、Orbitron、VT323、Space Grotesk、DM Serif Display、Rajdhani、Share Tech Mono、Pixelify Sans、Tinos、Instrument Sans、B612 Mono 等），也可以自带 woff2。所有字体文件都保留；分页预载和 PNG 内嵌读同一份声明，PNG 只内嵌当前模板实际字形所需的切片。批量导出固定点击时的卡片内容。

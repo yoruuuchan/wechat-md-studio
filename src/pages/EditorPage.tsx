@@ -492,6 +492,10 @@ export default function EditorPage() {
   const resolveDiagram = useCallback((code: string) => diagramRefs.get(code) ?? null, [diagramRefs])
   const diagramBusy = useRef(new Set<string>())
   const diagramFailed = useRef(new Set<string>())
+  /** Last failure reason per fence, so both views can say what actually went wrong. */
+  const diagramErrors = useRef(new Map<string, string>())
+  /** Bumped after a failure or a retry; it is the signal behind both mutable refs. */
+  const [diagramRevision, setDiagramRevision] = useState(0)
   /** The publish check the author is looking at, if any. */
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null)
   /** What the check was opened for, clicked through once the author agrees. */
@@ -815,9 +819,27 @@ export default function EditorPage() {
       if (b.type !== 'code' || !b.code.trim() || !diagramOf(b.lang)) continue
       if (out.some((d) => d.code === b.code)) continue
       const state = diagramRefs.has(b.code) ? 'ready' : diagramFailed.current.has(b.code) ? 'failed' : 'pending'
-      out.push({ code: b.code, line: b.line, state })
+      out.push({ code: b.code, line: b.line, state, ...(state === 'failed' ? { detail: diagramErrors.current.get(b.code) } : {}) })
     }
     return out
+  }
+
+  /** Reactive picture of the fence states; the revision is what re-reads the refs. */
+  const viewDiagramStates = diagramStates(parsed.blocks)
+
+  /** Clear parked diagram failures and let the rasterizer run again. */
+  const retryDiagrams = () => {
+    for (const block of parsed.blocks) {
+      if (block.type !== 'code' || !block.code.trim() || !diagramOf(block.lang)) continue
+      diagramFailed.current.delete(block.code)
+      diagramErrors.current.delete(block.code)
+    }
+    setDiagramRevision((value) => value + 1)
+  }
+
+  /** Retry the MathJax load behind unfinished formulas, the same path publish uses. */
+  const retryMath = () => {
+    for (const formula of documentFormulas(parsed.blocks)) void mathRenderer.warm(formula.tex, formula.display)
   }
 
   /** The article's publish state right now, from the source on screen. */
@@ -1180,6 +1202,9 @@ export default function EditorPage() {
 
     const park = (code: string, title: string, e: unknown) => {
       diagramFailed.current.add(code)
+      const message = e instanceof Error ? e.message.slice(0, 140) : String(e)
+      diagramErrors.current.set(code, message || title)
+      setDiagramRevision((value) => value + 1)
       toast.error(title, {
         description: e instanceof Error ? e.message.slice(0, 140) : String(e),
         duration: 8000,
@@ -1191,6 +1216,7 @@ export default function EditorPage() {
         const png = await renderDiagramPng(code)
         try {
           const ref = await uploadDiagram.current(png.blob)
+          diagramErrors.current.delete(code)
           setDiagramRefs((prev) => {
             const next = new Map(prev)
             rememberDiagram(next, code, ref)
@@ -1215,7 +1241,7 @@ export default function EditorPage() {
       })()
     }, 1200)
     return () => window.clearTimeout(timer)
-  }, [parsed, diagramRefs])
+  }, [parsed, diagramRefs, diagramRevision])
 
   /**
    * Tell the owner their previous upload is now unreferenced.
@@ -1870,13 +1896,15 @@ export default function EditorPage() {
   const previewPaneBody = previewMode === 'cards' ? (
     <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('cards.measuring')}</div>}>
       <CardsView ref={cardsViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
-        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram}
+        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} diagramStates={viewDiagramStates}
+        onRetryMath={retryMath} onRetryDiagrams={retryDiagrams}
         options={cardOptions} onStatusChange={setCardsStatus} />
     </Suspense>
   ) : previewMode === 'long' ? (
     <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('long.measuring')}</div>}>
       <LongImageView ref={longImageViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''}
         sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} options={longOptions}
+        diagramStates={viewDiagramStates} onRetryMath={retryMath} onRetryDiagrams={retryDiagrams}
         template={longTemplate} loadedVersion={longLoadedVersion} onStatusChange={setLongStatus} />
     </Suspense>
   ) : (
