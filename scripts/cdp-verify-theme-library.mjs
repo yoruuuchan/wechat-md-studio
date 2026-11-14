@@ -177,7 +177,7 @@ const renderedUpfront = await evaluate(
   `document.querySelectorAll('[data-theme-preview="rendered"]').length`,
 )
 check(
-  'previews are lazy (not all 172 injected at once)',
+  'previews are lazy (not all 227 injected at once)',
   renderedUpfront > 0 && renderedUpfront < cardCount,
   `rendered=${renderedUpfront}/${cardCount}`,
 )
@@ -313,14 +313,26 @@ for (const id of allIds) {
   byPrefix[p] = byPrefix[p] || []
   byPrefix[p].push(id)
 }
-// 手写主题 + 每个来源各取几套，覆盖不同上游格式与配色
-const picks = ['golden', 'minimal', 'steady', 'moyu-green', 'zen', 'olive']
+// 手写主题 + 每个来源各取几套，覆盖不同上游格式与配色；根容器契约的代表值也钉在这里：
+// golden 657px、olive 661px、xiaohu-apple-gradient 645px、xiaohu-academic-paper 633px
+// （gutter 折进 max-width 后依次是 677−2×10 / 8 / 16 / 22）。
+const pinnedWidths = new Map([
+  ['golden', 657],
+  ['olive', 661],
+  ['xiaohu-apple-gradient', 645],
+  ['xiaohu-academic-paper', 633],
+])
+const picks = ['golden', 'minimal', 'steady', 'moyu-green', 'zen', 'olive', ...pinnedWidths.keys()]
 for (const prefix of ['xiaohu', 'raphael', 'huasheng', 'md']) {
   picks.push(...(byPrefix[prefix] || []).slice(0, 3))
 }
+// 227 套主题在 1/2/3 层根嵌套与 375px 列宽下的全量检查由
+// cdp-verify-root-gutter.mjs 负责；这里只验主题库页面里真实渲染的抽样卡片。
+const samples = [...new Set(picks)]
 
 const badThemes = []
-for (const id of picks) {
+const pinnedSeen = new Map()
+for (const id of samples) {
   await evaluate(`document.querySelector('[data-theme-card="${id}"]')?.scrollIntoView({ block: 'center' })`)
   await sleep(700)
   const r = await evaluate(`(() => {
@@ -335,9 +347,12 @@ for (const id of picks) {
     return JSON.stringify({
       ok: true,
       maxWidth: cs.maxWidth,
+      paddingLeft: cs.paddingLeft,
+      paddingRight: cs.paddingRight,
+      boxSizing: cs.boxSizing,
       cells: cells.length,
-      centered: [...cells].some(c => (c.getAttribute('style')||'').includes('text-align:center')),
-      righted: [...cells].some(c => (c.getAttribute('style')||'').includes('text-align:right')),
+      centered: [...cells].some(c => (c.getAttribute('style') || '').includes('text-align:center')),
+      righted: [...cells].some(c => (c.getAttribute('style') || '').includes('text-align:right')),
       leafSpans: root.querySelectorAll('span[leaf]').length,
       hasCode: !!root.querySelector('section p span[leaf]'),
       hasCarousel: root.textContent.includes('左右滑动'),
@@ -350,13 +365,19 @@ for (const id of picks) {
   const problems = []
   if (!m.ok) problems.push(m.why)
   else {
-    if (m.maxWidth !== '677px') problems.push(`maxWidth=${m.maxWidth}`)
+    const maxWidthPx = Number.parseFloat(m.maxWidth)
+    const horizontalPadding = (Number.parseFloat(m.paddingLeft) || 0) + (Number.parseFloat(m.paddingRight) || 0)
+    if (!Number.isFinite(maxWidthPx) || maxWidthPx < 240 || maxWidthPx > 677) problems.push(`maxWidth=${m.maxWidth} outside 240-677px`)
+    else if (pinnedWidths.has(id) && maxWidthPx !== pinnedWidths.get(id)) problems.push(`pinned maxWidth=${m.maxWidth}, want ${pinnedWidths.get(id)}px`)
+    if (horizontalPadding !== 0) problems.push(`root horizontal padding=${m.paddingLeft}/${m.paddingRight}`)
+    if (m.boxSizing !== 'border-box') problems.push(`boxSizing=${m.boxSizing}`)
     if (m.cells !== 12) problems.push(`tableCells=${m.cells}/12`)
     if (!m.centered || !m.righted) problems.push('column alignment lost')
     if (m.leafSpans < 40) problems.push(`leafSpans=${m.leafSpans}`)
     if (!m.hasCarousel) problems.push('carousel missing')
     if (!m.hasSignature) problems.push('signature missing')
     if (m.bytes < 4000) problems.push(`bytes=${m.bytes}`)
+    if (pinnedWidths.has(id)) pinnedSeen.set(id, m.maxWidth)
   }
   if (problems.length) badThemes.push(`${id}: ${problems.join(', ')}`)
   console.log(
@@ -366,7 +387,14 @@ for (const id of picks) {
         : `${m.maxWidth} · ${m.cells}/12 cells · ${m.leafSpans} leaf · ${m.bytes}B · bg ${m.bg}`),
   )
 }
-check(`all ${picks.length} sampled themes render intact`, badThemes.length === 0, badThemes.slice(0, 4).join(' | '))
+check(`all ${samples.length} sampled themes render intact`, badThemes.length === 0, badThemes.slice(0, 4).join(' | '))
+const pinnedBad = [...pinnedWidths].filter(([id, want]) => pinnedSeen.get(id) !== `${want}px`)
+check(
+  'pinned root widths match the folded-gutter contract',
+  pinnedBad.length === 0 && pinnedSeen.size === pinnedWidths.size,
+  pinnedBad.map(([id, want]) => `${id}: got ${pinnedSeen.get(id) ?? 'missing'}, want ${want}px`).join(' | ') ||
+    [...pinnedSeen].map(([id, width]) => `${id}=${width}`).join(', '),
+)
 const libraryErrors = consoleErrors.length
 
 // ------------------------------------------------------- 应用主题

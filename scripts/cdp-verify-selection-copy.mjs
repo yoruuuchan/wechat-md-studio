@@ -444,7 +444,11 @@ const shotA = await screenshot('A-partial-paragraph')
 console.log(`  screenshot: ${shotA}`)
 
 console.log('\n=== toast ===')
-await sleep(300)
+await waitFor(
+  `document.body.innerText.includes('已复制选中内容')`,
+  5000,
+  'selection-copy toast',
+)
 const toastSeen = await evaluate(`(() => {
   const nodes = [...document.querySelectorAll('[data-sonner-toast]')].map((n) => n.textContent || '')
   return JSON.stringify({
@@ -559,7 +563,12 @@ await caseCopy({
 }
 
 console.log('\n=== K. a selection outside the article keeps the native copy ===')
-await sleep(5500) // let the copy toasts expire so they cannot confuse the check
+// 等局部复制 toast 自己消失，再核对正文外选区不会触发它。
+await waitFor(
+  `!document.body.innerText.includes('已复制选中内容')`,
+  12000,
+  'selection-copy toast expires',
+)
 const outsideText = await evaluate(`(() => {
   // The preview header now contains the WeChat/cards switch. The statistics
   // remain selectable UI text outside the article's copy event boundary.
@@ -595,38 +604,86 @@ const outsideText = await evaluate(`(() => {
   check('K: no selection-copy toast was raised', toast === false)
 }
 
+// TopBar 的复制按钮把原标签和成功标签叠在同一个 grid 格子里，只切换可见性，
+// 所以 textContent 不是状态：真实状态在 data-copied，可见文案取未被 visibility:hidden
+// 遮住的那个标签的 innerText。
+const readCopyButton = () =>
+  evaluate(`(() => {
+    const btn = document.querySelector('button[data-onboarding="copy"]')
+    if (!btn) return null
+    const labels = [...btn.querySelectorAll('span > span')]
+    const visibleText = labels
+      .filter((s) => getComputedStyle(s).visibility !== 'hidden')
+      .map((s) => (s.innerText || s.textContent || '').trim())
+      .join(' ')
+    return {
+      copied: btn.getAttribute('data-copied'),
+      visibleText,
+      ariaLabel: btn.getAttribute('aria-label') || '',
+      disabled: btn.disabled,
+    }
+  })()`)
+
+const waitForCopyButton = async (wantCopied, timeoutMs = 8000) => {
+  const until = Date.now() + timeoutMs
+  let last = null
+  while (Date.now() < until) {
+    last = await readCopyButton()
+    if (!!last && (last.copied === 'true') === wantCopied) return last
+    await sleep(100)
+  }
+  return last
+}
+
 console.log('\n=== L. the full-document copy is unchanged ===')
 await evaluate(`(() => {
-  const btn = [...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('复制到公众号'))
+  const btn = document.querySelector('button[data-onboarding="copy"]')
   if (!btn) throw new Error('copy button not found')
   btn.click()
   return true
 })()`)
-await sleep(900)
-// U02's publish check asks before handing out an article whose image address
-// WeChat cannot fetch; the fixture uses this origin's own favicon.
+// U02 的发布检查可能先弹出（fixture 用的是本站 favicon）；确认后等按钮自己的成功状态，
+// 不再用固定 sleep 猜时序。
+await waitFor(
+  `(() => {
+    const btn = document.querySelector('button[data-onboarding="copy"]')
+    return btn?.getAttribute('data-copied') === 'true' || !!document.querySelector('[role=dialog]')
+  })()`,
+  15000,
+  'copy confirmation or publish dialog',
+)
 await evaluate(`(() => {
   const d = document.querySelector('[role=dialog]')
   if (!d) return false
   const b = [...d.querySelectorAll('button')].find((x) => /仍要复制/.test(x.textContent || ''))
-  if (b) { b.click(); return true }
-  return false
+  if (b) b.click()
+  return !!b
 })()`)
-await sleep(900)
+const copiedAt = Date.now()
+const copiedState = await waitForCopyButton(true, 15000)
+check('L: the copy button reports success through data-copied', copiedState?.copied === 'true', JSON.stringify(copiedState))
+check('L: the visible label says 已复制', (copiedState?.visibleText || '').includes('已复制'), JSON.stringify(copiedState?.visibleText))
+check('L: the success label is announced', (copiedState?.ariaLabel || '').includes('已复制'), copiedState?.ariaLabel || '')
 {
   const clip = await readClipboard()
   const html = clip.html || ''
   const text = clip.text || ''
-  const buttonState = await evaluate(
-    `[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === '已复制')`,
-  )
   check('L: full copy wrote text/html and text/plain', typeof clip.html === 'string' && typeof clip.text === 'string', clip.error || '')
   check('L: full copy starts at the article root', html.replace(/^\s+/, '').startsWith('<section style="' + ROOT_MARK))
   check('L: full copy contains the first paragraph', html.includes('第一段用来做局部选择') && text.includes('第一段用来做局部选择'))
   check('L: full copy contains the last paragraph', html.includes('图片下方的收尾段落') && text.includes('图片下方的收尾段落'))
   check('L: full copy is longer than any partial fragment', html.length > 2000, `len=${html.length}`)
-  check('L: the copy button reports success', buttonState === true)
 }
+// 成功状态只保留 1500ms，不是常驻标签：等它自行复位并核对大致时长。
+const resetState = await waitForCopyButton(false, 8000)
+const resetElapsed = Date.now() - copiedAt
+check('L: data-copied resets after the confirmation', resetState?.copied !== 'true', JSON.stringify(resetState))
+check('L: the confirmation lasts about 1500ms', resetElapsed >= 1200 && resetElapsed <= 8000, `elapsed=${resetElapsed}ms`)
+check(
+  'L: the label returns to the copy label',
+  !(resetState?.visibleText || '').includes('已复制') && (resetState?.visibleText || '').includes('复制'),
+  JSON.stringify(resetState?.visibleText),
+)
 
 chrome.kill()
 try {

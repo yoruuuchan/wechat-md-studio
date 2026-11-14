@@ -8,10 +8,12 @@
 
 搭建台在仓库之外的项目里开发和构建，本仓库只接收它构建好的静态文件，不提交。
 
-- `npm run build` 的第二步 `npm run pack:motion`（[pack-motion.mjs](../scripts/motion/pack-motion.mjs)）把构建结果复制到 `public/motion/`，Vite 再把它带进 `dist/public/motion/`。`public/motion/` 在 `.gitignore` 里。
+- `npm run build`（开发 / 普通 CI 构建）的第二步 `npm run pack:motion`（[pack-motion.mjs](../scripts/motion/pack-motion.mjs)）把构建结果复制到 `public/motion/`，Vite 再把它带进 `dist/public/motion/`。`public/motion/` 在 `.gitignore` 里。
+- `npm run build:release` 是正式发布入口。它先跑 `npm run pack:motion:release`（`pack-motion.mjs --require`）：缺少有效 `index.html` 时在 Vite 之前非零退出并列出找过的来源，且不会先删掉 `public/motion/` 里上一份可用产物；Vite 结束后再由 `npm run verify:motion-dist` 核对 `dist/public/motion/index.html` 并打印文件数。缺了动效页面的正式发布不算成功，`/motion/` 会消失、入口退回占位。
 - 来源按顺序取第一个存在的：环境变量 `REED_MOTION_SITE` 指向的目录；主 checkout 旁边的 `wechat-motion-lab/out/site`。
-- 两处都没有时，这一步删掉旧副本并继续构建。[vite.config.ts](../vite.config.ts) 据此把 `__REED_MOTION__` 设为 `false`，[motion.ts](../src/lib/motion.ts) 返回 `null`，顶栏的「动效」保持「即将推出」的占位。
-- 页面必须是搭建台的站点版：没有内联脚本，脚本和字体样式的地址带内容哈希。本站的内容策略是 `script-src 'self'`，带内联脚本的页面会被 `pack:motion` 拒绝。
+- 开发构建里两处都没有时，这一步删掉旧副本并继续构建。[vite.config.ts](../vite.config.ts) 据此把 `__REED_MOTION__` 设为 `false`，[motion.ts](../src/lib/motion.ts) 返回 `null`，顶栏的「动效」保持「即将推出」的占位。
+- 页面必须是搭建台的站点版：没有内联脚本，脚本和字体样式的地址带内容哈希。本站的内容策略是 `script-src 'self'`，带内联脚本的页面会被 `pack-motion` 拒绝；显式给了 `REED_MOTION_SITE` 却没有 `index.html` 时，开发构建也会直接失败，不会静默退回占位。
+- 两条路径的打包行为都有自带临时 fixture 的检查：`npm run verify:motion` 覆盖缺来源 / 坏来源失败且保留旧副本、内联脚本被拒、有效 fixture 复制成功并记录文件数、开发构建可省略 `/motion/`，以及构建后 `dist` 核对的正反两路。
 - `/motion` 由 [boot.ts](../api/boot.ts) 重定向到 `/motion/`，页面按相对地址取自己的脚本、字体和许可文件。
 
 搭建台带的开源素材和字体的许可原文随页面一起发布（`/motion/LICENSE-*.txt`、`/motion/fonts/OFL-NotoSansSC.txt`），页面里「怎么用 → 开源素材和许可」列出每一项。
@@ -44,6 +46,7 @@
 
 ## 验证
 
+- 构建入口：`npm run verify:motion`（临时 fixture 的正反两路，含失败不破坏旧副本、开发构建可省略 `/motion/`）；正式发布构建用 `npm run build:release`，结束后 `npm run verify:motion-dist` 会核对 `dist/public/motion/index.html`。
 - 接口：`npx vitest run api/motion-drafts-router.test.ts`（鉴权、账号隔离、存 / 列 / 开 / 覆盖 / 删、校验与三项限制）。
 - 顶栏入口：`node scripts/cdp-verify-ui-modes.mjs <url>`，点「动效」原地切换、iframe 里搭建台能画出来、切回文章稿子仍在；构建里没有搭建台时是占位，这些检查跳过并打印一行说明。
 - 页面本身（本站内容策略下能运行、按需载入素材表、访客与站长两种「稿子」对话框、存 / 覆盖 / 打开 / 删除）由搭建台项目的 `tool/qa-drafts.mjs <origin> <口令文件>` 对着本地生产构建检查。
