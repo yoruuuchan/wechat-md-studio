@@ -251,7 +251,19 @@ export const storageRouter = createRouter({
     }),
 
   removeOrphans: visitorQuery
-    .input(z.object({ keys: z.array(z.string()).max(500) }))
+    .input(
+      z.object({
+        keys: z.array(z.string()).max(500),
+        /**
+         * The same local keep-list the `orphans` query was given, re-read by the
+         * browser right before this mutation. The server cannot see local-only
+         * drafts, and the caller's copy may be out of date by the time the user
+         * confirms: merging it here is what keeps a second tab's new reference
+         * from being deleted.
+         */
+        alsoKeep: z.array(z.string()).max(5000).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       if (input.keys.length === 0) return { deleted: 0, freedBytes: 0, skipped: [], failed: [] };
 
@@ -263,8 +275,10 @@ export const storageRouter = createRouter({
 
       // Never delete something a saved 稿件 still points at, whatever the caller
       // asked for. This is what stops a bad client (or a careless script) from
-      // wiping images that are in use.
-      const referenced = new Set<string>();
+      // wiping images that are in use. Local-draft keys are part of the same
+      // protection: they are re-checked here, not just trusted from the query
+      // that produced the list.
+      const referenced = new Set<string>(input.alsoKeep ?? []);
       if (ctx.user) {
         const savedDocs = await getDb()
           .select({ content: docs.content })

@@ -942,6 +942,8 @@ export const zh = {
   'materials.cleanPartialDesc': '{freed}；没删掉的图还在素材库里，可以重试',
   'materials.freed': '腾出 {size}',
   'materials.cleanFailed': '清理失败，稍后再试',
+  'materials.cleanStopped': '已停止清理：本机草稿里的图片引用读不出来',
+  'materials.cleanStoppedDesc': '空白的引用名单会把还在用的图当成旧图，所以这次一张都没删。修好后重试。',
   'materials.deleted': '已删除',
   'materials.deleteFailed': '删除失败',
   'materials.cleanEmpty': '干净，没有多余的图。',

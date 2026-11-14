@@ -961,6 +961,8 @@ export const en: Record<MsgKey, Msg> = {
   'materials.cleanPartialDesc': '{freed}; the rest are still in the library and can be retried',
   'materials.freed': 'freed {size}',
   'materials.cleanFailed': 'Cleanup failed; try again shortly',
+  'materials.cleanStopped': 'Cleanup stopped: image references in this browser’s drafts could not be read',
+  'materials.cleanStoppedDesc': 'An empty keep-list would treat images still in use as unused, so nothing was deleted. Retry once the read works again.',
   'materials.deleted': 'Deleted',
   'materials.deleteFailed': 'Delete failed',
   'materials.cleanEmpty': 'Nothing unused — all images are referenced.',
