@@ -47,6 +47,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 正文未就绪时的动作拦截 | `node scripts/cdp-verify-body-gating.mjs 4134 9734` | `docs.get` 延迟 / 失败、登出后保留 stub：编辑区显示加载、失败可重试、未登录显示原因，没有空白 CodeMirror；顶栏复制、改名、单篇 Markdown / HTML 导出被禁用并给出原因；实际断言剪贴板与下载为空、无成功提示，正文到达后编辑 / 复制 / 导出恢复；弹检查窗期间切稿不会用旧结论交出稿件；切换稿件不残留另一篇的回执；截图为三种阻断状态与加载完成 |
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
 | 按需字体表 | `node scripts/cdp-verify-theme-fonts.mjs 4133 9733` | 首屏样式不含模板 / 设计字体表的字体、不内联字体文件、界面字体仍是网页字体；逐个切到设计主题与手写主题，在预览里读 Chrome 实际渲染字体，确认按需加载的字体真正生效 |
+| 编辑器字体回退 | `node scripts/cdp-verify-editor-fonts.mjs 4128 9728 [输出目录] [标签]` | 1440px 下分别探测编辑器中文字、拉丁、数字、中英文标点的 Chrome 实际渲染字体（中文须为打包的 Noto Sans SC 且 isCustomFont，拉丁保持 Geist Mono、无系统回退），并留明暗两态截图；自带应用、mock 图床与 Chrome，证据 JSON 与截图写入输出目录 |
 | 慢网云端保存 | `node scripts/cdp-verify-slow-cloud-save.mjs 4131 9731` | 每次保存请求拖慢 2.5 秒、分段连续输入：不误报冲突、同一篇同时最多一个保存在路上、云端拿到全部内容；零延迟对照 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
