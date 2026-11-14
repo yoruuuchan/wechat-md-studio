@@ -8,7 +8,7 @@
 ## 本地开发
 
 使用 Node.js 24（当前开发与验收版本，需支持 `node:sqlite`）。命令在含 `package.json` 的目录运行；
-本地伞仓库的应用目录是 `app/`，公开仓库直接使用根目录。
+本地各 worktree 直接使用仓库根目录。
 
 ```bash
 npm ci

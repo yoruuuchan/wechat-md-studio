@@ -3,7 +3,7 @@
 [项目首页](../README.md) · [Agent 入口](../AGENTS.md) · [部署与线上验收](../HANDOFF.md)
 
 命令以 [package.json](../package.json) 与脚本自身参数为准；在含 `package.json` 的应用根目录运行。
-本地伞仓库的各 worktree 都先进入其 `app/`，使用 Node.js 24 与 `npm ci`。
+本地各 worktree 直接使用含 `package.json` 的仓库根目录，使用 Node.js 24 与 `npm ci`。
 
 ## 项目级检查
 
@@ -19,6 +19,7 @@ npm run verify:motion # 动效打包正反两路
 - `check`：TypeScript 项目检查；`test`：Vitest，覆盖 parser、存储、导入导出、API 等相邻测试。
 - `verify:themes`：全主题渲染、微信正文规则、metadata / 许可文件、图片短引用、比例、图片操作、SQLite 驱动契约；成功输出 `ALL CHECKS PASSED`。
 - `build`：Vite 前端 `dist/public/` + esbuild 服务端 `dist/boot.js`；开发 / 普通 CI 构建，可以没有 `/motion/`（顶栏动效退回占位）。`build:release` 是正式发布入口，要求搭建台页面存在，构建后核对 `dist/public/motion/index.html`。`verify:motion` 用临时 fixture 检查两条打包路径。`vite preview` 只预览前端，不能替代带 API 的服务验收。
+- DOCX 用例用动态 `import('mammoth')`：2026-11-14 在刚装完依赖的干净 worktree 连续 3 次冷跑，首个 DOCX 用例 164 / 192 / 171ms、`import('mammoth')` 冷启动 115–122ms，历史记录过的 5s 超时未复现，因此没有放宽局部或全局 timeout。
 
 主题验证同时输出 `verify-out/*_clean.html` 与 `*_preview.html`；可通过 `MOPAI_VERIFY_OUT` 指定目录。
 新增主题 / 来源时用 `npm run import:themes` 重生成，再复算主题统计与检查许可证文件，见
@@ -54,7 +55,7 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
 | 响应式编辑器布局 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 1536/1280px 三栏、1100/960/768/700px 编辑 + 预览两栏、320/390/430px 单面板；每档无横向滚动与被裁切 / 重叠的顶栏控件（手机是顶栏里的模式胶囊，不再有单独模式行）；768px 抽屉可开可关（按钮 / Esc / 点外部）、内容与宽屏右栏一致（含模式专属的「主题 / 模板」标签）、关闭再开保留标签页、封面大标题可见；切面板后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；弹窗、中英文、明暗主题（从「设置」标签切换）、触控与键盘、软键盘视口收缩；按档位截图并生成 index.html |
 | 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；中英文文案 |
-| 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图 |
+| 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图。与 [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs) 分工：这里全量合成页面，主题库脚本测量真实页面抽样并钉 golden=657 与代表值 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
 | AI 画图表入口 | `node scripts/cdp-verify-ai-diagram.mjs 3228 9356 [输出目录]` | 两个 AI 入口同排、「AI 图表」弹窗的中英文文案与提示词、可见文案保持简短、弹窗只有一个主 well、三张示例图从本地 `public/diagram-examples/` 真实解码且各自链到上游画廊对应锚点（带 alt 与 `rel="noreferrer"`）、两次真实复制（提示词 / Skill 地址）、三个外链（SKILL.md、仓库、英文原版）都带 `rel="noreferrer"`、弹窗不请求 Skill / 模型 / 图床、提示词框未塌陷、界面与示例图注字体实际生效、明暗主题对比度、390px 无横向溢出且弹窗在视口内、打开图表弹窗不改正文、与「AI 帮我写」互不串弹窗且同为一 well 结构；截图为明暗 / 中文 / 英文 / 390px 四张，JSON 与日志写入 `verify-out/ai-diagram/` |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
@@ -124,7 +125,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 
 | 改动范围 | 现有入口与参数 |
 |---|---|
-| 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` |
+| 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334`；筛选 / 搜索 / 来源面板 / 懒加载 / 应用主题 / 快速切换器 / 390px，以及根容器契约（240–677px、无横向根 padding、box-sizing，钉 golden=657px 与 olive / xiaohu 代表值） |
 | 主题库当前稿试排 / 对比 | [cdp-verify-theme-trial.mjs](../scripts/cdp-verify-theme-trial.mjs)：`node scripts/cdp-verify-theme-trial.mjs <url> [CDP端口] [证据目录]`；种一篇带标题 / 表格 / 单图 / 轮播 / 公式的本机稿，核对试排 HTML 与编辑器预览逐字节一致、1–3 套候选不写正文 / 主题、应用后返回保留筛选与滚动、已加载正文不提示缺失、缺失正文回退样稿，并在英文、390px 和明暗模式下复验标题 / 署名对比度、字体、标题与控件不重叠及正文白底 |
 | 首次加载体积与分块 | [cdp-measure-initial-load.mjs](../scripts/cdp-measure-initial-load.mjs)：`node scripts/cdp-measure-initial-load.mjs <url> [CDP端口] [输出文件]`；同环境记录入口资源、transfer / decoded 字节、FCP / DCL / load、长任务与编辑器可交互耗时，以及模板库首卡片 / 首预览 / 全部卡片时间 |
 | 分块失败与重试 | [cdp-verify-u05-load-failure.mjs](../scripts/cdp-verify-u05-load-failure.mjs)：`node scripts/cdp-verify-u05-load-failure.mjs <url> [CDP端口]`；路由分块被阻断时的可见错误页与重试、当前主题 pack 被阻断时正文不丢且可重试、离线 SPA 导航的错误页与恢复 |
@@ -150,8 +151,7 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 四处界面小毛病（手机模式胶囊 / 外观与语言 / 存草稿 / 我的模板） | [cdp-verify-ui-nits.mjs](../scripts/cdp-verify-ui-nits.mjs)：`node scripts/cdp-verify-ui-nits.mjs <url> [CDP端口] [输出目录]`；默认同上，连接已启动的应用；迭代截图写入 `verify-out/nits/after/` 并与 `before/` 生成 `verify-out/nits/index.html`；用 `.env` 的 `ACCESS_KEY` 登录，不上传真实图床 |
 
 这几个自起无头 Chrome 的脚本只连接已启动的应用，Chrome 路径同样按 Windows 写定。
-`cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；
-折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
+`cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；复制按钮的成功反馈改查 `data-copied` 与可见 `innerText`（1500ms 内出现、随后复位），不再依赖固定 sleep；折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
 `cdp-verify-dark-theme.mjs` 覆盖 `akari` / `yoru` 两态：`<html>` 上 `data-theme` 与 `.dark` 的同步、shadcn / Tailwind `dark:` 变体生效（侧栏四格 Tabs——主题或模板、图片、稿件信息、设置——在深色下可读，对比度 ≥ 3:1）；「设置」里的「外观与语言」两行及其语言 / 明暗控件在两套主题下都可见、标签对比度 ≥ 3:1，并留两主题截图。
 `cdp-verify-ui-modes.mjs` 覆盖 1536 / 1280 / 960 / 768 / 640 / 390 / 360 七档：顶栏无横向溢出、可见控件不被裁切或重叠，≥960px 稿件名至少容纳八个汉字；手机档的模式入口收成顶栏里的胶囊下拉（列出四种模式；长图可选，动效是原地切换的模式，搭建台嵌在同源 iframe 里，构建里没有搭建台时才是占位，见 [motion.md](motion.md)），不再有单独模式行，390 / 360 正文起点比改前高至少 40px；中英文与公众号 / 卡片两种模式下各档顶栏都不溢出；「更多」列出并真实打开草稿箱 / 素材库 / 导入 / 导出 / 外观与语言 / GitHub / 致谢 / 登录，1280 / 768 / 390 三档都能从「更多 → 外观与语言」打开右栏「设置」并切换语言和明暗；登录后保存状态旁的一键「存草稿」在 1536 / 1280 / 960 / 768 / 640 / 390 / 360 都显示完整中文且不裁切；卡片模板 / 比例 / 配色与公众号主题都实时换预览；公众号模式复制到剪贴板、卡片模式生成全套 ZIP。截图与 `ui-modes.json` 写入输出目录，并生成按宽度分组的 `index.html`。
 `cdp-verify-ui-nits.mjs` 覆盖四处小毛病：手机模式胶囊（四种模式、长图不可选、动效可选或在没有搭建台的构建里是占位、390 / 360 高度下降 ≥ 40px）；「更多 → 外观与语言」在 1280 / 768 / 390 打开「设置」且语言与明暗都生效；中文快捷保存按钮在七个宽度下始终是「存草稿」；「我的」模板组内上传两个示例包、管理状态删除一个且选中回退默认、管理状态点模板不切换、空组仍有提示与上传按钮、坏文件的报错留在组内、全右栏只在这一处列出「我的」模板。另核对稿件名输入框的 `text-overflow` 为 `ellipsis`，390 / 360 宽放不下时仍带省略号且顶栏不横向溢出。同时生成改前 / 改后并排的 `verify-out/nits/index.html`。
