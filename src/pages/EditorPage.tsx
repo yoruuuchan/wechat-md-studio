@@ -2002,17 +2002,17 @@ export default function EditorPage() {
         open={frameTask !== null && manualOpen === false}
         label={frameTask?.item?.no ?? ''}
         alt={frameTask?.item?.alt || frameTask?.files[0]?.name || ''}
-        current={frameTask?.locked}
+        current={frameTask?.item?.ratio}
+        locked={Boolean(frameTask?.locked)}
         mode={frameTask?.mode ?? 'loose'}
         fence={frameTask?.item?.kind === '画廊' ? ':::gallery' : ':::carousel'}
         size={settings.uploadSize}
         oversize={oversizeUpload}
         busy={uploadingKey !== null}
         onCancel={() => setFrameTask(null)}
-        onManual={() => {
+        onManual={(picked) => {
           if (!frameTask) return
-          const lockedOrCurrent = frameTask.locked ?? null
-          setFrameTask({ ...frameTask, ratio: lockedOrCurrent })
+          setFrameTask({ ...frameTask, ratio: picked })
           setManualOpen(true)
         }}
         onConfirm={(ratio, size) => {

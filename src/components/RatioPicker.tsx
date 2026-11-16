@@ -4,7 +4,7 @@ import { MaxImageBytes } from '@contracts/constants'
 import { carouselFrame } from '@/lib/theme-kit'
 import { UPLOAD_SIZE_CHOICES, type UploadSizeChoice } from '@/lib/image-compress'
 import { formatBytes } from '@/lib/image'
-import { CAROUSEL_RATIOS, type CarouselRatio } from '@/lib/types'
+import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio } from '@/lib/types'
 import { useI18n } from '@/hooks/useI18n'
 
 interface Props {
@@ -12,8 +12,10 @@ interface Props {
   /** Which slot is being filled, shown so the user knows what they are cropping. */
   label: string
   alt: string
-  /** Ratio already written into the block's opener — locks the choice when set. */
+  /** Ratio written into the block's opener; the selection starts here. */
   current?: CarouselRatio
+  /** True once the block's frame is fixed and the choice is read-only. */
+  locked: boolean
   /**
    * Every image in a multi-image block (carousel or gallery) must share one
    * frame, so the choice is mandatory there. A standalone image may keep its own
@@ -34,7 +36,7 @@ interface Props {
   onCancel: () => void
   onConfirm: (ratio: CarouselRatio | null, size: UploadSizeChoice) => void
   /** Hand the image over to the interactive cropper instead. */
-  onManual: () => void
+  onManual: (ratio: CarouselRatio | null) => void
 }
 
 /**
@@ -47,6 +49,7 @@ export default function RatioPicker({
   label,
   alt,
   current,
+  locked,
   mode,
   fence = ':::carousel',
   size,
@@ -57,14 +60,13 @@ export default function RatioPicker({
   onManual,
 }: Props) {
   const { t } = useI18n()
-  const [ratio, setRatio] = useState<CarouselRatio | null>(mode === 'loose' ? null : current ?? '4:3')
+  const [ratio, setRatio] = useState<CarouselRatio | null>(mode === 'loose' ? null : current ?? DEFAULT_CAROUSEL_RATIO)
   const [uploadSize, setUploadSize] = useState<UploadSizeChoice>(size)
-  const locked = mode === 'carousel' && Boolean(current)
 
   useEffect(() => {
     if (!open) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the dialog stays mounted while closed, so its state has to be re-seeded from the props on every open (and re-open on a different slot). The alternative — keying the dialog — would remount and lose the open/close transition.
-    setRatio(mode === 'loose' ? null : current ?? '4:3')
+    setRatio(mode === 'loose' ? null : current ?? DEFAULT_CAROUSEL_RATIO)
     setUploadSize(size)
   }, [open, current, mode, size])
 
@@ -197,7 +199,7 @@ export default function RatioPicker({
 
           <button
             type="button"
-            onClick={onManual}
+            onClick={() => onManual(mode === 'loose' ? null : ratio)}
             className="mt-2 flex w-full items-center justify-between rounded-xl border border-dashed border-line-strong px-3 py-2 text-left transition-colors hover:border-brand-300 hover:bg-surface-tint"
           >
             <span className="text-[12px] text-ink-1">{t('ratio.manual')}</span>
