@@ -82,7 +82,7 @@ export interface CarouselItem {
 }
 
 /** Uniform frame every image in one carousel or gallery is cropped to at upload time. */
-export const CAROUSEL_RATIOS = ['4:3', '3:4', '16:9', '9:16', '1:1'] as const
+export const CAROUSEL_RATIOS = ['4:3', '3:4', '3:2', '2:3', '16:9', '9:16', '1:1'] as const
 
 export type CarouselRatio = (typeof CAROUSEL_RATIOS)[number]
 

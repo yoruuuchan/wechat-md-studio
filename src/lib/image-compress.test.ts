@@ -104,6 +104,8 @@ describe('pickMime', () => {
     // fails here rather than silently drifting apart.
     expect(pickMime(4, 3)).toBe('image/webp') // 4:3
     expect(pickMime(3, 4)).toBe('image/jpeg') // 3:4
+    expect(pickMime(3, 2)).toBe('image/webp') // 3:2
+    expect(pickMime(2, 3)).toBe('image/jpeg') // 2:3
     expect(pickMime(16, 9)).toBe('image/webp') // 16:9
     expect(pickMime(9, 16)).toBe('image/jpeg') // 9:16
     expect(pickMime(1, 1)).toBe('image/webp') // 1:1

@@ -115,7 +115,7 @@ export default function RatioPicker({
             </button>
           )}
 
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {CAROUSEL_RATIOS.map((r) => {
               const f = carouselFrame(r)
               const active = r === ratio

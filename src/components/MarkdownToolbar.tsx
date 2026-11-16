@@ -141,6 +141,8 @@ type PanelKind = 'table' | 'carousel' | 'gallery' | 'math' | 'code'
 const RATIO_KEYS: Record<CarouselRatio, MsgKey> = {
   '4:3': 'toolbar.ratio.4:3',
   '3:4': 'toolbar.ratio.3:4',
+  '3:2': 'toolbar.ratio.3:2',
+  '2:3': 'toolbar.ratio.2:3',
   '16:9': 'toolbar.ratio.16:9',
   '9:16': 'toolbar.ratio.9:16',
   '1:1': 'toolbar.ratio.1:1',
