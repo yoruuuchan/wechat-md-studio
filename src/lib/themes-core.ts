@@ -97,7 +97,7 @@ export const goldenTheme: Theme = {
 
   imageBlock: (src, caption) =>
     src
-      ? `<p style="margin:24px 0 8px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;height:auto;border-radius:8px;border:1px solid #E6EDF6;" /></p><p style="margin:8px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(caption)}</span></p>`
+      ? `<section style="margin:0 0 24px;"><p style="margin:24px 0 8px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;height:auto;border-radius:8px;border:1px solid #E6EDF6;" /></p><p style="margin:8px 0 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(caption)}</span></p></section>`
       : `<p style="margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#888888;"><span leaf="">${esc(caption)}</span></p>`,
 
   carousel: (title, caption, items, ratio) => {
@@ -189,7 +189,7 @@ export const minimalTheme: Theme = {
 
   imageBlock: (src, caption) =>
     src
-      ? `<p style="margin:28px 0 8px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;height:auto;" /></p><p style="margin:8px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(caption)}</span></p>`
+      ? `<section style="margin:0 0 24px;"><p style="margin:28px 0 8px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;height:auto;" /></p><p style="margin:8px 0 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(caption)}</span></p></section>`
       : `<p style="margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#9A9A9A;"><span leaf="">${esc(caption)}</span></p>`,
 
   carousel: (title, caption, items, ratio) => {
@@ -292,7 +292,7 @@ export const steadyTheme: Theme = {
 
   imageBlock: (src, caption) =>
     src
-      ? `<p style="margin:26px 0 8px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;height:auto;border:1px solid #E4E9F0;" /></p><p style="margin:8px 0 24px;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(caption)}</span></p>`
+      ? `<section style="margin:0 0 24px;"><p style="margin:26px 0 8px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;height:auto;border:1px solid #E4E9F0;" /></p><p style="margin:8px 0 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(caption)}</span></p></section>`
       : `<p style="margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:#8C9BB3;"><span leaf="">${esc(caption)}</span></p>`,
 
   carousel: (title, caption, items, ratio) => {

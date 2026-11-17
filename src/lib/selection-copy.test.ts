@@ -170,6 +170,17 @@ describe('serializeWechatSelection', () => {
     expect(out!.plainText).toBe('图1 配图说明')
   })
 
+  it('keeps the figure block when only the image is selected', () => {
+    const root = mount(
+    `<section style="margin:0 0 24px;"><p style="图"><img src="/favicon.svg" /></p><p style="图注"><span leaf="">图1 配图说明</span></p></section>`,
+    )
+    const picture = root.querySelector('p')!
+    const out = serializeWechatSelection(root, select(picture, 0, picture, 1))
+    expect(out!.html).toContain('<section style="margin:0 0 24px;">')
+    expect(out!.html).toContain('<img src="/favicon.svg"')
+    expect(out!.html).not.toContain('配图说明')
+  })
+
   it('spans two modules from the middle of one to the middle of the next', () => {
     const root = mount(
       `<p style="模块一"><span leaf="">模块一的文字</span></p><section style="模块二"><p style="内文"><span leaf="">模块二的文字</span></p></section>`,
