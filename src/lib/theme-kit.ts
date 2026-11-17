@@ -480,14 +480,14 @@ export function makeImageBlock(opts: {
   captionColor: string
 }) {
   return (src: string, caption: string): string => {
-    const capStyle = `margin:8px 0 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:${opts.captionColor};`
+    const capStyle = `margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:${opts.captionColor};`
     if (!src) {
       return `<p style="margin:24px 0;font-size:12px;line-height:1.6;letter-spacing:1px;text-align:center;text-indent:0;color:${opts.captionColor};"><span leaf="">${esc(caption)}</span></p>`
     }
     const img = `<img src="${esc(src)}" style="display:block;width:100%;height:auto;${opts.imgStyle}" />`
     const figure = opts.wrapperStyle
-      ? `<section style="margin:24px 0 8px;${opts.wrapperStyle}">${img}</section>`
-      : `<p style="margin:24px 0 8px;text-align:center;text-indent:0;">${img}</p>`
+      ? `<section style="margin:24px 0;${opts.wrapperStyle}">${img}</section>`
+      : `<p style="margin:24px 0;text-align:center;text-indent:0;">${img}</p>`
     return `<section style="margin:0 0 24px;">${figure}<p style="${capStyle}"><span leaf="">${esc(caption)}</span></p></section>`
   }
 }
