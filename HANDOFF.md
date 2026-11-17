@@ -80,7 +80,7 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 | 部件 | 位置 |
 |---|---|
 | 站点 | cc-tokyo-01 `/opt/mopai/app`，Node 直跑 `dist/boot.js`，监听 **127.0.0.1:3100** |
-| 进程 | `mopai.service`（systemd，内存上限 384M，实测吃 ~35MB）+ `cloudflared-mopai.service` |
+| 进程 | `mopai.service`（systemd，内存上限 384M，实测吃  35MB）+ `cloudflared-mopai.service` |
 | 入口 | Cloudflare Tunnel → `wechat.yoru-and-akari.dev`，tunnel id `1c05edf4-f1f1-4156-9aa2-8a1ddca0fa14`（ingress 在服务器 `/etc/cloudflared/mopai.yml`） |
 | 门禁 | **站点公开，没有 Cloudflare Access**（2026-10-08 撤掉，之前是邮箱验证只放行站长）。撤的方式：本机的 CF token 只读写不动，于是借一个已登录 dashboard 的浏览器会话，走它的同源代理 `dash.cloudflare.com/api/v4/...` 删掉了两个 Access 应用；同一会话把本站并入了 zone 上那条高威胁分数 challenge 规则（现在 `http.host in {"app..." "wechat..."}`）。`ACCESS_KEY` 只决定谁能用云端草稿箱；排版、上传、复制、导出都不用登录 |
 | 图片公网读 | 站点公开之后 `/api/img/*` 自然是公网可读（微信抓图必须匿名可达）。以前那个 bypass Access 应用已随之删除。若将来把门禁关回去，必须同时建一个 bypass 应用放行 `/api/img/*`（`cf-create-access.sh` 里已有这段，路径最具体者优先）；同理若放行 `/api/agent/*`，**绝不能连带放行 `/api/trpc/*`**——那里有 `auth.login` |
@@ -88,7 +88,7 @@ harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 | 图片存储 | Worker `mopai-images` → R2 `mopai-assets`；Worker 持有 R2 binding，**服务器上不存在任何 S3 凭证** |
 | 数据 | SQLite，`/opt/mopai/app/data/mopai.db` |
 | SSH | `ssh cc-tokyo-01` |
-| Cloudflare token | 环境里的 `CLOUDFLARE_API_TOKEN` **是只读的**：读接口正常，写接口一律回 `HTTP 405` + 错误码 `10405 Method not allowed for this authentication scheme`（看着像方法不对，其实是 token scope 不够）。改 Access / WAF 规则要先换一个带 `Zone → Rulesets Edit` + `Account → Access → Apps and Policies Edit` 的 token。**不要硬编码、不要提交**。`~/.config/codex/private.env` 里已经没有这个变量了（只剩 SILICONFLOW_API_KEY），旧脚本的 `source` 那行会静默拿到空值 |
+| Cloudflare token | 环境里的 `CLOUDFLARE_API_TOKEN` **是只读的**：读接口正常，写接口一律回 `HTTP 405` + 错误码 `10405 Method not allowed for this authentication scheme`（看着像方法不对，其实是 token scope 不够）。改 Access / WAF 规则要先换一个带 `Zone → Rulesets Edit` + `Account → Access → Apps and Policies Edit` 的 token。**不要硬编码、不要提交**。` /.config/codex/private.env` 里已经没有这个变量了（只剩 SILICONFLOW_API_KEY），旧脚本的 `source` 那行会静默拿到空值 |
 | Cloudflare 标识 | account `5e96dfd2bf22d385e4ffdaa794d74676`；zone `yoru-and-akari.dev` = `4f9b5c7236e63090439676eec70031e2`（**Free 计划**）；ruleset：自定义规则 `3478aaf3df1b4d8eb385f7dadc47d3c6`、速率限制 `b002f9cb15564f3a9b560efe95f138eb` |
 | Cloudflare 免费额度现状 | 自定义规则 **5/5 已用满**（telegram webhook、扫描器 UA、app 域威胁分数 challenge、路径穿越、危险方法），速率限制 **1/1 已用掉**（`feedback-rl-5pm`，`/feedback` POST 5 req/10s）。所以本项目**不能再加规则**，只能并入既有的；上传防洪放在应用层。别以为 zone 是空的——`GET /zones/{z}/rulesets` 的列表里 `rules` 是空的，必须逐个 `GET /zones/{z}/rulesets/{id}` 才看得到规则 |
 
@@ -190,7 +190,7 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install-$TAG.sh /tmp/mop
 **三条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
 
 1. **包名永远带 commit 短哈希，本机临时文件用 `mktemp -d`。** worktree 只隔离仓库里的文件，
-   本机 `/tmp`（都指向同一个 `E:\SYSTEM~2\15877\Temp`）和服务器 `/tmp` 是所有会话共享的。
+   本机 `/tmp`（都指向同一个 `E:\SYSTEM 2\15877\Temp`）和服务器 `/tmp` 是所有会话共享的。
    配方原来写死 `$env:TEMP\mopai.tar.gz` → `/tmp/mopai-release.tar.gz`，照做就必然互相覆盖——
    而且同一份 dist 两次打包**尺寸几乎一样**，用尺寸或 mtime 根本核不出串包（当时还出现过
    「mtime 一直在更新、大小却对不上」的假象）。只有 sha256 能分辨：传前在服务器上
@@ -199,14 +199,13 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install-$TAG.sh /tmp/mop
    两个 install 并行时读者会看到半成品目录，或者后装的旧包把新包顶掉。`flock` 让第二次调用排队，
    而不是交错执行。
 
-3. **脚本站传路径也带 commit 短哈希（2026-11-17 补）。** `flock` 只能串行化同时执行的安装，
-    挡不住路径被覆盖：并行会话都把脚本写到同一个 `/tmp/install.sh`，后写的那份可能先被执行；
-    更隐蔽的是旧脚本把新包 `cp` 进已存在的 `dist.new`，换名后变成 `dist/dist.new` 嵌套——
-    服务照常重启、健康检查全过，实际仍在跑旧包。2026-11-17 部署 `94afcb6` 时撞过一次，
-    手动完成 `dist → dist.prev`、`dist.new → dist` 才真正换上。
-    因此脚本站 `/tmp/install-<tag>.sh`、包用 `/tmp/mopai-<tag>.tar.gz`；安装后核对
-    `dist/boot.js` 的 sha256 与入口 `index-*.js` 都对上本地，且 `dist` 里没有
-    `dist.new` / `dist.prev` 残留，才算部署完成。
+3. **安装脚本探测目录也要走 sudo，换名用 `mv -T`（2026-11-17 补）。** `/opt/mopai` 是 `750`，
+    安装脚本以 ubuntu 运行，`[ -d "$APP/dist" ]` 没有 sudo 看不到目标，条件永远为假——
+    旧 `dist` 没被挪开，`mv dist.new dist` 就把新包塞进 `dist/dist.new`：没有 `-T` 时嵌套，
+    有 `-T` 时报 Directory not empty；服务照常重启、健康检查全过，实际仍在跑旧包。
+    2026-11-17 部署 `e39f32d` 时连续撞了两次。现在探测用 `sudo test -d`、两次换名都用 `mv -T`
+    （回滚路径同样），开头一并清掉 `dist/dist.new`；安装后核对 `dist/boot.js` sha256、
+    入口 `index-*.js` 与本地一致，`dist` 里没有 `dist.new` / `dist.prev` 残留。
 
 **部署后必须核对**（别只看命令有没有报错）：本地与线上的 `dist/boot.js` sha256、以及
 `dist/public/index.html` 引用的 js/css 文件名是否一致；再用

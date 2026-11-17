@@ -46,10 +46,10 @@ fi
 # Overridable only so the swap and rollback can be exercised away from the server.
 APP=${MOPAI_APP_DIR:-/opt/mopai/app}
 echo "== install into $APP =="
-sudo rm -rf "$APP/dist.new" "$APP/dist.prev"
+sudo rm -rf "$APP/dist.new" "$APP/dist.prev" "$APP/dist/dist.new"
 sudo cp -r /tmp/mopai-extract/dist "$APP/dist.new"
-if [ -d "$APP/dist" ]; then sudo mv "$APP/dist" "$APP/dist.prev"; fi
-sudo mv "$APP/dist.new" "$APP/dist"
+if sudo test -d "$APP/dist"; then sudo mv -T "$APP/dist" "$APP/dist.prev"; fi
+sudo mv -T "$APP/dist.new" "$APP/dist"
 sudo mkdir -p "$APP/data"
 sudo chown -R mopai:mopai "$APP"
 sudo chmod 750 "$APP/data"
@@ -101,11 +101,11 @@ fi
 
 echo "--- recent logs of the failed release ---" >&2
 sudo journalctl -u mopai.service -n 60 --no-pager >&2 || true
-if [ -d "$APP/dist.prev" ]; then
+if sudo test -d "$APP/dist.prev"; then
   echo "== rolling back to the previous dist ==" >&2
   sudo rm -rf "$APP/dist.failed"
-  sudo mv "$APP/dist" "$APP/dist.failed"
-  sudo mv "$APP/dist.prev" "$APP/dist"
+  sudo mv -T "$APP/dist" "$APP/dist.failed"
+  sudo mv -T "$APP/dist.prev" "$APP/dist"
   if restart_and_check; then
     echo "FAILED: the new release did not pass the health check; the previous release is back and healthy." >&2
     echo "  The failed build is kept at $APP/dist.failed for inspection." >&2
