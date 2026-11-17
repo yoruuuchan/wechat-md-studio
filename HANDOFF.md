@@ -187,7 +187,7 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install-$TAG.sh /tmp/mop
 （每块配 `timeout`，失败只重传那一块）→ 每块在服务器上 `sha256sum` 对过 → `cat part-* > /tmp/mopai-$TAG.tar.gz`
 → 再对整个包对一次 sha256。9 块里通常有一两块要重传，整体 10 分钟左右，比反复重传整包可靠。
 
-**三条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
+**四条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
 
 1. **包名永远带 commit 短哈希，本机临时文件用 `mktemp -d`。** worktree 只隔离仓库里的文件，
    本机 `/tmp`（都指向同一个 `E:\SYSTEM 2\15877\Temp`）和服务器 `/tmp` 是所有会话共享的。
@@ -206,6 +206,12 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install-$TAG.sh /tmp/mop
     2026-11-17 部署 `e39f32d` 时连续撞了两次。现在探测用 `sudo test -d`、两次换名都用 `mv -T`
     （回滚路径同样），开头一并清掉 `dist/dist.new`；安装后核对 `dist/boot.js` sha256、
     入口 `index-*.js` 与本地一致，`dist` 里没有 `dist.new` / `dist.prev` 残留。
+4. **同一个提交被两个会话同时部署时，路径仍会撞：上传和清理也要隔离（2026-11-17 补）。**
+   commit 短哈希只能区分不同提交，区分不了同一提交的两个部署者。2026-11-17 部署 `e201fbc` 时，
+   两个会话都用了 `/tmp/deploy-e201fbc` 和 `/tmp/install-e201fbc.sh`，一方刚传上的分块被另一方覆盖，
+   清理时又把整个目录删掉，逐块核对全部对不上；实际上对方已经把同一提交装好并重启了。
+   上传路径再加一段随机后缀（`/tmp/deploy-<tag>-<nonce>`），清理只删自己建的那份；
+   `flock` 只护住安装，护不住上传、重组和清理。
 
 **部署后必须核对**（别只看命令有没有报错）：本地与线上的 `dist/boot.js` sha256、以及
 `dist/public/index.html` 引用的 js/css 文件名是否一致；再用
