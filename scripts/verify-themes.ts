@@ -437,7 +437,7 @@ for (const theme of THEMES) {
   // line up whichever route produced them.
   for (const r of CAROUSEL_RATIOS) {
     const f = carouselFrame(r)
-    const out = manualOutputSize({ width: 3000, height: 2000 }, { ratio: r, targetWidth: f.cropWidth })
+    const out = manualOutputSize({ width: 4000, height: 3000 }, { ratio: r, targetWidth: f.cropWidth })
     check(r, 'manual crop matches the automatic frame size',
       out.width === f.cropWidth && out.height === f.cropHeight, `${out.width}x${out.height} vs ${f.cropWidth}x${f.cropHeight}`)
   }

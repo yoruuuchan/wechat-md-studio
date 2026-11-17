@@ -65,6 +65,10 @@ export const BLANK = '<p style="margin:0;"><span leaf="">&nbsp;</span></p>'
 // 属性只用于占位和比例提示，正文里不写任何固定像素宽度（见 carouselStrip）。
 const CAROUSEL_MAX_W = 240
 const CAROUSEL_MAX_H = 240
+// 裁切长边预算：轮播格子在正文里占容器宽度约 88%（657px 栏下约 580 CSS px），
+// 高分屏两三倍就是 1200-1750 物理像素。取 2048 与单图链路的压缩预算同一条线，
+// 小图永不放大。
+const CAROUSEL_CROP_LONG_EDGE = 2048
 
 export interface CarouselFrame {
   width: number
@@ -81,8 +85,16 @@ export function carouselFrame(ratio: CarouselRatio): CarouselFrame {
     height = CAROUSEL_MAX_H
     width = Math.round((height * rw) / rh)
   }
-  // 按 3 倍屏取裁切尺寸，缩放后仍然清晰
-  return { width, height, cropWidth: width * 3, cropHeight: height * 3 }
+  // 裁切分辨率独立于占位属性：长边取预算，短边按比例缩放。
+  const long = Math.max(rw, rh)
+  const short = Math.min(rw, rh)
+  const shortCrop = Math.round((CAROUSEL_CROP_LONG_EDGE * short) / long)
+  return {
+    width,
+    height,
+    cropWidth: rw >= rh ? CAROUSEL_CROP_LONG_EDGE : shortCrop,
+    cropHeight: rh >= rw ? CAROUSEL_CROP_LONG_EDGE : shortCrop,
+  }
 }
 
 /**

@@ -21,8 +21,7 @@ import { t } from './i18n'
  * WeChat lays the article out in a `max-width:677px` container with `padding:0
  * 10px`, and body images are `width:100%`, so an image is displayed at 657 CSS
  * px at most. 657 * 3 DPR = 1971, and 2048 is the power of two that covers it —
- * the same "3x the real display size" convention `carouselFrame()` already uses
- * for `cropWidth`. Anything wider is bytes WeChat's own CDN will throw away.
+ * the same long-edge budget `carouselFrame()` now uses for `cropWidth` (2048).
  */
 const DEFAULT_MAX_EDGE = 2048
 

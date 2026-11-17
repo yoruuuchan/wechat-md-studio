@@ -86,7 +86,7 @@ const evaluate = async (expression) => {
 // ---- stub the upload + image-read endpoints --------------------------------
 // Hijack fetch inside the page: uploads answer a synthetic key and record the
 // real pixel dimensions of the blob, while image reads return a controlled
-// 1200×900 source. Everything else flows through the shipped code.
+// 3000×2400 source. Everything else flows through the shipped code.
 const stubSrc = `(() => {
   const rawFetch = window.fetch
   window.__uploadedKeys = []
@@ -127,17 +127,17 @@ const stubSrc = `(() => {
     if (/\\/api\\/img\\//.test(url)) {
       return new Promise((resolve) => {
         const canvas = document.createElement('canvas')
-        canvas.width = 1200
-        canvas.height = 900
+        canvas.width = 3000
+        canvas.height = 2400
         const context = canvas.getContext('2d')
-        const gradient = context.createLinearGradient(0, 0, 1200, 900)
+        const gradient = context.createLinearGradient(0, 0, 3000, 2400)
         gradient.addColorStop(0, '#16365c')
         gradient.addColorStop(1, '#e5a54b')
         context.fillStyle = gradient
-        context.fillRect(0, 0, 1200, 900)
+        context.fillRect(0, 0, 3000, 2400)
         context.fillStyle = 'rgba(255,255,255,.8)'
-        for (let x = 0; x < 1200; x += 100) context.fillRect(x, 0, 2, 900)
-        for (let y = 0; y < 900; y += 100) context.fillRect(0, y, 1200, 2)
+        for (let x = 0; x < 3000; x += 100) context.fillRect(x, 0, 2, 2400)
+        for (let y = 0; y < 2400; y += 100) context.fillRect(0, y, 3000, 2)
         canvas.toBlob((blob) => resolve(new Response(blob, {
           status: 200, headers: { 'Content-Type': 'image/png' },
         })), 'image/png')
@@ -157,6 +157,16 @@ if (ACCESS_KEY) {
 // Install the stub after login so the auth call flows normally.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: stubSrc }, sessionId)
 await evaluate(stubSrc)
+// The sidebar opens on the theme tab; the row controls live behind the materials tab.
+const materialsTab = await evaluate(`(() => {
+ const t = document.querySelector('[data-side-tab="materials"]')
+ if (!t) return 'no-tab'
+ t.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+ t.click()
+ return 'ok'
+})()`)
+if (materialsTab !== 'ok') console.log('  materials tab:', materialsTab)
+await sleep(600)
 const uploadedKeys = () => evaluate(`window.__uploadedKeys || []`)
 const uploadedSizes = () => evaluate(`window.__uploadedSizes || []`)
 
@@ -273,15 +283,15 @@ check('recrop', 'slide 1 is untouched', /!\[甲\]\(img:AKEY\)/.test(afterCar))
 check('recrop', 'slide 2 got the new key', /!\[乙\]\(img:stubkey\d+\)/.test(afterCar))
 check('recrop', 'the old slide key is gone', !/BKEY/.test(afterCar))
 const carouselSize = (await uploadedSizes()).at(-1)
-check('ratio', '4:3 carousel output is 720×540', carouselSize?.width === 720 && carouselSize?.height === 540, JSON.stringify(carouselSize))
+check('ratio', '4:3 carousel output is 2048×1536', carouselSize?.width === 2048 && carouselSize?.height === 1536, JSON.stringify(carouselSize))
 console.log('  toasts:', JSON.stringify(await toastTexts()))
 
 // ---- 3. every group ratio survives carousel and gallery re-cropping --------
 console.log('\n=== group ratios are inherited by the manual cropper ===')
 const RATIOS = [
-  ['9:16', 405, 720],
-  ['3:4', 540, 720],
-  ['1:1', 720, 720],
+  ['9:16', 1152, 2048],
+  ['3:4', 1536, 2048],
+  ['1:1', 2048, 2048],
 ]
 
 async function recropSingle(fence, ratio, kind) {
