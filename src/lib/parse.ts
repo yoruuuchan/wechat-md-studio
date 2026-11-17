@@ -247,6 +247,26 @@ function rawParagraphText(inline: Token | undefined): string {
   return out
 }
 
+/**
+ * The images on one source line when the line holds nothing else (whitespace
+ * between them is fine), read with the article's own markdown-it grammar so
+ * titles, brackets in alt text, `<…>` destinations and several images on one
+ * line come out exactly as the renderer sees them. Null for any other line.
+ */
+export function imageOnlyLine(line: string): { alt: string; src: string; title: string }[] | null {
+  if (!line.trim()) return null
+  const children = md.parseInline(line, {})[0]?.children ?? []
+  const images: { alt: string; src: string; title: string }[] = []
+  for (const token of children) {
+    if (token.type === 'image') {
+      images.push({ alt: token.content.trim(), src: String(token.attrGet('src') ?? ''), title: String(token.attrGet('title') ?? '') })
+    } else if (token.type !== 'softbreak' && !(token.type === 'text' && token.content.trim() === '')) {
+      return null
+    }
+  }
+  return images.length ? images : null
+}
+
 function imageFromInline(t: Token): { alt: string; src: string } | null {
   if (!t.children || t.children.length !== 1) return null
   const img = t.children[0]

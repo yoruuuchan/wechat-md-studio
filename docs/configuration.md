@@ -8,7 +8,7 @@
 ## 本地开发
 
 使用 Node.js 24（当前开发与验收版本，需支持 `node:sqlite`）。命令在含 `package.json` 的目录运行；
-本地伞仓库的应用目录是 `app/`，公开仓库直接使用根目录。
+本地各 worktree 直接使用仓库根目录。
 
 ```bash
 npm ci
@@ -119,7 +119,7 @@ HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_
 
 ## 本地生产模式
 
-先填好生产配置，再 `npm run build`。输出为 `dist/boot.js` 与 `dist/public/`。
+先填好生产配置，再 `npm run build:release`。输出为 `dist/boot.js` 与 `dist/public/`；正式发布入口要求找得到搭建台的构建结果，只想本地跑生产模式且不需要 `/motion/` 时可用 `npm run build`。
 POSIX shell 可直接运行 `npm start`；该脚本使用 POSIX 环境变量语法，Windows PowerShell 用：
 
 ```powershell

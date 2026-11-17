@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { useI18n } from '@/hooks/useI18n'
@@ -11,14 +11,15 @@ import {
   downloadCloudCardTemplate, listCloudCardTemplates, uploadCloudCardTemplate,
   type CloudCardTemplateMeta,
 } from '@/lib/card-template-cloud'
-import { CardTemplateError, type CardTemplateSummary } from '@/lib/card-template-format'
+import { CardTemplateError, type CardTemplateSummary, type TemplateKind } from '@/lib/card-template-format'
 import { planCardTemplateSync, type LocalCardTemplateCandidate } from '@/lib/card-template-sync'
 import {
   deleteCardTemplateRecord, listCardTemplateRecords, saveCardTemplateRecord,
 } from '@/lib/card-template-store'
 import {
-  PUBLIC_CARD_TEMPLATES, isPublicCardTemplateId, publicCardTemplateInstanceId,
+  PUBLIC_CARD_TEMPLATES, PUBLIC_LONG_TEMPLATES, isPublicCardTemplateId, publicCardTemplateInstanceId,
 } from '@/lib/public-card-templates'
+import { loadPublicTemplatePackages } from '@/lib/public-template-loader'
 
 export interface CardTemplateUploadFailure {
   file: string
@@ -38,6 +39,7 @@ export interface CardTemplateRemoveResult {
 export type CardTemplateSyncState = 'idle' | 'syncing' | 'synced' | 'failed'
 
 export interface CardTemplateUpload {
+  kind: TemplateKind
   templates: CardTemplateSummary[]
   /** Reed's own templates, loaded from `/card-templates/*.reedcard` in card mode. */
   publicTemplates: CardTemplateSummary[]
@@ -54,6 +56,8 @@ export interface CardTemplateUpload {
   upload: (files: File[]) => Promise<CardTemplateUploadResult>
   remove: (id: string) => Promise<CardTemplateRemoveResult>
   retrySync: () => void
+  /** Re-fetch the public packages after a partial load; loaded ones stay available meanwhile. */
+  retryPublic: () => void
   clearError: () => void
 }
 
@@ -62,7 +66,7 @@ interface PublicLoadResult {
   error: CardTemplateError | null
 }
 
-let publicLoadPromise: Promise<PublicLoadResult> | null = null
+const publicLoadPromises = new Map<TemplateKind, Promise<PublicLoadResult>>()
 
 /**
  * Fetch the nine public packages through the ordinary upload parser. The
@@ -70,29 +74,29 @@ let publicLoadPromise: Promise<PublicLoadResult> | null = null
  * same stylesheet twice. A public instance gets a `public-*` record id, which
  * `customTemplateId` turns into a runtime id distinct from every user upload.
  */
-function loadPublicTemplates(): Promise<PublicLoadResult> {
-  if (publicLoadPromise) return publicLoadPromise
-  publicLoadPromise = (async () => {
-    const templates: CardTemplateSummary[] = []
-    let firstError: CardTemplateError | null = null
-    for (const item of PUBLIC_CARD_TEMPLATES) {
-      try {
-        const response = await fetch(item.pack, { cache: 'no-cache' })
-        if (!response.ok) throw new CardTemplateError('missing-file', `${item.pack} (${response.status})`)
-        const raw = await response.arrayBuffer()
-        const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
-        if (record.parsed.manifest.id !== item.id) {
-          throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
-        }
-        const loaded = await activateCardTemplate(record)
-        templates.push(loaded.summary)
-      } catch (itemError) {
-        firstError ??= asError(itemError, 'unknown')
+function loadPublicTemplates(kind: TemplateKind): Promise<PublicLoadResult> {
+  const existing = publicLoadPromises.get(kind)
+  if (existing) return existing
+  const items = kind === 'long' ? PUBLIC_LONG_TEMPLATES : PUBLIC_CARD_TEMPLATES
+  const promise = loadPublicTemplatePackages({
+    catalog: items,
+    // Network half: every package at once instead of one after another.
+    fetchPack: async (pack) => {
+      const response = await fetch(pack, { cache: 'no-cache' })
+      if (!response.ok) throw new CardTemplateError('missing-file', `${pack} (${response.status})`)
+      return response.arrayBuffer()
+    },
+    // CPU half: parse and activate in catalog order, one at a time.
+    install: async (item, raw) => {
+      const record = await parseCardTemplateSource(raw, publicCardTemplateInstanceId(item.id))
+      if (record.parsed.manifest.id !== item.id || record.parsed.manifest.kind !== kind) {
+        throw new CardTemplateError('bad-manifest', `${item.pack}: ${record.parsed.manifest.id}`)
       }
-    }
-    return { templates, error: firstError }
-  })()
-  return publicLoadPromise
+      return (await activateCardTemplate(record)).summary
+    },
+  })
+  publicLoadPromises.set(kind, promise)
+  return promise
 }
 
 function newId(): string {
@@ -106,8 +110,8 @@ function asError(item: unknown, fallback: 'unknown' | 'storage' | 'cloud'): Card
   return new CardTemplateError(fallback, item instanceof Error ? item.message : String(item))
 }
 
-export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTemplateUpload {
-  const { loadPublic = false } = options
+export function useCardTemplates(options: { loadPublic?: boolean; kind?: TemplateKind } = {}): CardTemplateUpload {
+  const { loadPublic = false, kind = 'card' } = options
   const [templates, setTemplates] = useState<CardTemplateSummary[]>([])
   const [publicTemplates, setPublicTemplates] = useState<CardTemplateSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -154,18 +158,21 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     return () => { alive = false }
   }, [refresh])
 
+  /** Incremented by retryPublic: it is what re-runs the loader for a fresh attempt. */
+  const [publicAttempt, setPublicAttempt] = useState(0)
   useEffect(() => {
     if (!loadPublic) return
     let alive = true
     setPublicLoading(true)
-    void loadPublicTemplates().then((result) => {
+    setPublicError(null)
+    void loadPublicTemplates(kind).then((result) => {
       if (!alive) return
       setPublicTemplates(result.templates)
       setPublicError(result.error)
       setPublicLoading(false)
     })
     return () => { alive = false }
-  }, [loadPublic])
+  }, [loadPublic, kind, publicAttempt])
 
   /** Upload one local record and remember the server version it now matches. */
   const pushLocal = useCallback(async (record: CardTemplateSourceRecord): Promise<void> => {
@@ -194,6 +201,8 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     if (meta.sha256 !== digest) {
       throw new CardTemplateCloudError(0, 'checksum_mismatch', meta.id)
     }
+    // Server time, as pushLocal does, so later comparisons never mix clocks.
+    record.updatedAt = meta.uploadedAt
     record.cloudUploadedAt = meta.uploadedAt
     await activateCardTemplate(record)
     await saveCardTemplateRecord(record)
@@ -275,7 +284,21 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
       try {
         if (file.size > 8 * 1024 * 1024) throw new CardTemplateError('archive-too-large', String(file.size))
         const raw = await file.arrayBuffer()
-        const record = await parseCardTemplateSource(raw, newId())
+        let record = await parseCardTemplateSource(raw, newId())
+        // One local copy per manifest id. Uploading a package that is already
+        // here replaces that copy and keeps its key (a template chosen in the
+        // picker stays chosen); a second copy would survive a later delete and
+        // come back on reload or through the next sync.
+        const copies = (await listCardTemplateRecords())
+          .filter((item) => item.parsed.manifest.id === record.parsed.manifest.id)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+        if (copies.length) {
+          record = await parseCardTemplateSource(raw, copies[0].id)
+          for (const stale of copies.slice(1)) {
+            deactivateCardTemplate(stale.template)
+            await deleteCardTemplateRecord(stale.id)
+          }
+        }
         const loaded = await activateCardTemplate(record)
         try {
           await saveCardTemplateRecord(record)
@@ -309,7 +332,8 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     setError(null)
     setFailures([])
     try {
-      const record = await listCardTemplateRecords().then((rows) => rows.find((row) => row.id === id))
+      const rows = await listCardTemplateRecords()
+      const record = rows.find((row) => row.id === id)
       if (record && authenticated) {
         try {
           await deleteCloudCardTemplate(record.parsed.manifest.id)
@@ -318,8 +342,14 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
           return { ok: false, localOnly: false }
         }
       }
-      if (record) deactivateCardTemplate(record.template)
-      await deleteCardTemplateRecord(id)
+      // The cloud deletes by manifest id, so every local copy of it goes too;
+      // copies stored before uploads replaced each other may still be here.
+      const copies = record ? rows.filter((row) => row.parsed.manifest.id === record.parsed.manifest.id) : []
+      for (const copy of copies) {
+        deactivateCardTemplate(copy.template)
+        await deleteCardTemplateRecord(copy.id)
+      }
+      if (!record) await deleteCardTemplateRecord(id)
       refresh()
       return { ok: true, localOnly: !authenticated }
     } catch (item) {
@@ -328,13 +358,23 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     }
   }, [authenticated, refresh])
 
+  /** Drop the cached partial result for this kind and fetch every package again. */
+  const retryPublic = useCallback(() => {
+    publicLoadPromises.delete(kind)
+    setPublicAttempt((value) => value + 1)
+  }, [kind])
+
   const retrySync = useCallback(() => {
     setSync('idle')
     void runSync()
   }, [runSync])
 
+  // Uploads of both kinds share one registry; each picker lists only its own.
+  const ownTemplates = useMemo(() => templates.filter((item) => item.kind === kind), [templates, kind])
+
   return {
-    templates,
+    kind,
+    templates: ownTemplates,
     publicTemplates,
     loading,
     publicLoading,
@@ -347,6 +387,7 @@ export function useCardTemplates(options: { loadPublic?: boolean } = {}): CardTe
     upload,
     remove,
     retrySync,
+    retryPublic,
     clearError: () => { setError(null); setFailures([]) },
   }
 }

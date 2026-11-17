@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme-meta'
 import { parseMarkdown } from '@/lib/parse'
 import { renderDoc } from '@/lib/render'
+import { ensureFontSheetsFor } from '@/lib/font-catalog'
 import { loadSettings, saveSettings } from '@/lib/store'
 import { THEME_PREVIEW_DOC } from '@/lib/sample'
 import { createMathRenderer, documentFormulas, mathReadiness, type MathSnapshot } from '@/lib/math'
@@ -67,6 +68,8 @@ function ThemePreview({ theme, doc, sig }: { theme: ThemeCatalogEntry; doc: Pars
   const [renderedHtml, setRenderedHtml] = useState<string | null>(null)
   const html = renderedHtml ?? previewCache.get(previewKey(theme.id, sig)) ?? null
   const [error, setError] = useState(false)
+  // Themes may name a family from a sheet that is not on the first paint.
+  useEffect(() => { if (html) void ensureFontSheetsFor(html) }, [html])
   const [attempt, setAttempt] = useState(0)
 
   useLayoutEffect(() => {

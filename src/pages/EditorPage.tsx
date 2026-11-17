@@ -69,7 +69,7 @@ import { applyZoom, createDoc, loadSettings, saveSettings, type DocRecord } from
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import PaneSwitcher, { type EditorPaneId } from '@/components/PaneSwitcher'
-import { useDocs, UNDO_DELETE_MS } from '@/hooks/useDocs'
+import { useDocs, UNDO_DELETE_MS, type BundleCloudResult } from '@/hooks/useDocs'
 import { useRemoteMcp } from '@/hooks/useRemoteMcp'
 import AiWritingDialog from '@/components/AiWritingDialog'
 import AiDiagramDialog from '@/components/AiDiagramDialog'
@@ -93,7 +93,6 @@ import {
   MAX_BUNDLE_BYTES,
   bundleFilename,
   docxToDocxImport,
-  mergeBundleDocs,
   parseBundle,
   parseMarkdownFile,
   safeFilename,
@@ -114,12 +113,19 @@ import { useEditorLayout } from '@/hooks/use-mobile'
 import { useCardTemplates } from '@/hooks/useCardTemplates'
 import { withTemplate, type CardOptions } from '@/lib/cards'
 import { isPublicCardTemplateId } from '@/lib/public-card-templates'
+import { MOTION_EMBED_URL } from '@/lib/motion'
 import {
   DEFAULT_CARD_OPTIONS, loadCardOptions, reconcileCardOptions, saveCardOptions,
 } from '@/lib/card-options'
 import type { CardsStatus, CardsViewHandle } from '@/components/CardsView'
+import type { LongStatus, LongImageViewHandle } from '@/components/LongImageView'
+import {
+  DEFAULT_LONG_OPTIONS, loadLongOptions, reconcileLongOptions, saveLongOptions, type LongOptions,
+} from '@/lib/long-options'
+import { getLoadedLongTemplate } from '@/lib/card-template'
 
 const CardsView = lazy(() => import('@/components/CardsView'))
+const LongImageView = lazy(() => import('@/components/LongImageView'))
 
 function plainTextOf(html: string): string {
   const div = document.createElement('div')
@@ -221,9 +227,22 @@ export default function EditorPage() {
   const [initialLayout] = useState(loadLayout)
   const layoutRef = useRef<Record<string, number>>(initialLayout ?? {})
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375)
-  const [previewMode, setPreviewMode] = useState<'wechat' | 'cards'>('wechat')
+  const [previewMode, setPreviewMode] = useState<'wechat' | 'cards' | 'long'>('wechat')
+  /** The embedded composer is up; previewMode stays on article or cards. */
+  const [motionOpen, setMotionOpen] = useState(false)
+  /** Created on first use and kept mounted, so the composer keeps its work. */
+  const [motionMounted, setMotionMounted] = useState(false)
+  const [motionReady, setMotionReady] = useState(false)
   const [cardOptions, setCardOptions] = useState<CardOptions>(() => loadCardOptions() ?? DEFAULT_CARD_OPTIONS)
-  const cardTemplates = useCardTemplates({ loadPublic: previewMode === 'cards' })
+  const cardTemplates = useCardTemplates({
+    loadPublic: previewMode === 'cards' || previewMode === 'long',
+    kind: previewMode === 'long' ? 'long' : 'card',
+  })
+  const [longOptions, setLongOptions] = useState<LongOptions>(() => loadLongOptions() ?? DEFAULT_LONG_OPTIONS)
+  const [longStatus, setLongStatus] = useState<LongStatus>({
+    ready: false, layoutReady: false, busy: false, pending: true, failed: false, error: false,
+    height: 0, sections: 0, split: 0, progress: { phase: 'measure', done: 0, total: 0 },
+  })
   const [cardsStatus, setCardsStatus] = useState<CardsStatus>({
     ready: false, busy: false, total: 0, failed: false, error: false, progress: { done: 0, total: 0 },
   })
@@ -246,6 +265,7 @@ export default function EditorPage() {
   const editorRef = useRef<EditorHandle>(null)
   const previewRef = useRef<PreviewScrollHandle>(null)
   const cardsViewRef = useRef<CardsViewHandle>(null)
+  const longImageViewRef = useRef<LongImageViewHandle>(null)
   /**
    * Live editor state for the toolbar: the selection, and how deep the undo
    * history is. Reported by EditorPane on every transaction.
@@ -280,12 +300,12 @@ export default function EditorPage() {
     activeId,
     setActiveId,
     activeDoc,
-    activeLoading,
-    activeError,
-    activeBodyError,
+    contentReadable,
+    contentReadiness,
+    contentReadinessFor,
+    retryContent,
     retryLocalBodies,
     retryingLocal,
-    retryHydrate,
     activeConflict,
     resolveConflictKeepLocal,
     resolveConflictUseRemote,
@@ -303,7 +323,14 @@ export default function EditorPage() {
     removeDoc,
     undoRemove,
     saveCurrentToDrafts,
-  } = useDocs({ enabled: isAuthenticated, deepLinkId, onDeepLinkSettled: clearDeepLink })
+    importBundle,
+    retryBundleImport,
+  } = useDocs({
+    enabled: isAuthenticated,
+    deepLinkId,
+    onDeepLinkSettled: clearDeepLink,
+    authPending: authLoading || authFetching,
+  })
 
   const remoteMcp = useRemoteMcp({ docs, activeId, setDocs })
   const remoteConflictKey = remoteMcp.conflict ? `${activeId}:${remoteMcp.conflict.hash}` : null
@@ -326,6 +353,7 @@ export default function EditorPage() {
   useEffect(() => saveSettings(settings), [settings])
   useEffect(() => applyZoom(settings.zoom), [settings.zoom])
   useEffect(() => saveCardOptions(cardOptions), [cardOptions])
+  useEffect(() => saveLongOptions(longOptions), [longOptions])
   // Wait until uploaded templates are registered before deciding whether the
   // remembered id still exists; a package that is gone (deleted here or not yet
   // synced) returns the selection to Reed.
@@ -334,6 +362,7 @@ export default function EditorPage() {
   // mode its id is still valid, so leave the preference alone rather than
   // treating "not fetched yet" as "removed".
   useEffect(() => {
+    if (cardTemplates.kind !== 'card') return
     if (cardTemplates.loading) return
     if (isPublicCardTemplateId(cardOptions.template) &&
       (cardTemplates.publicLoading ||
@@ -346,6 +375,23 @@ export default function EditorPage() {
   }, [
     cardTemplates.loading, cardTemplates.templates, cardTemplates.publicLoading,
     cardTemplates.publicTemplates, cardTemplates.publicError, cardOptions.template,
+  ])
+
+  // Long-image selections follow the same rule: a package that is gone falls
+  // back to the public blue template, which is also the default.
+  useEffect(() => {
+    if (cardTemplates.kind !== 'long') return
+    if (cardTemplates.loading) return
+    if (cardTemplates.publicLoading ||
+      (!cardTemplates.publicError && cardTemplates.publicTemplates.length === 0)) return
+    const available = new Set([
+      ...cardTemplates.templates.map((item) => item.template),
+      ...cardTemplates.publicTemplates.map((item) => item.template),
+    ])
+    setLongOptions((current) => reconcileLongOptions(current, available))
+  }, [
+    cardTemplates.kind, cardTemplates.loading, cardTemplates.templates, cardTemplates.publicLoading,
+    cardTemplates.publicTemplates, cardTemplates.publicError, longOptions.template,
   ])
 
   // First visit only: let the panes settle, then auto-start the tour. The tour
@@ -447,10 +493,16 @@ export default function EditorPage() {
   const resolveDiagram = useCallback((code: string) => diagramRefs.get(code) ?? null, [diagramRefs])
   const diagramBusy = useRef(new Set<string>())
   const diagramFailed = useRef(new Set<string>())
+  /** Last failure reason per fence, so both views can say what actually went wrong. */
+  const diagramErrors = useRef(new Map<string, string>())
+  /** Bumped after a failure or a retry; it is the signal behind both mutable refs. */
+  const [diagramRevision, setDiagramRevision] = useState(0)
   /** The publish check the author is looking at, if any. */
   const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null)
   /** What the check was opened for, clicked through once the author agrees. */
   const pendingPublish = useRef<PublishAction | null>(null)
+  /** The article that check belongs to; a switch makes the findings stale. */
+  const pendingPublishDoc = useRef<string | null>(null)
 
   const renderThemePreview = useCallback(
     (previewTheme: Theme) => renderDoc(parsed, previewTheme, settings.sig, resolveImgSrc).html,
@@ -535,6 +587,20 @@ export default function EditorPage() {
   docsRef.current = docs
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
+  /**
+   * Read the body state at the moment an action runs, not the render it was
+   * requested in: the publish check can stay open while the author switches
+   * articles, logs out or a fetch fails. The callback is refreshed on every
+   * render, so a late click sees the latest hydration / session facts.
+   */
+  const contentReadinessRef = useRef(contentReadinessFor)
+  contentReadinessRef.current = contentReadinessFor
+  const blockedBodyReason = (): string | null => {
+    const doc = docsRef.current.find((d) => d.id === activeIdRef.current) ?? null
+    const readiness = contentReadinessRef.current(doc)
+    if (readiness.readable) return null
+    return t(readiness.reasonKey ?? 'docs.bodyLoading')
+  }
   /** One timer owns the copy confirmation; repeat clicks replace it. */
   const copiedTimerRef = useRef<number | null>(null)
   const clearCopiedTimer = useCallback(() => {
@@ -754,9 +820,27 @@ export default function EditorPage() {
       if (b.type !== 'code' || !b.code.trim() || !diagramOf(b.lang)) continue
       if (out.some((d) => d.code === b.code)) continue
       const state = diagramRefs.has(b.code) ? 'ready' : diagramFailed.current.has(b.code) ? 'failed' : 'pending'
-      out.push({ code: b.code, line: b.line, state })
+      out.push({ code: b.code, line: b.line, state, ...(state === 'failed' ? { detail: diagramErrors.current.get(b.code) } : {}) })
     }
     return out
+  }
+
+  /** Reactive picture of the fence states; the revision is what re-reads the refs. */
+  const viewDiagramStates = diagramStates(parsed.blocks)
+
+  /** Clear parked diagram failures and let the rasterizer run again. */
+  const retryDiagrams = () => {
+    for (const block of parsed.blocks) {
+      if (block.type !== 'code' || !block.code.trim() || !diagramOf(block.lang)) continue
+      diagramFailed.current.delete(block.code)
+      diagramErrors.current.delete(block.code)
+    }
+    setDiagramRevision((value) => value + 1)
+  }
+
+  /** Retry the MathJax load behind unfinished formulas, the same path publish uses. */
+  const retryMath = () => {
+    for (const formula of documentFormulas(parsed.blocks)) void mathRenderer.warm(formula.tex, formula.display)
   }
 
   /** The article's publish state right now, from the source on screen. */
@@ -779,8 +863,9 @@ export default function EditorPage() {
     const docId = activeIdRef.current
     clearCopiedTimer()
     setCopied(false)
-    if (activeBodyError) {
-      toast.error(activeBodyError)
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      toast.error(blocked)
       return
     }
     const { article, snapshot } = currentArticle()
@@ -803,6 +888,13 @@ export default function EditorPage() {
   const handleCopy = () => void startPublish('copy')
 
   const exportHtml = (kind: 'clean' | 'page', allowUnfinished: boolean, notices?: PreflightReport) => {
+    // A download is the last irreversible step here; the placeholder check is
+    // therefore repeated even when the caller already looked a moment ago.
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      toast.error(blocked)
+      return
+    }
     const { article, doc, snapshot } = currentArticle()
     const name = doc?.name || t('io.fallbackArticle')
     const { html } = renderDoc(article, theme, settings.sig, resolveImgSrc, (tex, display) =>
@@ -840,8 +932,11 @@ export default function EditorPage() {
    * away is how an unfinished formula used to reach the clipboard.
    */
   const startPublish = (kind: PublishAction) => {
-    if (kind === 'copy' && activeBodyError) {
-      toast.error(activeBodyError)
+    // Content, not just rendering: a body this browser does not hold must never
+    // reach the clipboard or a file, whatever the menus say.
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      toast.error(blocked)
       return
     }
     const { article, snapshot } = currentArticle()
@@ -858,6 +953,7 @@ export default function EditorPage() {
       if (snapshot.status(f.tex, f.display) === 'pending') void mathRenderer.warm(f.tex, f.display)
     }
     pendingPublish.current = kind
+    pendingPublishDoc.current = activeIdRef.current
     setPreflightReport(report)
   }
 
@@ -874,6 +970,26 @@ export default function EditorPage() {
   const confirmPublish = ({ allowUnfinished }: { allowUnfinished: boolean }) => {
     const kind = pendingPublish.current
     if (!kind) return
+    // The panel belongs to the article it was opened on. Switching articles
+    // while it was up means these findings no longer describe the open one:
+    // start the check over instead of copying the new article behind old advice.
+    if (pendingPublishDoc.current !== activeIdRef.current) {
+      pendingPublish.current = null
+      pendingPublishDoc.current = null
+      setPreflightReport(null)
+      startPublish(kind)
+      return
+    }
+    // The body can have gone away while the panel was open (a retry failed, a
+    // logout kept a stub). Check again here, not only when the click opened it.
+    const blocked = blockedBodyReason()
+    if (blocked) {
+      pendingPublish.current = null
+      pendingPublishDoc.current = null
+      setPreflightReport(null)
+      toast.error(blocked)
+      return
+    }
     if (!allowUnfinished) {
       const { article, snapshot } = currentArticle()
       const fresh = buildPreflightReport(article, snapshot)
@@ -889,24 +1005,35 @@ export default function EditorPage() {
     runPublish(kind, allowUnfinished)
   }
 
+  /**
+   * Take the author to a line in the editor. On a phone the editor can be the
+   * hidden pane, so locating the line without showing that pane looks like the
+   * button did nothing.
+   */
+  const jumpToEditorLine = useCallback((line: number) => {
+    editorRef.current?.jumpToLine(line)
+    if (phone) setPane('editor')
+  }, [phone])
+
   const jumpToLocation = (location: PreflightLocation) => {
     setPreflightReport(null)
-    if (location.line !== undefined) {
-      editorRef.current?.jumpToLine(location.line)
-    }
-    if (phone) setPane('editor')
+    if (location.line !== undefined) jumpToEditorLine(location.line)
   }
 
   const handleExport = (kind: 'clean' | 'page' | 'markdown' | 'bundle') => {
     // Copying or exporting the placeholder would hand the author an empty
     // article. The bundle path has its own check in hydrateAllForExport.
-    if (kind !== 'bundle' && activeBodyError) {
-      toast.error(activeBodyError)
-      return
+    if (kind !== 'bundle') {
+      const blocked = blockedBodyReason()
+      if (blocked) {
+        toast.error(blocked)
+        return
+      }
     }
     if (kind === 'markdown') {
-      const name = activeDoc?.name || t('io.fallbackArticle')
-      const f = toMarkdownFile(name, activeDoc?.content || '')
+      const doc = docsRef.current.find((d) => d.id === activeIdRef.current)
+      const name = doc?.name || t('io.fallbackArticle')
+      const f = toMarkdownFile(name, doc?.content ?? '')
       downloadFile(f.filename, f.content, f.mime)
       toast.success(t('editor.toast.exportedMarkdown'), { description: t('editor.toast.exportedMarkdownDesc') })
       return
@@ -963,6 +1090,61 @@ export default function EditorPage() {
     })
   }
 
+  /**
+   * The account half of a bundle import, reported on its own.
+   *
+   * The local count was already toasted when the articles appeared in the
+   * library; these messages only ever describe what reached the server, so a
+   * successful local import can never read like a successful sync.
+   */
+  function reportBundleCloud(cloud: BundleCloudResult) {
+    if (cloud.status === 'signed-out') {
+      toast.info(t('editor.toast.bundleCloudSignedOut'))
+      return
+    }
+    if (cloud.status === 'not-ready') {
+      toast.warning(t('editor.toast.bundleCloudNotReady'))
+      return
+    }
+    const done = cloud.imported + cloud.existing
+    if (cloud.failed > 0) {
+      toast.warning(t('editor.toast.bundleCloudPartial', { ok: done, failed: cloud.failed }), {
+        description: t('editor.toast.bundleCloudPartialDesc'),
+        duration: 9000,
+        action: cloud.failedIds.length
+          ? { label: t('common.retry'), onClick: () => void retryBundleCloud(cloud.failedIds) }
+          : undefined,
+      })
+      return
+    }
+    if (cloud.conflicts > 0) {
+      toast.warning(t('editor.toast.bundleCloudConflict', { n: cloud.conflicts }), {
+        description: t('editor.toast.bundleCloudConflictDesc'),
+        duration: 9000,
+      })
+      return
+    }
+    if (cloud.imported === 0) {
+      toast.info(t('editor.toast.bundleCloudAlreadyThere', { n: cloud.existing }))
+      return
+    }
+    toast.success(t('editor.toast.bundleCloudDone', { n: cloud.imported }), {
+      description: cloud.existing
+        ? t('editor.toast.bundleCloudExisting', { n: cloud.existing })
+        : undefined,
+    })
+  }
+
+  /** Re-send only the ids an earlier import could not confirm. */
+  async function retryBundleCloud(ids: string[]) {
+    const cloud = await retryBundleImport(ids)
+    if (cloud.status === 'signed-out' || cloud.status === 'not-ready' || cloud.failed > 0 || cloud.conflicts > 0) {
+      reportBundleCloud(cloud)
+      return
+    }
+    toast.success(t('editor.toast.bundleRetryDone', { n: cloud.imported + cloud.existing }))
+  }
+
   const handleImportFile = async (file: File, kind: 'markdown' | 'docx' | 'bundle') => {
     setImporting(true)
     try {
@@ -995,16 +1177,18 @@ export default function EditorPage() {
         toast.error(t('editor.toast.bundleUnreadable'), { description: result.reason, duration: 9000 })
         return
       }
-      // Ids are kept as they are: an existing article always wins, and the
-      // cloud import uses insert-only batches after the local library settles.
-      const merged = mergeBundleDocs(docs, result.docs)
-      setDocs(merged.docs)
+      // Ids are kept as they are: an existing article always wins and is never
+      // uploaded again. The truly new ids then go to the account through the
+      // insert-only import batches once the login merge has completed; the local
+      // result is toasted here and the cloud result separately below it.
+      const receipt = await importBundle(result.docs)
       if (result.settings) setSettings((s) => ({ ...s, ...result.settings! }))
-      toast.success(t('editor.toast.importedCount', { n: merged.added }), {
-        description: merged.skipped
-          ? t('editor.toast.importedSkipped', { n: merged.skipped })
+      toast.success(t('editor.toast.importedCount', { n: receipt.added }), {
+        description: receipt.skipped
+          ? t('editor.toast.importedSkipped', { n: receipt.skipped })
           : undefined,
       })
+      reportBundleCloud(receipt.cloud)
     } catch (e) {
       toast.error(t('editor.toast.importFailed'), { description: e instanceof Error ? e.message : t('editor.toast.importUnknown') })
     } finally {
@@ -1083,6 +1267,9 @@ export default function EditorPage() {
 
     const park = (code: string, title: string, e: unknown) => {
       diagramFailed.current.add(code)
+      const message = e instanceof Error ? e.message.slice(0, 140) : String(e)
+      diagramErrors.current.set(code, message || title)
+      setDiagramRevision((value) => value + 1)
       toast.error(title, {
         description: e instanceof Error ? e.message.slice(0, 140) : String(e),
         duration: 8000,
@@ -1094,6 +1281,7 @@ export default function EditorPage() {
         const png = await renderDiagramPng(code)
         try {
           const ref = await uploadDiagram.current(png.blob)
+          diagramErrors.current.delete(code)
           setDiagramRefs((prev) => {
             const next = new Map(prev)
             rememberDiagram(next, code, ref)
@@ -1118,7 +1306,7 @@ export default function EditorPage() {
       })()
     }, 1200)
     return () => window.clearTimeout(timer)
-  }, [parsed, diagramRefs])
+  }, [parsed, diagramRefs, diagramRevision])
 
   /**
    * Tell the owner their previous upload is now unreferenced.
@@ -1681,31 +1869,35 @@ export default function EditorPage() {
       </div>
       <MarkdownToolbar state={toolbarState} brush={brush} onAction={runAction} onBrush={handleBrush} scrollable={phone} />
       <div className="min-h-0 flex-1">
-        {activeBodyError ? (
+        {contentReadiness.state !== 'ready' ? (
+          // No body, no editor: an empty CodeMirror would look like an empty
+          // article the author could type into and then save over the real one.
           <div
-            data-local-body-error
+            data-body-state={contentReadiness.state}
+            data-local-body-error={contentReadiness.retry === 'local' ? true : undefined}
+            role={contentReadiness.state === 'loading' ? 'status' : undefined}
             className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
           >
-            <p className="text-[13px] text-ink-2">{activeBodyError}</p>
-            <button
-              data-local-retry
-              onClick={() => void retryLocalBodies()}
-              disabled={retryingLocal}
-              className="ya-btn ya-btn-secondary"
-            >
-              {t('common.retry')}
-            </button>
-          </div>
-        ) : activeLoading || activeError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-            {activeLoading ? (
-              <p className="text-[13px] text-ink-3">{t('editor.loadingDoc')}</p>
+            {contentReadiness.state === 'loading' ? (
+              <p data-body-loading className="text-[13px] text-ink-3">
+                {t('docs.bodyLoading')}
+              </p>
             ) : (
               <>
-                <p className="text-[13px] text-ink-2">{activeError}</p>
-                <button onClick={retryHydrate} className="ya-btn ya-btn-secondary">
-                  {t('common.retry')}
-                </button>
+                <p data-body-state-reason className="text-[13px] text-ink-2">
+                  {t(contentReadiness.reasonKey ?? 'docs.bodyLoading')}
+                </p>
+                {contentReadiness.retry && (
+                  <button
+                    data-body-retry={contentReadiness.retry}
+                    data-local-retry={contentReadiness.retry === 'local' ? true : undefined}
+                    onClick={retryContent}
+                    disabled={retryingLocal}
+                    className="ya-btn ya-btn-secondary"
+                  >
+                    {t('common.retry')}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1737,9 +1929,17 @@ export default function EditorPage() {
   )
 
   /** Switching modes takes the right column to that mode's own tab. */
-  const changePreviewMode = useCallback((next: 'wechat' | 'cards') => {
+  const changePreviewMode = useCallback((next: 'wechat' | 'cards' | 'long') => {
+    setMotionOpen(false)
     setPreviewMode(next)
-    setSideTab(next === 'cards' ? 'card' : 'theme')
+    setSideTab(next === 'wechat' ? 'theme' : 'card')
+  }, [])
+
+  /** First open creates the iframe; later opens just show it again. */
+  const openMotion = useCallback(() => {
+    if (!MOTION_EMBED_URL) return
+    setMotionMounted(true)
+    setMotionOpen(true)
   }, [])
 
   /**
@@ -1748,17 +1948,29 @@ export default function EditorPage() {
    * drawer, or the phone's side pane.
    */
   const openSettings = useCallback(() => {
+    // The settings tab is part of the workspace the composer covers.
+    setMotionOpen(false)
     setSideTab('settings')
     if (phone) setPane('side')
     else if (medium) setSideDrawerOpen(true)
     else setPanelOpen(true)
   }, [phone, medium])
 
+  const longTemplate = getLoadedLongTemplate(longOptions.template)
+  const longLoadedVersion = cardTemplates.templates.length + cardTemplates.publicTemplates.length + (cardTemplates.loading ? 0 : 1)
   const previewPaneBody = previewMode === 'cards' ? (
     <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('cards.measuring')}</div>}>
       <CardsView ref={cardsViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''} accent={theme.ui.accent}
-        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram}
+        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} diagramStates={viewDiagramStates}
+        onRetryMath={retryMath} onRetryDiagrams={retryDiagrams}
         options={cardOptions} onStatusChange={setCardsStatus} />
+    </Suspense>
+  ) : previewMode === 'long' ? (
+    <Suspense fallback={<div className="p-4 text-ink-2" role="status">{t('long.measuring')}</div>}>
+      <LongImageView ref={longImageViewRef} doc={parsed} source={deferredContent} title={activeDoc?.name ?? ''}
+        sig={settings.sig} math={mathSvgs} resolveDiagram={resolveDiagram} options={longOptions}
+        diagramStates={viewDiagramStates} onRetryMath={retryMath} onRetryDiagrams={retryDiagrams}
+        template={longTemplate} loadedVersion={longLoadedVersion} onStatusChange={setLongStatus} />
     </Suspense>
   ) : (
     <PreviewPane
@@ -1782,6 +1994,7 @@ export default function EditorPage() {
       themeId={settings.themeId}
       onTheme={(id) => setSettings((s) => ({ ...s, themeId: id }))}
       renderPreview={renderThemePreview}
+      themePanelVisible={!phone || pane === 'side'}
       onOpenThemes={() => navigate('/themes')}
       cardOptions={cardOptions}
       onCardOptionsChange={setCardOptions}
@@ -1790,6 +2003,15 @@ export default function EditorPage() {
       onCardTemplateUploaded={(summary) => setCardOptions((current) => withTemplate(current, summary.template))}
       onCardTemplateDeleted={(template) => setCardOptions((current) =>
         current.template === template ? withTemplate(current, 'reed') : current)}
+      longOptions={longOptions}
+      onLongOptionsChange={setLongOptions}
+      longBusy={longStatus.busy}
+      onLongTemplateUploaded={(summary) => setLongOptions((current) => ({
+        ...current,
+        template: summary.template,
+      }))}
+      onLongTemplateDeleted={(template) => setLongOptions((current) =>
+        current.template === template ? DEFAULT_LONG_OPTIONS : current)}
       materials={materials}
       titles={parsed.meta.titles}
       cover={parsed.meta.cover}
@@ -1799,7 +2021,7 @@ export default function EditorPage() {
       onSyncScrollChange={(v) => setSettings((s) => ({ ...s, syncScroll: v }))}
       zoom={settings.zoom}
       onZoomChange={(z) => setSettings((s) => ({ ...s, zoom: z }))}
-      onJump={(line) => editorRef.current?.jumpToLine(line)}
+      onJump={jumpToEditorLine}
       onCopyTitle={(title) => {
         void copyPlain(title).then((ok) => {
           if (ok) toast.success(t('editor.toast.titleCopied'))
@@ -1824,7 +2046,12 @@ export default function EditorPage() {
         docs={docs}
         activeId={activeId}
         docName={activeDoc?.name || ''}
-        onRename={(name) => updateActive({ name })}
+        onRename={(name) => {
+          // Renaming an unloaded article would be overwritten by the body that
+          // arrives later; the input is disabled too, this is the belt.
+          if (!contentReadiness.readable) return
+          updateActive({ name })
+        }}
         onSelectDoc={setActiveId}
         onCreateDoc={() => addDoc()}
         onCreateSample={() => addSampleDoc()}
@@ -1845,7 +2072,8 @@ export default function EditorPage() {
           })
         }}
         saveStatus={saveStatus}
-        readable={Boolean(activeDoc && activeDoc.contentLoaded !== false)}
+        readable={contentReadable}
+        readableReason={contentReadiness.readable ? null : t(contentReadiness.reasonKey ?? 'docs.bodyLoading')}
         retryingLocal={retryingLocal}
         onRetryLocal={() => void retryLocalBodies()}
         onRetryCloud={() => void retryCloudSave()}
@@ -1886,10 +2114,17 @@ export default function EditorPage() {
         remoteConnected={Boolean(activeDoc?.remoteMcp)}
         mode={previewMode}
         onModeChange={changePreviewMode}
+        motion={motionOpen}
+        onOpenMotion={openMotion}
         cardsReady={cardsStatus.ready}
         cardsExporting={cardsStatus.busy}
         cardsProgress={cardsStatus.progress}
         onExportAll={() => cardsViewRef.current?.exportAll()}
+        longReady={longStatus.ready}
+        longExporting={longStatus.busy}
+        longProgress={{ done: longStatus.progress.done, total: longStatus.progress.total }}
+        onExportLong={() => longImageViewRef.current?.export()}
+        onCancelLong={() => longImageViewRef.current?.cancel()}
         phone={phone}
         wide={wide}
       />
@@ -1909,83 +2144,111 @@ export default function EditorPage() {
           </div>
         )}
 
-      {/* 手机上才需要这条说明：单面板切换怎么用；640px 起就是编辑 + 预览两栏 */}
-      {phone && (
-        <div data-narrow-note className="flex shrink-0 items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3">
-          {t('editor.narrowNote')}
+      <div
+        data-editor-workspace
+        hidden={motionOpen}
+        style={motionOpen ? { display: 'none' } : undefined}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {/* 手机上才需要这条说明：单面板切换怎么用；640px 起就是编辑 + 预览两栏 */}
+        {phone && (
+          <div data-narrow-note className="flex shrink-0 items-center justify-center border-b border-line-2 bg-surface-sunken px-3 py-1.5 text-center text-[11px] leading-relaxed text-ink-3">
+            {t('editor.narrowNote')}
+          </div>
+        )}
+
+        {phone ? (
+          <PaneSwitcher pane={pane} onPaneChange={setPane}>
+            {/* All three panes stay mounted and laid out; the inactive ones are
+                only invisible, so the editor keeps its caret and scroll offset
+                and an in-flight upload keeps running while another pane is up. */}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <div role="tabpanel" id="pane-editor" aria-labelledby="pane-tab-editor" data-pane="editor" className={`absolute inset-0 min-h-0 ${pane === 'editor' ? '' : 'invisible pointer-events-none'}`}>{editorPaneBody}</div>
+              <div role="tabpanel" id="pane-preview" aria-labelledby="pane-tab-preview" data-pane="preview" className={`absolute inset-0 min-h-0 ${pane === 'preview' ? '' : 'invisible pointer-events-none'}`}>{previewPaneBody}</div>
+              <div role="tabpanel" id="pane-side" aria-labelledby="pane-tab-side" data-pane="side" className={`absolute inset-0 min-h-0 ${pane === 'side' ? '' : 'invisible pointer-events-none'}`}>{sidebarPaneBody}</div>
+            </div>
+          </PaneSwitcher>
+        ) : (
+          <>
+            <ResizablePanelGroup
+              orientation="horizontal"
+              className="min-h-0 flex-1"
+              defaultLayout={initialLayout}
+              onLayoutChange={(layout) => {
+                layoutRef.current = { ...layoutRef.current, ...layout }
+                try {
+                  localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRef.current))
+                } catch {
+                  // 宽度记不住也不碍事
+                }
+              }}
+            >
+              {/* 左：Markdown 编辑（支持拖图上传）。中等档把最小宽度让给预览。 */}
+              <ResizablePanel id="editor" defaultSize={wide ? '55%' : '50%'} minSize={wide ? '320px' : '240px'} className="min-w-0">
+                {editorPaneBody}
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖，没有上限） */}
+              <ResizablePanel id="preview" defaultSize={wide ? '500px' : '50%'} minSize={wide ? '380px' : '360px'} className="min-w-0 border-l border-line-2">
+                {previewPaneBody}
+              </ResizablePanel>
+
+              {/* 右：只在宽屏占一栏，且可以一直拖宽；中等档改用下面的抽屉。 */}
+              {wide && panelOpen && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" className="min-w-0">
+                    {sidebarPaneBody}
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+
+            {/* The medium drawer reuses the same SidePanel; its selected tab is
+                owned by the page so closing and reopening keeps it, and uploaded
+                images already live in the page state. */}
+            {medium && (
+              <Sheet open={sideDrawerOpen} onOpenChange={setSideDrawerOpen}>
+                <SheetContent
+                  side="right"
+                  data-side-drawer
+                  className="w-[420px] max-w-[92vw] gap-0 border-line-2 bg-surface-base p-0 pt-10 sm:max-w-[420px]"
+                >
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>{t('editor.pane.side')}</SheetTitle>
+                    <SheetDescription>{t('editor.sideDrawerDescription')}</SheetDescription>
+                  </SheetHeader>
+                  {sidebarPaneBody}
+                </SheetContent>
+              </Sheet>
+            )}
+          </>
+        )}
+      </div>
+
+      {MOTION_EMBED_URL && motionMounted && (
+        <div
+          data-motion-frame-shell
+          hidden={!motionOpen}
+          style={motionOpen ? undefined : { display: 'none' }}
+          className="relative min-h-0 flex-1"
+        >
+          {!motionReady && (
+            <p className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[13px] text-ink-3" role="status">
+              {t('motion.loading')}
+            </p>
+          )}
+          <iframe
+            data-motion-frame
+            src={MOTION_EMBED_URL}
+            title={t('motion.frameTitle')}
+            onLoad={() => setMotionReady(true)}
+            className={`h-full w-full border-0 ${motionReady ? '' : 'invisible'}`}
+          />
         </div>
       )}
-
-      {phone ? (
-        <PaneSwitcher pane={pane} onPaneChange={setPane}>
-          {/* All three panes stay mounted and laid out; the inactive ones are
-              only invisible, so the editor keeps its caret and scroll offset
-              and an in-flight upload keeps running while another pane is up. */}
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div role="tabpanel" id="pane-editor" aria-labelledby="pane-tab-editor" data-pane="editor" className={`absolute inset-0 min-h-0 ${pane === 'editor' ? '' : 'invisible pointer-events-none'}`}>{editorPaneBody}</div>
-            <div role="tabpanel" id="pane-preview" aria-labelledby="pane-tab-preview" data-pane="preview" className={`absolute inset-0 min-h-0 ${pane === 'preview' ? '' : 'invisible pointer-events-none'}`}>{previewPaneBody}</div>
-            <div role="tabpanel" id="pane-side" aria-labelledby="pane-tab-side" data-pane="side" className={`absolute inset-0 min-h-0 ${pane === 'side' ? '' : 'invisible pointer-events-none'}`}>{sidebarPaneBody}</div>
-          </div>
-        </PaneSwitcher>
-      ) : (
-        <>
-          <ResizablePanelGroup
-            orientation="horizontal"
-            className="min-h-0 flex-1"
-            defaultLayout={initialLayout}
-            onLayoutChange={(layout) => {
-              layoutRef.current = { ...layoutRef.current, ...layout }
-              try {
-                localStorage.setItem(LAYOUT_KEY, JSON.stringify(layoutRef.current))
-              } catch {
-                // 宽度记不住也不碍事
-              }
-            }}
-          >
-            {/* 左：Markdown 编辑（支持拖图上传）。中等档把最小宽度让给预览。 */}
-            <ResizablePanel id="editor" defaultSize={wide ? '55%' : '50%'} minSize={wide ? '320px' : '240px'} className="min-w-0">
-              {editorPaneBody}
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            {/* 中：预览（375/677 是里面手机框的宽度，栏宽随便拖，没有上限） */}
-            <ResizablePanel id="preview" defaultSize={wide ? '500px' : '50%'} minSize={wide ? '380px' : '360px'} className="min-w-0 border-l border-line-2">
-              {previewPaneBody}
-            </ResizablePanel>
-
-            {/* 右：只在宽屏占一栏，且可以一直拖宽；中等档改用下面的抽屉。 */}
-            {wide && panelOpen && (
-              <>
-                <ResizableHandle withHandle />
-                <ResizablePanel id="sidebar" defaultSize="300px" minSize="240px" className="min-w-0">
-                  {sidebarPaneBody}
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-
-          {/* The medium drawer reuses the same SidePanel; its selected tab is
-              owned by the page so closing and reopening keeps it, and uploaded
-              images already live in the page state. */}
-          {medium && (
-            <Sheet open={sideDrawerOpen} onOpenChange={setSideDrawerOpen}>
-              <SheetContent
-                side="right"
-                data-side-drawer
-                className="w-[420px] max-w-[92vw] gap-0 border-line-2 bg-surface-base p-0 pt-10 sm:max-w-[420px]"
-              >
-                <SheetHeader className="sr-only">
-                  <SheetTitle>{t('editor.pane.side')}</SheetTitle>
-                  <SheetDescription>{t('editor.sideDrawerDescription')}</SheetDescription>
-                </SheetHeader>
-                {sidebarPaneBody}
-              </SheetContent>
-            </Sheet>
-          )}
-        </>
-      )}
-
       <AiWritingDialog open={aiWritingOpen} onOpenChange={setAiWritingOpen} />
       <AiDiagramDialog open={aiDiagramOpen} onOpenChange={setAiDiagramOpen} />
       <RemoteMcpDialog open={remoteMcpOpen} onOpenChange={setRemoteMcpOpen} doc={activeDoc} remote={remoteMcp} />

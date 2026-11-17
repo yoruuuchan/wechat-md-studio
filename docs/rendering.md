@@ -77,6 +77,7 @@ TeX 包白名单、MathJax Safe 与序列化 SVG 消毒共同限制可进入正�
 公式还在渲染时提示等待，不交付 TeX 占位；编译失败时说明是哪个公式，改好即可恢复，也可以由作者明确选择按源稿继续；
 MathJax 组件本身加载失败会单独说明并可重试。Markdown 与整包备份始终导出源稿，切稿后状态按当前稿件重算。
 2026-10-29 用 [浏览器脚本](../scripts/cdp-verify-math-readiness.mjs) 在限速、断网、坏公式与 Mermaid 并存下复验。
+卡片和长图导出共用同一份就绪事实（[graphics-readiness.ts](../src/lib/graphics-readiness.ts)）：公式或图表还在处理时按钮禁用并说明是等待还是失败，失败给出现有重试路径；2026-11-14 用 [浏览器脚本](../scripts/cdp-verify-graphics-gate.mjs) 在慢 MathJax、坏公式、延迟 Mermaid 与 Mermaid 失败下复验，确认禁用期间没有下载、就绪后恢复。
 2026-10-07 的微信实粘记录支持保留 `ex` 尺寸与 `currentColor`，只在 wrapper 明确颜色，
 不手算 `ex → px`；对应 [math.test.ts](../src/lib/math.test.ts) 与 [浏览器脚本](../scripts/cdp-verify-math.mjs)。
 
@@ -235,6 +236,48 @@ unicode-range 逐片裁成 99 个 woff2（没有字形的片跳过），CSS 在
 [OFL-MajorMonoDisplay.txt](../public/fonts/OFL-MajorMonoDisplay.txt)。
 卡片分页预载与 PNG 内嵌都读 [cards.ts](../src/lib/cards.ts) 的 `CARD_TEMPLATE_FONTS`，
 两处不会各写一份字体白名单。
+
+模板右栏「字体」菜单另有六款可选中文字体，同样用
+[slice-by-ranges.py](../scripts/fonts/slice-by-ranges.py) 按 Noto Serif SC 700 的 unicode-range
+裁成 woff2（`--no-hinting`，去掉 TrueType 微调指令，合计约 25 MB，按需只下载用到的片）：
+霞鹜文楷 LXGW WenKai 1.522（101 片，[lxgw-wenkai.css](../public/fonts/lxgw-wenkai.css)）、
+得意黑 Smiley Sans 2.0.1（100 片）、站酷小薇体 ZCOOL XiaoWei 1.000（93 片）、
+站酷庆科黄油体 ZCOOL QingKe HuangYou 1.000（93 片）、站酷快乐体 ZCOOL KuaiLe 2.001（94 片）、
+马善政楷书 Ma Shan Zheng 2.003（93 片），CSS 分别在 `public/fonts/` 下同名文件。
+这六款不进全局样式表，读者选中时才由 [font-catalog.ts](../src/lib/font-catalog.ts) 的
+`ensureFontSheets` 插入 `<link>`；朱雀仿宋也改由它在预览里按需加载（此前只在导出时内嵌，预览靠回落）。
+许可副本（版权行取自各字体 name 表，正文为 SIL OFL 1.1）：
+[OFL-LXGWWenKai.txt](../public/fonts/OFL-LXGWWenKai.txt)、
+[OFL-SmileySans.txt](../public/fonts/OFL-SmileySans.txt)、
+[OFL-ZCOOLXiaoWei.txt](../public/fonts/OFL-ZCOOLXiaoWei.txt)、
+[OFL-ZCOOLQingKeHuangYou.txt](../public/fonts/OFL-ZCOOLQingKeHuangYou.txt)、
+[OFL-ZCOOLKuaiLe.txt](../public/fonts/OFL-ZCOOLKuaiLe.txt)、
+[OFL-MaShanZheng.txt](../public/fonts/OFL-MaShanZheng.txt)。
+
+另有五款标题字体也进了这个菜单，切法相同（`--no-hinting`，Noto Serif SC 700 的区段）：
+无界黑 Unbounded Sans 1.100（101 片，约 3.7 MB）、铁蒺藜体 Tiejili SC 1.100（100 片，约 2.7 MB）、
+源流明体 GenRyuMin2 2.100 与源样明体 GenYoMin2 2.100（各取 B / H 两个字重，各 202 片，约 12 MB / 10 MB）、
+未来荧黑 Glow Sans SC 0.93（只取 Normal Heavy，100 片，约 20 MB；上游已于 2022 年归档）。
+源流、源样只有繁体 / 日文版：简体字齐全，但中文标点按台湾习惯放在字格中央，
+所以切片前先用 fontTools 去掉 U+3000–303F、U+FF00–FFEF 和中文引号、省略号、破折号、间隔号，
+这些字符回落到后面的思源字体，按大陆习惯排。CSS 分别是
+[unbounded-sans.css](../public/fonts/unbounded-sans.css)、[tiejili-sc.css](../public/fonts/tiejili-sc.css)、
+[genryumin2.css](../public/fonts/genryumin2.css)、[genyomin2.css](../public/fonts/genyomin2.css)、
+[glow-sans-sc.css](../public/fonts/glow-sans-sc.css)，都按需加载。
+长图模板的数字和西文另用 Anton 与 Instrument Serif（Google Fonts 版，只留 latin 子集，写在
+[fonts-design.css](../public/fonts/fonts-design.css)）。许可副本：
+[OFL-UnboundedSans.txt](../public/fonts/OFL-UnboundedSans.txt)、[OFL-TiejiliSC.txt](../public/fonts/OFL-TiejiliSC.txt)、
+[OFL-GenRyuMin2.txt](../public/fonts/OFL-GenRyuMin2.txt)、[OFL-GenYoMin2.txt](../public/fonts/OFL-GenYoMin2.txt)、
+[OFL-GlowSansSC.txt](../public/fonts/OFL-GlowSansSC.txt)、[OFL-Anton.txt](../public/fonts/OFL-Anton.txt)、
+[OFL-InstrumentSerif.txt](../public/fonts/OFL-InstrumentSerif.txt)（均为上游原文）。
+
+思源黑体的特粗字重另起名 `Noto Sans SC Black`：用 fontTools 的 `varLib.instancer` 把 Noto Sans SC 可变字体（2.004）固定在 wght=900，再按 [noto-sans-sc-local.css](../public/fonts/noto-sans-sc-local.css) 700 的 unicode-range 切成 101 片（`--no-hinting`，约 4.9 MB，[noto-sans-sc-black.css](../public/fonts/noto-sans-sc-black.css) 按需加载），许可同 [OFL-NotoSansSC.txt](../public/fonts/OFL-NotoSansSC.txt)。
+
+读者自己添加的字体文件只存在浏览器 IndexedDB，不经过服务器。导出 PNG 时，`.ttf` / `.otf`
+由 [font-subset.ts](../src/lib/font-subset.ts) 调用 harfbuzzjs 1.6.4 的 `harfbuzz-subset.wasm`
+裁成只含这张图用到的字再以 data URL 内嵌（25 MB 的文楷裁一段中文约 6 KB）；`.woff` / `.woff2` 整个内嵌。
+WebAssembly 需要 CSP 的 `script-src 'wasm-unsafe-eval'`，它只放行 wasm 编译，JavaScript 的 `eval` 仍被禁止
+（[security-headers.ts](../api/lib/security-headers.ts)）。
 
 主题移植损耗与许可审计见 [THEME-SOURCES](../THEME-SOURCES.md)；借鉴与未采用的机制见
 [References](https://wechat.yoru-and-akari.dev/references) / [credits 数据](../src/lib/credits.ts)。

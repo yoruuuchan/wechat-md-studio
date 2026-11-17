@@ -40,8 +40,11 @@ export function contentSecurityPolicy() {
     defaultSrc: ["'self'"],
     // The bundle is served from this origin; there are no inline scripts in
     // index.html and no third-party scripts at runtime (MathJax and mermaid
-    // are Vite chunks, not CDN tags).
-    scriptSrc: ["'self'"],
+    // are Vite chunks, not CDN tags). 'wasm-unsafe-eval' lets the bundled
+    // HarfBuzz subsetter compile its own WebAssembly so an uploaded font can be
+    // cut down to the exported glyphs; it does not re-enable eval() or
+    // new Function(), and the module is still a same-origin file.
+    scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
     // 'unsafe-inline' is required and stays: CodeMirror injects <style> at
     // runtime, Radix positions its overlays with style attributes, and both the
     // article preview and the HTML copied into WeChat are inline-style HTML by
@@ -121,6 +124,16 @@ export function securityHeaders(): MiddlewareHandler {
     if (c.req.path.startsWith('/api/img/')) {
       c.header('Access-Control-Allow-Origin', '*')
       c.header('Cross-Origin-Resource-Policy', 'cross-origin')
+    }
+    // The motion composer is served from this same origin and embedded by the
+    // editor at /motion/?embed=1. Only that path relaxes framing, and only to
+    // same-origin pages: every other response stays unframeable.
+    if (c.req.path.startsWith('/motion/')) {
+      const csp = c.res.headers.get('Content-Security-Policy')
+      if (csp) {
+        c.header('Content-Security-Policy', csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'"))
+      }
+      c.header('X-Frame-Options', 'SAMEORIGIN')
     }
     if (env.isProduction && isHttpsRequest(c)) {
       c.header('Strict-Transport-Security', HSTS_VALUE)

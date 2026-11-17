@@ -285,7 +285,7 @@ const editorTheme = EditorView.theme(
       fontSize: '13.5px',
     },
     '.cm-content': {
-      fontFamily: '"Geist Mono", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+      fontFamily: 'var(--font-mono)',
       padding: '16px 0',
       caretColor: 'var(--primary-500)',
       lineHeight: '1.75',
@@ -313,7 +313,7 @@ const editorTheme = EditorView.theme(
       boxShadow: 'var(--shadow-pop)',
       overflow: 'hidden',
     },
-    '.cm-tooltip-autocomplete ul': { fontFamily: 'inherit', maxHeight: '260px' },
+    '.cm-tooltip-autocomplete ul': { fontFamily: 'var(--font-mono)', maxHeight: '260px' },
     '.cm-tooltip-autocomplete ul li': {
       padding: '4px 8px',
       color: 'var(--ink-1)',
@@ -324,8 +324,9 @@ const editorTheme = EditorView.theme(
       backgroundColor: 'var(--select-strong)',
       color: 'var(--ink-1)',
     },
-    '.cm-completionLabel': { fontFamily: '"Geist Mono", ui-monospace, Menlo, Consolas, monospace' },
+    '.cm-completionLabel': { fontFamily: 'var(--font-mono)' },
     '.cm-completionDetail': {
+      fontFamily: 'var(--font-mono)',
       color: 'var(--ink-3)',
       fontStyle: 'normal',
       marginLeft: '10px',

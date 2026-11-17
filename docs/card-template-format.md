@@ -97,7 +97,8 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 | `variants` | 1–16 个变体；`id` 用小写字母、数字、连字符，`name` 显示在“卡片背景”。`dark` 决定导出时是否使用暗色语义变量。`tokens` 只允许 `accent` / `text` / `muted` 三种安全颜色，`accent` 会写入 `--xhs-accent`。 |
 | `metrics` | 分页与封面共用的度量，见下一节。 |
 | `fonts` | 字体声明，见第 6 节。 |
-| `pages` | 三个页面 HTML 的相对路径；`end` 省略时最后一页复用 `body`。 |
+| `customize` | 可选，读者能在右栏改的颜色和字体，见下面的 [customize](#customize)。 |
+| `pages` | 三个页面 HTML 的相对路径。`end` 省略时最后一页复用 `body`；`end` 里放了 `data-slot="content"` 时，它是最后一页正文的外框；没放时，它是正文之后**另加**的一张结尾页（只有标题、作者等），不会吞掉最后一页的正文。 |
 | `styles` | 1–8 个 CSS 相对路径。 |
 
 ### metrics
@@ -116,6 +117,31 @@ node scripts/cards/pack-template.mjs examples/card-templates/example verify-out/
 | `coverSmallScale` | 高度小于 600px 时的标题缩放系数。 |
 
 度量是声明式的：引擎把 `padX` 等写成 `--xhs-pad-x` 等 CSS 变量，并按 `height - padTop - padBottom` 分页。模板不需要重复实现分页。
+
+### customize
+
+模板把自己的几个 CSS 变量开放给读者，右栏「模板」里就会出现对应的色块和字体菜单：
+
+```json
+"customize": {
+  "colors": [
+    { "var": "--accent", "name": "主色" },
+    { "var": "--paper", "name": "底色" }
+  ],
+  "fonts": [
+    { "var": "--display", "name": "标题" },
+    { "var": "--body-font", "name": "正文" }
+  ]
+}
+```
+
+- `colors` 最多 10 项，`fonts` 最多 4 项；`var` 符合 `^--[a-z][a-z0-9-]{0,47}$`，同一个 `var` 只能出现一次。`--xhs-`、`--long-`、`--reed-` 开头的是引擎保留的，不能开放。`name` 是最多 20 个字符的显示名。
+- 这些变量要声明在作用域根上（卡片是 `.xhs-card`，长图是 `.reed-long-root`），模板 CSS 里只通过 `var(--…)` 使用它们。色块的初始颜色就是从根上读到的值，带透明度的颜色改色相时保留原透明度；根上没有值的显示为「跟随主题」。
+- 读者的选择以内联样式写到卡片根、测量副本 `.xhs-body`（长图是 `.reed-long-root` 和 `.reed-long-flow`）上，所以分页、封面标题适配和导出都按改后的字体测量。
+- 颜色只接受普通颜色值（十六进制、`rgb()`、`hsl()` 等），按变体分别记住；字体按模板记住。字体菜单里是「模板默认」、芦苇自带的 15 款（见第 6 节）和读者自己添加的字体文件；选中后变量的值是 `"字体名", "Noto Sans SC", sans-serif`，缺字回落到思源黑体。
+- 选择存在本机 `localStorage` 的 `mopai.template-custom.v1`，按模板 id 分开；「恢复默认」清掉当前变体的颜色和这个模板的全部字体选择。
+- 读者添加的字体（`.ttf` / `.otf` / `.woff` / `.woff2`，单个最多 40 MB）只存在这台设备浏览器的 IndexedDB `mopai.user-fonts`，不上传。导出时 `.ttf` / `.otf` 用 HarfBuzz（WebAssembly）裁成只含这张图用到的字再嵌入，`.woff` / `.woff2` 整个嵌入。删除字体后，用到它的位置回到模板默认。
+- 不写 `customize` 的模板不显示这块面板。默认 Reed 模板开放「主色」和正文字体。
 
 ## 3. 页面与 slot
 
@@ -236,10 +262,17 @@ svg g path circle ellipse rect line polyline polygon text tspan defs clippath
 Geist, Geist Mono, Noto Sans SC, Noto Serif SC, Zhuque Fangsong, Inter,
 JetBrains Mono, EB Garamond, IBM Plex Sans, IBM Plex Mono, Caveat, Orbitron,
 VT323, Space Grotesk, DM Serif Display, Rajdhani, Share Tech Mono,
-Pixelify Sans, Tinos, Instrument Sans, B612 Mono
+Pixelify Sans, Tinos, Instrument Sans, B612 Mono, LXGW WenKai, Smiley Sans,
+ZCOOL XiaoWei, ZCOOL QingKe HuangYou, ZCOOL KuaiLe, Ma Shan Zheng,
+Noto Sans SC Black, Unbounded Sans, Tiejili SC, GenRyuMin2, GenYoMin2,
+Glow Sans SC, Anton, Instrument Serif
 ```
 
-`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 只有 400。
+`weights` / `styles` 必须在该 family 的内置声明范围内，例如 `Zhuque Fangsong` 和霞鹜文楷到马善政楷书这六款都只有 400，`Noto Sans SC Black` 只有 900；无界黑 `Unbounded Sans`、铁蒺藜体 `Tiejili SC`、`Anton`、`Instrument Serif`（正体和斜体）只有 400，源流明体 `GenRyuMin2`、源样明体 `GenYoMin2` 有 700 和 900，未来荧黑 `Glow Sans SC` 只有 900。单字重的标题字体用在 800 / 900 的标题上时，浏览器会再假加粗一层；模板可以在根上写 `font-synthesis-weight: none` 关掉。
+
+`Noto Sans SC Black` 是思源黑体的特粗字重。单独起名是为了不影响已有模板里 `Noto Sans SC` 的 800 / 900 粗体（它们仍用 700 字形）；要用特粗标题就在 `fonts` 里引用它，CSS 写 `font-family: "Noto Sans SC Black"; font-weight: 900`。
+
+读者在 `customize` 字体菜单里能选的是其中 15 款中文字体：思源黑体、思源黑体 特粗、思源宋体、朱雀仿宋、霞鹜文楷、得意黑、站酷小薇体、站酷庆科黄油体、站酷快乐体、马善政楷书、无界黑、铁蒺藜体、源流明体、源样明体、未来荧黑。它们都是 SIL OFL 1.1 字体，按 Unicode 区段切成小文件，用到哪段才下载哪段；许可证副本在 `public/fonts/OFL-*.txt`，来源见 [渲染与图片](rendering.md)。
 
 ### 包内 woff2
 
@@ -273,6 +306,8 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 | 变体 | 16 |
 | CSS 文件 | 8 |
 | 字体声明 | 24 |
+| `customize.colors` | 10 |
+| `customize.fonts` | 4 |
 
 超限、坏 manifest、路径穿越、zip 炸弹、非白名单扩展名、危险 HTML/CSS 或包外资源都会让上传失败，界面会给出对应的中文 / 英文提示。解压是流式的：中央目录声明的大小只用于提前判断，实际字节一边解压一边累计，超过单文件或总上限立刻中止并丢弃，声明 1 KB、实际几百 MB 的 zip 不会先被整块解开。
 
@@ -298,3 +333,93 @@ Pixelify Sans, Tinos, Instrument Sans, B612 Mono
 - 封面标题自适应、页眉、页脚、页码。
 
 把它打包后上传，就能在「我的」组里看到并使用。
+
+## 10. 长图模板
+
+同一个 `.reedcard` 包也可以是长图模板：在 manifest 里写 `"kind": "long"`。不写 `kind` 就是卡片，前面九节的规则不变。长图的用法见 [长图模式](long-image.md)。
+
+和卡片不同的地方只有这些：
+
+| 项 | 长图模板 |
+|---|---|
+| `ratios` / `defaultRatio` | 不接受，写了会被拒绝（长图没有固定比例） |
+| `metrics` | 只有四项：`padX`（0–140）、`contentWidth`（200–540）、`photoGap`（0–60）、`photoInset`（0–80）；`contentWidth + 2 × padX` 不能超过 540 |
+| `pages` | 只有 `header` 和 `footer`，都可以不写；小节和照片组由引擎生成 |
+| CSS 作用域根 | `.reed-long-root`（外层）和 `.reed-long-flow`（内容流） |
+
+其余字段（`id`、`renderId`、`name`、`version`、`author`、`description`、`variants`、`fonts`、`customize`、`styles`）、允许的 HTML、CSS 规则、字体、大小限制和上传存储都与卡片相同。
+
+### 页面片段与 slot
+
+`header` 在稿件有一级标题时出现，`footer` 在稿件有落款（最后一个单独一行的 `---` 之后有内容）时出现。可用的 slot：
+
+| slot | 内容 |
+|---|---|
+| `title` / `subtitle` | 一级标题和紧跟的短段落；为空时元素被移除 |
+| `cover` | 头图，只能放在 `<img>` 上，引擎写入 `src`；没有头图时元素被移除 |
+| `content` | 仅 `footer`：落款内容（引擎渲染好的段落） |
+| `author` | front matter 的 `author`；为空时元素被移除 |
+| `brand` / `date` | 与卡片相同 |
+
+条件属性在卡片的 `data-when-variant`、`data-when-dark` 之外多一个 `data-when-cover="true|false"`：有没有头图时各显示哪一块。
+
+### 引擎生成的结构
+
+```html
+<div class="reed-long-root" data-template="…" data-variant="…" data-kind="long">
+  <div class="reed-long-flow">
+    <!-- header 片段 -->
+    <div class="reed-long-preamble">…</div>            <!-- 第一个二级标题之前的正文 -->
+    <section class="reed-long-section">
+      <div class="reed-long-section-head">
+        <span class="reed-long-section-mark"></span>
+        <h2 class="reed-long-section-label"><span>小节标题</span></h2>
+        <span class="reed-long-section-kicker">KICKER</span>   <!-- 写了才有 -->
+      </div>
+      <div class="reed-long-section-body">
+        <p class="reed-long-lede">小节的第一段</p>
+        <div class="reed-long-photos" data-photo-count="5">
+          <div class="reed-long-photo-frame">
+            <div class="reed-long-photo-row">
+              <figure class="reed-long-photo"><img></figure>
+            </div>
+          </div>
+          <span class="reed-long-photo-next"></span>
+        </div>
+        <div class="reed-long-divider"></div>             <!-- 小节里的 --- -->
+      </div>
+    </section>
+    <!-- footer 片段 -->
+  </div>
+</div>
+```
+
+照片行的宽高由引擎按原始比例算好并写成内联样式，模板不要改 `.reed-long-photo` 的宽高，只画外框、间距和装饰。
+
+引擎还给正文留了几个钩子，模板用得上就写 CSS，用不上什么都不用做：
+
+| 钩子 | 来自 Markdown | 用法 |
+|---|---|---|
+| `figure.reed-long-photo[data-has-caption] > figcaption.reed-long-photo-caption` | 照片的说明文字 `![说明](…)` | 默认带 `hidden` 不显示。模板写 `.reed-long-photo-caption { display: block }` 就显示在照片下方：照片仍按行高排，`figure` 的高度随说明变高。显示说明时别给 `.reed-long-photo` 加上下内边距或边框，否则会撑出行外 |
+| `p[data-lead]` | 段落以一段加粗开头，后面还有正文：`**导语** 近日……` | 开头的加粗词是 `p[data-lead] > strong:first-child`，可以排成标签 |
+| `p[data-label]` | 整段都是加粗、不超过 16 个字：`**要点**` | 一行小标签，常用来给下面的列表起头 |
+| `ul[data-lead-items]` / `ol[data-lead-items]` | 列表的每一项都以加粗开头：`- **10倍** 推理速度提升` | 可以排成数字卡片或带箭头的步骤卡；每项的加粗部分是 `li > p > strong:first-child` |
+
+这几个属性只按 Markdown 的写法判断，不看文字内容；不满足条件的段落和列表保持原样。
+
+导出时每个块的高度会按预览量到的值固定下来，穿出父元素的外边距在这一步会丢。引擎自己的容器（`.reed-long-preamble`、`.reed-long-section`、`.reed-long-section-body`）已经是 `display: flow-root`；`header` / `footer` 片段的最外层元素请自己留 padding 或写 `display: flow-root`，别让里面的外边距穿出去，否则导出会比预览矮。
+
+引擎在 `.reed-long-root` 上提供这些变量：
+
+| 变量 | 含义 |
+|---|---|
+| `--long-pad-x`、`--long-content-w`、`--long-photo-gap`、`--long-photo-inset` | manifest 里的四项 metrics，带 `px` |
+| `--long-title-units`、`--long-subtitle-units` | 标题、副标题大约相当于多少个全角字（中文算 1，其它算 0.55）。用它让长标题自动缩小，例如 `font-size: clamp(30px, calc(486px / var(--long-title-units, 8) - 2px), 56px)` |
+
+### 最小示例
+
+`examples/card-templates/example-long/` 是一个可以直接打包上传的长图模板：白底、一个变体、只用内置 Noto Sans SC。
+
+```bash
+node scripts/cards/pack-template.mjs examples/card-templates/example-long example-long.reedcard
+```

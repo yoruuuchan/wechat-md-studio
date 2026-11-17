@@ -9,11 +9,13 @@
  * editor or the rest of the page. No template code is ever executed.
  */
 import DOMPurify from 'dompurify'
-import JSZip from 'jszip'
+// Type only: the zip library is fetched when a package is first opened, so
+// it stays out of the editor's entry bundle.
+import type JSZip from 'jszip'
 import {
   CARD_TEMPLATE_LIMITS, CardTemplateError, extensionOf, isAllowedTemplatePath,
   normalizeTemplatePath, parseCardTemplateManifest,
-  type CardTemplateManifest,
+  type ReedTemplateManifest, type TemplateKind,
 } from './card-template-format'
 
 export interface CardTemplateArchiveFile {
@@ -22,7 +24,7 @@ export interface CardTemplateArchiveFile {
 }
 
 export interface CardTemplateArchive {
-  manifest: CardTemplateManifest
+  manifest: ReedTemplateManifest
   files: Map<string, CardTemplateArchiveFile>
 }
 
@@ -122,9 +124,11 @@ export async function openCardTemplateArchive(data: ArrayBuffer): Promise<CardTe
   if (data.byteLength > CARD_TEMPLATE_LIMITS.archiveBytes) {
     throw new CardTemplateError('archive-too-large', `${data.byteLength} bytes`)
   }
+  // Outside the try: a failed chunk download is a network error, not a bad zip.
+  const { default: Zip } = await import('jszip')
   let zip: JSZip
   try {
-    zip = await JSZip.loadAsync(data)
+    zip = await Zip.loadAsync(data)
   } catch (error) {
     throw new CardTemplateError('bad-zip', error instanceof Error ? error.message : String(error))
   }
@@ -217,6 +221,9 @@ const ALLOWED_ATTR = [
   'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity',
   'preserveaspectratio', 'text-anchor', 'dominant-baseline', 'font-family',
   'font-size', 'font-weight', 'aria-hidden', 'aria-label',
+  // URL attribute, but scanHtml checks it against the package before this
+  // list is consulted; DOMPurify needs it listed or every <img> loses it.
+  'src',
 ]
 
 const URL_ATTRS = new Set(['src', 'href', 'xlink:href', 'poster', 'data', 'action', 'formaction'])
@@ -425,14 +432,19 @@ export interface CssSanitizeOptions {
   cssPath: string
   files: Map<string, CardTemplateArchiveFile>
   assetUrls?: Map<string, string>
+  /** Which root the rules are scoped to; cards when omitted. */
+  kind?: TemplateKind
 }
 
-function scopeRoot(template: string): string {
+function scopeRoot(template: string, kind: TemplateKind = 'card'): string {
   if (!/^[\w.:-]{1,120}$/.test(template)) throw new CardTemplateError('bad-manifest', '模板内部 id 不合法')
   // Scope by the upload's unique runtime id, not by manifest.renderId. A
   // converted design keeps its original [data-template="console"] selectors,
   // but two packages (or a package and the built-in template) sharing that key
   // must not be able to restyle each other.
+  if (kind === 'long') {
+    return `.reed-long-root[data-card-template-source="${template}"], .reed-long-flow[data-card-template-source="${template}"]`
+  }
   return `.xhs-card[data-card-template-source="${template}"], .xhs-body[data-card-template-source="${template}"]`
 }
 
@@ -521,9 +533,11 @@ function splitSelectors(text: string): string[] {
  * with the card/body class gets a second, explicit root form. The original form
  * still matches the body as a descendant of the card.
  */
-function rootScopedSelectors(selectorText: string): string {
+function rootScopedSelectors(selectorText: string, kind: TemplateKind): string {
   const roots = splitSelectors(selectorText)
-    .map((selector) => selector.replace(/^\.xhs-(card|body)\b/, ':scope.xhs-$1'))
+    .map((selector) => (kind === 'long'
+      ? selector.replace(/^\.reed-long-(root|flow)\b/, ':scope.reed-long-$1')
+      : selector.replace(/^\.xhs-(card|body)\b/, ':scope.xhs-$1')))
     .filter((selector, index) => selector !== splitSelectors(selectorText)[index])
   return roots.join(', ')
 }
@@ -534,6 +548,7 @@ function collectRules(
   files: Map<string, CardTemplateArchiveFile>,
   assetUrls: Map<string, string> | undefined,
   out: string[],
+  kind: TemplateKind,
 ): void {
   for (const rule of Array.from(rules)) {
     const candidate = rule as CSSRule & { selectorText?: string; style?: CSSStyleDeclaration; cssRules?: CSSRuleList; media?: MediaList; conditionText?: string }
@@ -542,7 +557,7 @@ function collectRules(
       if (!selector || BAD_SELECTOR.test(selector)) throw new CardTemplateError('unsafe-css', `选择器: ${selector}`)
       sanitizeStyle(candidate.style, cssPath, files, assetUrls)
       out.push(`${selector} { ${candidate.style.cssText} }`)
-      const roots = rootScopedSelectors(selector)
+      const roots = rootScopedSelectors(selector, kind)
       if (roots) out.push(`${roots} { ${candidate.style.cssText} }`)
       continue
     }
@@ -550,19 +565,19 @@ function collectRules(
       const name = rule.constructor.name
       if (name === 'CSSMediaRule' && candidate.media) {
         out.push(`@media ${candidate.media.mediaText} {`)
-        collectRules(candidate.cssRules, cssPath, files, assetUrls, out)
+        collectRules(candidate.cssRules, cssPath, files, assetUrls, out, kind)
         out.push('}')
         continue
       }
       if (name === 'CSSSupportsRule' && typeof candidate.conditionText === 'string') {
         out.push(`@supports ${candidate.conditionText} {`)
-        collectRules(candidate.cssRules, cssPath, files, assetUrls, out)
+        collectRules(candidate.cssRules, cssPath, files, assetUrls, out, kind)
         out.push('}')
         continue
       }
       if (name === 'CSSContainerRule' && typeof candidate.conditionText === 'string') {
         out.push(`@container ${candidate.conditionText} {`)
-        collectRules(candidate.cssRules, cssPath, files, assetUrls, out)
+        collectRules(candidate.cssRules, cssPath, files, assetUrls, out, kind)
         out.push('}')
         continue
       }
@@ -600,8 +615,8 @@ export function sanitizeTemplateCss(css: string, options: CssSanitizeOptions): s
     throw new CardTemplateError('unsafe-css', `${options.cssPath}: ${error instanceof Error ? error.message : String(error)}`)
   }
   const out: string[] = []
-  collectRules(sheet.cssRules, options.cssPath, options.files, options.assetUrls, out)
-  const scoped = `@scope (${scopeRoot(options.template)}) {\n${out.join('\n')}\n}`
+  collectRules(sheet.cssRules, options.cssPath, options.files, options.assetUrls, out, options.kind ?? 'card')
+  const scoped = `@scope (${scopeRoot(options.template, options.kind ?? 'card')}) {\n${out.join('\n')}\n}`
   try {
     const verify = new CSSStyleSheet()
     verify.replaceSync(scoped)
@@ -613,7 +628,7 @@ export function sanitizeTemplateCss(css: string, options: CssSanitizeOptions): s
 
 /** Build the `@font-face` CSS embedded into exported PNGs (data URLs only). */
 export function packageFontCss(
-  manifest: CardTemplateManifest,
+  manifest: ReedTemplateManifest,
   files: Map<string, CardTemplateArchiveFile>,
 ): string {
   return manifest.fonts.filter((font) => font.source === 'package').map((font) => {
@@ -626,7 +641,7 @@ export function packageFontCss(
 
 /** Load package webfaces from ArrayBuffers, never from a network request. */
 export async function loadPackageFonts(
-  manifest: CardTemplateManifest,
+  manifest: ReedTemplateManifest,
   files: Map<string, CardTemplateArchiveFile>,
 ): Promise<FontFace[]> {
   if (typeof FontFace === 'undefined' || !document.fonts) return []

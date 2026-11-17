@@ -14,6 +14,7 @@
 //    module testable under vitest's `node` environment.
 
 import type { AppSettings, DocRecord } from './store'
+import { documentHash } from './content-hash'
 import { isUploadSize } from './image-compress'
 import { t } from './i18n'
 import { readDocMeta } from './parse'
@@ -336,20 +337,91 @@ export function parseBundle(text: string): BundleParseResult {
 }
 
 /**
+ * The local half of a bundle import: which incoming articles are actually new.
+ *
+ * `addedDocs` is not a convenience — it is the only set allowed onto the wire
+ * after a login merge. An id this browser already holds keeps its own body and
+ * must never be re-uploaded: the backup is a restore, not an overwrite.
+ */
+export interface BundleMergeResult {
+  docs: DocRecord[]
+  added: number
+  skipped: number
+  /** The incoming records that entered the library, in bundle order. */
+  addedDocs: DocRecord[]
+}
+
+/**
  * Merge a validated bundle into the on-device library. Existing ids win, so a
  * replay or a backup restored over newer local work never overwrites a body.
  */
 export function mergeBundleDocs(
   existing: DocRecord[],
   incoming: DocRecord[],
-): { docs: DocRecord[]; added: number; skipped: number } {
+): BundleMergeResult {
   const known = new Set(existing.map((d) => d.id))
   const fresh = incoming.filter((d) => !known.has(d.id))
   return {
     docs: [...fresh, ...existing],
     added: fresh.length,
     skipped: incoming.length - fresh.length,
+    addedDocs: fresh,
   }
+}
+
+/**
+ * The authenticated import moves a backup in bounded requests: a 205-article
+ * import is three calls of 100, 100 and 5, not one request the server has to
+ * bound on its own. The same constant drives the login merge, so a backup and a
+ * first sign-in talk to the server in the same shape.
+ */
+export function bundleImportBatches<T>(items: readonly T[]): T[][] {
+  const batches: T[][] = []
+  for (let i = 0; i < items.length; i += BUNDLE_IMPORT_BATCH_SIZE) {
+    batches.push(items.slice(i, i + BUNDLE_IMPORT_BATCH_SIZE))
+  }
+  return batches
+}
+
+export type BundleCloudHashStatus =
+  /** The account now stores exactly this name+body. */
+  | 'stored'
+  /** The id belonged to a different document; the insert was skipped. */
+  | 'conflict'
+  /** The reply carried no hash for this id, so nothing can be claimed. */
+  | 'unknown'
+
+export interface BundleCloudHashCheck {
+  status: BundleCloudHashStatus
+  /** The server's token for the row that owns this id, when it sent one. */
+  hash: string | null
+}
+
+/**
+ * Decide, per id, whether the insert-only import actually took this document.
+ *
+ * The import route skips ids that already exist and answers with the stored
+ * hash instead. Comparing that hash with this browser's own name+body hash is
+ * the only honest way to tell "the cloud now has my article" from "the id was
+ * already a different article". Anything but the former must not adopt the
+ * server hash as a compare-and-swap base: a later autosave would then overwrite
+ * the other version without anyone choosing to.
+ */
+export async function classifyBundleImportHashes(
+  docs: readonly Pick<DocRecord, 'id' | 'name' | 'content'>[],
+  hashes: Readonly<Record<string, string>>,
+): Promise<Map<string, BundleCloudHashCheck>> {
+  const out = new Map<string, BundleCloudHashCheck>()
+  for (const doc of docs) {
+    const stored = hashes[doc.id] ?? null
+    if (!stored) {
+      out.set(doc.id, { status: 'unknown', hash: null })
+      continue
+    }
+    const expected = await documentHash(doc.name, doc.content)
+    out.set(doc.id, { status: stored === expected ? 'stored' : 'conflict', hash: stored })
+  }
+  return out
 }
 
 /**

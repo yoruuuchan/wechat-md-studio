@@ -10,8 +10,9 @@ import {
   openCardTemplateArchive, readArchiveEntry, sanitizeTemplateCss, sanitizeTemplateHtml,
 } from './card-template-security'
 import {
-  activateCardTemplate, deactivateCardTemplate, fragmentHtml,
+  activateCardTemplate, cardEndIsExtraPage, deactivateCardTemplate, fragmentHtml,
   parseCardTemplateSource, renderTemplatePage, type CardTemplateSourceRecord,
+  type LoadedCardTemplate,
 } from './card-template'
 import { currentLang, setLanguage } from './i18n'
 
@@ -114,6 +115,31 @@ describe('card template manifest', () => {
     expect(() => parseCardTemplateManifest(manifest({
       fonts: [fonts[0], { ...fonts[0], file: 'fonts/family-700.woff2' }],
     }), files)).toThrow(CardTemplateError)
+  })
+
+  it('reads customize slots and defaults to none', () => {
+    const files = new Set(['manifest.json', 'pages/cover.html', 'pages/body.html', 'styles/template.css'])
+    expect(parseCardTemplateManifest(manifest(), files).customize).toEqual({ colors: [], fonts: [] })
+    const parsed = parseCardTemplateManifest(manifest({
+      customize: {
+        colors: [{ var: '--accent', name: '主色' }, { var: '--paper', name: '底色' }],
+        fonts: [{ var: '--display', name: '标题' }],
+      },
+    }), files)
+    expect(parsed.customize.colors.map((slot) => slot.var)).toEqual(['--accent', '--paper'])
+    expect(parsed.customize.fonts).toEqual([{ var: '--display', name: '标题' }])
+    for (const customize of [
+      { colors: [{ var: 'accent', name: '主色' }] },
+      { colors: [{ var: '--Accent', name: '主色' }] },
+      { colors: [{ var: '--xhs-accent', name: '主色' }] },
+      { fonts: [{ var: '--long-title', name: '标题' }] },
+      { colors: [{ var: '--a', name: 'A' }], fonts: [{ var: '--a', name: 'B' }] },
+      { colors: [{ var: '--a', name: 'A', default: '#fff' }] },
+      { colors: Array.from({ length: CARD_TEMPLATE_LIMITS.customColors + 1 }, (_, i) => ({ var: `--c${i}`, name: 'C' })) },
+      { sizes: [] },
+    ]) {
+      expect(() => parseCardTemplateManifest(manifest({ customize }), files), JSON.stringify(customize)).toThrow(CardTemplateError)
+    }
   })
 
   it('rejects bad ids, ratios, variants, metrics, fonts and unknown fields', () => {
@@ -228,6 +254,16 @@ describe('HTML whitelist', () => {
     })
   }
 
+  it('keeps package images and inline image data on <img>', () => {
+    const files = new Map([['pages/logo.png', { path: 'pages/logo.png', bytes: new Uint8Array([1, 2, 3]) }]])
+    const withAsset = { files, resolve: (path: string) => path === 'pages/logo.png' ? 'data:image/png;base64,AQID' : null }
+    const packaged = sanitizeTemplateHtml('<img src="logo.png" alt="logo">', 'pages/cover.html', withAsset)
+    expect(packaged).toContain('src="data:image/png;base64,AQID"')
+    expect(packaged).toContain('alt="logo"')
+    const inline = sanitizeTemplateHtml('<img src="data:image/png;base64,AQID" alt="dot">', 'pages/cover.html', context)
+    expect(inline).toContain('src="data:image/png;base64,AQID"')
+  })
+
   it('keeps declarative slots and basic SVG shapes', () => {
     const html = '<div class="xhs-cover"><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"></circle></svg><h1 data-slot="title" data-fit-cover-title></h1></div>'
     const clean = sanitizeTemplateHtml(html, 'pages/cover.html', context)
@@ -322,7 +358,7 @@ describe('parsed template runtime', () => {
   it('parses, activates and fills slots without concatenating HTML', async () => {
     const record = await parseCardTemplateSource(await validZip(), 'test-id')
     expect(record.template).toBe('custom.test-id')
-    const loaded = await activateCardTemplate(record)
+    const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     expect(document.head.querySelector('style[data-card-template-style]')).not.toBeNull()
 
     const coverPage = renderTemplatePage(loaded, {
@@ -357,7 +393,7 @@ describe('parsed template runtime', () => {
         'styles/template.css': 'p { margin: 0; }',
       })
       const record = await parseCardTemplateSource(zip, 'page-count-id')
-      const loaded = await activateCardTemplate(record)
+      const loaded = await activateCardTemplate(record) as LoadedCardTemplate
       const html = fragmentHtml(renderTemplatePage(loaded, {
         kind: 'body', pageIndex: 0, total: 6, title: '', subtitle: '',
         author: 'Yoru', articleTitle: '标题', contentHtml: '<p>正文</p>', height: 720, lang: 'zh',
@@ -379,7 +415,7 @@ describe('parsed template runtime', () => {
       'styles/template.css': 'p { margin: 0; }',
     })
     const record = await parseCardTemplateSource(zip, 'variant-id')
-    const loaded = await activateCardTemplate(record)
+    const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     const ctx = {
       kind: 'cover' as const, pageIndex: 0, total: 2, title: 'T', subtitle: '',
       author: 'A', articleTitle: 'A', height: 720, lang: 'zh' as const,
@@ -397,7 +433,7 @@ describe('parsed template runtime', () => {
         ...base.parsed,
         pages: {
           ...base.parsed.pages,
-          cover: { ...base.parsed.pages.cover, html: '<script>alert(1)</script>' },
+          cover: { ...base.parsed.pages.cover!, html: '<script>alert(1)</script>' },
         },
       },
     }
@@ -417,12 +453,32 @@ describe('parsed template runtime', () => {
     }
     walk(source)
     const record = await parseCardTemplateSource(await zip.generateAsync({ type: 'arraybuffer' }), 'example')
+    if (record.parsed.manifest.kind !== 'card') throw new Error('expected a card template')
     expect(record.parsed.manifest.pages.end).toBe('pages/end.html')
     expect(record.parsed.styles[0].css).toContain('.example-end')
-    const loaded = await activateCardTemplate(record)
+    const loaded = await activateCardTemplate(record) as LoadedCardTemplate
     expect(loaded.summary.name).toContain('示例')
     expect(loaded.packageFontCss).toContain('@font-face')
     expect(loaded.packageFontCss).toContain('data:font/woff2;base64,')
     deactivateCardTemplate(record.template)
+  })
+})
+describe('closing page', () => {
+  const loaded = (end: string | undefined) => ({
+    manifest: { pages: { cover: 'c.html', body: 'b.html', ...(end === undefined ? {} : { end: 'e.html' }) } },
+    pages: { cover: '', body: '<div data-slot="content"></div>', end: end ?? '<div data-slot="content"></div>' },
+  }) as unknown as LoadedCardTemplate
+
+  it('adds a page of its own when the end page has no content slot', () => {
+    expect(cardEndIsExtraPage(loaded('<p data-slot="article-title"></p><span data-slot="author"></span>'))).toBe(true)
+  })
+
+  it('keeps framing the last page when the end page places the content', () => {
+    expect(cardEndIsExtraPage(loaded('<div class="x" data-slot="content"></div><p data-slot="author"></p>'))).toBe(false)
+    expect(cardEndIsExtraPage(loaded('<div data-slot=content></div>'))).toBe(false)
+  })
+
+  it('has no closing page when the template declares none', () => {
+    expect(cardEndIsExtraPage(loaded(undefined))).toBe(false)
   })
 })

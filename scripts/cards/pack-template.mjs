@@ -58,7 +58,7 @@ for (const absolute of walk(source)) {
   zip.file(relativePath, bytes)
 }
 
-for (const required of [manifest.pages?.cover, manifest.pages?.body, ...(manifest.styles ?? [])]) {
+for (const required of [...Object.values(manifest.pages ?? {}).filter(Boolean), ...(manifest.styles ?? [])]) {
   if (typeof required !== 'string' || !zip.file(required)) throw new Error('manifest references a missing file: ' + required)
 }
 for (const font of manifest.fonts ?? []) {

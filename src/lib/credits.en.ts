@@ -36,6 +36,11 @@ export const CREDITS_EN: Record<string, CreditTextEn> = {
       'Runtime dependency dompurify 3.4.17, used as the HTML whitelist filter for uploaded card templates. Scripts, event attributes, iframe / form / foreignObject and external URLs are rejected before any template markup reaches the DOM.',
     ],
   },
+  'https://github.com/harfbuzz/harfbuzzjs': {
+    borrowed: [
+      'Runtime dependency harfbuzzjs, pinned to 1.6.4. Only its harfbuzz-subset.wasm is used, loaded on demand when exporting cards or long images, to cut a reader\'s own .ttf / .otf font down to the characters in the picture before embedding it in the PNG. The font file never leaves the browser.',
+    ],
+  },
   'https://github.com/geekfoxcharlie/XHS-TextCard': {
     licenseNote: 'The upstream NOTICE is retained alongside the MIT license (LICENSES/geekfoxcharlie-XHS-TextCard-NOTICE.txt); modified redistributions keep the license and reasonable attribution.',
     borrowed: [

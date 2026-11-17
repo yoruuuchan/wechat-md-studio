@@ -3,7 +3,7 @@
 [项目首页](../README.md) · [Agent 入口](../AGENTS.md) · [部署与线上验收](../HANDOFF.md)
 
 命令以 [package.json](../package.json) 与脚本自身参数为准；在含 `package.json` 的应用根目录运行。
-本地伞仓库的各 worktree 都先进入其 `app/`，使用 Node.js 24 与 `npm ci`。
+本地各 worktree 直接使用含 `package.json` 的仓库根目录，使用 Node.js 24 与 `npm ci`。
 
 ## 项目级检查
 
@@ -11,12 +11,15 @@
 npm run check
 npm test
 npm run verify:themes
-npm run build
+npm run build # 开发构建，可以省略 /motion/
+npm run build:release # 正式发布构建，必须有搭建台页面
+npm run verify:motion # 动效打包正反两路
 ```
 
 - `check`：TypeScript 项目检查；`test`：Vitest，覆盖 parser、存储、导入导出、API 等相邻测试。
 - `verify:themes`：全主题渲染、微信正文规则、metadata / 许可文件、图片短引用、比例、图片操作、SQLite 驱动契约；成功输出 `ALL CHECKS PASSED`。
-- `build`：Vite 前端 `dist/public/` + esbuild 服务端 `dist/boot.js`。`vite preview` 只预览前端，不能替代带 API 的服务验收。
+- `build`：Vite 前端 `dist/public/` + esbuild 服务端 `dist/boot.js`；开发 / 普通 CI 构建，可以没有 `/motion/`（顶栏动效退回占位）。`build:release` 是正式发布入口，要求搭建台页面存在，构建后核对 `dist/public/motion/index.html`。`verify:motion` 用临时 fixture 检查两条打包路径。`vite preview` 只预览前端，不能替代带 API 的服务验收。
+- DOCX 用例用动态 `import('mammoth')`：2026-11-14 在刚装完依赖的干净 worktree 连续 3 次冷跑，首个 DOCX 用例 164 / 192 / 171ms、`import('mammoth')` 冷启动 115–122ms，历史记录过的 5s 超时未复现，因此没有放宽局部或全局 timeout。
 
 主题验证同时输出 `verify-out/*_clean.html` 与 `*_preview.html`；可通过 `MOPAI_VERIFY_OUT` 指定目录。
 新增主题 / 来源时用 `npm run import:themes` 重生成，再复算主题统计与检查许可证文件，见
@@ -35,19 +38,28 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 改动范围 | 命令 | 覆盖 |
 |---|---|---|
 | 小红书卡片 | `node scripts/cdp-verify-xhs-cards.mjs 3201 9334` | SAMPLE_DOC / 中文长文、右栏「模板」里的三比例 × 默认模板五背景、默认模板 × 各自变体的封面 + 前两页导出与像素对比（3:4）、封面标题 / 副标题 / 第 3 页正文对比度、默认模板每个变体 × 三比例的装饰扫描（封面 / 正文 / 结尾的 1–16px 短横线与正文外短句 / 伪元素中的装饰破折号）、PNG 尺寸与 ZIP 张数、明暗 / 中英界面、图片读取失败、卡片视图下改稿时卡片与阅读位置保持、CDP 实际字体；本地 mock 图床、独立 `data/test-xhs.db`，证据在 `verify-out/xhs/`，模板小样在 `verify-out/templates/` |
+| 模板颜色与字体 | `node scripts/cdp-verify-template-custom.mjs 3295 9405` | 公用卡片模板 Editorial White：右栏列出模板开放的 5 个颜色和 2 个字体；色块初值等于模板自己的颜色；改主色 / 底色后每张卡片生效；选霞鹜文楷后按需插入它的样式表、封面标题实际渲染为霞鹜文楷而正文仍是模板字体，导出内嵌该字体且 PNG 随之变化；刷新后选择仍在；从本机添加字体（测试用 node_modules 里 KaTeX 的 TTF）后标题用上它、导出以子集内嵌（小于原文件）、刷新仍在、删除后回到模板默认；「恢复默认」；默认 Reed 模板的主色与正文字体（得意黑）且不漏到编辑器界面；没有内容 slot 的结尾页加在正文之后而不吞正文；长图预览按需加载朱雀仿宋；无 CSP / WebAssembly 报错与页面报错。自带本地文件服务与独立 `data/test-custom-cdp.db`，证据在 `verify-out/template-custom/` |
+|公用模板并行加载 /失败重试 | `node scripts/cdp-verify-public-template-retry.mjs 4113 9713` | CDP 给每个 `.reedcard`请求注入 220 ms 延迟并记录请求起点：九个包的起点跨度 ≤300 ms、列表仍按目录顺序；swiss-grid 首次失败时其余 8 套可用且错误行与重试可见；点击重试发出 9 个新请求、样式表仍为 9 条（不重复注册）、不刷新页面补全 9 套、当前选择不变；长图 kind 同样失败 → 重试成功。证据在 `verify-out/public-template-retry/`（含 timeline.json 与截图），独立 `data/audit-a10.db` |
+| 长图 | `node scripts/cdp-verify-long-image.mjs 3295 9405` | 中性测试稿（5 节、24 张占位照片、横竖混排、列表与引用、落款）：公用蓝色模板经上传加载器装载、CDP 实际字体、1080 / 1440 的 JPG / PNG 尺寸、预览 DOM 与导出 PNG 的三段像素对比、标题与小节标签的墨色、渐变接缝、强制小上限时的分张 ZIP、空稿 / 只有标题 / 没有图 / 读图失败、示例长图模板上传 → 刷新仍在 → 删除回默认、明暗与中英界面、console 报错；自带本地图床与独立 `data/test-long-cdp.db`，证据在 `verify-out/long/` |
+|并发导出的精确字号 | `node scripts/cdp-verify-export-concurrency.mjs 4113 9713` | 同一张密集中文卡片上同时发起两个导出，再顺序导出两次作对照：并发与顺序导出的像素差满足 mean <2、bad <0.025；导出期间断言补丁已安装（读同一份精确字号），重叠结束与顺序结束后的 `CSSStyleDeclaration.prototype.setProperty`都严格等于启动时的原生方法；对照 PNG、页面截图与 metrics.json在 `verify-out/export-concurrency/`，数据库 `data/audit-b03.db` |
 | 上传卡片模板 | `node scripts/cdp-verify-card-template-upload.mjs 3281 9398 [输出目录]` | 只用仓库里的示例模板：`.reedcard` 打包、空 / 有内容两态、多文件上传（含坏包逐项拒绝，报错就在「我的」组内）、上传后进入选择器与「我的」组、选中渲染、单张 PNG 与整包 ZIP、预览 DOM / PNG 像素一致、刷新后仍在、恶意包被拒绝并显示提示、管理状态下删除及刷新后不再出现、删除选中模板回退默认；站长登录后自动上云、全新浏览器 profile 登录后自动下载、登录删除两边消失、访客看不到同步；`data/test-card-template.db` 与本地 mock 图床，证据默认在 `verify-out/card-template-upload/` |
 | 公用卡片模板 | `node scripts/cdp-verify-public-cards.mjs 3281 9398 [模板id,...]` | 九套公用模板全部经上传同款解析与激活；公众号模式不请求包、进入卡片模式才加载；逐个变体检查封面 / 正文 / 结尾页溢出、每个变体 × 三比例的装饰扫描（含 `::before` / `::after` 的细短横线与装饰破折号）、3:4 封面 + 正文导出、1:1 / 9:16 封面导出、DOM / PNG 像素一致（mean < 2、bad < 0.025）、封面标题墨色与标题 / 正文对比度；记住公用模板选择并在刷新后恢复；证据在 `verify-out/public-cards/` |
 | Agent API / 编辑器深链 | `node scripts/cdp-verify-agent.mjs 3215 9351` | 推稿、登录跳转、网页精修、读回、图片链路 |
 | Python 客户端 | `node scripts/verify-agent-skill.mjs 3219` | CLI、配置、JSON / 退出码、本地图改写；无 Python 时显式 SKIP |
-| 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱 |
+| 稿件同步 | `node scripts/cdp-verify-docs-sync.mjs 3216 9352` | 登录合并、仅改名称同步与刷新、stale save、三种冲突处理、按需正文与草稿箱；登录合并后导入 205 篇整包备份实际分 100/100/5 三批且全部可读、已有 id 不重传、同 id 不同内容冲突不覆盖、第二批失败后重试只补未完成项 |
 | 稿件删除 / 撤销 / 回收站 | `node scripts/cdp-verify-draft-recovery.mjs 4101 9701` | 登录前后新稿的删除、立即撤销、撤销期结束后回收站恢复与刷新持久化、彻底删除；云端稿件的撤销 / 回收站；未同步正文与改名的删除、撤销及刷新恢复；remove / restore 故障注入 |
 | 本机正文读取失败 | `node scripts/cdp-verify-storage-read-failure.mjs 4102 9702` | 一次 / 持续 `getAll` 失败、IndexedDB 打开失败、真实缺失正文、云端 stub、主动清空、旧版迁移失败；每项都核对 IndexedDB 原件未被空串覆盖 |
+| 正文未就绪时的动作拦截 | `node scripts/cdp-verify-body-gating.mjs 4134 9734` | `docs.get` 延迟 / 失败、登出后保留 stub：编辑区显示加载、失败可重试、未登录显示原因，没有空白 CodeMirror；顶栏复制、改名、单篇 Markdown / HTML 导出被禁用并给出原因；实际断言剪贴板与下载为空、无成功提示，正文到达后编辑 / 复制 / 导出恢复；弹检查窗期间切稿不会用旧结论交出稿件；切换稿件不残留另一篇的回执；截图为三种阻断状态与加载完成 |
 | 双标签页本机保存 | `node scripts/cdp-verify-cross-tab.mjs 4104 9704` | 同稿并发冲突与副本、通知丢失、刷新恢复；不同稿件与同时新建；删除后继续编辑及撤销；已归档 / 曾恢复稿件彻底删除后的旧页编辑；事务中断回滚和可见失败 |
+| 按需字体表 | `node scripts/cdp-verify-theme-fonts.mjs 4133 9733` | 首屏样式不含模板 / 设计字体表的字体、不内联字体文件、界面字体仍是网页字体；逐个切到设计主题与手写主题，在预览里读 Chrome 实际渲染字体，确认按需加载的字体真正生效 |
+| 编辑器字体回退 | `node scripts/cdp-verify-editor-fonts.mjs 4128 9728 [输出目录] [标签]` | 1440px 下分别探测编辑器中文字、拉丁、数字、中英文标点的 Chrome 实际渲染字体（中文须为打包的 Noto Sans SC 且 isCustomFont，拉丁保持 Geist Mono、无系统回退），并留明暗两态截图；自带应用、mock 图床与 Chrome，证据 JSON 与截图写入输出目录 |
+| 慢网云端保存 | `node scripts/cdp-verify-slow-cloud-save.mjs 4131 9731` | 每次保存请求拖慢 2.5 秒、分段连续输入：不误报冲突、同一篇同时最多一个保存在路上、云端拿到全部内容；零延迟对照 |
 | 保存状态与恢复提示 | `node scripts/cdp-verify-save-status.mjs 4126 9726` | 本机提交时间、写失败与重试、切稿和迟到回执、未归档 / 同步中 / 网络失败、首次云端读取失败、冲突副本、撤销恢复、中英文、明暗主题、键盘焦点和窄屏 |
 | 游客保存指引 | `node scripts/cdp-verify-guest-save-guidance.mjs 4129 9729` | 匿名保存详情说明本机存储与换浏览器 / 清站点数据的影响、「下载 Markdown」「下载整包备份」两个真实下载动作、站长登录命名、/login 与 /drafts 的"不开放注册"口径、中英文、明暗主题、390px 不横向溢出、退出与已登录深链、AI 提示词复制与匿名单篇 MCP |
 | 响应式编辑器布局 | `node scripts/cdp-verify-mobile-panes.mjs 4128 9728` | 1536/1280px 三栏、1100/960/768/700px 编辑 + 预览两栏、320/390/430px 单面板；每档无横向滚动与被裁切 / 重叠的顶栏控件（手机是顶栏里的模式胶囊，不再有单独模式行）；768px 抽屉可开可关（按钮 / Esc / 点外部）、内容与宽屏右栏一致（含模式专属的「主题 / 模板」标签）、关闭再开保留标签页、封面大标题可见；切面板后正文 / 光标 / 滚动 / 上传不丢；复制 / 导入 / 裁切上传真实完成；弹窗、中英文、明暗主题（从「设置」标签切换）、触控与键盘、软键盘视口收缩；按档位截图并生成 index.html |
-| 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；中英文文案 |
-| 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图 |
+| 手机素材 / 发布检查跳转 | `node scripts/cdp-verify-mobile-jump.mjs 4128 9728 [输出目录] [标签]` | 390px / 320px 点素材行后可见面板切回编辑、光标落在图片源行，发布前检查的跳转同样回到编辑面板与对应行；1536px宽屏跳转与三栏布局不变；每档留修复前后截图与证据 JSON，自带应用、mock 图床与 Chrome |
+| 素材接口失败 / 引用未知 | `node scripts/cdp-verify-materials-states.mjs 4120 9720` | 用量、孤儿判定、图片列表分别失败与同时离线；重试恢复、后台刷新失败保留过期数据、本机草稿引用读取失败、真实空素材、单图删除失败保留账目；双标签竞态（另一标签页新建本机未归档引用后，点击清理会重新扫描、把最新引用作为 `alsoKeep` 发送，受保护图仍返回 skipped 且图床没收到 DELETE、账本保留，另一张正常删除）；点击时本机读取失败停止批量清理、不发 DELETE、给出错误与重试，恢复后重试真正完成清理；中英文文案 |
+| 全主题根容器 | `node --import tsx scripts/cdp-verify-root-gutter.mjs [CDP端口]` | 227 套主题根节点嵌套 1/2/3 层后的真实内容宽度、375px 横向溢出；代表主题截图。与 [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs) 分工：这里全量合成页面，主题库脚本测量真实页面抽样并钉 golden=657 与代表值 |
 | AI 写作 / 单篇 MCP | `node scripts/cdp-verify-remote-mcp.mjs 3227 9355` | 三个真实复制动作、匿名授权、SDK 工具与浏览器往返、冲突、隔离、撤销 / 到期、本地重开；更新 README 两态截图 |
 | AI 画图表入口 | `node scripts/cdp-verify-ai-diagram.mjs 3228 9356 [输出目录]` | 两个 AI 入口同排、「AI 图表」弹窗的中英文文案与提示词、可见文案保持简短、弹窗只有一个主 well、三张示例图从本地 `public/diagram-examples/` 真实解码且各自链到上游画廊对应锚点（带 alt 与 `rel="noreferrer"`）、两次真实复制（提示词 / Skill 地址）、三个外链（SKILL.md、仓库、英文原版）都带 `rel="noreferrer"`、弹窗不请求 Skill / 模型 / 图床、提示词框未塌陷、界面与示例图注字体实际生效、明暗主题对比度、390px 无横向溢出且弹窗在视口内、打开图表弹窗不改正文、与「AI 帮我写」互不串弹窗且同为一 well 结构；截图为明暗 / 中文 / 英文 / 390px 四张，JSON 与日志写入 `verify-out/ai-diagram/` |
 | Mermaid | `node scripts/cdp-verify-diagram.mjs 3203 9347` | fence → PNG → 上传 → 图片 |
@@ -56,16 +68,21 @@ Worker 端口通常为应用端口 + 10，运行前也要确认可用；脚本�
 | 单图上传大小 | `node scripts/cdp-verify-upload-size.mjs 3233 9357` | 松散图弹窗的自动 / 1–5 MB / 原图选项、自动＝2048px、2 MB＝2560px、原图字节一致（sha256）、选择跨上传记忆、超限原图在弹窗里被拦下并提示换档、轮播弹窗不出现该选项 |
 | 侧栏单图回填 | `node scripts/cdp-verify-single-slot-upload.mjs 4106 9706 4206` | 侧栏单图占位 / 替换精确回填、同 alt 多占位、自动与手动裁切、多选只传第一张并提示、切稿与上传中文字保留、编辑器工具栏 / 拖入 / 粘贴仍按发起位置新增 |
 | 公式就绪 / 复制与 HTML 导出 | `node scripts/cdp-verify-math-readiness.mjs 4113 9713 4213` | MathJax 慢加载、断网、坏公式、改公式、切稿、Mermaid 并存时，复制与干净正文 / 预览页导出先开「发布前检查」；未完成公式与图表不能默认通过，确认后才复制真实 SVG |
+| 卡片 /长图公式与图表就绪 | `node scripts/cdp-verify-graphics-gate.mjs 4113 9713 4213` | 卡片与长图在慢 MathJax、坏公式、延迟 Mermaid、Mermaid 失败时按钮禁用、无下载、可见原因与重试；就绪后恢复导出并真的产生下载；证据截图在 `verify-out/graphics-gate/`，独立 `data/audit-a06.db` 与本地图床 |
 | 发布前检查 | `node scripts/cdp-verify-publish-preflight.mjs 4127 9727` | 纯文字稿一键通过；空图片位 / 本机内网地址 / 外链地址 / 坏公式 / 未完成图表各自可定位与可定位跳转；提醒需显式勾选、阻断项只能显式绕过；复制用点击那一刻的最新稿件；Markdown 与整包备份不受阻断；慢网、图床报错、切稿、键盘操作与中英文 |
 
 以上入口分别为 [agent](../scripts/cdp-verify-agent.mjs)、[skill](../scripts/verify-agent-skill.mjs)、
 [sync](../scripts/cdp-verify-docs-sync.mjs)、[draft-recovery](../scripts/cdp-verify-draft-recovery.mjs)、
 [storage-read-failure](../scripts/cdp-verify-storage-read-failure.mjs)、
-[save-status](../scripts/cdp-verify-save-status.mjs)、
+[body-gating](../scripts/cdp-verify-body-gating.mjs)、
+[save-status](../scripts/cdp-verify-save-status.mjs)、[slow-cloud-save](../scripts/cdp-verify-slow-cloud-save.mjs)、[theme-fonts](../scripts/cdp-verify-theme-fonts.mjs)、
 [guest-save-guidance](../scripts/cdp-verify-guest-save-guidance.mjs)、
 [mobile-panes](../scripts/cdp-verify-mobile-panes.mjs)、
 [public-cards](../scripts/cdp-verify-public-cards.mjs)、
 [math-readiness](../scripts/cdp-verify-math-readiness.mjs)、
+[graphics-gate](../scripts/cdp-verify-graphics-gate.mjs)、
+[public-template-retry](../scripts/cdp-verify-public-template-retry.mjs)、
+[export-concurrency](../scripts/cdp-verify-export-concurrency.mjs)、
 [publish-preflight](../scripts/cdp-verify-publish-preflight.mjs)、
 [materials-states](../scripts/cdp-verify-materials-states.mjs)、
 [diagram](../scripts/cdp-verify-diagram.mjs)、
@@ -116,8 +133,9 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 
 | 改动范围 | 现有入口与参数 |
 |---|---|
-| 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334` |
+| 主题库筛选 / 来源 / 预览 | [cdp-verify-theme-library.mjs](../scripts/cdp-verify-theme-library.mjs)：`node scripts/cdp-verify-theme-library.mjs <url> <key> 9334`；筛选 / 搜索 / 来源面板 / 懒加载 / 应用主题 / 快速切换器 / 390px，以及根容器契约（240–677px、无横向根 padding、box-sizing，钉 golden=657px 与 olive / xiaohu 代表值） |
 | 主题库当前稿试排 / 对比 | [cdp-verify-theme-trial.mjs](../scripts/cdp-verify-theme-trial.mjs)：`node scripts/cdp-verify-theme-trial.mjs <url> [CDP端口] [证据目录]`；种一篇带标题 / 表格 / 单图 / 轮播 / 公式的本机稿，核对试排 HTML 与编辑器预览逐字节一致、1–3 套候选不写正文 / 主题、应用后返回保留筛选与滚动、已加载正文不提示缺失、缺失正文回退样稿，并在英文、390px 和明暗模式下复验标题 / 署名对比度、字体、标题与控件不重叠及正文白底 |
+| 主题快切加载与性能对照 | [cdp-measure-theme-quick-picker.mjs](../scripts/cdp-measure-theme-quick-picker.mjs)：`node scripts/cdp-measure-theme-quick-picker.mjs 4128 9728 verify-out/theme-quick-picker before` / `... after --assert`；自起应用、mock 图床与 Chrome，量测 1600×1000 与 390px 下快切器实际请求的主题包、首屏缩略图数量、10 字输入的 DOM mutation、主预览延迟、滚动加载与切主题；同环境跑 before / after 两份 JSON 与截图，`--assert` 时按 A08 阈值判失败；依赖先 `npm run build` |
 | 首次加载体积与分块 | [cdp-measure-initial-load.mjs](../scripts/cdp-measure-initial-load.mjs)：`node scripts/cdp-measure-initial-load.mjs <url> [CDP端口] [输出文件]`；同环境记录入口资源、transfer / decoded 字节、FCP / DCL / load、长任务与编辑器可交互耗时，以及模板库首卡片 / 首预览 / 全部卡片时间 |
 | 分块失败与重试 | [cdp-verify-u05-load-failure.mjs](../scripts/cdp-verify-u05-load-failure.mjs)：`node scripts/cdp-verify-u05-load-failure.mjs <url> [CDP端口]`；路由分块被阻断时的可见错误页与重试、当前主题 pack 被阻断时正文不丢且可重试、离线 SPA 导航的错误页与恢复 |
 | 字体实际呈现 | [cdp-verify-u05-fonts.mjs](../scripts/cdp-verify-u05-fonts.mjs)：`node scripts/cdp-verify-u05-fonts.mjs <url> [CDP端口]`；Geist / Noto Sans SC 真实可用、导入主题的 Noto Serif SC 在标题实际生效、已移除的 Zen Kaku 不再有 @font-face |
@@ -142,11 +160,10 @@ node scripts/cdp-verify-remote-mcp.mjs 3227 9355
 | 四处界面小毛病（手机模式胶囊 / 外观与语言 / 存草稿 / 我的模板） | [cdp-verify-ui-nits.mjs](../scripts/cdp-verify-ui-nits.mjs)：`node scripts/cdp-verify-ui-nits.mjs <url> [CDP端口] [输出目录]`；默认同上，连接已启动的应用；迭代截图写入 `verify-out/nits/after/` 并与 `before/` 生成 `verify-out/nits/index.html`；用 `.env` 的 `ACCESS_KEY` 登录，不上传真实图床 |
 
 这几个自起无头 Chrome 的脚本只连接已启动的应用，Chrome 路径同样按 Windows 写定。
-`cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；
-折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
+`cdp-verify-selection-copy.mjs` 覆盖预览内的真实选区与 Ctrl/⌘+C：`text/html` / `text/plain` 双通道、祖先内联样式随片段保留、选区首尾不被扩大、跨块选择、正文外选区回退浏览器原生复制，以及整篇复制不回归；复制按钮的成功反馈改查 `data-copied` 与可见 `innerText`（1500ms 内出现、随后复位），不再依赖固定 sleep；折叠选区与端点越界的回退另见 [selection-copy.test.ts](../src/lib/selection-copy.test.ts)。
 `cdp-verify-dark-theme.mjs` 覆盖 `akari` / `yoru` 两态：`<html>` 上 `data-theme` 与 `.dark` 的同步、shadcn / Tailwind `dark:` 变体生效（侧栏四格 Tabs——主题或模板、图片、稿件信息、设置——在深色下可读，对比度 ≥ 3:1）；「设置」里的「外观与语言」两行及其语言 / 明暗控件在两套主题下都可见、标签对比度 ≥ 3:1，并留两主题截图。
-`cdp-verify-ui-modes.mjs` 覆盖 1536 / 1280 / 960 / 768 / 640 / 390 / 360 七档：顶栏无横向溢出、可见控件不被裁切或重叠，≥960px 稿件名至少容纳八个汉字；手机档的模式入口收成顶栏里的胶囊下拉（列出四种模式、长图与动效仍不可选），不再有单独模式行，390 / 360 正文起点比改前高至少 40px；中英文与公众号 / 卡片两种模式下各档顶栏都不溢出；「更多」列出并真实打开草稿箱 / 素材库 / 导入 / 导出 / 外观与语言 / GitHub / 致谢 / 登录，1280 / 768 / 390 三档都能从「更多 → 外观与语言」打开右栏「设置」并切换语言和明暗；登录后保存状态旁的一键「存草稿」在 1536 / 1280 / 960 / 768 / 640 / 390 / 360 都显示完整中文且不裁切；卡片模板 / 比例 / 配色与公众号主题都实时换预览；公众号模式复制到剪贴板、卡片模式生成全套 ZIP。截图与 `ui-modes.json` 写入输出目录，并生成按宽度分组的 `index.html`。
-`cdp-verify-ui-nits.mjs` 覆盖四处小毛病：手机模式胶囊（四种模式、长图 / 动效不可选、390 / 360 高度下降 ≥ 40px）；「更多 → 外观与语言」在 1280 / 768 / 390 打开「设置」且语言与明暗都生效；中文快捷保存按钮在七个宽度下始终是「存草稿」；「我的」模板组内上传两个示例包、管理状态删除一个且选中回退默认、管理状态点模板不切换、空组仍有提示与上传按钮、坏文件的报错留在组内、全右栏只在这一处列出「我的」模板。另核对稿件名输入框的 `text-overflow` 为 `ellipsis`，390 / 360 宽放不下时仍带省略号且顶栏不横向溢出。同时生成改前 / 改后并排的 `verify-out/nits/index.html`。
+`cdp-verify-ui-modes.mjs` 覆盖 1536 / 1280 / 960 / 768 / 640 / 390 / 360 七档：顶栏无横向溢出、可见控件不被裁切或重叠，≥960px 稿件名至少容纳八个汉字；手机档的模式入口收成顶栏里的胶囊下拉（列出四种模式；长图可选，动效是原地切换的模式，搭建台嵌在同源 iframe 里，构建里没有搭建台时才是占位，见 [motion.md](motion.md)），不再有单独模式行，390 / 360 正文起点比改前高至少 40px；中英文与公众号 / 卡片两种模式下各档顶栏都不溢出；「更多」列出并真实打开草稿箱 / 素材库 / 导入 / 导出 / 外观与语言 / GitHub / 致谢 / 登录，1280 / 768 / 390 三档都能从「更多 → 外观与语言」打开右栏「设置」并切换语言和明暗；登录后保存状态旁的一键「存草稿」在 1536 / 1280 / 960 / 768 / 640 / 390 / 360 都显示完整中文且不裁切；卡片模板 / 比例 / 配色与公众号主题都实时换预览；公众号模式复制到剪贴板、卡片模式生成全套 ZIP。截图与 `ui-modes.json` 写入输出目录，并生成按宽度分组的 `index.html`。
+`cdp-verify-ui-nits.mjs` 覆盖四处小毛病：手机模式胶囊（四种模式、长图不可选、动效可选或在没有搭建台的构建里是占位、390 / 360 高度下降 ≥ 40px）；「更多 → 外观与语言」在 1280 / 768 / 390 打开「设置」且语言与明暗都生效；中文快捷保存按钮在七个宽度下始终是「存草稿」；「我的」模板组内上传两个示例包、管理状态删除一个且选中回退默认、管理状态点模板不切换、空组仍有提示与上传按钮、坏文件的报错留在组内、全右栏只在这一处列出「我的」模板。另核对稿件名输入框的 `text-overflow` 为 `ellipsis`，390 / 360 宽放不下时仍带省略号且顶栏不横向溢出。同时生成改前 / 改后并排的 `verify-out/nits/index.html`。
 `cdp-verify-onboarding.mjs` 覆盖首次使用引导：新 profile 自动出现并逐步命中五个锚点、进度与完成 / 跳过 / 关闭三条退出路径都写入本机状态、刷新与窄屏不再自动出现、设置内「重新查看使用引导」可重开、中英文文案、明暗两主题对比度 ≥ 3:1，以及引导关掉后编辑器输入仍实时进入预览；截图留在临时目录。
 
 ## 微信后台实测

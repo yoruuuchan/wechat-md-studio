@@ -1,4 +1,5 @@
 // Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt.
+import { ensureFontSheets } from './font-catalog'
 
 export const CARD_WIDTH = 540
 export const CARD_RATIOS = { '3:4': 720, '1:1': 540, '9:16': 960 } as const
@@ -59,6 +60,14 @@ export function cardAccent(template: CardTemplateId, background: CardBackground,
   return fallback
 }
 
+/** Measurements a long template declares for the shared photo-row engine. */
+export interface LongImageMetrics {
+  padX: number
+  contentWidth: number
+  photoGap: number
+  photoInset: number
+}
+
 export interface CardMeasurements {
   padX: number
   /** Top of the article body, i.e. space reserved for the masthead. */
@@ -109,6 +118,14 @@ export const CARD_TEMPLATE_FONTS: Record<CardTemplate, readonly CardFontFace[]> 
   ],
 }
 
+/** Colour and font slots a reader may change (manifest `customize`). */
+export interface TemplateCustomizeRuntime {
+  colors: readonly { var: string; name: string }[]
+  fonts: readonly { var: string; name: string }[]
+}
+
+const NO_CUSTOMIZE: TemplateCustomizeRuntime = { colors: [], fonts: [] }
+
 export interface CardTemplateVariantRuntime {
   id: string
   name: string
@@ -129,9 +146,22 @@ export interface CardTemplateRuntime {
   ratios: readonly CardRatio[]
   metrics: CardMeasurements
   fonts: readonly CardFontFace[]
+  customize?: TemplateCustomizeRuntime
+}
+
+/** An uploaded long template, flattened for the shared long-image engine. */
+export interface LongTemplateRuntime {
+  kind: 'long'
+  template: CardTemplateId
+  name: string
+  variants: readonly CardTemplateVariantRuntime[]
+  metrics: LongImageMetrics
+  fonts: readonly CardFontFace[]
+  customize?: TemplateCustomizeRuntime
 }
 
 const CUSTOM_TEMPLATE_RUNTIMES = new Map<CardTemplateId, CardTemplateRuntime>()
+const LONG_TEMPLATE_RUNTIMES = new Map<CardTemplateId, LongTemplateRuntime>()
 
 export function isBuiltinCardTemplate(template: CardTemplateId): template is CardTemplate {
   return (CARD_TEMPLATES as readonly string[]).includes(template)
@@ -147,6 +177,48 @@ export function unregisterCardTemplateRuntime(template: CardTemplateId): void {
 
 export function customCardTemplateRuntime(template: CardTemplateId): CardTemplateRuntime | undefined {
   return CUSTOM_TEMPLATE_RUNTIMES.get(template)
+}
+
+export function registerLongTemplateRuntime(runtime: LongTemplateRuntime): void {
+  LONG_TEMPLATE_RUNTIMES.set(runtime.template, runtime)
+}
+
+export function unregisterLongTemplateRuntime(template: CardTemplateId): void {
+  LONG_TEMPLATE_RUNTIMES.delete(template)
+}
+
+export function longTemplateRuntime(template: CardTemplateId): LongTemplateRuntime | undefined {
+  return LONG_TEMPLATE_RUNTIMES.get(template)
+}
+
+/** Long templates have the same variant rules as cards, without ratios. */
+export function longTemplateVariants(template: CardTemplateId): readonly CardBackground[] {
+  return longTemplateRuntime(template)?.variants.map((variant) => variant.id) ?? []
+}
+
+export function longTemplateFonts(template: CardTemplateId): readonly CardFontFace[] {
+  return longTemplateRuntime(template)?.fonts ?? []
+}
+
+/**
+ * Reed's built-in card reads these from src/components/cards.css. Its slot
+ * names are i18n keys (the settings panel translates them); package slots
+ * carry the template author's own words.
+ */
+const BUILTIN_CUSTOMIZE: Record<CardTemplate, TemplateCustomizeRuntime> = {
+  reed: {
+    colors: [{ var: '--xhs-accent', name: 'customize.slot.accent' }],
+    fonts: [{ var: '--font-ui', name: 'customize.slot.font' }],
+  },
+}
+
+export function cardTemplateCustomize(template: CardTemplateId): TemplateCustomizeRuntime {
+  return customCardTemplateRuntime(template)?.customize ??
+    BUILTIN_CUSTOMIZE[template as CardTemplate] ?? NO_CUSTOMIZE
+}
+
+export function longTemplateCustomize(template: CardTemplateId): TemplateCustomizeRuntime {
+  return longTemplateRuntime(template)?.customize ?? NO_CUSTOMIZE
 }
 
 /** The face list shared by pagination preload and PNG embedding. */
@@ -166,6 +238,8 @@ export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = new Ma
   ['Geist', { family: 'Geist', weights: [400, 700] }],
   ['Geist Mono', { family: 'Geist Mono', weights: [400, 700] }],
   ['Noto Sans SC', { family: 'Noto Sans SC', weights: [400, 700] }],
+  // A separate family, so existing 800/900 text in Noto Sans SC keeps its 700 face.
+  ['Noto Sans SC Black', { family: 'Noto Sans SC Black', weights: [900] }],
   ['Noto Serif SC', { family: 'Noto Serif SC', weights: [400, 700] }],
   ['Zhuque Fangsong', { family: 'Zhuque Fangsong', weights: [400] }],
   ['Inter', { family: 'Inter', weights: [400, 600] }],
@@ -184,6 +258,22 @@ export const BUILTIN_CARD_FONT_FACES: ReadonlyMap<string, CardFontFace> = new Ma
   ['Tinos', { family: 'Tinos', weights: [400, 700], styles: ['normal', 'italic'] }],
   ['Instrument Sans', { family: 'Instrument Sans', weights: [400, 500, 700] }],
   ['B612 Mono', { family: 'B612 Mono', weights: [400, 700] }],
+  // Reader-selectable Chinese faces (font-catalog.ts); single weight each.
+  ['LXGW WenKai', { family: 'LXGW WenKai', weights: [400] }],
+  ['Smiley Sans', { family: 'Smiley Sans', weights: [400] }],
+  ['ZCOOL XiaoWei', { family: 'ZCOOL XiaoWei', weights: [400] }],
+  ['ZCOOL QingKe HuangYou', { family: 'ZCOOL QingKe HuangYou', weights: [400] }],
+  ['ZCOOL KuaiLe', { family: 'ZCOOL KuaiLe', weights: [400] }],
+  ['Ma Shan Zheng', { family: 'Ma Shan Zheng', weights: [400] }],
+  // Display faces for headlines (font-catalog.ts); the serif pair and Glow Sans
+  // ship only the heavy weights headlines use.
+  ['Unbounded Sans', { family: 'Unbounded Sans', weights: [400] }],
+  ['Tiejili SC', { family: 'Tiejili SC', weights: [400] }],
+  ['GenRyuMin2', { family: 'GenRyuMin2', weights: [700, 900] }],
+  ['GenYoMin2', { family: 'GenYoMin2', weights: [700, 900] }],
+  ['Glow Sans SC', { family: 'Glow Sans SC', weights: [900] }],
+  ['Anton', { family: 'Anton', weights: [400] }],
+  ['Instrument Serif', { family: 'Instrument Serif', weights: [400], styles: ['normal', 'italic'] }],
 ])
 
 /** The CSS files that declare the faces above. */
@@ -193,6 +283,18 @@ export const CARD_FONT_SHEETS = [
   '/fonts/fonts-templates.css',
   '/fonts/fonts-design.css',
   '/fonts/zhuque-fangsong.css',
+  '/fonts/noto-sans-sc-black.css',
+  '/fonts/lxgw-wenkai.css',
+  '/fonts/smiley-sans.css',
+  '/fonts/zcool-xiaowei.css',
+  '/fonts/zcool-qingke-huangyou.css',
+  '/fonts/zcool-kuaile.css',
+  '/fonts/ma-shan-zheng.css',
+  '/fonts/unbounded-sans.css',
+  '/fonts/tiejili-sc.css',
+  '/fonts/genryumin2.css',
+  '/fonts/genyomin2.css',
+  '/fonts/glow-sans-sc.css',
 ] as const
 
 const CN_DIGIT = '〇一二三四五六七八九'
@@ -321,6 +423,8 @@ export async function paginateCards(article: HTMLElement, options: {
   template?: CardTemplateId
   signal?: AbortSignal
   measure?: (page: HTMLElement) => number
+  /** Faces picked by the reader on top of the template's own (template-custom.ts). */
+  extraFaces?: readonly CardFontFace[]
 }): Promise<{ pages: CardPage[]; scaledBlocks: number }> {
   const { height, signal } = options
   const template = options.template ?? article.dataset.template ?? 'reed'
@@ -399,7 +503,9 @@ export async function paginateCards(article: HTMLElement, options: {
     host.append(article)
     if (document.fonts) {
       const text = article.textContent ?? ''
-      await Promise.all(cardTemplateFonts(template).flatMap(({ family, weights, styles }) =>
+      const faces = [...cardTemplateFonts(template), ...(options.extraFaces ?? [])]
+      await ensureFontSheets(faces.map((face) => face.family))
+      await Promise.all(faces.flatMap(({ family, weights, styles }) =>
         weights.flatMap((weight) => (styles ?? ['normal']).map((style) =>
           document.fonts.load(`${style === 'italic' ? 'italic ' : ''}${weight} 18px "${family}"`, text),
         )),

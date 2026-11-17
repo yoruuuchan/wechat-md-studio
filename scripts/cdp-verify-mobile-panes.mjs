@@ -424,14 +424,14 @@ const drawerOpenSettled = () => waitFor(`(() => {
       copy: cr ? { visible: cr.width > 0, w: Math.round(cr.width), h: Math.round(cr.height), inside: cr.left >= -0.5 && cr.right <= vw + 0.5 } : null,
       drawerButton: dr ? { visible: dr.width > 0, inside: dr.left >= -0.5 && dr.right <= vw + 0.5 } : null,
       drawer: drawerState,
-      sidebar: sidebar ? { visible: sidebar.getBoundingClientRect().width > 0, text: sidebar.innerText.trim() } : null,
+      sidebar: sidebar ? { visible: sidebar.getBoundingClientRect().width > 0, text: sidebar.innerText.trim(), tabLabels: [...sidebar.querySelectorAll('[role=tab]')].map((el) => el.innerText.trim()), tileIds: [...sidebar.querySelectorAll('[data-theme-quick]')].map((el) => el.dataset.themeQuick) } : null,
       tabs,
       docText: window.__mopaiCodemirror ? window.__mopaiCodemirror.state.doc.toString() : '',
     }
   })()`
 
   // ---------- 1. wide (>=1200): the original three columns ----------
-  let wideSidebarText = ''
+  let wideSidebarShape = ''
   for (const width of [1536, 1280]) {
     await setWidth(width, 900)
     const l = await evaluate(layoutProbe)
@@ -449,7 +449,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
       // The first tab is the live theme picker now; let its tiles arrive so
       // the drawer comparison below sees the same settled text.
       await waitFor(`!!document.querySelector('[data-theme-quick]')`, 'theme picker settled', 20_000).catch(() => {})
-      wideSidebarText = (await evaluate(layoutProbe)).sidebar?.text || ''
+      wideSidebarShape = JSON.stringify(((l) => ({ tabs: l?.tabLabels ?? [], tiles: l?.tileIds ?? [] }))((await evaluate(layoutProbe)).sidebar))
     }
     await screenshot(`desktop-${width}.png`)
   }
@@ -488,7 +488,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
       state: d.dataset.state,
       visible: getComputedStyle(d).display !== 'none',
       rect: { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width },
-      text: aside ? aside.innerText.trim() : '',
+      text: aside ? aside.innerText.trim() : '', tabLabels: aside ? [...aside.querySelectorAll('[role=tab]')].map((el) => el.innerText.trim()) : [], tileIds: aside ? [...aside.querySelectorAll('[data-theme-quick]')].map((el) => el.dataset.themeQuick) : [],
     }
   })()`)
   check(
@@ -496,7 +496,7 @@ const drawerOpenSettled = () => waitFor(`(() => {
     drawerOpen.visible === true && drawerOpen.rect.left >= -0.5 && drawerOpen.rect.right <= 768.5 && drawerOpen.rect.top >= -0.5 && drawerOpen.rect.bottom <= 900.5,
     JSON.stringify(drawerOpen.rect),
   )
-  check('768px: the drawer contains the same right column as the wide layout', drawerOpen.text === wideSidebarText, `${drawerOpen.text.length} vs ${wideSidebarText.length} chars`)
+  check('768px: the drawer contains the same right column as the wide layout', JSON.stringify({ tabs: drawerOpen.tabLabels, tiles: drawerOpen.tileIds }) === wideSidebarShape, `${drawerOpen.text.length} chars; ${JSON.stringify({ tabs: drawerOpen.tabLabels, tiles: drawerOpen.tileIds })} vs ${wideSidebarShape}`)
   await click(`[...document.querySelectorAll('[data-side-drawer] [role=tab]')].find((el) => el.innerText.trim() === '设置')`)
   await waitFor(`[...document.querySelectorAll('[data-side-drawer] [role=tab][aria-selected=true]')].some((el) => el.innerText.trim() === '设置')`, 'drawer settings tab selected')
   check('768px: the settings tab renders inside the drawer', await evaluate(`!!document.querySelector('[data-side-drawer] [data-open-remote-mcp]')`))

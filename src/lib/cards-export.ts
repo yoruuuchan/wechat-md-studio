@@ -3,12 +3,15 @@ import {
   CARD_FONT_SHEETS, CARD_TEMPLATE_FONTS, CARD_WIDTH, type CardFontFace, type CardTemplate, type CardTemplateId,
 } from './cards'
 import { t } from './i18n'
+import { userFontCss } from './user-fonts'
 
 /** Faces the embedder should keep, plus package faces that need no fetch. */
 export interface CardFontEmbedSpec {
   faces: readonly CardFontFace[]
   /** @font-face rules with data: URLs, built from the template archive. */
   packageCss?: string
+  /** Fonts from the reader's computer (user-fonts.ts), embedded as subsets. */
+  userFonts?: readonly string[]
 }
 
 function blobDataUrl(blob: Blob): Promise<string> {
@@ -98,7 +101,8 @@ export async function cardFontCss(
     face.weights.includes(Number(weight)) &&
     (face.styles ?? ['normal']).includes(style as 'normal' | 'italic'),
   )
-  if (!declared.length) return spec.packageCss ?? ''
+  const userCss = await userFontCss(spec.userFonts ?? [], text)
+  if (!declared.length) return [spec.packageCss ?? '', userCss].filter(Boolean).join('\n')
   const rules = await Promise.all(CARD_FONT_SHEETS.map(async (path) => {
     const url = new URL(path, location.href)
     const response = await fetch(url)
@@ -116,7 +120,7 @@ export async function cardFontCss(
       return rule.replace(/url\([^)]+\)/, `url("${data}")`)
     }))
   }))
-  return [...rules.flat().filter(Boolean), spec.packageCss ?? ''].filter(Boolean).join('\n')
+  return [...rules.flat().filter(Boolean), spec.packageCss ?? '', userCss].filter(Boolean).join('\n')
 }
 
 const EXACT_FONT_SIZE = '--xhs-export-font-size'
@@ -129,7 +133,7 @@ const EXACT_FONT_SIZE = '--xhs-export-font-size'
  * other computed property (margins in em, line-height, ...) came from the
  * untouched original.
  */
-function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): void {
+export function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): void {
   const visit = (source: Element, target: Element) => {
     const styled = target as HTMLElement | SVGElement
     styled.style.setProperty(EXACT_FONT_SIZE, getComputedStyle(source).fontSize)
@@ -140,12 +144,29 @@ function markExactFontSizes(nodes: HTMLElement[], snapshots: HTMLElement[]): voi
   nodes.forEach((node, index) => visit(node, snapshots[index]))
 }
 
-async function toBlobWithExactFonts(
-  toBlob: (node: HTMLElement, options: Record<string, unknown>) => Promise<Blob | null>,
-  node: HTMLElement,
-  options: Record<string, unknown>,
-): Promise<Blob | null> {
+let exactFontUsers = 0
+let nativeSetProperty: CSSStyleDeclaration['setProperty'] | null = null
+
+/**
+ * Install the substitution once and count the exports sharing it.
+ *
+ * Saving and restoring the prototype per call made overlapping exports fight
+ * over it: the first export to finish restored the native method underneath the
+ * other one, which then lost its exact sizes, and the last one wrote the first
+ * export's wrapper back onto the prototype, where it stayed for the session.
+ *
+ * The wrapper itself is stateless - it reads the marker off whichever node is
+ * being cloned - so one installation serves every overlap. Count the users and
+ * restore the exact method captured at the first install when the last one
+ * leaves, including exception and cancel paths.
+ */
+function acquireExactFontPatch(): void {
+  if (exactFontUsers > 0) {
+    exactFontUsers += 1
+    return
+  }
   const original = CSSStyleDeclaration.prototype.setProperty
+  nativeSetProperty = original
   CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
     if (name === 'font-size') {
       const exact = this.getPropertyValue(EXACT_FONT_SIZE)
@@ -153,10 +174,27 @@ async function toBlobWithExactFonts(
     }
     return original.call(this, name, value, priority)
   }
+  exactFontUsers = 1
+}
+
+function releaseExactFontPatch(): void {
+  if (exactFontUsers === 0) return
+  exactFontUsers -= 1
+  if (exactFontUsers > 0 || nativeSetProperty === null) return
+  CSSStyleDeclaration.prototype.setProperty = nativeSetProperty
+  nativeSetProperty = null
+}
+
+export async function toBlobWithExactFonts(
+  toBlob: (node: HTMLElement, options: Record<string, unknown>) => Promise<Blob | null>,
+  node: HTMLElement,
+  options: Record<string, unknown>,
+): Promise<Blob | null> {
+  acquireExactFontPatch()
   try {
     return await toBlob(node, options)
   } finally {
-    CSSStyleDeclaration.prototype.setProperty = original
+    releaseExactFontPatch()
   }
 }
 

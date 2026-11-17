@@ -17,8 +17,10 @@ import { t } from './i18n'
  *   - same id, different content is a divergence: the cloud version keeps the
  *     id and the local version is re-homed under a new id and archived, so
  *     neither side is ever dropped without trace;
- *   - an article trashed in the cloud is "present, just not live" and is left
- *     exactly as the browser had it.
+ *   - an article trashed in the cloud, or purged from it while the browser
+ *     still holds an archived copy, comes back as a working copy: the body,
+ *     name and restore base stay, but the archive claim (`savedAt`) is dropped
+ *     because the server no longer holds that article in the drafts box.
  *
  * Nothing here touches the network or React: useDocs feeds it the cache and
  * the (complete) cloud metadata, then performs the plan.
@@ -57,6 +59,13 @@ export interface MergePlan {
    * everything else in `docs` is clean as of this merge.
    */
   unsynced: string[]
+  /**
+   * Ids that arrived as an archived local copy but are not archived any more
+   * (their row is purged from, or sitting in, the cloud bin). Their `savedAt`
+   * is null; the caller must not register their body as a confirmed synced
+   * version, so no status can read "synced" until the owner saves them again.
+   */
+  unarchived: string[]
   /** Lines for the notice toast; empty when the merge was uneventful. */
   notices: string[]
 }
@@ -109,6 +118,7 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
   const toImport: DocRecord[] = []
   const toArchive: DocRecord[] = []
   const unsynced: string[] = []
+  const unarchived: string[] = []
   const notices: string[] = []
   const localOnly: DocRecord[] = []
   const remoteDocs: DocRecord[] = []
@@ -176,9 +186,14 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
   for (const d of input.local) {
     if (remoteById.has(d.id)) continue
     if (trashed.has(d.id)) {
-      // Alive here, in the cloud's bin there: leave the browser's copy exactly
-      // as it is — neither resurrected into the live list nor dropped.
-      localOnly.push(d)
+      // Alive here, in the cloud's bin there: neither resurrected into the live
+      // list nor dropped. The body, name and last synced base stay, so an
+      // explicit "save to drafts" can restore the row and CAS against it; the
+      // archive claim does not stay, because the drafts box does not show it.
+      const working: DocRecord = { ...d, savedAt: null }
+      localOnly.push(working)
+      unarchived.push(d.id)
+      notices.push(t('merge.trashed', { name: d.name || t('common.unnamedDoc') }))
       continue
     }
     if (!holdsBody(d)) {
@@ -195,12 +210,16 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
       localOnly.push(d)
       continue
     }
-    toImport.push(d)
-    localOnly.push(d)
+    // One record serves both lists: the state gets exactly what is uploaded, so
+    // the local copy and the pushed row cannot disagree about its archive state.
+    const working: DocRecord = { ...d, savedAt: null }
+    toImport.push(working)
+    localOnly.push(working)
+    unarchived.push(d.id)
     if (d.savedAt !== null) {
       // It was archived once, yet the cloud no longer has it (purged on another
-      // device). Coming back as an unarchived working copy keeps the text alive
-      // without pretending it is still in the drafts box.
+      // device). It comes back as an unarchived working copy: the text stays
+      // alive locally, and nothing claims the drafts box still shows it.
       notices.push(t('merge.cloudGone', { name: d.name || t('common.unnamedDoc') }))
     }
   }
@@ -210,6 +229,7 @@ export async function planMerge(input: MergeInput): Promise<MergePlan> {
     toImport,
     toArchive,
     unsynced,
+    unarchived,
     notices,
   }
 }

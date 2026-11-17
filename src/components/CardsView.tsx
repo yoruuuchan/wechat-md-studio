@@ -1,44 +1,30 @@
 // Adapted from https://github.com/woodti/mopai (MIT); see LICENSES/woodti-mopai-LICENSE.txt.
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Doc, SignatureConfig } from '@/lib/types'
 import type { MathSnapshot } from '@/lib/math'
+import type { DiagramState } from '@/lib/preflight'
+import { graphicsReadiness } from '@/lib/graphics-readiness'
 import type { DiagramResolver } from '@/lib/render'
 import type { MsgKey, MsgParams } from '@/lib/i18n'
 import { resolveImgSrc } from '@/lib/image'
 import { safeFilename } from '@/lib/import-export'
 import { renderCardArticle } from '@/lib/cards-render'
 import {
-  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, cardTemplateFonts,
+  CARD_RATIOS, CARD_WIDTH, cardAccent, cardMetrics, cardTemplateCustomize, cardTemplateFonts,
   coverTitleSize, isDarkVariant, paginateCards,
   type CardBackground, type CardOptions, type CardPage,
 } from '@/lib/cards'
-import { fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
+import { cardEndIsExtraPage, fragmentHtml, getLoadedCardTemplate, renderTemplatePage } from '@/lib/card-template'
 import { useI18n } from '@/hooks/useI18n'
+import { useResolvedTemplateCustom } from '@/hooks/useTemplateCustom'
+import GraphicsReadinessNotice from '@/components/GraphicsReadinessNotice'
+import { BRAND_ACCENT, cardFrameStyle } from '@/lib/card-style'
 import './cards.css'
 
 const PREVIEW_WIDTH = 260
 const PREVIEW_SCALE = PREVIEW_WIDTH / CARD_WIDTH
-// The brand accent stays the same when the application's UI theme changes.
-const BRAND_ACCENT = '#4F6CE8'
-
-/** Reed's five paint jobs; uploaded templates carry their own background in CSS. */
-function background(id: CardBackground, accent: string): CSSProperties {
-  switch (id) {
-    case 'white': return { background: '#ffffff' }
-    case 'paper': return { background: '#fbf7ef' }
-    case 'night': return { background: '#1c1d22' }
-    case 'tint': return { background: `linear-gradient(color-mix(in srgb, ${accent} 9%, transparent), color-mix(in srgb, ${accent} 9%, transparent)), #ffffff` }
-    case 'grid': return {
-      backgroundColor: '#fcfcfa',
-      backgroundImage: 'linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)',
-      backgroundSize: '24px 24px',
-    }
-    default: return { background: '#fbf7ef' }
-  }
-}
-
 type Translate = (key: MsgKey, params?: MsgParams) => string
 interface CoverProps {
   page: Extract<CardPage, { kind: 'cover' }>
@@ -109,13 +95,18 @@ interface Props {
   sig: SignatureConfig
   math: MathSnapshot
   resolveDiagram: DiagramResolver
+  /** Diagram facts owned by the editor; the views reuse them instead of counting twice. */
+  diagramStates?: readonly DiagramState[]
+  /** Retry paths the editor already owns; the failure hint offers them. */
+  onRetryMath?: () => void
+  onRetryDiagrams?: () => void
   options: CardOptions
   /** Top bar owns the ZIP button; this keeps its disabled/progress state true. */
   onStatusChange?: (status: CardsStatus) => void
 }
 
 const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
-  { doc, source, title, accent: themeAccent, sig, math, resolveDiagram, options, onStatusChange },
+  { doc, source, title, accent: themeAccent, sig, math, resolveDiagram, diagramStates = [], onRetryMath, onRetryDiagrams, options, onStatusChange },
   ref,
 ) {
   const { t, lang } = useI18n()
@@ -132,6 +123,10 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
   const custom = getLoadedCardTemplate(template)
   const dark = isDarkVariant(template, bg)
   const accent = cardAccent(template, bg, themeAccent || BRAND_ACCENT)
+  // Colour and font picks from the side panel; pagination measures with them.
+  const picks = useResolvedTemplateCustom(template, bg, cardTemplateCustomize(template))
+  // A card is only exportable once every formula SVG and diagram PNG exists.
+  const graphics = graphicsReadiness(doc.blocks, math, diagramStates)
   const coverTitle = doc.blocks.find((block) => block.type === 'heading' && !block.numbered)
   const articleTitle = coverTitle?.type === 'heading' ? coverTitle.title : title
   const author = doc.meta.author || t('app.name')
@@ -152,9 +147,12 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
           source, height, template, renderTemplate: custom?.renderId, templateSource: custom?.template,
           background: bg, accent, dark, sig, resolveImage: resolveImgSrc,
           resolveMath: (tex, display) => math.get(tex, display), resolveDiagram,
+          customVars: picks.vars,
         })
         const failedImages = await prepareCardImages(article, controller.signal)
-        const layout = await paginateCards(article, { height, template, signal: controller.signal })
+        const layout = await paginateCards(article, {
+          height, template, signal: controller.signal, extraFaces: picks.faces,
+        })
         if (!controller.signal.aborted) {
           setResult({ ...layout, failedImages, height, dark, template, background: bg })
           setPending(false)
@@ -167,7 +165,9 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
       }
     }, 160)
     return () => { controller.abort(); clearTimeout(timer) }
-  }, [doc, source, height, template, bg, accent, dark, sig, math, resolveDiagram, retry, lang, custom?.renderId, custom?.template])
+    // picks.key stands for picks.vars / picks.faces, which change together.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, source, height, template, bg, accent, dark, sig, math, resolveDiagram, retry, lang, custom?.renderId, custom?.template, picks.key])
 
   useLayoutEffect(() => {
     // Ordinary titles keep each template's size ladder. Extremely long H1s are
@@ -194,19 +194,28 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
     }
   }, [result, height, metrics.coverReserve])
 
+  // The article's pages, plus the template's closing page when it is a page
+  // of its own (see cardEndIsExtraPage).
+  const extraEnd = custom ? cardEndIsExtraPage(custom) : false
+  const pages: (CardPage | { kind: 'end' })[] = result
+    ? (extraEnd && result.pages.length ? [...result.pages, { kind: 'end' as const }] : result.pages)
+    : []
+
   const exportCards = async (index?: number) => {
-    if (!result?.pages.length || result.failedImages.length || busy || pending) return
+    if (!result || !pages.length || result.failedImages.length || busy || pending || !graphics.ready) return
     setBusy(true)
-    setProgress({ done: 0, total: index === undefined ? result.pages.length : 1 })
+    setProgress({ done: 0, total: index === undefined ? pages.length : 1 })
     let exporter: Awaited<ReturnType<typeof import('@/lib/cards-export').createCardExporter>> | undefined
     try {
       const { createCardExporter, downloadCardBlob } = await import('@/lib/cards-export')
-      const nodes = cardsRef.current.slice(0, result.pages.length).filter((node): node is HTMLDivElement => node !== null)
-      if (nodes.length !== result.pages.length) throw new Error('card not mounted')
+      const nodes = cardsRef.current.slice(0, pages.length).filter((node): node is HTMLDivElement => node !== null)
+      if (nodes.length !== pages.length) throw new Error('card not mounted')
       const loaded = getLoadedCardTemplate(result.template)
-      exporter = await createCardExporter(nodes, loaded
-        ? { faces: cardTemplateFonts(result.template), packageCss: loaded.packageFontCss }
-        : result.template)
+      exporter = await createCardExporter(nodes, {
+        faces: [...cardTemplateFonts(result.template), ...picks.faces],
+        packageCss: loaded?.packageFontCss,
+        userFonts: picks.userFonts,
+      })
       const name = safeFilename(articleTitle, t('cards.filename'), '')
       if (index !== undefined) {
         downloadCardBlob(await exporter.shoot(index), `${name}-${String(index + 1).padStart(2, '0')}.png`)
@@ -228,9 +237,9 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
     }
   }
 
-  const total = result?.pages.length ?? 0
+  const total = pages.length
   const failed = Boolean(result?.failedImages.length)
-  const disabled = busy || pending || !total || failed
+  const disabled = busy || pending || !total || failed || !graphics.ready
 
   useImperativeHandle(ref, () => ({ exportAll: () => void exportCards() }))
 
@@ -239,7 +248,9 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
   }, [onStatusChange, disabled, busy, total, failed, error, progress])
 
   return (
-    <div data-onboarding="preview" data-xhs-view data-ready={!pending && !error && result !== null} className="flex h-full min-w-0 flex-col">
+    <div data-onboarding="preview" data-xhs-view data-ready={!pending && !error && result !== null}
+      data-cards-math={graphics.math.state} data-cards-diagram={graphics.diagrams.state}
+      className="flex h-full min-w-0 flex-col">
       {/* The preview keeps only the card summary; templates, ratios,
           backgrounds and the ZIP action live in the side panel and top bar. */}
       <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-line-1 px-4">
@@ -256,16 +267,17 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
           <ul className="mt-1 list-inside list-disc break-all">{result.failedImages.map((src) => <li key={src}>{src}</li>)}</ul>
           <button className="ya-link-btn" onClick={() => setRetry((n) => n + 1)}>{t('common.retry')}</button>
         </div> : null}
+        <GraphicsReadinessNotice kind="cards" graphics={graphics} onRetryMath={onRetryMath} onRetryDiagrams={onRetryDiagrams} />
         {result?.scaledBlocks ? <p role="status" className="mb-4 text-xs text-warning-700">{t('cards.scaled', { n: result.scaledBlocks })}</p> : null}
         {result && !total && <p className="text-sm text-ink-2">{t('cards.empty')}</p>}
         <div className="flex flex-wrap justify-center gap-5">
-          {result?.pages.map((page, i) => {
+          {pages.map((page, i) => {
             const customHtml = custom
               ? fragmentHtml(renderTemplatePage(custom, {
                 kind: page.kind === 'cover' ? 'cover'
-                  : custom.manifest.pages.end && i === result.pages.length - 1 ? 'end' : 'body',
+                  : page.kind === 'end' || (custom.manifest.pages.end && !extraEnd && i === pages.length - 1) ? 'end' : 'body',
                 pageIndex: i,
-                total: result.pages.length,
+                total: pages.length,
                 title: page.kind === 'cover' ? page.title : articleTitle,
                 subtitle: page.kind === 'cover' ? page.subtitle : '',
                 author,
@@ -283,22 +295,14 @@ const CardsView = forwardRef<CardsViewHandle, Props>(function CardsView(
                     {...(custom ? { 'data-card-template-source': custom.template } : {})}
                     ref={(el) => { cardsRef.current[i] = el }}
                     {...(customHtml !== null ? { dangerouslySetInnerHTML: { __html: customHtml } } : {})}
-                    style={{
-                      width: CARD_WIDTH, height, '--xhs-accent': accent,
-                      '--xhs-pad-x': `${metrics.padX}px`,
-                      '--xhs-pad-top': `${metrics.padTop}px`,
-                      '--xhs-pad-bottom': `${metrics.padBottom}px`,
-                      '--xhs-content-w': `${metrics.contentWidth}px`,
-                      '--xhs-header-top': `${metrics.headerTop}px`,
-                      '--xhs-footer-bottom': `${metrics.footerBottom}px`,
-                      '--xhs-cover-inset-x': `${metrics.coverInsetX}px`,
-                      '--xhs-cover-inset-y': `${metrics.coverInsetY}px`,
-                      '--xhs-cover-foot-bottom': `${metrics.coverFootBottom}px`,
-                      ...(custom ? {} : background(bg, accent)),
-                    } as CSSProperties}>
+                    style={cardFrameStyle({
+                      template, background: bg, accent, height, width: CARD_WIDTH, custom: Boolean(custom), vars: picks.vars,
+                    })}>
                     {customHtml !== null ? null : page.kind === 'cover'
                       ? <Cover page={page} author={author} height={height} t={t} />
-                      : <Body page={page} index={i} articleTitle={articleTitle} author={author} total={total} />}
+                      : page.kind === 'body'
+                        ? <Body page={page} index={i} articleTitle={articleTitle} author={author} total={total} />
+                        : null}
                   </div>
                 </div>
               </div>

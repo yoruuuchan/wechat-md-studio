@@ -42,10 +42,17 @@ async function localDraftKeys(): Promise<{ keys: string[]; ok: boolean }> {
     // A diagram's PNG is referenced only here: the fence in the document holds
     // mermaid source, so the server-side scan of 稿件 content cannot see it.
     for (const ref of loadDiagramCache().values()) out.add(ref.replace(/^img:/, ''))
-    return { keys: [...out], ok: !loaded.bodyReadFailed }
+    // Sorted so an unchanged rescan keeps the same reference: the orphans query
+    // is keyed by this list, and a needless refetch would only add noise.
+    return { keys: [...out].sort(), ok: !loaded.bodyReadFailed }
   } catch {
     return { keys: [], ok: false }
   }
+}
+
+/** Same protection list and same readability means the same answer. */
+function sameDraftScan(a: { keys: string[]; ok: boolean }, b: { keys: string[]; ok: boolean }): boolean {
+  return a.ok === b.ok && a.keys.length === b.keys.length && a.keys.every((key, i) => key === b.keys[i])
 }
 
 /** A browser network failure is already explained by the section copy. */
@@ -115,6 +122,11 @@ export default function Materials() {
   // 本地草稿引用的图也算“在用”，避免误判成可清理的旧图。
   // `null` = 本机草稿还在扫描，引用状态尚未确定。
   const [draftScan, setDraftScan] = useState<{ keys: string[]; ok: boolean } | null>(null)
+  // A rescan runs between the confirmation and the mutation, so the button has
+  // to stay busy (and unclickable) during it as well.
+  const [cleanScanning, setCleanScanning] = useState(false)
+  const applyDraftScan = (next: { keys: string[]; ok: boolean }) =>
+    setDraftScan((prev) => (prev && sameDraftScan(prev, next) ? prev : next))
   useEffect(() => {
     // StrictMode runs this twice; reading the drafts twice is harmless.
     let alive = true
@@ -180,6 +192,33 @@ export default function Materials() {
 
   const orphanKeys = useMemo(() => (orphans.data ?? []).map((o) => o.key), [orphans.data])
   const selectedOrphans = orphanKeys.filter((k) => selected.has(k))
+
+  /**
+   * The list this page shows was built from a scan that may be old: another tab
+   * can reference one of these images in an unsaved local draft while this tab
+   * sits open. So the local keep-list is read again after the confirmation and
+   * sent with the mutation; the server re-checks it before deleting anyway.
+   *
+   * A failed read aborts the whole batch. Sending no keep-list would be the same
+   * as claiming no local draft references anything, which is exactly how a live
+   * image would get deleted.
+   */
+  const cleanSelected = async () => {
+    if (!referenceReady || selectedOrphans.length === 0 || cleanScanning) return
+    if (!window.confirm(t('materials.cleanConfirm', { n: selectedOrphans.length }))) return
+    setCleanScanning(true)
+    try {
+      const fresh = await localDraftKeys()
+      applyDraftScan(fresh)
+      if (!fresh.ok) {
+        toast.error(t('materials.cleanStopped'), { description: t('materials.cleanStoppedDesc') })
+        return
+      }
+      removeMutation.mutate({ keys: selectedOrphans, alsoKeep: fresh.keys })
+    } finally {
+      setCleanScanning(false)
+    }
+  }
 
   const statsData = stats.data
   const usagePct = statsData && statsData.quotaBytes > 0
@@ -298,15 +337,11 @@ export default function Materials() {
             </div>
             <button
               data-materials-clean
-              disabled={!referenceReady || selectedOrphans.length === 0 || removeMutation.isPending}
-              onClick={() => {
-                if (!referenceReady) return
-                if (!window.confirm(t('materials.cleanConfirm', { n: selectedOrphans.length }))) return
-                removeMutation.mutate({ keys: selectedOrphans })
-              }}
+              disabled={!referenceReady || selectedOrphans.length === 0 || cleanScanning || removeMutation.isPending}
+              onClick={() => { void cleanSelected() }}
               className="ya-btn ya-btn-danger shrink-0"
             >
-              {removeMutation.isPending ? t('materials.cleaning') : t('materials.cleanSelected', { n: selectedOrphans.length })}
+              {cleanScanning || removeMutation.isPending ? t('materials.cleaning') : t('materials.cleanSelected', { n: selectedOrphans.length })}
             </button>
           </div>
 

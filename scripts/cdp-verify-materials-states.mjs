@@ -19,7 +19,13 @@
 //   8. a failed single delete keeps the object and its ledger row, while a
 //      successful delete updates the usage and both lists;
 //   9. a truly empty library still shows the normal empty/clean states;
-//  10. the failure copy exists in English as well as Chinese.
+//  10. the failure copy exists in English as well as Chinese;
+//  11. two real tabs: a draft an unsaved second tab creates after this page's
+//      scan is not deleted — the click re-reads local references, sends them as
+//      `alsoKeep`, the server skips that key without a worker DELETE and keeps
+//      its ledger row, while the other image is deleted and counted;
+//  12. a local draft read failure at click time stops the batch before any
+//      mutation, says why, and a retry after recovering really does clean up.
 
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -39,7 +45,17 @@ const ACCESS_KEY = 'audit-r20-owner-key-20261029'
 const IN_USE = 'in-use-key'
 const ORPHAN_A = 'orphan-a-key'
 const ORPHAN_B = 'fail-delete-key'
+// The batch-cleanup regression uses its own rows so the earlier single-delete
+// scenarios keep their fixtures: one image a second tab will reference, one
+// image nothing references, and one for the click-time scan failure.
+const BATCH_KEEP = 'batch-keep-key'
+const BATCH_FREE = 'batch-free-key'
+const SCAN_FAIL = 'scan-fail-key'
+const LOCAL_DRAFT_ID = 'r20-tab2-local-draft'
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+/** Every key a DELETE was actually sent for, in order. */
+const deleteCalls = []
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let failures = 0
@@ -68,6 +84,7 @@ const worker = http.createServer(async (req, res) => {
   }
   if (req.method === 'DELETE') {
     const key = url.searchParams.get('key') ?? ''
+    deleteCalls.push(key)
     if (key.includes('fail-delete')) {
       res.writeHead(500, { 'Content-Type': 'application/json' }).end('{"error":"simulated worker refusal"}')
       return
@@ -134,6 +151,37 @@ function seedDatabase() {
     'INSERT INTO docs (id,ownerId,name,content,createdAt,updatedAt,savedAt,deletedAt,source,hash) VALUES (?,1,?,?,?,?,?,NULL,NULL,NULL)',
   ).run('doc-in-use', '引用这张图的稿件', `![配图](img:${IN_USE})`, now - 86400, now - 86400, now - 86400)
   db.close()
+}
+
+/**
+ * The batch-cleanup fixtures: a cloud-referenced image, one the second tab will
+ * reference locally, and one nothing references. No fixture is named
+ * "fail-delete": a worker refusal would turn the assertion about freed bytes
+ * into an assertion about a partial failure.
+ */
+function seedBatchDatabase(extraKeys = []) {
+  const db = new DatabaseSync(DB_FILE)
+  const now = Math.floor(Date.now() / 1000)
+  db.exec(`
+    DELETE FROM files;
+    DELETE FROM docs;
+  `)
+  const file = db.prepare('INSERT INTO files (key,ownerId,name,size,createdAt,visitor) VALUES (?,1,?,?,?,NULL)')
+  file.run(IN_USE, 'in-use.png', 1000, now - 3600)
+  file.run(BATCH_KEEP, 'batch-keep.png', 4000, now - 7200)
+  file.run(BATCH_FREE, 'batch-free.png', 5000, now - 10800)
+  for (const [key, size] of extraKeys) file.run(key, `${key}.png`, size, now - 14400)
+  db.prepare(
+    'INSERT INTO docs (id,ownerId,name,content,createdAt,updatedAt,savedAt,deletedAt,source,hash) VALUES (?,1,?,?,?,?,?,NULL,NULL,NULL)',
+  ).run('doc-in-use', '引用这张图的稿件', `![配图](img:${IN_USE})`, now - 86400, now - 86400, now - 86400)
+  db.close()
+}
+
+const ledgerRow = (key) => {
+  const db = new DatabaseSync(DB_FILE)
+  const row = db.prepare('SELECT key FROM files WHERE key = ?').get(key)
+  db.close()
+  return row
 }
 
 // ---------- Chrome + CDP ----------
@@ -308,6 +356,77 @@ async function click(selector) {
     const el = document.querySelector(${JSON.stringify(selector)});
     if (!el) return false;
     el.click();
+    return true;
+  })()`)
+}
+
+/**
+ * A real second tab in the same browser profile: same origin, same localStorage
+ * and the same IndexedDB. It deliberately carries none of this suite's fault
+ * shims, because the race under test is a write that really lands in the shared
+ * store while the first tab's page state is still old.
+ */
+async function openTab(url) {
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
+  const { sessionId: tabSession } = await send('Target.attachToTarget', { targetId, flatten: true })
+  await send('Page.enable', {}, tabSession)
+  await send('Runtime.enable', {}, tabSession)
+  const evaluateIn = async (expression) => {
+    const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, tabSession)
+    if (r.exceptionDetails) {
+      throw new Error(r.exceptionDetails.text + ' ' + (r.exceptionDetails.exception?.description ?? ''))
+    }
+    return r.result.value
+  }
+  const waitIn = async (expression, timeoutMs = 15000) => {
+    const until = Date.now() + timeoutMs
+    while (Date.now() < until) {
+      try {
+        if (await evaluateIn(expression)) return true
+      } catch {
+        /* navigation in flight */
+      }
+      await sleep(150)
+    }
+    return false
+  }
+  await send('Page.navigate', { url }, tabSession)
+  return { targetId, sessionId: tabSession, evaluate: evaluateIn, waitFor: waitIn }
+}
+
+/**
+ * Writes an unsaved draft straight into the shared body store, the way another
+ * tab's autosave would: a body row plus the index-shaped metadata, carrying
+ * one image reference the server cannot see. No notification is broadcast, so
+ * the first tab's scan is stale until it reads again.
+ */
+async function writeLocalDraft(tab, key) {
+  return tab.evaluate(`(async () => {
+    const id = ${JSON.stringify(LOCAL_DRAFT_ID)};
+    const content = ${JSON.stringify(`---\ntitles:\n  - 另一标签页的草稿\n---\n\n![图](img:${key})`)};
+    const open = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('mopai', 2);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('bodies')) db.createObjectStore('bodies', { keyPath: 'id' });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = open.transaction('bodies', 'readwrite');
+      tx.objectStore('bodies').put({
+        id,
+        content,
+        revision: 1,
+        storedAt: Date.now(),
+        metadata: { name: '另一标签页的草稿', updatedAt: Date.now(), savedAt: null, deletedAt: null, contentLoaded: true },
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    open.close();
     return true;
   })()`)
 }
@@ -525,6 +644,91 @@ try {
   check('the English error copy carries no Chinese', !/[一-鿿]/.test(await textOf('[data-materials-error="stats"]')))
   await evaluate(`localStorage.setItem('mopai.lang.v1', 'zh')`)
   await setFault({})
+
+  // ================= 11. batch cleanup re-reads local references (two tabs) =================
+  section('a second tab references an image after this page scanned')
+  seedBatchDatabase()
+  await gotoMaterials()
+  await waitFor(`document.querySelectorAll('[data-materials-file-item]').length === 3`)
+  await waitFor(`!!document.querySelector('[data-materials-select-all]')`)
+  check('both unreferenced images are offered for cleanup', (await countOf('[data-materials-orphan-item]')) === 2)
+
+  const tab2 = await openTab(`${APP}/materials`)
+  check('a second tab opens on the same browser data', await tab2.waitFor(`!!document.querySelector('[data-materials-clean]')`))
+  check('the second tab shares the logged-in session', await tab2.waitFor(`document.body.innerText.includes('存储用量')`))
+
+  // The race: this tab's scan ran before the draft existed, and a raw store
+  // write tells no other tab. Only the read at click time can still see it.
+  check('the other tab writes a local draft that references the image', await writeLocalDraft(tab2, BATCH_KEEP))
+  check('the draft is really in the shared body store', await tab2.evaluate(`new Promise((resolve, reject) => {
+    const request = indexedDB.open('mopai', 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('bodies', 'readonly');
+      const get = tx.objectStore('bodies').get(${JSON.stringify(LOCAL_DRAFT_ID)});
+      get.onsuccess = () => {
+        const row = get.result;
+        db.close();
+        resolve(Boolean(row && typeof row.content === 'string' && row.content.includes('img:${BATCH_KEEP}')));
+      };
+      get.onerror = () => { db.close(); reject(get.error); };
+    };
+  })`))
+  check('this tab still lists the image as unused', (await evaluate(`document.querySelector('[data-materials-reference="${BATCH_KEEP}"]')?.innerText`)) === '没在用')
+  await send('Target.closeTarget', { targetId: tab2.targetId })
+  check('the draft survives its tab closing', await waitFor(`document.querySelector('[data-materials-reference="${BATCH_KEEP}"]')?.innerText === '没在用'`))
+
+  await click('[data-materials-select-all]')
+  check('both candidates are selected for cleanup', (await textOf('[data-materials-clean]')).includes('2'))
+  const deletesBeforeBatch = deleteCalls.length
+  await click('[data-materials-clean]')
+  check('the cleanup lands and reports the protected image as skipped', await waitFor(`document.body.innerText.includes('仍被稿件引用，已跳过')`, 8000))
+  const batchDeletes = deleteCalls.slice(deletesBeforeBatch)
+  check('the referenced image was never sent to the worker', !batchDeletes.includes(BATCH_KEEP), batchDeletes.join(','))
+  check('the free image was deleted exactly once', batchDeletes.filter((key) => key === BATCH_FREE).length === 1, batchDeletes.join(','))
+  check('the protected image keeps its ledger row', Boolean(ledgerRow(BATCH_KEEP)))
+  check('the free image loses its ledger row', !ledgerRow(BATCH_FREE))
+  check('the protected image is still in the library', await waitFor(`!!document.querySelector('[data-materials-file-item="${BATCH_KEEP}"]')`))
+  check('the next reference check marks it in use', await waitFor(`document.querySelector('[data-materials-reference="${BATCH_KEEP}"]')?.innerText === '在用'`))
+  check('the free image is gone from the library', await waitFor(`!document.querySelector('[data-materials-file-item="${BATCH_FREE}"]')`))
+
+  // ================= 12. the local read fails at click time =================
+  section('the local draft read fails only when cleanup starts')
+  seedBatchDatabase([[SCAN_FAIL, 6000]])
+  await gotoMaterials()
+  // IN_USE + BATCH_KEEP + BATCH_FREE + SCAN_FAIL. BATCH_KEEP is protected by the
+  // draft the other tab left behind, so only the other two are offered.
+  await waitFor(`document.querySelectorAll('[data-materials-file-item]').length === 4`)
+  await waitFor(`document.querySelectorAll('[data-materials-orphan-item]').length === 2`)
+  check('the draft left by the other tab is still respected on a fresh load', (await countOf(`[data-materials-reference="${BATCH_KEEP}"]`)) === 1 && (await evaluate(`document.querySelector('[data-materials-reference="${BATCH_KEEP}"]')?.innerText`)) === '在用')
+
+  const deletesBeforeStop = deleteCalls.length
+  // The initial scan already succeeded; break the body read only now, so the
+  // failure happens at the click-time rescan and nothing else.
+  check('a body read can be made to fail on this loaded page', await evaluate(`(() => {
+    window.__r20GetAll = IDBObjectStore.prototype.getAll;
+    IDBObjectStore.prototype.getAll = function () { throw new Error('Simulated local draft read failure at cleanup'); };
+    return true;
+  })()`))
+  await click('[data-materials-select-all]')
+  await click('[data-materials-clean]')
+  check('the cleanup stops and says why', await waitFor(`document.body.innerText.includes('已停止清理')`, 8000))
+  check('no DELETE was sent for any selected image', deleteCalls.length === deletesBeforeStop, deleteCalls.slice(deletesBeforeStop).join(','))
+  check('the selected ledger rows are still there', Boolean(ledgerRow(SCAN_FAIL)) && Boolean(ledgerRow(BATCH_KEEP)) && Boolean(ledgerRow(BATCH_FREE)))
+  check('the draft read failure is reported with a retry', await waitFor(`!!document.querySelector('[data-materials-error="drafts"]') && !!document.querySelector('[data-materials-retry="drafts"]')`))
+  check('batch cleanup is disabled while the local list is unknown', await evaluate(`document.querySelector('[data-materials-clean]').disabled`))
+
+  await evaluate(`(() => { IDBObjectStore.prototype.getAll = window.__r20GetAll; return true; })()`)
+  await click('[data-materials-retry="drafts"]')
+  check('the retry clears the draft error', await waitFor(`!document.querySelector('[data-materials-error="drafts"]')`))
+  check('references are usable again after the retry', await waitFor(`!!document.querySelector('[data-materials-select-all]')`))
+  await click('[data-materials-select-all]')
+  const deletesAfterRetry = deleteCalls.length
+  await click('[data-materials-clean]')
+  check('the retried cleanup deletes the free image', await waitFor(`!document.querySelector('[data-materials-file-item="${SCAN_FAIL}"]')`, 10000))
+  check('its ledger row is gone', !ledgerRow(SCAN_FAIL))
+  check('the locally referenced image was still never deleted', !deleteCalls.slice(deletesAfterRetry).includes(BATCH_KEEP) && Boolean(ledgerRow(BATCH_KEEP)))
 
   check('no uncaught page exception during the run', pageErrors.length === 0, pageErrors.join(' | '))
 } catch (e) {

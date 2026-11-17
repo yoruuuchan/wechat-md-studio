@@ -39,6 +39,21 @@ describe('card template cloud merge', () => {
     )).toEqual([{ kind: 'download', id: 'a' }])
   })
 
+  it('compares server times only for a confirmed copy, whatever the device clock says', () => {
+    // This device runs 120 s fast: its record time looks later than the cloud
+    // upload, but the server confirmed it 30 s before the cloud version.
+    const cloudAt = 1_000_000
+    expect(planCardTemplateSync(
+      [local('local-a', 'a', 'older', cloudAt + 90_000, cloudAt - 30_000)],
+      [cloud('a', 'newer', cloudAt)],
+    )).toEqual([{ kind: 'download', id: 'a' }])
+    // A slow device clock must not make a newer confirmed copy look older.
+    expect(planCardTemplateSync(
+      [local('local-a', 'a', 'newer', cloudAt - 200_000, cloudAt + 30_000)],
+      [cloud('a', 'older', cloudAt)],
+    )).toEqual([{ kind: 'upload', id: 'a', key: 'local-a' }])
+  })
+
   it('uses the newest local duplicate for one manifest id', () => {
     expect(planCardTemplateSync(
       [local('old', 'a', 'old', 10), local('new', 'a', 'new', 20)],

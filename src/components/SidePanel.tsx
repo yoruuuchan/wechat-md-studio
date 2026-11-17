@@ -9,10 +9,12 @@ import { CAROUSEL_RATIOS, DEFAULT_CAROUSEL_RATIO, type CarouselRatio, type Signa
 import { useI18n } from '@/hooks/useI18n'
 import type { Theme } from '@/lib/theme-kit'
 import type { CardOptions } from '@/lib/cards'
+import type { LongOptions } from '@/lib/long-options'
 import type { CardTemplateSummary } from '@/lib/card-template-format'
 import type { CardTemplateUpload } from '@/hooks/useCardTemplates'
 import ThemeQuickPicker from '@/components/ThemeQuickPicker'
 import CardSettings from '@/components/CardSettings'
+import LongSettings from '@/components/LongSettings'
 import { LanguageToggle } from '@/components/LanguageToggle'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -23,10 +25,11 @@ interface Props {
   tab: SidePanelTab
   onTabChange: (tab: SidePanelTab) => void
   /** The first tab follows the preview mode: 主题 for articles, 模板 for cards. */
-  mode: 'wechat' | 'cards'
+  mode: 'wechat' | 'cards' | 'long'
   themeId: string
   onTheme: (id: string) => void
   renderPreview: (theme: Theme) => string
+  themePanelVisible: boolean
   onOpenThemes: () => void
   cardOptions: CardOptions
   onCardOptionsChange: (options: CardOptions) => void
@@ -34,6 +37,11 @@ interface Props {
   cardTemplates: CardTemplateUpload
   onCardTemplateUploaded: (summary: CardTemplateSummary) => void
   onCardTemplateDeleted: (template: string) => void
+  longOptions: LongOptions
+  onLongOptionsChange: (options: LongOptions) => void
+  longBusy: boolean
+  onLongTemplateUploaded: (summary: CardTemplateSummary) => void
+  onLongTemplateDeleted: (template: string) => void
   materials: MaterialItem[]
   titles: string[]
   cover: string
@@ -140,6 +148,8 @@ export default function SidePanel(p: Props) {
     <li key={m.no} className="rounded-xl bg-surface-sunken px-3 py-2" style={{ boxShadow: 'var(--shadow-inset)' }}>
       <div className="flex items-center gap-2">
         <button
+          data-material-jump={m.no}
+          data-material-line={m.line}
           onClick={() => p.onJump(m.line)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           title={t('panel.row.jumpTitle')}
@@ -192,19 +202,31 @@ export default function SidePanel(p: Props) {
         </div>
 
         {p.mode === 'wechat' ? (
-          <TabsContent value="theme" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+          <TabsContent value="theme" data-theme-scroll className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
             <ThemeQuickPicker
               themeId={p.themeId}
               onTheme={p.onTheme}
               renderPreview={p.renderPreview}
               onOpenThemes={p.onOpenThemes}
+              visible={p.themePanelVisible}
             />
           </TabsContent>
         ) : (
           <TabsContent value="card" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
+              {p.mode === 'long' ? (
+                <LongSettings
+                  options={p.longOptions}
+                  onOptionsChange={p.onLongOptionsChange}
+                  busy={p.longBusy}
+                  templates={p.cardTemplates}
+                  onTemplateUploaded={p.onLongTemplateUploaded}
+                  onTemplateDeleted={p.onLongTemplateDeleted}
+                />
+              ) : (
             <CardSettings options={p.cardOptions} onOptionsChange={p.onCardOptionsChange} busy={p.cardBusy}
               templates={p.cardTemplates} onTemplateUploaded={p.onCardTemplateUploaded}
               onTemplateDeleted={p.onCardTemplateDeleted} />
+              )}
           </TabsContent>
         )}
 

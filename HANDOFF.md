@@ -34,12 +34,12 @@ README / README_EN 的界面截图共用 `docs/images/`。下文历史部署记�
 
 harness 会在父仓库自建分支或 worktree。并行干活必须遵守：
 
-1. **工作目录**：不管哪棵树、哪个分支，npm 命令（check/build/test/CDP）都在其 `app/` 子目录里跑。新 worktree 建好后要在其 `app/` 里 `npm ci`，并从主工作区复制 `app/.env`（gitignore 不随仓库走）。
+1. **工作目录**：不管哪棵树、哪个分支，npm 命令（check/build/test/CDP）都在应用根目录（含 `package.json` 的那一层）里跑：公开仓库 `wechat-md-studio` 是仓库根目录，本地伞仓库是其中的 `app/`。新 worktree 建好后在应用根目录 `npm ci`，需要站长密钥的检查另建一次性的 `.env`（gitignore 不随仓库走，用完删掉）。
 2. **端口错开**：本地测试服与 CDP 调试端口不能撞车。主工作区用 `PORT=3200` + CDP `9333`；第二棵树用 `PORT=3201` + CDP `9334`（CDP 脚本接受端口参数或改文件内常量）。测试数据库按惯例用环境变量覆盖成独立文件（`DATABASE_URL=file:./data/test-xxx.db`），绝不共享。
 3. **部署只许从 master 执行，且同一时刻只留一个会话在部署**：线上只有一个。功能在分支上验证全绿（check + verify:themes + test + CDP）后合回 `master`，由主工作区统一构建、scp、`install.sh`；主工作区被并行会话占用或弄脏时，改从**目标 commit 的干净 worktree** 构建（`git worktree add <tmp> <commit>`，2026-10-10 起的等效做法）。分支上的人不碰服务器。
 4. **合并顺序**：分支开工前先 `git merge master` 同步；交付在分支上提交，回合由主工作区执行，冲突按功能归属取舍。
 5. **合并前先 `git status -sb` 确认主工作区停在哪个分支**——并行会话会把它切到自己的分支，此时 `--ff-only` 落在的是那个分支而不是 master（2026-10-10 实例：merge 落在 `codex/ai-writing-mcp` 上，master 原地没动；事后用带旧值校验的 `git update-ref refs/heads/master <new> <old>` 补真快进）。事后 `git log -1 master` 回查。
-6. **`update-ref` 前进 master 后主工作区不会自动跟随**——它仍停在旧检出，`git status` 会把新旧差异显示成一大片「已暂存」的改动，看着像回滚、其实只是没同步（2026-10-10 实例：rebrand 合并后主工作区冻结在 `92d7511`，两天后才发现）。拿主工作区构建/提交前先同步：`git restore --source=HEAD --staged --worktree -- .`（只重置 tracked 文件，零丢失）。
+6. **`update-ref` 前进 master 后主工作区不会自动跟随**——它仍停在旧检出，`git status` 会把新旧差异显示成一大片「已暂存」的改动，看着像回滚、其实只是没同步（2026-10-10 实例：rebrand 合并后主工作区冻结在 `92d7511`，两天后才发现）。拿主工作区构建/提交前先同步：`git restore --source=HEAD --staged --worktree -- .`。它把所有已跟踪文件的暂存区和工作区都改回 HEAD，未跟踪文件不受影响；只有在差异全部来自那次 `update-ref`、主工作区没有自己未提交的改动时才不丢东西。拿不准就先 `git diff HEAD > <备份>.patch` 或在临时分支上提交一次，再执行。
 
 - Node.js 24（当前开发与验收版本，使用内置 `node:sqlite`），`npm ci` 装依赖
 - `.env` 从 `.env.example` 复制（`.env` 已被 gitignore，**永远不要提交**）
@@ -163,7 +163,7 @@ bash scripts/cf-open-public.sh           # 执行
 # 本地：包名带 commit 短哈希，临时目录用 mktemp——绝不用固定名
 TAG=$(git rev-parse --short HEAD)
 OUT=$(mktemp -d)
-npm run build
+npm run build:release
 tar -czf "$OUT/mopai-$TAG.tar.gz" dist
 
 # 传上去：先传脚本本身（仓库版），再传包
@@ -175,8 +175,12 @@ ssh cc-tokyo-01 "sha256sum /tmp/mopai-$TAG.tar.gz"   # 必须等于本机 sha256
 ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$TAG.tar.gz"
 ```
 
-`scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 装到 /opt/mopai/app → **restart** → 健康检查），
-它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。
+正式发布必须用 `npm run build:release`：它先要求找得到搭建台的构建结果（`REED_MOTION_SITE` 或主 checkout 旁的 `wechat-motion-lab/out/site`），缺失或页面无效时在 Vite 前非零退出，不会先删上一份 `public/motion/`；构建结束还会核对 `dist/public/motion/index.html` 并打印文件数。只做开发构建、可以没有 `/motion/` 时仍用 `npm run build`（顶栏动效退回占位），但它不能当作正式发布。
+
+`scripts/server-install-release.sh` 就是那个 install 脚本（解包 → 新 dist 复制到旁边再换名替换 → **restart** → 健康检查），
+它接受一个 tarball 路径参数，默认 `/tmp/mopai-release.tar.gz`。健康检查要求服务处于 active、`/`、`/login`、`/api/trpc/auth.me` 30 秒内都回 200；
+通过才删旧版本、打印 `done`。不通过就把旧 dist 换回来重启，打印 `FAILED: …` 并以非零状态退出，失败的那份留在 `/opt/mopai/app/dist.failed`；
+旧版本也起不来时会明说，改从 `/opt/mopai/backups` 手动恢复（2026-11-13 起，之前的版本一路 `|| true`，失败也打印 `done`）。
 
 **家里这条线路对 30 MB+ 的单次 scp 会稳定重置**（`FATAL: send() failed, 10054`，2026-10-09 当天连试三次全挂，
 有一次还挂在连接上不退出）。别干等重试，按 network-ops 的分块办法：`split -b 4M` 切块 → 逐块 `scp`
@@ -981,6 +985,79 @@ wsl -e bash -lc "bash '<umbrella repo root>/app/scripts/stage-to-tokyo.sh' '<脚
 > `check`、`lint`（0 errors，保留 1 条既有 exhaustive-deps warning）、`test` 3035 项、`build`、`verify:themes` 全过；CDP：发布前检查 88/88、手机布局 152/152、公式就绪 ALL CHECKS PASSED。
 > 生产包 50,461,274 B，sha256 `36088ab3…`，13×4MB 分块上传且逐块核对，重组整包 hash 一致；`flock` 安装于 2026-11-10 04:56:56 UTC。
 > 三重核对全过：线上 `dist/boot.js` sha256 = 本地 `be2987d1…`，入口 `index-Cb5awqAx.js` / `index-jMgmJ9jY.css` 本地=线上=公网；公网 200，bundle 含新文案与滚动样式。公开仓库增量发布未做。
+>
+> 2026-11-11 部署记录（推文动效搭建台上线）：`03ef0c5`（feat(motion)：顶栏「动效」从占位变成指向 `/motion/` 的链接；
+> 站长的云端草稿接口 `/api/motion-drafts`，新表 `motion_drafts` 启动时自动创建）。说明见 [docs/motion.md](docs/motion.md)。
+> 搭建台本身是仓库外构建的静态页面，`npm run build` 的 `pack:motion` 一步把它复制进 `public/motion/`（不提交）。
+> **以后每次构建都要让这一步找得到搭建台的构建结果**（主 checkout 旁边的 `wechat-motion-lab/out/site`，或 `REED_MOTION_SITE`）：
+> 找不到时构建照常成功，但线上的 `/motion/` 会消失、入口退回「即将推出」。构建输出里 `[pack-motion] N files` 一行是确认。
+> `check`、`lint`、`test` 3044 项、`verify:themes`、`verify:sources`、`build` 全过；本地生产构建上搭建台的浏览器检查 25/25
+> （访客与站长两种「稿子」对话框、存 / 覆盖 / 打开 / 删除、按需载入素材表、本站内容策略下无报错）。
+> `cdp-verify-ui-modes` 111/114：三项不过都是「稿件名至少显示八个汉字」（1536 / 1280 / 960，可用 98px、需要 104px）。
+> 去掉搭建台、按 `95e7892` 的行为重跑，同样三项不过、数字相同，所以不是这次改动带来的，本次没有处理。
+> 生产包 62,792,117 B（比上一版多出的约 12 MB 是搭建台的素材表和字体），sha256 `2ad89c2f…`，15×4MB 分块上传且逐块核对；
+> 安装前备份 `dist-20261111T012846Z-ce16029a` 与同名 `.db`，`flock` 安装，服务于 **2026-11-11 01:28:49 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `4e07fd06…`；入口 `index-Cc4POHHE.js` / `index-1KXwwfIe.css` 本地=线上=公网；
+> `/motion/app.3122687e57.js` 公网与本地逐字节一致；`verify-all.sh` 通过；`card_templates` 9 行不变，`motion_drafts` 已建、0 行。
+> 公网只读冒烟 25/25（`live-smoke.mjs … groups,nits,motion`，`motion` 是这次新加的一组），搭建台页面以访客身份另查 8 项全过。
+> Cloudflare 往 `/motion/` 的 HTML 里同样会加它自己的探测脚本，被内容策略拦下，每次打开一条 CSP 提示，和主页一样，无害。
+> 线上没有用站长账号登录测过：云端草稿的存取只在本地生产构建上验证。
+>
+> 2026-11-11 部署记录（「动效」原地切换 + 搭建台深色界面）：`8925641`（feat(motion)：点顶栏「动效」不再跳到 `/motion/`，
+> 而是和「公众号文章 / 小红书卡片」一样原地切换：顶栏不动，工作区让位给同源 iframe `/motion/?embed=1`；首次使用才创建、
+> 载入完成前不显示、之后只是隐藏，所以文章和搭建台里的内容来回切换都保留）。说明见 [docs/motion.md](docs/motion.md)。
+> 安全头：只有 `/motion/` 下的响应改成 `frame-ancestors 'self'` + `X-Frame-Options: SAMEORIGIN`，其余路径仍是 `'none'` / `DENY`（公网已核对）。
+> 同一次发布带上了搭建台的深色界面（仓库外的静态页面，随 `pack:motion` 进包）：嵌在编辑器里时读父页面 `<html data-theme>` 并实时跟随，
+> 单独打开时读 `mopai.theme.v1`，没有就跟系统。芦苇这边不需要为它改代码。
+> `check`、`lint`、`test` 3045 项、`build`（`[pack-motion] 328 files`）全过；本地生产构建上的浏览器检查：原地切换与主题跟随 12/12，
+> `cdp-verify-ui-nits` 134/134，搭建台 27 项全过；`cdp-verify-ui-modes` 126/129，不过的仍是 11-10 起就有的「稿件名至少显示八个汉字」三项，本次没有处理。
+> 生产包 62,796,030 B，sha256 `c0628832…`，15×4MB 分块上传且逐块核对；安装前备份 `dist-20261111T071917Z-c46cd4d8` 与同名 `.db`，
+> `flock` 安装，服务于 **2026-11-11 07:19:21 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `e5e59ce2…`；入口 `index-BMhZKATG.js` / `index-jMgmJ9jY.css`、`/motion/app.6946eed0e3.js`、
+> `/motion/theme.js` 公网与本地逐字节一致；`verify-all.sh` 通过；`card_templates` 9 行、`motion_drafts` 0 行，都没变。
+> 公网只读冒烟 28/28（`live-smoke.mjs … groups,nits,motion`；`motion` 一组改成查原地切换、主题实时跟随、手机预览保持白底），
+> 搭建台页面以访客身份另查 18 项全过。线上仍然没有用站长账号登录测过。
+>
+> 2026-11-12 部署记录（长图模式 + 模板配色字体可换 + 新内置字体 + 模板缩略图）：`7cb5fe1`（13 个提交快进合入 master：
+> 长图模式与导出、公用长图模板「蓝色科技活动回顾」；模板颜色 / 字体槽位与读者自选字体；内置无界黑、铁蒺藜体、源流明体、源样明体、
+> 未来荧黑、Anton、Instrument Serif；右栏模板列表改成缩略图；字体下拉框里每个字体用自己的字形显示（Chrome / Edge 135+ 的
+> customizable select，其他浏览器退回原生列表））。说明见 [docs/long-image.md](docs/long-image.md)、[docs/card-template-format.md](docs/card-template-format.md)。
+> `check`、`lint`（0 错误，`EditorPage` 里原有的 2 条警告）、`test` 3096 项、`verify:themes`、`verify:sources`、`build`
+> （`[pack-public] 9 card + 1 long`、`[pack-motion] 328 files`）全过；本地生产构建上的浏览器检查：长图 30/30、模板自定义 25/25、
+> 模板上传、公用卡片 452/452、小红书卡片、`cdp-verify-ui-modes` 128/128（稿件名框加宽后 11-10 起的三项也过了）、`cdp-verify-ui-nits` 134/134、
+> 手机布局 152/152。生产包 118,716,371 B（新增字体切片约 48 MB），sha256 `e3adaf2e…`，29×4MB 分块上传且逐块核对；
+> 安装前备份 `dist-20261112T083047Z-0e526e89` 与同名 `.db`，`flock` 安装，服务于 **2026-11-12 08:30:53 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `03315b3b…`；入口 `index-DR4khLwI.js` / `index-B5YnkUNf.css`；`verify-all.sh` 通过；
+> `card_templates` 9 行、`motion_drafts` 0 行，都没变。
+> 公网冒烟没跑完：家里线路当时很差（4 KB 的文件 12 秒、`ERR_NETWORK_CHANGED`，新资源 Cloudflare 缓存还是 `MISS`），
+> 切到卡片模式超过脚本 60 秒上限，中止前已通过的项全过、没有页面错误；同一时刻从东京服务器取公网资源 0.06–0.09 秒。
+> 同一份构建在本地用 `SMOKE_ORIGIN` 跑 `live-smoke.mjs … groups,nits,motion` 28/28。线上仍然没有用站长账号登录测过。
+>
+> 2026-11-13 部署记录（外部审计里会出错的 6 条）：`1405dc6`（1 个提交快进合入 master）。慢网下同一篇不再同时发两次保存
+> （误报冲突）；上传模板里的 `<img src>` 不再被删；长图读图改用正文解析器的图片语法，代码块和注释里的图片示例不算照片；
+> 模板同步对已确认的副本只比服务器时间；没有二级标题的长图分张时在段落边界切。
+> `check`、`lint`（0 错误，原有 2 条警告）、`test` 3102 项、`verify:themes`、`verify:sources`、`build`（`[pack-public] 9 card + 1 long`、
+> `[pack-motion] 328 files`）全过；浏览器检查：新增慢网保存 9/9（旧版本 4/9）、稿件同步、保存状态 29/29（修了三个过时选择器）、
+> 长图 30/30、模板自定义 25/25、模板上传、公用卡片 452/452、小红书卡片、`cdp-verify-ui-modes` 128/128、`cdp-verify-ui-nits` 134/134、
+> 手机布局 152/152。生产包 118,721,440 B，sha256 `355512eb…`，29×4MB 分块上传且逐块核对；安装前备份 `dist-20261113T025419Z-fd69e63d`
+> 与同名 `.db`，`flock` 安装，服务于 **2026-11-13 02:54:27 UTC** 重启。
+> 核对：线上 `dist/boot.js` sha256 = 本地 `03315b3b…`（服务端代码没变）；入口 `index-mIjKMC7K.js` / `index-B5YnkUNf.css`；
+> `verify-all.sh` 通过；`card_templates` 14 行（站长上传了 5 套）、`motion_drafts` 0 行。公网只读冒烟 28/28。
+>
+> 2026-11-13 部署记录（审计第二轮：首屏瘦身、安装脚本、三个小毛病）：`0e0441a`（3 个提交快进合入 master）。首屏样式只带界面字体，
+> 模板 / 设计字体表按需链接，字体文件不再内联（入口 CSS gzip 313→152 KB，`@font-face` 827→447）；手写与设计主题、JSZip 按需加载
+> （入口 JS gzip 690→648 KB）；安装脚本换名替换 dist，健康检查不过就回滚并以 `FAILED` 非零退出；MCP 资源在授权失效时回 -32002
+> 和工具一致的原因；同一模板包重复上传替换原副本，删除清掉同 id 的所有本地副本。
+> `check`、`lint`（0 错误，原有 2 条警告）、`test` 3114 项、`verify:themes`、`verify:sources`、`build`（`[pack-public] 9 card + 1 long`、
+> `[pack-motion] 328 files`）全过；安装脚本用桩命令模拟 9/9（健康升级、失败回滚、回滚也失败、首装失败）；浏览器检查：新增按需字体
+> 16/16、模板上传（新增重复上传与删除后不复活三项，旧代码第一项失败）、长图 30/30、模板自定义 25/25、公用卡片 452/452、小红书卡片、
+> 手机布局 152/152、保存状态 29/29、`ui-modes` 128/128、`ui-nits` 134/134、主题试用、深色主题。`themes9`（9 套模板时代的过时检查）、
+> `i18n` 的反馈邮件两项（本地无邮件服务）、`selection-copy` 的复制按钮一项、`theme-library` 的 15 套 `maxWidth` 在线上版本 `1405dc6`
+> 上逐项相同，不是本次引入。生产包 108,311,568 B，sha256 `e9905a98…`，26×4MB 分块上传且逐块核对；安装前备份
+> `dist-20261113T043825Z-08a52fe6` 与同名 `.db`，`flock` 安装（首次由新安装脚本执行，健康检查一次通过），服务于
+> **2026-11-13 04:38:34 UTC** 重启。核对：线上 `dist/boot.js` sha256 = 本地 `8b6c5717…`；入口 `index-DAhpae6w.js` / `index-IQv0KQSl.css`，
+> 线上实传 gzip 649,064 B / 150,664 B；`/fonts/fonts-design.css`、`/fonts/fonts-templates.css` 及其字体文件 200；无 `dist.prev` /
+> `dist.new` / `dist.failed` 残留；`verify-all.sh` 通过；`card_templates` 14 行、`motion_drafts` 0 行。公网只读冒烟 28/28。
 
 ---
 

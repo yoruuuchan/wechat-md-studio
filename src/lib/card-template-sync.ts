@@ -2,8 +2,13 @@
  * Pure merge plan for local uploads and the owner's cloud archive.
  *
  * The manifest id is the identity shared by both devices. When the two sides
- * hold different bytes for one id, the later upload wins without a dialog:
- * compare the local record's upload time with the server's `uploadedAt`.
+ * hold different bytes for one id, the later upload wins without a dialog. A
+ * local copy the server has confirmed carries that server time
+ * (`cloudUploadedAt`) and is compared with the server's `uploadedAt` only, so
+ * a fast or slow device clock cannot make an old copy look newer. A copy that
+ * was never confirmed has only its device time; that is the one comparison
+ * where the two clocks meet, and it only decides between two uploads made
+ * within the skew of each other.
  *
  * A tombstone changes only the "local id missing from the cloud" case. If this
  * device holds a version the server had confirmed at or before the delete, the
@@ -71,7 +76,10 @@ export function planCardTemplateSync(
       actions.push({ kind: 'keep', id })
       continue
     }
-    actions.push(remote.uploadedAt > row.updatedAt
+    const cloudIsNewer = row.cloudUploadedAt !== undefined
+      ? remote.uploadedAt > row.cloudUploadedAt
+      : remote.uploadedAt > row.updatedAt
+    actions.push(cloudIsNewer
       ? { kind: 'download', id }
       : { kind: 'upload', id, key: row.key })
   }

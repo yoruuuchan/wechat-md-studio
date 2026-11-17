@@ -1385,3 +1385,28 @@
   font-weight: 700;
   src: url(files/tinos-latin-700-italic.woff2) format('woff2');
 }
+
+/* Latin display faces for the long-image templates (Google Fonts, latin subset). */
+@font-face {
+  font-family: 'Anton';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(files/anton-latin-400-normal.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(files/instrument-serif-latin-400-normal.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url(files/instrument-serif-latin-400-italic.woff2) format('woff2');
+}

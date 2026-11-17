@@ -303,29 +303,204 @@ try {
     pressed: el.getAttribute('aria-pressed'),
     title: el.getAttribute('title') || '',
     label: el.getAttribute('aria-label') || '',
+    href: el.getAttribute('href') || '',
     height: Math.round(el.getBoundingClientRect().height),
   })))()`)
   console.log(' ', JSON.stringify(modes))
   check('all four mode entries are present', JSON.stringify(modes.map((m) => m.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), modes.map((m) => m.id))
   check('mode entries are at least as large as the old preview toggle (>= 28px)', modes.every((m) => m.height >= 28), modes.map((m) => m.height))
-  check('long-image and motion are visibly disabled placeholders', modes.filter((m) => m.id === 'long' || m.id === 'motion').every((m) => m.disabled && m.label.includes('即将推出')), modes.filter((m) => m.id === 'long' || m.id === 'motion'))
-  const placeholderBox = await evaluate(`(() => {
-    const r = document.querySelector('[data-preview-mode="long"]').getBoundingClientRect();
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  })()`)
-  await call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...placeholderBox })
-  const placeholderTip = await waitFor(
-    `(() => { const el = document.querySelector('[data-slot="tooltip-content"]'); return el ? el.textContent.trim() : '' })()`,
-    'placeholder coming-soon tooltip',
-    5000,
-  ).catch(() => '')
-  // Radix puts the visible text and a visually hidden copy inside the same
-  // content node, so textContent contains the hint twice.
-  check('hovering a placeholder shows the coming-soon hint', placeholderTip.includes('即将推出'), placeholderTip)
-  await call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 })
+  // The motion entry depends on the build: a real mode when
+  // scripts/motion/pack-motion.mjs packed the composer, a placeholder otherwise.
+  const isPlaceholder = (m) => m.disabled && m.label.includes('即将推出')
+  const hasMotion = modes.some((m) => m.id === 'motion' && !m.disabled)
+  check(
+    'long-image is a selectable mode',
+    modes.filter((m) => m.id === 'long').every((m) => !m.disabled && m.pressed === 'false'),
+    modes.filter((m) => m.id === 'long'),
+  )
+  if (hasMotion) {
+    check(
+      'motion is a selectable mode when the build packs the composer',
+      modes.filter((m) => m.id === 'motion').every((m) => !m.disabled && m.pressed === 'false'),
+      modes.filter((m) => m.id === 'motion'),
+    )
+  } else {
+    check(
+      'motion is a placeholder when the build has none',
+      modes.filter((m) => m.id === 'motion').every(isPlaceholder),
+      modes.filter((m) => m.id === 'motion'),
+    )
+    const placeholderBox = await evaluate(`(() => {
+      const r = document.querySelector('[data-preview-mode="motion"]').getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`)
+    await call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...placeholderBox })
+    const placeholderTip = await waitFor(
+      `(() => { const el = document.querySelector('[data-slot="tooltip-content"]'); return el ? el.textContent.trim() : '' })()`,
+      'placeholder coming-soon tooltip',
+      5000,
+    ).catch(() => '')
+    // Radix puts the visible text and a visually hidden copy inside the same
+    // content node, so textContent contains the hint twice.
+    check('hovering a placeholder shows the coming-soon hint', placeholderTip.includes('即将推出'), placeholderTip)
+    await call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 })
+  }
   await click(`document.querySelector('[data-preview-mode="long"]')`)
-  await sleep(250)
-  check('clicking a placeholder does not change mode', await evaluate(`document.querySelector('[data-preview-mode="wechat"]').getAttribute('aria-pressed') === 'true'`))
+  await waitFor(`document.querySelector('[data-preview-mode="long"]')?.getAttribute('aria-pressed') === 'true'`, 'long mode selected')
+  await waitFor(`!!document.querySelector('[data-long-view]')`, 'long view mounted')
+  check('choosing long-image switches the workspace', await evaluate(`!!document.querySelector('[data-long-view]')`))
+  await click(`document.querySelector('[data-preview-mode="wechat"]')`)
+
+  if (hasMotion) {
+    console.log('\n=== motion composer embedded in the editor ===')
+    const docLength = await evaluate(`window.__mopaiCodemirror.state.doc.length`)
+    await click(`document.querySelector('[data-preview-mode="motion"]')`)
+    await waitFor(`document.querySelector('[data-preview-mode="motion"]')?.getAttribute('aria-pressed') === 'true'`, 'motion mode selected')
+    check(
+      'motion: the entry becomes the selected mode',
+      await evaluate(
+        `document.querySelector('[data-preview-mode="motion"]')?.getAttribute('aria-pressed') === 'true' && document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'false'`,
+      ),
+    )
+    const frame = await evaluate(`(() => {
+   const f = document.querySelector('iframe[data-motion-frame]');
+   if (!f) return null;
+   const r = f.getBoundingClientRect();
+   return { src: f.getAttribute('src'), width: r.width, height: r.height, visible: r.width >0 && r.height >0 && getComputedStyle(f).visibility !== 'hidden' };
+   })()`)
+    check(
+      'motion: the composer iframe takes the space below the bar',
+      Boolean(frame?.src?.endsWith('/motion/?embed=1') && frame.width > 300 && frame.height > 300),
+      frame,
+    )
+    check(
+      'motion: the editor workspace is not visible',
+      await evaluate(`(() => {
+   const w = document.querySelector('[data-editor-workspace]');
+   if (!w) return false;
+   const r = w.getBoundingClientRect();
+   return getComputedStyle(w).display === 'none' && r.width ===0 && r.height ===0;
+   })()`),
+    )
+    const drawn = await waitFor(
+      `(() => {
+   const d = document.querySelector('iframe[data-motion-frame]')?.contentDocument;
+   return !!d && d.querySelectorAll('#scenes .tabs .tab').length >0;
+   })()`,
+      'motion composer drawn',
+      90_000,
+    )
+      .then(() => true)
+      .catch(() => false)
+    const embedded = drawn
+      ? await evaluate(`(() => {
+   const d = document.querySelector('iframe[data-motion-frame]')?.contentDocument;
+   if (!d) return null;
+   const home = d.querySelector('#home');
+   const brand = d.querySelector('.brand');
+   const drafts = d.querySelector('#drafts');
+   return { embed: d.body.dataset.embed, home: home?.getBoundingClientRect().width ?? null, brand: brand?.getBoundingClientRect().width ?? null, drafts: drafts?.getBoundingClientRect().width ?? null };
+   })()`)
+      : null
+    check(
+      'motion: the embedded composer draws without its own brand row',
+      Boolean(embedded && embedded.embed === '1' && embedded.home === 0 && embedded.brand === 0 && embedded.drafts > 0),
+      embedded,
+    )
+    // The frame stays out of sight until it has loaded, so a dark editor never flashes a blank page.
+    check(
+      'motion: the frame shows once the composer has loaded, and the loading line is gone',
+      await waitFor(
+        `getComputedStyle(document.querySelector('iframe[data-motion-frame]')).visibility === 'visible' && !document.querySelector('[data-motion-frame-shell] [role=status]')`,
+        'motion frame shown',
+        10_000,
+      )
+        .then(() => true)
+        .catch(() => false),
+    )
+    await evaluate(`(() => { window.__motionFrame = document.querySelector('iframe[data-motion-frame]')?.contentWindow; return true })()`)
+    await click(`document.querySelector('[data-preview-mode="wechat"]')`)
+    await waitFor(`document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'true'`, 'back to the article')
+    check(
+      'motion: the article and its text come back',
+      await evaluate(`(() => {
+   const w = document.querySelector('[data-editor-workspace]');
+   return !!w && getComputedStyle(w).display !== 'none' && w.getBoundingClientRect().width >0 && window.__mopaiCodemirror.state.doc.length === ${docLength};
+   })()`),
+      await evaluate(`window.__mopaiCodemirror.state.doc.length`),
+    )
+    check(
+      'motion: the hidden iframe stays in the DOM',
+      await evaluate(`(() => {
+   const f = document.querySelector('iframe[data-motion-frame]');
+   if (!f) return false;
+   const r = f.getBoundingClientRect();
+   return r.width ===0 && r.height ===0;
+   })()`),
+    )
+    await click(`document.querySelector('[data-preview-mode="motion"]')`)
+    await waitFor(`document.querySelector('[data-preview-mode="motion"]')?.getAttribute('aria-pressed') === 'true'`, 'motion mode back')
+    check(
+      'motion: the second visit reuses the same iframe',
+      await evaluate(`window.__motionFrame === document.querySelector('iframe[data-motion-frame]')?.contentWindow`),
+    )
+    check(
+      'motion: the second visit does not show the loading line',
+      await evaluate(`!document.querySelector('[data-motion-frame-shell] p[role="status"]')`),
+    )
+    await click(`document.querySelector('[data-preview-mode="wechat"]')`)
+    await waitFor(`document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'true'`, 'article again')
+    for (const width of [1536, 1280, 960]) {
+      await setWidth(width, 900)
+      const beforeLeft = await evaluate(`document.querySelector('[data-preview-mode="wechat"]').getBoundingClientRect().left`)
+      await click(`document.querySelector('[data-preview-mode="motion"]')`)
+      await waitFor(
+        `document.querySelector('[data-preview-mode="motion"]')?.getAttribute('aria-pressed') === 'true'`,
+        `${width}px motion selected`,
+      )
+      const afterLeft = await evaluate(`document.querySelector('[data-preview-mode="wechat"]').getBoundingClientRect().left`)
+      check(`${width}px: switching to motion does not move the mode entries`, Math.abs(afterLeft - beforeLeft) <= 1, {
+        beforeLeft,
+        afterLeft,
+      })
+      await click(`document.querySelector('[data-preview-mode="wechat"]')`)
+      await waitFor(
+        `document.querySelector('[data-preview-mode="wechat"]')?.getAttribute('aria-pressed') === 'true'`,
+        `${width}px article selected`,
+      )
+    }
+    await setWidth(390, 844)
+    await click(`document.querySelector('[data-topbar-mode-pill]')`)
+    await waitFor(`!!document.querySelector('[role=menu] [data-preview-mode="motion"]')`, 'phone motion entry')
+    await click(`document.querySelector('[role=menu] [data-preview-mode="motion"]')`)
+    await waitFor(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === 'motion'`, 'phone motion mode')
+    check(
+      '390px: the pill selects motion and the iframe is visible',
+      await evaluate(`(() => {
+   const f = document.querySelector('iframe[data-motion-frame]');
+   const r = f?.getBoundingClientRect();
+   return document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === 'motion' && !!r && r.width >0 && r.height >300;
+   })()`),
+    )
+    await waitFor(`!document.querySelector('[role=menu]')`, 'phone mode menu closed', 5000).catch(() => {})
+    await sleep(300)
+    await click(`document.querySelector('[data-topbar-mode-pill]')`)
+    await waitFor(`!!document.querySelector('[role=menu] [data-preview-mode="wechat"]')`, 'phone article entry')
+    await click(`document.querySelector('[role=menu] [data-preview-mode="wechat"]')`)
+    await waitFor(`document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === 'wechat'`, 'phone article mode')
+    check(
+      '390px: the pill switches back to the article',
+      await evaluate(`(() => {
+   const w = document.querySelector('[data-editor-workspace]');
+   return document.querySelector('[data-topbar-mode-pill]')?.dataset.mode === 'wechat' && !!w && getComputedStyle(w).display !== 'none';
+   })()`),
+    )
+    await setWidth(1536, 900)
+    check('motion: no new console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3))
+  } else {
+    console.log('SKIP motion embed: this build has no composer (scripts/motion/pack-motion.mjs)')
+  }
+
 
   await setMode('wechat')
   check('WeChat mode starts on the 主题 tab', (await activeSideTab()) === '主题', await activeSideTab())
@@ -610,10 +785,23 @@ try {
       disabled: el.hasAttribute('data-disabled') || el.getAttribute('aria-disabled') === 'true',
       placeholder: el.dataset.modePlaceholder === 'true',
       selected: el.dataset.modeSelected === 'true',
+      href: el.getAttribute('href') || '',
     })))()`)
     check(`${width}px: the pill menu lists all four modes`, JSON.stringify(entries.map((entry) => entry.id)) === JSON.stringify(['wechat', 'cards', 'long', 'motion']), entries)
-    check(`${width}px: long-image and motion are disabled placeholders in the pill menu`,
-      entries.filter((entry) => entry.id === 'long' || entry.id === 'motion').every((entry) => entry.disabled && entry.placeholder && entry.text.includes('即将推出')), entries)
+    check(`${width}px: long-image is selectable in the pill menu`, entries.filter((entry) => entry.id === 'long').every((entry) => !entry.disabled && !entry.placeholder), entries)
+    if (hasMotion) {
+      check(
+        `${width}px: motion is a selectable mode in the pill menu`,
+        entries.filter((entry) => entry.id === 'motion').every((entry) => !entry.disabled && !entry.placeholder),
+        entries,
+      )
+    } else {
+      check(
+        `${width}px: motion is a placeholder in the pill menu when the build has none`,
+        entries.filter((entry) => entry.id === 'motion').every(isPlaceholder),
+        entries,
+      )
+    }
     check(`${width}px: the pill marks the current mode`, entries.some((entry) => entry.id === 'wechat' && entry.selected), entries)
     await shot(`${width}-mode-picker.png`)
     await setMode('cards')

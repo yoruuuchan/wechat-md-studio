@@ -211,6 +211,22 @@ describe('anonymous single-document MCP', () => {
     expect((await rpc(next.token, 'tools/list')).status).toBe(401)
     expect((getSqlite().prepare('SELECT count(*) AS n FROM docs WHERE ownerId = 0 AND id IN (SELECT docId FROM remote_mcp_connections WHERE id = ?)').get(c.connection.id)!).n).toBe(0)
   })
+  it('answers resource reads of a vanished document with the same plain reason the tools give', async () => {
+    const c = await create()
+    const { docId } = getSqlite().prepare('SELECT docId FROM remote_mcp_connections WHERE id = ?').get(c.connection.id) as { docId: string }
+    getSqlite().prepare('DELETE FROM docs WHERE id = ?').run(docId)
+    const tool = await call(c.token, 'read_current_document')
+    expect(tool.isError).toBe(true)
+    const reason = tool.value.error as string
+    expect(reason).toContain('连接已失效')
+    for (const uri of ['mopai://document/current', 'http://localhost/skill.md']) {
+      const response = await rpc(c.token, 'resources/read', { uri })
+      expect(response.status).toBe(200)
+      const body = await response.json() as { error?: { code: number; message: string } }
+      expect(body.error?.message, uri).toBe(reason)
+      expect(body.error?.code, uri).toBe(-32002)
+    }
+  })
   it('expires before cleanup and removes the body while retaining owner documents', async () => {
     const c = await create()
     const { docId } = getSqlite().prepare('SELECT docId FROM remote_mcp_connections WHERE id = ?').get(c.connection.id) as { docId: string }

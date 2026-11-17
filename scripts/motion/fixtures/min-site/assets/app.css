@@ -1,0 +1,4 @@
+/* Part of the motion build fixture; only proves the recursive copy works. */
+body {
+  margin: 0;
+}

@@ -80,11 +80,12 @@ def parse_codepoints(value: str) -> set[int]:
     return points
 
 
-def slice_font(source: Path, points: set[int], out: Path, style: str) -> None:
+def slice_font(source: Path, points: set[int], out: Path, style: str, hinting: bool = True) -> None:
     font = TTFont(str(source), lazy=True)
     options = subset.Options()
     options.flavor = "woff2"
     options.desubroutinize = True
+    options.hinting = hinting
     options.drop_tables += ["STAT", "DSIG"]
     options.layout_features = ["*"]
     options.name_IDs = ["*"]
@@ -110,6 +111,9 @@ def main() -> None:
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--output-css", required=True, type=Path)
+    # Display faces are drawn large and exported at 2x; their TrueType
+    # instructions cost about a third of every slice and change nothing there.
+    parser.add_argument("--no-hinting", action="store_true", help="drop TrueType hinting from every slice")
     args = parser.parse_args()
 
     cmap = TTFont(str(args.input), lazy=True).getBestCmap()
@@ -123,7 +127,7 @@ def main() -> None:
             skipped += 1
             continue
         name = f"{args.prefix}-{index}-{args.weight}-{args.style}.woff2"
-        slice_font(args.input, points, args.output_dir / name, args.style)
+        slice_font(args.input, points, args.output_dir / name, args.style, hinting=not args.no_hinting)
         emitted.append((range_text, name))
 
     family = args.family.replace("'", "\\'")

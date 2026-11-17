@@ -7,11 +7,13 @@
  * registers the measurements/fonts the shared pagination code consumes.
  */
 import {
-  chinesePageNumber, coverTitleSize, registerCardTemplateRuntime,
-  unregisterCardTemplateRuntime, type CardFontFace, type CardTemplateRuntime,
+  chinesePageNumber, coverTitleSize, registerCardTemplateRuntime, registerLongTemplateRuntime,
+  unregisterCardTemplateRuntime, unregisterLongTemplateRuntime, type CardFontFace,
+  type CardTemplateRuntime, type LongTemplateRuntime,
 } from './cards'
 import {
-  CardTemplateError, type CardTemplateManifest, type CardTemplateSummary,
+  CardTemplateError, type CardTemplateManifest, type CardTemplateSummary, type LongTemplateManifest,
+  type ReedTemplateManifest,
 } from './card-template-format'
 import {
   archiveAssetUrls, loadPackageFonts, openCardTemplateArchive, packageFontCss,
@@ -30,8 +32,14 @@ export interface CardTemplateStyleSource {
 }
 
 export interface CardTemplateParsed {
-  manifest: CardTemplateManifest
-  pages: { cover: CardTemplatePageSource; body: CardTemplatePageSource; end?: CardTemplatePageSource }
+  manifest: ReedTemplateManifest
+  pages: {
+    cover?: CardTemplatePageSource
+    body?: CardTemplatePageSource
+    end?: CardTemplatePageSource
+    header?: CardTemplatePageSource
+    footer?: CardTemplatePageSource
+  }
   styles: CardTemplateStyleSource[]
   files: { path: string; bytes: ArrayBuffer }[]
 }
@@ -52,20 +60,33 @@ export interface CardTemplateSourceRecord {
   parsed: CardTemplateParsed
 }
 
-export interface LoadedCardTemplate {
+interface LoadedTemplateBase {
   template: string
   /** CSS key written to `data-template`, from manifest.renderId. */
   renderId: string
-  manifest: CardTemplateManifest
+  manifest: ReedTemplateManifest
   summary: CardTemplateSummary
-  pages: { cover: string; body: string; end: string }
   files: Map<string, CardTemplateArchiveFile>
   packageFontCss: string
   style: HTMLStyleElement | null
   fonts: FontFace[]
 }
 
-const LOADED = new Map<string, LoadedCardTemplate>()
+export interface LoadedCardTemplate extends LoadedTemplateBase {
+  kind: 'card'
+  manifest: CardTemplateManifest
+  pages: { cover: string; body: string; end: string }
+}
+
+export interface LoadedLongTemplate extends LoadedTemplateBase {
+  kind: 'long'
+  manifest: LongTemplateManifest
+  pages: { header: string; footer: string }
+}
+
+export type LoadedTemplate = LoadedCardTemplate | LoadedLongTemplate
+
+const LOADED = new Map<string, LoadedTemplate>()
 const STYLE_ID_PREFIX = 'reed-card-template-style-'
 
 export function customTemplateId(id: string): string {
@@ -73,7 +94,13 @@ export function customTemplateId(id: string): string {
 }
 
 export function getLoadedCardTemplate(template: string): LoadedCardTemplate | undefined {
-  return LOADED.get(template)
+  const loaded = LOADED.get(template)
+  return loaded?.kind === 'card' ? loaded : undefined
+}
+
+export function getLoadedLongTemplate(template: string): LoadedLongTemplate | undefined {
+  const loaded = LOADED.get(template)
+  return loaded?.kind === 'long' ? loaded : undefined
 }
 
 export function loadedCardTemplateSummaries(): CardTemplateSummary[] {
@@ -104,7 +131,7 @@ function decode(bytes: Uint8Array, what: string): string {
   }
 }
 
-function checkFontMagic(files: Map<string, CardTemplateArchiveFile>, manifest: CardTemplateManifest): void {
+function checkFontMagic(files: Map<string, CardTemplateArchiveFile>, manifest: ReedTemplateManifest): void {
   for (const font of manifest.fonts) {
     if (font.source !== 'package') continue
     const file = files.get(font.file)
@@ -119,24 +146,19 @@ export async function parseCardTemplateSource(raw: ArrayBuffer, id: string): Pro
   const files = archive.files
   checkFontMagic(files, archive.manifest)
   const validationAssets = placeholderAssets(files)
-  const pages: CardTemplateParsed['pages'] = {
-    cover: {
-      path: archive.manifest.pages.cover,
-      html: sanitizeTemplateHtml(decode(files.get(archive.manifest.pages.cover)!.bytes, 'cover'),
-        archive.manifest.pages.cover, { files, resolve: (path) => path }),
-    },
-    body: {
-      path: archive.manifest.pages.body,
-      html: sanitizeTemplateHtml(decode(files.get(archive.manifest.pages.body)!.bytes, 'body'),
-        archive.manifest.pages.body, { files, resolve: (path) => path }),
-    },
-    ...(archive.manifest.pages.end ? {
-      end: {
-        path: archive.manifest.pages.end,
-        html: sanitizeTemplateHtml(decode(files.get(archive.manifest.pages.end)!.bytes, 'end'),
-          archive.manifest.pages.end, { files, resolve: (path) => path }),
-      },
-    } : {}),
+  const manifest = archive.manifest
+  const pages: CardTemplateParsed['pages'] = {}
+  const page = (path: string, what: string): CardTemplatePageSource => ({
+    path,
+    html: sanitizeTemplateHtml(decode(files.get(path)!.bytes, what), path, { files, resolve: (value) => value }),
+  })
+  if (manifest.kind === 'long') {
+    if (manifest.pages.header) pages.header = page(manifest.pages.header, 'header')
+    if (manifest.pages.footer) pages.footer = page(manifest.pages.footer, 'footer')
+  } else {
+    pages.cover = page(manifest.pages.cover, 'cover')
+    pages.body = page(manifest.pages.body, 'body')
+    if (manifest.pages.end) pages.end = page(manifest.pages.end, 'end')
   }
   const styles: CardTemplateStyleSource[] = archive.manifest.styles.map((path) => {
     const css = decode(files.get(path)!.bytes, path)
@@ -154,7 +176,7 @@ export async function parseCardTemplateSource(raw: ArrayBuffer, id: string): Pro
     updatedAt: now,
     raw,
     parsed: {
-      manifest: archive.manifest,
+      manifest,
       pages,
       styles,
       files: [...files.values()].map((file) => ({
@@ -166,50 +188,88 @@ export async function parseCardTemplateSource(raw: ArrayBuffer, id: string): Pro
 }
 
 /** Re-validate stored sources and make the template available to the card UI. */
-export async function activateCardTemplate(record: CardTemplateSourceRecord): Promise<LoadedCardTemplate> {
+export async function activateCardTemplate(record: CardTemplateSourceRecord): Promise<LoadedTemplate> {
   const { parsed } = record
-  const manifest = parsed.manifest
+  // Packages stored before `customize` existed were parsed without it.
+  const manifest = { ...parsed.manifest, customize: parsed.manifest.customize ?? { colors: [], fonts: [] } }
   const renderId = manifest.renderId
   const files = filesFromParsed(parsed)
   const assetUrls = archiveAssetUrls(files)
-  const pages = {
-    cover: sanitizeTemplateHtml(parsed.pages.cover.html, parsed.pages.cover.path, { files, resolve: (path) => assetUrls.get(path) ?? null }),
-    body: sanitizeTemplateHtml(parsed.pages.body.html, parsed.pages.body.path, { files, resolve: (path) => assetUrls.get(path) ?? null }),
-    end: sanitizeTemplateHtml((parsed.pages.end ?? parsed.pages.body).html,
-      (parsed.pages.end ?? parsed.pages.body).path, { files, resolve: (path) => assetUrls.get(path) ?? null }),
-  }
-  const css = manifest.styles.map((path) => {
+  const styleCss = manifest.styles.map((path) => {
     const source = parsed.styles.find((style) => style.path === path)
     if (!source) throw new CardTemplateError('missing-file', path)
     return sanitizeTemplateCss(source.css, {
-      template: record.template, cssPath: path, files, assetUrls,
+      template: record.template, cssPath: path, files, assetUrls, kind: manifest.kind,
     })
   }).join('\n')
   deactivateCardTemplate(record.template)
   const style = document.createElement('style')
   style.id = STYLE_ID_PREFIX + record.id
   style.dataset.cardTemplateStyle = record.template
-  style.textContent = css
+  style.textContent = styleCss
   document.head.append(style)
   try {
     const fonts = await loadPackageFonts(manifest, files)
-    const loaded: LoadedCardTemplate = {
+    const base = {
       template: record.template,
       renderId,
       manifest,
       summary: summaryOf(record),
-      pages,
       files,
       packageFontCss: packageFontCss(manifest, files),
       style,
       fonts,
     }
-    LOADED.set(record.template, loaded)
-    registerCardTemplateRuntime(runtimeOf(loaded))
+    let loaded: LoadedTemplate
+    if (manifest.kind === 'long') {
+      const header = parsed.pages.header
+      const footer = parsed.pages.footer
+      const page = (source?: CardTemplatePageSource) => source
+        ? sanitizeTemplateHtml(source.html, source.path, { files, resolve: (path) => assetUrls.get(path) ?? null })
+        : ''
+      loaded = {
+        ...base,
+        kind: 'long',
+        manifest,
+        pages: { header: page(header), footer: page(footer) },
+      }
+      checkLongPages(loaded)
+      LOADED.set(record.template, loaded)
+      registerLongTemplateRuntime(runtimeOfLong(loaded))
+    } else {
+      const page = (source: CardTemplatePageSource | undefined, fallback?: CardTemplatePageSource) =>
+        sanitizeTemplateHtml((source ?? fallback)!.html, (source ?? fallback)!.path, {
+          files, resolve: (path) => assetUrls.get(path) ?? null,
+        })
+      loaded = {
+        ...base,
+        kind: 'card',
+        manifest,
+        pages: {
+          cover: page(parsed.pages.cover),
+          body: page(parsed.pages.body),
+          end: page(parsed.pages.end, parsed.pages.body),
+        },
+      }
+      LOADED.set(record.template, loaded)
+      registerCardTemplateRuntime(runtimeOf(loaded))
+    }
     return loaded
   } catch (error) {
     style.remove()
     throw error
+  }
+}
+
+/** The engine fills the cover slot itself; it must be an img element. */
+function checkLongPages(loaded: LoadedLongTemplate): void {
+  for (const html of [loaded.pages.header, loaded.pages.footer]) {
+    if (!html) continue
+    const holder = document.createElement('div')
+    holder.innerHTML = html
+    for (const element of Array.from(holder.querySelectorAll('[data-slot="cover"]'))) {
+      if (element.tagName !== 'IMG') throw new CardTemplateError('bad-manifest', 'cover slot must be an img element')
+    }
   }
 }
 
@@ -223,18 +283,20 @@ export function deactivateCardTemplate(template: string): void {
   }
   LOADED.delete(template)
   unregisterCardTemplateRuntime(template)
+  unregisterLongTemplateRuntime(template)
 }
 
 export function summaryOf(record: CardTemplateSourceRecord): CardTemplateSummary {
   const manifest = record.parsed.manifest
   return {
+    kind: manifest.kind,
     id: record.id,
     template: record.template,
     name: manifest.name,
     version: manifest.version,
     author: manifest.author,
     variants: manifest.variants.map((variant) => ({ id: variant.id, name: variant.name })),
-    ratios: [...manifest.ratios],
+    ratios: manifest.kind === 'card' ? [...manifest.ratios] : [],
   }
 }
 
@@ -254,6 +316,27 @@ function runtimeOf(loaded: LoadedCardTemplate): CardTemplateRuntime {
     fonts: manifest.fonts.map((font): CardFontFace => font.source === 'builtin'
       ? { family: font.family, weights: font.weights, styles: font.styles }
       : { family: font.family, weights: [font.weight], styles: [font.style] }),
+    customize: manifest.customize ?? { colors: [], fonts: [] },
+  }
+}
+
+function runtimeOfLong(loaded: LoadedLongTemplate): LongTemplateRuntime {
+  const manifest = loaded.manifest
+  return {
+    kind: 'long',
+    template: loaded.template,
+    name: manifest.name,
+    variants: manifest.variants.map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      accent: variant.tokens.accent,
+      dark: variant.dark,
+    })),
+    metrics: manifest.metrics,
+    fonts: manifest.fonts.map((font): CardFontFace => font.source === 'builtin'
+      ? { family: font.family, weights: font.weights, styles: font.styles }
+      : { family: font.family, weights: [font.weight], styles: [font.style] }),
+    customize: manifest.customize ?? { colors: [], fonts: [] },
   }
 }
 
@@ -317,6 +400,16 @@ function parseFragment(html: string): DocumentFragment {
 }
 
 /**
+ * An end page without a content slot is a closing page of its own (title,
+ * author) that follows the article. Using it as the frame of the last body
+ * page would drop that page's text, so it is added after the body pages
+ * instead. An end page that does place the content keeps framing the last page.
+ */
+export function cardEndIsExtraPage(loaded: LoadedCardTemplate): boolean {
+  return Boolean(loaded.manifest.pages.end) && !/data-slot\s*=\s*["']?content["'\s>]/.test(loaded.pages.end)
+}
+
+/**
  * Fill declarative slots with DOM nodes. Text values use `textContent`, and the
  * only HTML inserted is the engine's own rendered article, never template text.
  */
@@ -371,4 +464,72 @@ export function fragmentHtml(fragment: DocumentFragment): string {
   const holder = document.createElement('div')
   holder.append(fragment)
   return holder.innerHTML
+}
+
+export interface LongTemplatePageContext {
+  kind: 'header' | 'footer'
+  title: string
+  subtitle: string
+  /** Empty when the article has no cover image. */
+  coverSrc: string
+  author: string
+  contentHtml?: string
+  lang: 'zh' | 'en'
+}
+
+/**
+ * Fill one long-image fragment. Same declarative rules as cards plus
+ * `data-when-cover` and the engine-only `cover` slot.
+ */
+export function renderLongTemplatePage(
+  loaded: LoadedLongTemplate,
+  ctx: LongTemplatePageContext,
+  variant: string,
+  dark: boolean,
+): DocumentFragment {
+  const source = ctx.kind === 'header' ? loaded.pages.header : loaded.pages.footer
+  const fragment = parseFragment(source)
+  const hasCover = Boolean(ctx.coverSrc)
+  for (const element of Array.from(fragment.querySelectorAll('[data-when-variant], [data-when-dark], [data-when-cover]'))) {
+    const variants = (element.getAttribute('data-when-variant') ?? '').split(/\s+/).filter(Boolean)
+    if (variants.length && !variants.includes(variant)) {
+      element.remove()
+      continue
+    }
+    const darkExpectation = element.getAttribute('data-when-dark')
+    if (darkExpectation !== null && (darkExpectation === 'true') !== dark) {
+      element.remove()
+      continue
+    }
+    const coverExpectation = element.getAttribute('data-when-cover')
+    if (coverExpectation !== null && (coverExpectation === 'true') !== hasCover) element.remove()
+  }
+  for (const element of Array.from(fragment.querySelectorAll('[data-slot]'))) {
+    if (!fragment.contains(element)) continue
+    const slot = element.getAttribute('data-slot') ?? ''
+    if (slot === 'cover') {
+      if (!hasCover) {
+        element.remove()
+        continue
+      }
+      element.setAttribute('src', ctx.coverSrc)
+      element.setAttribute('alt', '')
+      continue
+    }
+    if (slot === 'content') {
+      element.replaceChildren(...Array.from(parseFragment(ctx.contentHtml ?? '').childNodes))
+      continue
+    }
+    const value = slotValue(slot, 1, 1, element.getAttribute('data-format') ?? undefined, {
+      kind: 'cover', pageIndex: 0, total: 1, title: ctx.title, subtitle: ctx.subtitle,
+      author: ctx.author, articleTitle: ctx.title, height: 0, lang: ctx.lang,
+    })
+    if (value === null) continue
+    element.textContent = value
+    const transform = element.getAttribute('data-transform')
+    if (transform === 'lowercase') element.textContent = value.toLowerCase()
+    if (transform === 'uppercase') element.textContent = value.toUpperCase()
+    if (!value && (slot === 'subtitle' || slot === 'title' || slot === 'author')) element.remove()
+  }
+  return fragment
 }

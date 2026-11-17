@@ -4,7 +4,7 @@
 LICENSE 全文副本，以及我们对各自的使用性质说明。
 
 - **抓取日期**：2026-10-07
-- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。2026-11-03 增加 DOMPurify 3.4.17，按双许可择一 Apache-2.0，与 AGPL-3.0-or-later 兼容。2026-11-04 增加九套公用卡片模板的三个上游（XHS-TextCard、uhhc/md2card、haodongcui/md2card，均 MIT），XHS-TextCard 的 NOTICE 一并保留。
+- **卡片功能补录**：2026-10-31，woodti/mopai 与两项导出依赖；包版本与许可按本机安装包的原文核对，JSZip 选择 MIT。2026-11-03 增加 DOMPurify 3.4.17，按双许可择一 Apache-2.0，与 AGPL-3.0-or-later 兼容。2026-11-04 增加九套公用卡片模板的三个上游（XHS-TextCard、uhhc/md2card、haodongcui/md2card，均 MIT），XHS-TextCard 的 NOTICE 一并保留。2026-11-12 增加 harfbuzzjs 1.6.4（MIT），用于读者自带字体的导出裁字。
 - **抓取方式**：从本地 shallow clone（`git clone --depth 1`）逐字复制 LICENSE 文件，未经任何修改、截断或重新排版。
 - **结构化数据**：[credits.ts](../src/lib/credits.ts) 是来源与使用性质的统一事实源，[References](https://wechat.yoru-and-akari.dev/references) 直接读它；[README](../README.md) 只保留入口。本文件保存许可证副本、核实时间、commit 与摘要；主题来源另见 [THEME-SOURCES](../THEME-SOURCES.md)。
 
@@ -18,6 +18,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | `woodti-mopai-LICENSE.txt` | github.com/woodti/mopai | MIT | `Copyright (c) 2026 woodti` | `0c2b2f8e983727da7c5b2b10fafb540c5ed70893`（2026-10-31 核实） | `bbb1ee83d5221d4efdc7c663f4944749` |
 | `html-to-image-LICENSE.txt` | github.com/bubkoo/html-to-image | MIT | `Copyright (c) 2017-2025 W.Y.` | npm `html-to-image@1.11.13`（2026-10-31 核实） | `3eeb2e7abce2370a4f5e29e4b46e28b0` |
 | `jszip-LICENSE.markdown` | github.com/Stuk/jszip | MIT（双许可择一） | `Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso` | npm `jszip@3.10.2`（2026-10-31 核实） | `28c4d6943c892a3c61ac2aaa5d781861` |
+| `harfbuzzjs-LICENSE.txt` | github.com/harfbuzz/harfbuzzjs | MIT | `Copyright (c) 2019-2026 The harfbuzzjs project authors` | npm `harfbuzzjs@1.6.4`（2026-11-12 核实） | `474d986a0eca91c2848386aabb5b1fe2` |
 | `dompurify-LICENSE.txt` | github.com/cure53/DOMPurify | Apache-2.0（MPL-2.0 / Apache-2.0 双许可，本项目选择 Apache-2.0） | 标准 Apache 2.0 附录；npm `author`: `Dr.-Ing. Mario Heiderich, Cure53 <mario@cure53.de>` | npm `dompurify@3.4.17`（2026-11-03 核实） | `3b83ef96387f14655fc854ddc3c6bd57` |
 | `doocs-md-LICENSE.txt` | github.com/doocs/md | **WTFPL**（DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE, Version 2, December 2004） | `Copyright (C) 2025 Doocs <admin@doocs.org>` | `a7c17fc`（2026-09-29） | `3bb7c32637627c1ab12bc7cd873b7aa0` |
 | `laogou717-md-wechat-LICENSE.txt` | github.com/laogou717/md-wechat | MIT | `Copyright (c) 2026 字间排版` | `8a21962`（2026-09-02） | `23972954ac1a477e76be78b98dfd25a2` |
@@ -62,7 +63,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 ### 许可传染性结论
 
 <!-- BEGIN GENERATED: notice-license-tally — npm run sync:docs -->
-**15个上游项目全部是宽松许可：MIT × 10、Apache-2.0 × 4、WTFPL v2 × 1。
+**16个上游项目全部是宽松许可：MIT × 11、Apache-2.0 × 4、WTFPL v2 × 1。
 没有任何 GPL / LGPL / AGPL / MPL / SSPL / BUSL 等 copyleft 或 source-available 许可，
 也没有任何项目缺失 LICENSE 文件。**
 <!-- END GENERATED: notice-license-tally -->
@@ -145,6 +146,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | [woodti/mopai](https://github.com/woodti/mopai) | MIT | `Copyright (c) 2026 woodti` | `LICENSES/woodti-mopai-LICENSE.txt` |
 | [html-to-image](https://github.com/bubkoo/html-to-image) | MIT | `Copyright (c) 2017-2025 W.Y.` | `LICENSES/html-to-image-LICENSE.txt` |
 | [DOMPurify](https://github.com/cure53/DOMPurify) | Apache-2.0 | `Cure53 and DOMPurify contributors` | `LICENSES/dompurify-LICENSE.txt` |
+| [harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs) | MIT | `Copyright (c) 2019-2026 The harfbuzzjs project authors` | `LICENSES/harfbuzzjs-LICENSE.txt` |
 | [XHS-TextCard](https://github.com/geekfoxcharlie/XHS-TextCard) | MIT | `Copyright (c) 2026 geekfoxcharlie` | `LICENSES/geekfoxcharlie-XHS-TextCard-LICENSE.txt` |
 | [md2card（uhhc）](https://github.com/uhhc/md2card) | MIT | `Copyright (c) 2026 uhhc` | `LICENSES/uhhc-md2card-LICENSE.txt` |
 | [md2card（Haodong Cui）](https://github.com/haodongcui/md2card) | MIT | `Copyright (c) 2026 Haodong Cui` | `LICENSES/haodongcui-md2card-LICENSE.txt` |
@@ -158,7 +160,7 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 | [wenyan](https://github.com/caol64/wenyan) | Apache-2.0 | `标准 Apache 2.0 附录，未填写具体版权人（package.json author: Lei <caol64@gmail.com>）` | `LICENSES/caol64-wenyan-LICENSE.txt` |
 | [editor（foolgry）](https://github.com/foolgry/editor) | MIT | `Copyright (c) 2024 花生 (alchaincyf)` | `LICENSES/foolgry-editor-LICENSE.txt` |
 
-15 个上游全部是宽松许可：MIT × 10、Apache-2.0 × 4、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
+16 个上游全部是宽松许可：MIT × 11、Apache-2.0 × 4、WTFPL v2 × 1。**没有 GPL / AGPL / SSPL 一类 copyleft，也没有任何项目缺失 LICENSE 文件**——所以这些上游对本项目自己选开源许可证不构成传染性约束。
 
 6 点需要留意：
 
@@ -180,6 +182,10 @@ LICENSE 全文副本，以及我们对各自的使用性质说明。
 **[DOMPurify](https://github.com/cure53/DOMPurify)**（Apache-2.0，Cure53 and contributors）
 
 - 运行时依赖 dompurify 3.4.17，用于上传的卡片模板 HTML 白名单过滤；模板里的 script、事件属性、iframe / form / foreignObject 与外部 URL 都在进入 DOM 前被拒绝。
+
+**[harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs)**（MIT，The harfbuzzjs project authors）
+
+- 运行时依赖 harfbuzzjs，锁定 1.6.4；只用其中的 harfbuzz-subset.wasm，在导出卡片 / 长图时按需加载，把读者自己添加的 .ttf / .otf 字体裁成只含图里用到的字再内嵌进 PNG。字体文件不离开浏览器。
 
 **[JSZip](https://github.com/Stuk/jszip)**（MIT，Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso）
 

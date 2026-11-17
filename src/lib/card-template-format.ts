@@ -9,7 +9,7 @@
  */
 import {
   BUILTIN_CARD_FONT_FACES, CARD_RATIOS, CARD_TEMPLATES, CARD_WIDTH,
-  type CardFontFace, type CardMeasurements, type CardRatio,
+  type CardFontFace, type CardMeasurements, type CardRatio, type LongImageMetrics,
 } from './cards'
 
 export const CARD_TEMPLATE_FORMAT = 'reed-card-template'
@@ -32,6 +32,8 @@ export const CARD_TEMPLATE_LIMITS = {
   imageBytes: 2 * 1024 * 1024,
   variants: 16,
   styles: 8,
+  customColors: 10,
+  customFonts: 4,
   fonts: 24,
   title: 120,
 } as const
@@ -39,6 +41,9 @@ export const CARD_TEMPLATE_LIMITS = {
 export const CARD_TEMPLATE_ALLOWED_EXTENSIONS = [
   '.json', '.html', '.css', '.woff2', '.woff', '.png', '.jpg', '.jpeg', '.webp', '.svg',
 ] as const
+
+export const TEMPLATE_KINDS = ['card', 'long'] as const
+export type TemplateKind = typeof TEMPLATE_KINDS[number]
 
 export type CardTemplateVariantToken = 'accent' | 'text' | 'muted'
 
@@ -64,6 +69,30 @@ export interface CardTemplatePackageFont {
 
 export type CardTemplateFont = CardTemplateBuiltinFont | CardTemplatePackageFont
 
+/**
+ * What a reader may change without editing the package: CSS custom properties
+ * the template already reads for colours and font stacks. The engine writes a
+ * picked value onto the card page / long-image root as an inline declaration,
+ * so the property must be declared on that root (or inherited from it).
+ */
+export interface TemplateCustomizeSlot {
+  /** A custom property name such as `--accent`. */
+  var: string
+  /** Shown beside the swatch or font menu. */
+  name: string
+}
+
+export interface TemplateCustomize {
+  colors: TemplateCustomizeSlot[]
+  fonts: TemplateCustomizeSlot[]
+}
+
+/** Long images have no fixed page: header and footer are both optional. */
+export interface LongTemplatePages {
+  header?: string
+  footer?: string
+}
+
 export interface CardTemplatePages {
   cover: string
   body: string
@@ -74,6 +103,8 @@ export interface CardTemplatePages {
 export interface CardTemplateManifest {
   format: typeof CARD_TEMPLATE_FORMAT
   formatVersion: typeof CARD_TEMPLATE_FORMAT_VERSION
+  /** Absent in a package means `card`; the parser always fills it in. */
+  kind: 'card'
   id: string
   /**
    * The value written to `data-template` for CSS matching. Defaults to `id`.
@@ -92,7 +123,30 @@ export interface CardTemplateManifest {
   fonts: CardTemplateFont[]
   pages: CardTemplatePages
   styles: string[]
+  customize: TemplateCustomize
 }
+
+/** A long-image template: same archive, no ratios and two optional fragments. */
+export interface LongTemplateManifest {
+  format: typeof CARD_TEMPLATE_FORMAT
+  formatVersion: typeof CARD_TEMPLATE_FORMAT_VERSION
+  kind: 'long'
+  id: string
+  renderId: string
+  name: string
+  version: string
+  author: string
+  description: string
+  variants: CardTemplateVariant[]
+  metrics: LongImageMetrics
+  fonts: CardTemplateFont[]
+  pages: LongTemplatePages
+  styles: string[]
+  customize: TemplateCustomize
+}
+
+/** Every `.reedcard` manifest, discriminated by `kind`. */
+export type ReedTemplateManifest = CardTemplateManifest | LongTemplateManifest
 
 export type CardTemplateErrorCode =
   | 'archive-too-large'
@@ -332,14 +386,59 @@ function parseFonts(value: unknown, files: ReadonlySet<string>): CardTemplateFon
   })
 }
 
+const CUSTOM_VAR_RE = /^--[a-z][a-z0-9-]{0,47}$/
+/** Engine-owned properties: metrics and accents the renderer writes itself. */
+const RESERVED_VAR_RE = /^--(xhs|long|reed)-/
+
+function parseCustomizeSlots(value: unknown, where: string, max: number, seen: Set<string>): TemplateCustomizeSlot[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) bad(`${where} 必须是数组`)
+  if (value.length > max) bad(`${where} 最多 ${max} 项`)
+  return value.map((entry, index) => {
+    const slot = record(entry, `${where}[${index}]`)
+    onlyKeys(slot, ['var', 'name'], `${where}[${index}]`)
+    const name = text(slot.var, `${where}[${index}].var`, 49)
+    if (!CUSTOM_VAR_RE.test(name)) bad(`${where}[${index}].var 必须是 --小写字母开头的变量名`)
+    if (RESERVED_VAR_RE.test(name)) bad(`${where}[${index}].var 不能用引擎保留的 ${name}`)
+    if (seen.has(name)) bad(`customize 里的变量重复: ${name}`)
+    seen.add(name)
+    return { var: name, name: text(slot.name, `${where}[${index}].name`, 20) }
+  })
+}
+
+function parseCustomize(value: unknown): TemplateCustomize {
+  if (value === undefined) return { colors: [], fonts: [] }
+  const c = record(value, 'customize')
+  onlyKeys(c, ['colors', 'fonts'], 'customize')
+  const seen = new Set<string>()
+  return {
+    colors: parseCustomizeSlots(c.colors, 'customize.colors', CARD_TEMPLATE_LIMITS.customColors, seen),
+    fonts: parseCustomizeSlots(c.fonts, 'customize.fonts', CARD_TEMPLATE_LIMITS.customFonts, seen),
+  }
+}
+
+function parseLongMetrics(value: unknown): LongImageMetrics {
+  const m = record(value, 'metrics')
+  onlyKeys(m, ['padX', 'contentWidth', 'photoGap', 'photoInset'], 'metrics')
+  const metrics: LongImageMetrics = {
+    padX: number(m.padX, 'metrics.padX', 0, 140),
+    contentWidth: number(m.contentWidth, 'metrics.contentWidth', 200, CARD_WIDTH),
+    photoGap: number(m.photoGap, 'metrics.photoGap', 0, 60),
+    photoInset: number(m.photoInset, 'metrics.photoInset', 0, 80),
+  }
+  if (metrics.contentWidth + metrics.padX * 2 > CARD_WIDTH) bad('metrics.contentWidth + 2 × padX 超出 540px 画布')
+  return metrics
+}
+
 export function parseCardTemplateManifest(
   value: unknown,
   files: ReadonlySet<string>,
-): CardTemplateManifest {
+): ReedTemplateManifest {
   const m = record(value, 'manifest')
+  const kind = m.kind === undefined ? 'card' : oneOf(m.kind, TEMPLATE_KINDS, 'kind')
   onlyKeys(m, [
-    'format', 'formatVersion', 'id', 'renderId', 'name', 'version', 'author', 'description',
-    'ratios', 'defaultRatio', 'variants', 'metrics', 'fonts', 'pages', 'styles',
+    'format', 'formatVersion', 'kind', 'id', 'renderId', 'name', 'version', 'author', 'description',
+    'ratios', 'defaultRatio', 'variants', 'metrics', 'fonts', 'pages', 'styles', 'customize',
   ], 'manifest')
   if (m.format !== CARD_TEMPLATE_FORMAT) bad(`format 必须是 ${CARD_TEMPLATE_FORMAT}`)
   if (m.formatVersion !== CARD_TEMPLATE_FORMAT_VERSION) bad(`formatVersion 必须是 ${CARD_TEMPLATE_FORMAT_VERSION}`)
@@ -355,6 +454,45 @@ export function parseCardTemplateManifest(
   }
   const version = text(m.version, 'version', 40)
   if (!VERSION_RE.test(version)) bad('version 必须是 1.0.0 这样的版本号')
+  const variants = parseVariants(m.variants)
+  const fonts = parseFonts(m.fonts, files)
+  if (!Array.isArray(m.styles) || !m.styles.length) bad('styles 至少要有 1 个 CSS 文件')
+  if (m.styles.length > CARD_TEMPLATE_LIMITS.styles) bad(`styles 最多 ${CARD_TEMPLATE_LIMITS.styles} 个`)
+  const styles = [...new Set(m.styles.map((style, index) =>
+    checkFile(normalizeTemplatePath(text(style, `styles[${index}]`, 240), `styles[${index}]`),
+      files, `styles[${index}]`, ['.css'])))]
+  if (styles.length !== m.styles.length) bad('styles 不能重复')
+  const common = {
+    format: CARD_TEMPLATE_FORMAT,
+    formatVersion: CARD_TEMPLATE_FORMAT_VERSION,
+    id,
+    renderId,
+    name: text(m.name, 'name', 80),
+    version,
+    author: text(m.author, 'author', 80),
+    description: text(m.description, 'description', 500, false),
+    variants,
+    fonts,
+    styles,
+    customize: parseCustomize(m.customize),
+  } as const
+
+  if (kind === 'long') {
+    // Long templates have no page ratios and no cover metrics. Reject those
+    // keys instead of silently ignoring a card manifest pasted into a long
+    // package: a half-applied declaration is harder to diagnose than a no.
+    if (m.ratios !== undefined || m.defaultRatio !== undefined) bad('长图模板不接受 ratios / defaultRatio')
+    const pagesIn = m.pages === undefined ? {} : record(m.pages, 'pages')
+    onlyKeys(pagesIn, ['header', 'footer'], 'pages')
+    const pages: LongTemplatePages = {}
+    for (const key of ['header', 'footer'] as const) {
+      if (pagesIn[key] === undefined) continue
+      pages[key] = checkFile(normalizeTemplatePath(text(pagesIn[key], `pages.${key}`, 240), `pages.${key}`),
+        files, `pages.${key}`, ['.html'])
+    }
+    return { ...common, kind: 'long', metrics: parseLongMetrics(m.metrics), pages }
+  }
+
   if (!Array.isArray(m.ratios) || !m.ratios.length) bad('ratios 至少要有一种比例')
   const ratios = [...new Set(m.ratios.map((ratio, index) =>
     oneOf(ratio, Object.keys(CARD_RATIOS) as CardRatio[], `ratios[${index}]`)))]
@@ -373,34 +511,12 @@ export function parseCardTemplateManifest(
         files, 'pages.end', ['.html']),
     }),
   }
-  if (!Array.isArray(m.styles) || !m.styles.length) bad('styles 至少要有 1 个 CSS 文件')
-  if (m.styles.length > CARD_TEMPLATE_LIMITS.styles) bad(`styles 最多 ${CARD_TEMPLATE_LIMITS.styles} 个`)
-  const styles = [...new Set(m.styles.map((style, index) =>
-    checkFile(normalizeTemplatePath(text(style, `styles[${index}]`, 240), `styles[${index}]`),
-      files, `styles[${index}]`, ['.css'])))]
-  if (styles.length !== m.styles.length) bad('styles 不能重复')
-
-  return {
-    format: CARD_TEMPLATE_FORMAT,
-    formatVersion: CARD_TEMPLATE_FORMAT_VERSION,
-    id,
-    renderId,
-    name: text(m.name, 'name', 80),
-    version,
-    author: text(m.author, 'author', 80),
-    description: text(m.description, 'description', 500, false),
-    ratios,
-    defaultRatio,
-    variants: parseVariants(m.variants),
-    metrics: parseMetrics(m.metrics),
-    fonts: parseFonts(m.fonts, files),
-    pages,
-    styles,
-  }
+  return { ...common, kind: 'card', ratios, defaultRatio, metrics: parseMetrics(m.metrics), pages }
 }
 
 /** Summaries shown in the picker, without keeping the archive in memory. */
 export interface CardTemplateSummary {
+  kind: TemplateKind
   id: string
   name: string
   version: string

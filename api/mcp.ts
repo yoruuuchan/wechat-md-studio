@@ -26,6 +26,32 @@ function withGrant(token: string, action: () => ReturnType<typeof jsonResult> | 
   }
 }
 
+/**
+ * Resource reads cannot return `isError` the way tools do; the SDK turns a
+ * thrown error into a JSON-RPC error and takes `code` from it. A lost grant or
+ * vanished document answers "resource not found" (-32002 in the MCP spec) with
+ * the same plain reason the tools give; anything else is logged and answered
+ * generically, so internal error text never reaches the client.
+ */
+class ResourceReadError extends Error {
+  constructor(readonly code: number, message: string) {
+    super(message)
+  }
+}
+const RESOURCE_NOT_FOUND = -32002
+const INTERNAL_ERROR = -32603
+
+function readWithGrant<T>(token: string, read: () => T): T {
+  try {
+    readTokenConnection(token)
+    return read()
+  } catch (error) {
+    if (error instanceof RemoteMcpError) throw new ResourceReadError(RESOURCE_NOT_FOUND, error.message)
+    console.error('[remote-mcp] resource read failed')
+    throw new ResourceReadError(INTERNAL_ERROR, '协作服务暂时不可用，请稍后重试')
+  }
+}
+
 function createServer(token: string, origin: string): McpServer {
   const server = new McpServer(
     { name: 'wechat-md-studio', title: '芦苇 Reed', version: '1.0.0' },
@@ -54,13 +80,14 @@ function createServer(token: string, origin: string): McpServer {
   }))
   server.registerResource('writing-skill', `${origin}/skill.md`, {
     title: '芦苇写作 Skill', mimeType: 'text/markdown',
-  }, (uri) => {
-    readTokenConnection(token)
-    return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: writingSkill }] }
-  })
+  }, (uri) => readWithGrant(token, () => ({
+    contents: [{ uri: uri.href, mimeType: 'text/markdown', text: writingSkill }],
+  })))
   server.registerResource('current-document', 'mopai://document/current', {
     title: '当前授权稿件', mimeType: 'application/json',
-  }, (uri) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(readTokenConnection(token)) }] }))
+  }, (uri) => readWithGrant(token, () => ({
+    contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(readTokenConnection(token)) }],
+  })))
   return server
 }
 

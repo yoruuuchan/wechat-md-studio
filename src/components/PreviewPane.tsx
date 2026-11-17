@@ -5,6 +5,7 @@ import { fillBlockOffsets } from '@/lib/sync-scroll'
 import { serializeWechatSelection } from '@/lib/selection-copy'
 import type { PreviewScrollHandle } from '@/hooks/useSyncScroll'
 import { useI18n } from '@/hooks/useI18n'
+import { ensureFontSheetsFor } from '@/lib/font-catalog'
 
 interface Props {
   html: string
@@ -34,6 +35,8 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
 ) {
   const { t } = useI18n()
   const article = useMemo(() => ({ __html: html }), [html])
+  // Themes may name a family from a sheet that is not on the first paint.
+  useEffect(() => { if (html) void ensureFontSheetsFor(html) }, [html])
   const scrollerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const onScrollRef = useRef(onScroll)
@@ -194,7 +197,7 @@ const PreviewPane = forwardRef<PreviewScrollHandle, Props>(function PreviewPane(
             className="shrink-0 rounded-[4px] bg-white transition-all duration-300"
             style={{ width, boxShadow: 'var(--shadow-lifted)' }}
           >
-            <div ref={contentRef} className="px-1 py-6" onCopy={handleCopy} dangerouslySetInnerHTML={article} />
+            <div ref={contentRef} data-preview-article className="px-1 py-6" onCopy={handleCopy} dangerouslySetInnerHTML={article} />
           </div>
         </div>
       </div>

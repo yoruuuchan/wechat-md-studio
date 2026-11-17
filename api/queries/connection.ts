@@ -170,6 +170,23 @@ function openDatabase(): DatabaseSync {
       ON card_template_tombstones (ownerId, deletedAt DESC);
   `)
 
+  // Owner-only cloud drafts of the motion composer (/motion/): the composer's
+  // own JSON as text, with what the list shows beside it. CREATE IF NOT EXISTS
+  // is the whole migration because no earlier release had this table.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS motion_drafts (
+      id TEXT PRIMARY KEY,
+      ownerId INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      scenes INTEGER NOT NULL,
+      size INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      body TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS motion_drafts_owner_updated
+      ON motion_drafts (ownerId, updatedAt DESC);
+  `)
+
   // One-off data migrations, recorded so they never run twice.
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (

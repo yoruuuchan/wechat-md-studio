@@ -4,17 +4,15 @@
 // - THEME_BY_ID：按 id 取目录条目（顶栏、收藏、来源信息用）；
 // - theme implementation 走 theme-api.ts 的 loadTheme / loadAllThemes。
 //
-// 自研与手写主题的目录条目从主题对象即时派生；导入主题的目录由
-// scripts/themes/import.ts 与 pack 一起生成到 themes-imported/catalog.ts，
-// 两边共用 theme-meta 的 catalogEntryOf，字段口径不会分叉。
+// 自研、手写与设计主题的目录由 scripts/themes/local-catalog.ts 用 catalogEntryOf
+// 生成到 themes-local-catalog.ts（过期时 theme-local-catalog.test.ts 会失败）；
+// 导入主题的目录由 scripts/themes/import.ts 与 pack 一起生成到
+// themes-imported/catalog.ts。两边都不带渲染实现。
 import type { ThemeCatalogEntry } from './theme-meta'
-import { catalogEntryOf } from './theme-meta'
-import { CORE_THEMES } from './themes-core'
-import { EXTRA_THEMES } from './themes-extra'
-import { DESIGN_THEMES } from './themes-design'
+import { LOCAL_THEME_CATALOG } from './themes-local-catalog'
 import { IMPORTED_THEME_COUNT, IMPORTED_THEME_CATALOG } from './themes-imported/catalog'
 
-const LOCAL_CATALOG: ThemeCatalogEntry[] = [...CORE_THEMES, ...EXTRA_THEMES, ...DESIGN_THEMES].map(catalogEntryOf)
+const LOCAL_CATALOG: ThemeCatalogEntry[] = LOCAL_THEME_CATALOG
 
 /** 顺序与完整注册表一致：自研 → 手写 → 导入 pack 顺序。 */
 export const THEME_CATALOG: ThemeCatalogEntry[] = [...LOCAL_CATALOG, ...IMPORTED_THEME_CATALOG]

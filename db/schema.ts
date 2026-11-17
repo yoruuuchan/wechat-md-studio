@@ -146,6 +146,25 @@ export const cardTemplateTombstones = sqliteTable("card_template_tombstones", {
 export type CardTemplateTombstoneRow = typeof cardTemplateTombstones.$inferSelect;
 
 /**
+ * Owner-only cloud drafts of the motion composer (the page at /motion/). One
+ * row is one whole article: `body` is the composer's own JSON, which the server
+ * keeps as text and never interprets beyond counting its scenes for the list.
+ * `size` is that text in UTF-8 bytes; `ownerId` scopes rows like docs.
+ */
+export const motionDrafts = sqliteTable("motion_drafts", {
+  id: text("id").primaryKey(),
+  ownerId: integer("ownerId").notNull(),
+  name: text("name").notNull(),
+  scenes: integer("scenes").notNull(),
+  size: integer("size").notNull(),
+  /** Milliseconds, like the card templates' `uploadedAt`. */
+  updatedAt: integer("updatedAt").notNull(),
+  body: text("body").notNull(),
+});
+
+export type MotionDraftRow = typeof motionDrafts.$inferSelect;
+
+/**
  * Single-owner deployment: the app authenticates with one access key, so there
  * is no user table. This shape is kept so upload code can keep referring to
  * `ctx.user` exactly as it did before.

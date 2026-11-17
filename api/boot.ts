@@ -16,6 +16,7 @@ import { writingSkill } from "./lib/writing-skill";
 import { remoteMcpRouter } from "./remote-mcp-router";
 import { feedbackRouter } from "./feedback-router";
 import { cardTemplatesRouter } from "./card-templates-router";
+import { motionDraftsRouter } from "./motion-drafts-router";
 import { handleMcpRequest } from "./mcp";
 import { startRemoteMcpCleanup } from "./lib/remote-mcp";
 
@@ -43,6 +44,11 @@ app.all("/api/mcp", handleMcpRequest);
 app.route("/api/feedback", feedbackRouter);
 // Owner-only cloud archive for uploaded card templates; same session as docs.
 app.route("/api/card-templates", cardTemplatesRouter);
+// Owner-only cloud drafts of the motion composer served at /motion/.
+app.route("/api/motion-drafts", motionDraftsRouter);
+
+// The composer's page addresses its scripts relative to /motion/.
+app.get("/motion", (c) => c.redirect("/motion/", 308));
 
 // Public image read: stable address, redirects to the R2 worker.
 // Copied WeChat HTML references this stable address, so the key space can never

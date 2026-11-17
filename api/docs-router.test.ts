@@ -354,6 +354,115 @@ describe('importLocal', () => {
       content: '批量正文 500',
     })
   })
+
+  it('moves a 205-article backup in 100 / 100 / 5 batches and keeps every full body', async () => {
+    const bulk = client(23)
+    const incoming = Array.from({ length: 205 }, (_, i) => ({
+      id: `chunk-import-${i}`,
+      name: `分批稿件 ${i}`,
+      content: `---\ntitles:\n  - 分批稿件 ${i}\n---\n\n## 第 ${i} 节\n\n正文 ${i} BODY-MARKER-${i}-END`,
+      updatedAt: 1_700_100_000_000 + i,
+      baseHash: null,
+    }))
+
+    // The client-side batching contract is what the browser sends: exact
+    // 100-article requests, a short final chunk, and a per-id stored hash.
+    const requestSizes: number[] = []
+    let imported = 0
+    for (let i = 0; i < incoming.length; i += 100) {
+      const batch = incoming.slice(i, i + 100)
+      requestSizes.push(batch.length)
+      const res = await bulk.importLocal({ docs: batch })
+      expect(res.imported).toBe(batch.length)
+      for (const entry of batch) {
+        expect(res.hashes[entry.id]).toBe(await documentHash(entry.name, entry.content))
+      }
+      imported += res.imported
+    }
+    expect(requestSizes).toEqual([100, 100, 5])
+    expect(imported).toBe(205)
+
+    // Every one of the 205 rows comes back with its complete name and body.
+    // getMany takes at most 200 ids, so this is two calls, not 205 `get`s.
+    const head = await bulk.getMany({ ids: incoming.slice(0, 200).map((d) => d.id) })
+    const tail = await bulk.getMany({ ids: incoming.slice(200).map((d) => d.id) })
+    const stored = [...head.docs, ...tail.docs]
+    expect(stored).toHaveLength(205)
+    for (const expected of incoming) {
+      const row = stored.find((d) => d.id === expected.id)
+      expect(row).toBeDefined()
+      expect(row!.name).toBe(expected.name)
+      expect(row!.content).toBe(expected.content)
+      expect(row!.hash).toBe(await documentHash(expected.name, expected.content))
+      // An import is a working copy until the owner saves it to the drafts box.
+      expect(row!.savedAt).toBeNull()
+    }
+    expect((await bulk.get({ id: 'chunk-import-204' })).doc?.content).toBe(
+      incoming[204].content,
+    )
+
+    // Working copies are listed (savedAt null), but do not appear in drafts.
+    const firstPage = await bulk.list({ limit: 200, offset: 0 })
+    expect(firstPage.total).toBe(205)
+    expect(firstPage.items).toHaveLength(200)
+    expect(firstPage.hasMore).toBe(true)
+    expect(firstPage.items.every((d) => d.savedAt === null)).toBe(true)
+    const secondPage = await bulk.list({ limit: 200, offset: 200 })
+    expect(secondPage.items).toHaveLength(5)
+    expect(secondPage.hasMore).toBe(false)
+
+    const drafts = await bulk.drafts({ limit: 200, offset: 0 })
+    expect(drafts.total).toBe(0)
+    expect(drafts.items).toEqual([])
+  })
+
+  it('answers a same-id replay with the stored hash and never overwrites the body', async () => {
+    const replay = client(24)
+    const firstBody = '第一次导入的正文 ==保留=='
+    const first = await replay.importLocal({
+      docs: [
+        {
+          id: 'replay-1',
+          name: '重放稿',
+          content: firstBody,
+          updatedAt: 1_700_200_000_000,
+          baseHash: null,
+        },
+      ],
+    })
+    expect(first.imported).toBe(1)
+    const storedHash = await documentHash('重放稿', firstBody)
+    expect(first.hashes['replay-1']).toBe(storedHash)
+
+    // A replay with a different body is insert-only: nothing is overwritten,
+    // and the reply's hash is the server's row, not the incoming text.
+    const incomingBody = '重放时不一样的正文 ==新=='
+    const replayRes = await replay.importLocal({
+      docs: [
+        {
+          id: 'replay-1',
+          name: '重放稿',
+          content: incomingBody,
+          updatedAt: 1_700_200_999_000,
+          baseHash: null,
+        },
+      ],
+    })
+    expect(replayRes.imported).toBe(0)
+    expect(replayRes.hashes['replay-1']).toBe(storedHash)
+    expect(replayRes.hashes['replay-1']).not.toBe(
+      await documentHash('重放稿', incomingBody),
+    )
+
+    const got = await replay.get({ id: 'replay-1' })
+    expect(got.doc?.content).toBe(firstBody)
+    expect(got.doc?.hash).toBe(storedHash)
+    expect(got.doc?.savedAt).toBeNull()
+    expect((await replay.list({ limit: 200, offset: 0 })).items.map((d) => d.id)).toEqual([
+      'replay-1',
+    ])
+    expect((await replay.drafts({ limit: 200, offset: 0 })).items).toEqual([])
+  })
 })
 
 describe('the metadata list', () => {

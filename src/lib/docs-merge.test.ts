@@ -167,17 +167,38 @@ describe('the login merge', () => {
     expect(plan.toImport.map((d) => d.id)).toEqual([sample.id])
   })
 
-  it('treats an article in the cloud bin as present, not missing', async () => {
-    const local = localDoc({ id: 'binny', content: '本机这份', savedAt: NOW, baseHash: 'h' })
+  it('keeps an article in the cloud bin as an unarchived working copy, body and restore base intact', async () => {
+    const local = localDoc({ id: 'binny', name: '回收站里的稿', content: '本机这份', savedAt: NOW, baseHash: 'h' })
     const plan = await planMerge({ local: [local], remote: [], trashedIds: new Set(['binny']) })
     expect(plan.toImport).toEqual([])
-    expect(plan.docs[0]).toMatchObject({ id: 'binny', savedAt: NOW, content: '本机这份' })
+    expect(plan.docs[0]).toMatchObject({
+      id: 'binny',
+      name: '回收站里的稿',
+      content: '本机这份',
+      savedAt: null,
+      baseHash: 'h',
+      contentLoaded: true,
+    })
+    // The drafts box does not show this article, so the merge may not claim it.
+    expect(plan.unarchived).toEqual(['binny'])
+    expect(plan.notices.join('\n')).toContain('回收站')
   })
 
-  it('brings an archived local-only article back as a working copy, with a notice', async () => {
-    const local = localDoc({ id: 'purged', name: '被删的稿', content: '本机还有', savedAt: NOW })
+  it('brings an archived local-only article back as one working copy for both the state and the upload', async () => {
+    const local = localDoc({ id: 'purged', name: '被删的稿', content: '本机还有', savedAt: NOW, baseHash: 'base-1' })
     const plan = await planMerge({ local: [local], remote: [] })
     expect(plan.toImport.map((d) => d.id)).toEqual(['purged'])
+    const kept = plan.docs.find((d) => d.id === 'purged')!
+    // Exactly the record that will be uploaded: the two lists cannot disagree.
+    expect(kept).toBe(plan.toImport[0])
+    expect(kept).toMatchObject({
+      savedAt: null,
+      name: '被删的稿',
+      content: '本机还有',
+      baseHash: 'base-1',
+      contentLoaded: true,
+    })
+    expect(plan.unarchived).toEqual(['purged'])
     expect(plan.notices.join('\n')).toContain('在云端已经没有了')
   })
 
