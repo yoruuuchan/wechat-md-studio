@@ -274,10 +274,10 @@ export const yoruTypeTheme: Theme & ThemeExtensions = {
       .join('')}</section>`,
 
   imageBlock: (src, caption) => {
-    const capStyle = `margin:0 20px 0;font-size:13px;line-height:1.55;letter-spacing:.04em;text-align:center;text-indent:0;color:${YORU_INK_3};`
+    const capStyle = `margin:24px 0;font-size:13px;line-height:1.55;letter-spacing:.04em;text-align:center;text-indent:0;color:${YORU_INK_3};`
     const cap = `<p style="${capStyle}">${figureCaption(caption, `font-family:${MONO};font-size:12px;color:${YORU_ACCENT};letter-spacing:.08em;`, 'letter-spacing:.04em;')}</p>`
     if (!src) return `<p style="margin:26px 20px;font-size:13px;line-height:1.55;letter-spacing:.04em;text-align:center;text-indent:0;color:${YORU_INK_3};">${plainCaption(caption)}</p>`
-    return `<section style="margin:0 0 30px;"><p style="margin:30px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${YORU_LINE_2};border-radius:2px;box-shadow:0 1px 2px rgba(17,24,39,.05),0 8px 24px rgba(17,24,39,.07);" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 30px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${YORU_LINE_2};border-radius:2px;box-shadow:0 1px 2px rgba(17,24,39,.05),0 8px 24px rgba(17,24,39,.07);" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -435,10 +435,10 @@ export const paperEditorialTheme: Theme & ThemeExtensions = {
       .join('')}</section>`,
 
   imageBlock: (src, caption) => {
-    const capStyle = `margin:0 20px 0;font-family:${PAPER_SANS};font-size:12px;line-height:1.55;letter-spacing:.14em;text-align:left;text-indent:0;color:${PAPER_MUTED};`
+    const capStyle = `margin:24px 0;font-family:${PAPER_SANS};font-size:12px;line-height:1.55;letter-spacing:.14em;text-align:left;text-indent:0;color:${PAPER_MUTED};`
     const cap = `<p style="${capStyle}">${figureCaption(caption, `font-family:${MONO};font-size:12px;color:${PAPER_RUST};letter-spacing:.06em;`, 'letter-spacing:.14em;')}</p>`
     if (!src) return `<p style="margin:26px 20px;font-family:${PAPER_SANS};font-size:12px;line-height:1.55;letter-spacing:.14em;text-align:left;text-indent:0;color:${PAPER_MUTED};">${plainCaption(caption)}</p>`
-    return `<section style="margin:0 0 32px;"><p style="margin:32px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${PAPER_FRAME};border-radius:0;" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 32px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${PAPER_FRAME};border-radius:0;" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -595,10 +595,10 @@ export const consoleAkariTheme: Theme & ThemeExtensions = {
       .join('')}</section>`,
 
   imageBlock: (src, caption) => {
-    const capStyle = `margin:0 20px 0;font-size:12px;line-height:1.55;letter-spacing:.04em;text-align:center;text-indent:0;color:${CONSOLE_INK_3};`
+    const capStyle = `margin:24px 0;font-size:12px;line-height:1.55;letter-spacing:.04em;text-align:center;text-indent:0;color:${CONSOLE_INK_3};`
     const cap = `<p style="${capStyle}">${figureCaption(caption, `font-family:${MONO};font-size:12px;color:${CONSOLE_PRIMARY};letter-spacing:.04em;`, 'letter-spacing:.04em;')}</p>`
     if (!src) return `<p style="margin:24px 20px;font-size:12px;line-height:1.55;letter-spacing:.04em;text-align:center;text-indent:0;color:${CONSOLE_INK_3};">${plainCaption(caption)}</p>`
-    return `<section style="margin:0 0 28px;"><p style="margin:28px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${CONSOLE_LINE};border-radius:12px;" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 28px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${CONSOLE_LINE};border-radius:12px;" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -791,12 +791,12 @@ export const kunlunSnowlineTheme: Theme & ThemeExtensions = {
       .join('')}</section>`,
 
   imageBlock: (src, caption) => {
-    const capStyle = `margin:8px 20px 0;font-family:${KUNLUN_MONO};font-size:11px;line-height:1.6;letter-spacing:.12em;text-align:left;text-indent:0;color:${KUNLUN_INK_500};`
+    const capStyle = `margin:24px 0;font-family:${KUNLUN_MONO};font-size:11px;line-height:1.6;letter-spacing:.12em;text-align:left;text-indent:0;color:${KUNLUN_INK_500};`
     const cap = `<p style="${capStyle}">${labeledFigureCaption(caption, `font-family:${KUNLUN_MONO};font-size:11px;color:${KUNLUN_CYAN_700};letter-spacing:.12em;`, 'letter-spacing:.12em;')}</p>`
     if (!src) {
       return `<p style="margin:26px 20px;font-family:${KUNLUN_MONO};font-size:11px;line-height:1.6;letter-spacing:.12em;text-align:left;text-indent:0;color:${KUNLUN_INK_500};">${plainCaption(caption)}</p>`
     }
-    return `<section style="margin:0 0 30px;"><p style="margin:30px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${KUNLUN_LINE_STRONG};border-radius:2px;" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 30px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${KUNLUN_LINE_STRONG};border-radius:2px;" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -961,12 +961,12 @@ export const riftDaybreakTheme: Theme & ThemeExtensions = {
       .join('')}</section>`,
 
   imageBlock: (src, caption) => {
-    const capStyle = `margin:8px 20px 0;font-family:${RIFT_MONO};font-size:11px;line-height:1.6;letter-spacing:.12em;text-transform:uppercase;text-align:left;text-indent:0;color:${RIFT_INK_3};`
+    const capStyle = `margin:24px 0;font-family:${RIFT_MONO};font-size:11px;line-height:1.6;letter-spacing:.12em;text-transform:uppercase;text-align:left;text-indent:0;color:${RIFT_INK_3};`
     const cap = `<p style="${capStyle}">${labeledFigureCaption(caption, `font-family:${RIFT_MONO};font-size:11px;color:${RIFT_ROYAL};letter-spacing:.12em;`, 'letter-spacing:.12em;')}</p>`
     if (!src) {
       return `<p style="margin:26px 20px;font-family:${RIFT_MONO};font-size:11px;line-height:1.6;letter-spacing:.12em;text-transform:uppercase;text-align:left;text-indent:0;color:${RIFT_INK_3};">${plainCaption(caption)}</p>`
     }
-    return `<section style="margin:0 0 30px;"><p style="margin:30px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${RIFT_GLASS_BORDER};border-radius:18px;box-shadow:0 6px 18px rgba(20,45,95,.08);" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 30px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${RIFT_GLASS_BORDER};border-radius:18px;box-shadow:0 6px 18px rgba(20,45,95,.08);" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -1131,12 +1131,12 @@ export const coreFrostTheme: Theme & ThemeExtensions = {
       .join('')}</section>`,
 
   imageBlock: (src, caption) => {
-    const capStyle = `margin:8px 20px 0;font-family:${CORE_MONO};font-size:11.5px;line-height:1.6;letter-spacing:.04em;text-transform:lowercase;text-align:left;text-indent:0;color:${CORE_MUTED};`
+    const capStyle = `margin:24px 0;font-family:${CORE_MONO};font-size:11.5px;line-height:1.6;letter-spacing:.04em;text-transform:lowercase;text-align:left;text-indent:0;color:${CORE_MUTED};`
     const cap = `<p style="${capStyle}">${archiveFigureCaption(caption, `font-family:${CORE_MONO};font-size:11.5px;color:${CORE_BONDI_DARK};letter-spacing:.04em;`, 'letter-spacing:.04em;')}</p>`
     if (!src) {
       return `<p style="margin:26px 20px;font-family:${CORE_MONO};font-size:11.5px;line-height:1.6;letter-spacing:.04em;text-transform:lowercase;text-align:left;text-indent:0;color:${CORE_MUTED};">${plainCaption(caption)}</p>`
     }
-    return `<section style="margin:0 0 30px;"><p style="margin:30px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${CORE_INK};box-shadow:2px 2px 0 ${CORE_INK};" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 30px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;width:100%;max-width:100%;height:auto;border:1px solid ${CORE_INK};box-shadow:2px 2px 0 ${CORE_INK};" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -1307,12 +1307,12 @@ export const aozoraDaylightTheme: Theme & ThemeExtensions = {
 
   imageBlock: (src, caption) => {
     // Yoru 的决定：系统禁止真实照片，图片按普通图片展示，不额外套一层玻璃框。
-    const capStyle = `margin:8px 20px 0;font-family:${AOZORA_MONO};font-size:11px;line-height:1.6;letter-spacing:.16em;text-align:center;text-indent:0;color:${AOZORA_MUTED};`
+    const capStyle = `margin:24px 0;font-family:${AOZORA_MONO};font-size:11px;line-height:1.6;letter-spacing:.16em;text-align:center;text-indent:0;color:${AOZORA_MUTED};`
     const cap = `<p style="${capStyle}">${figureCaption(caption, `font-family:${AOZORA_MONO};font-size:11px;color:${AOZORA_BLUE_INK};letter-spacing:.08em;`, 'letter-spacing:.16em;')}</p>`
     if (!src) {
       return `<p style="margin:26px 20px;font-family:${AOZORA_MONO};font-size:11px;line-height:1.6;letter-spacing:.16em;text-align:center;text-indent:0;color:${AOZORA_MUTED};">${plainCaption(caption)}</p>`
     }
-    return `<section style="margin:0 0 30px;"><p style="margin:30px 20px 10px;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${AOZORA_GLASS_STROKE};border-radius:20px;box-shadow:0 6px 18px rgba(10,68,140,.12);" /></p>${cap}</section>`
+    return `<section style="margin:0 20px 30px;"><p style="margin:24px 0;text-align:center;text-indent:0;"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${AOZORA_GLASS_STROKE};border-radius:20px;box-shadow:0 6px 18px rgba(10,68,140,.12);" /></p>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
@@ -1504,12 +1504,12 @@ export const kihonGinTheme: Theme & ThemeExtensions = {
 
   imageBlock: (src, caption) => {
     // 图片放在 card 面：1px 线、10px 圆角、两段 chamfer 与三层定向阴影；图片本身不倾斜、不裁成异形。
-    const capStyle = `margin:8px 20px 0;font-family:${KIHON_DISPLAY};font-size:12px;line-height:1.5;letter-spacing:0;text-align:left;text-indent:0;color:${KIHON_MUTED};`
+    const capStyle = `margin:24px 0;font-family:${KIHON_DISPLAY};font-size:12px;line-height:1.5;letter-spacing:0;text-align:left;text-indent:0;color:${KIHON_MUTED};`
     const cap = `<p style="${capStyle}">${figureCaption(caption, `font-family:${KIHON_MONO};font-size:12px;color:${KIHON_ACCENT};letter-spacing:0;font-variant-numeric:tabular-nums;${KIHON_ENGRAVE}`, 'letter-spacing:0;')}</p>`
     if (!src) {
       return `<p style="margin:26px 20px;font-family:${KIHON_DISPLAY};font-size:12px;line-height:1.5;letter-spacing:0;text-align:left;text-indent:0;color:${KIHON_MUTED};">${plainCaption(caption)}</p>`
     }
-    return `<section style="margin:0 0 30px;"><section style="margin:30px 20px 10px;padding:8px;${KIHON_CARD_FILL}border:1px solid ${KIHON_LINE};border-radius:10px;${KIHON_CARD_SHADOW}"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${KIHON_LINE};border-radius:6px;" /></section>${cap}</section>`
+    return `<section style="margin:0 20px 30px;"><section style="margin:24px 0;padding:8px;${KIHON_CARD_FILL}border:1px solid ${KIHON_LINE};border-radius:10px;${KIHON_CARD_SHADOW}"><img src="${esc(src)}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid ${KIHON_LINE};border-radius:6px;" /></section>${cap}</section>`
   },
 
   carousel: (title, caption, items, ratio) => {
