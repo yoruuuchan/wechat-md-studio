@@ -167,12 +167,12 @@ npm run build:release
 tar -czf "$OUT/mopai-$TAG.tar.gz" dist
 
 # 传上去：先传脚本本身（仓库版），再传包
-scp scripts/server-install-release.sh cc-tokyo-01:/tmp/install.sh
+scp scripts/server-install-release.sh cc-tokyo-01:/tmp/install-$TAG.sh
 scp "$OUT/mopai-$TAG.tar.gz" cc-tokyo-01:/tmp/mopai-$TAG.tar.gz
 
 # 服务器：先对哈希，再抢部署锁装（tarball 路径当参数传给脚本）
 ssh cc-tokyo-01 "sha256sum /tmp/mopai-$TAG.tar.gz"   # 必须等于本机 sha256sum 的输出
-ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$TAG.tar.gz"
+ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install-$TAG.sh /tmp/mopai-$TAG.tar.gz"
 ```
 
 正式发布必须用 `npm run build:release`：它先要求找得到搭建台的构建结果（`REED_MOTION_SITE` 或主 checkout 旁的 `wechat-motion-lab/out/site`），缺失或页面无效时在 Vite 前非零退出，不会先删上一份 `public/motion/`；构建结束还会核对 `dist/public/motion/index.html` 并打印文件数。只做开发构建、可以没有 `/motion/` 时仍用 `npm run build`（顶栏动效退回占位），但它不能当作正式发布。
@@ -187,7 +187,7 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$T
 （每块配 `timeout`，失败只重传那一块）→ 每块在服务器上 `sha256sum` 对过 → `cat part-* > /tmp/mopai-$TAG.tar.gz`
 → 再对整个包对一次 sha256。9 块里通常有一两块要重传，整体 10 分钟左右，比反复重传整包可靠。
 
-**两条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
+**三条硬规矩，2026-10-09 三个并行会话同时部署时踩出来的，别再违反：**
 
 1. **包名永远带 commit 短哈希，本机临时文件用 `mktemp -d`。** worktree 只隔离仓库里的文件，
    本机 `/tmp`（都指向同一个 `E:\SYSTEM~2\15877\Temp`）和服务器 `/tmp` 是所有会话共享的。
@@ -198,6 +198,15 @@ ssh cc-tokyo-01 "flock /tmp/mopai-deploy.lock bash /tmp/install.sh /tmp/mopai-$T
 2. **安装必须在服务器上抢 `flock`。** install 脚本是 `rm -rf dist` + `cp` + `restart` 的顺序，
    两个 install 并行时读者会看到半成品目录，或者后装的旧包把新包顶掉。`flock` 让第二次调用排队，
    而不是交错执行。
+
+3. **脚本站传路径也带 commit 短哈希（2026-11-17 补）。** `flock` 只能串行化同时执行的安装，
+    挡不住路径被覆盖：并行会话都把脚本写到同一个 `/tmp/install.sh`，后写的那份可能先被执行；
+    更隐蔽的是旧脚本把新包 `cp` 进已存在的 `dist.new`，换名后变成 `dist/dist.new` 嵌套——
+    服务照常重启、健康检查全过，实际仍在跑旧包。2026-11-17 部署 `94afcb6` 时撞过一次，
+    手动完成 `dist → dist.prev`、`dist.new → dist` 才真正换上。
+    因此脚本站 `/tmp/install-<tag>.sh`、包用 `/tmp/mopai-<tag>.tar.gz`；安装后核对
+    `dist/boot.js` 的 sha256 与入口 `index-*.js` 都对上本地，且 `dist` 里没有
+    `dist.new` / `dist.prev` 残留，才算部署完成。
 
 **部署后必须核对**（别只看命令有没有报错）：本地与线上的 `dist/boot.js` sha256、以及
 `dist/public/index.html` 引用的 js/css 文件名是否一致；再用
