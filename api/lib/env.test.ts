@@ -51,6 +51,7 @@ describe('parseEnv in production', () => {
     expect(env.anonGcEnabled).toBe(true)
     expect(env.anonBurstPerMinute).toBe(12)
     expect(env.anonIpDailyImages).toBe(100)
+    expect(env.anonIpDailyBytes).toBe(256 * 1024 * 1024)
     expect(env.authLoginPerMinute).toBe(10)
     expect(env.remoteMcpTtlHours).toBe(24)
     expect(env.remoteMcpTotalBytes).toBe(50 * 1024 * 1024)

@@ -162,6 +162,7 @@ cat <<NOTE
   app    per-IP burst limit      12 uploads / minute        (api/lib/burst.ts)
   app    per-visitor allowance   30 images + 100 MB / 24 h  (api/lib/anon-quota.ts)
   app    shared anonymous cap    1.5 GB total               (ANON_TOTAL_BYTES)
+  app    per-IP daily volume     256 MB / UTC day per /64  (ANON_IP_DAILY_BYTES)
   app    content sniffing        only jpeg/png/gif/webp     (api/lib/image-type.ts)
   edge   high-threat-score challenge, scanner UA block, path traversal block,
          dangerous method block — the zone-wide rules already installed

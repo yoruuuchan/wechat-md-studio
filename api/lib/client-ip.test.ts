@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_TRUSTED_PROXY_CIDRS,
   clientIp,
+  ipBucket,
   parseTrustedProxyCidrs,
 } from './client-ip'
 
@@ -22,10 +23,30 @@ describe('parseTrustedProxyCidrs', () => {
     '10.0.0.0/33',
     '2001:db8::/129',
     '10.0.0.0/nope',
-    '10.0.0.0,,127.0.0.1',
+    '10.0.0.0,, 127.0.0.1',
     '10.0.0.0/8/16',
   ])('rejects malformed proxy boundary %s', (raw) => {
     expect(parseTrustedProxyCidrs(raw)).toBeNull()
+  })
+})
+
+describe('ipBucket', () => {
+  it('leaves IPv4 and the unattributed bucket as they are', () => {
+    expect(ipBucket('203.0.113.9')).toBe('203.0.113.9')
+    expect(ipBucket('unattributed')).toBe('unattributed')
+  })
+
+  it('folds an IPv4-mapped address into its plain IPv4 form', () => {
+    expect(ipBucket('::ffff:192.0.2.7')).toBe('192.0.2.7')
+  })
+
+  it('collapses every address in one /64 into a single bucket', () => {
+    expect(ipBucket('2001:db8:1234:5678::1')).toBe('2001:db8:1234:5678::/64')
+    expect(ipBucket('2001:db8:1234:5678:ffff:ffff:ffff:ffff')).toBe('2001:db8:1234:5678::/64')
+  })
+
+  it('keeps neighbouring /64s apart', () => {
+    expect(ipBucket('2001:db8:1234:5678::1')).not.toBe(ipBucket('2001:db8:1234:5679::1'))
   })
 })
 
@@ -52,7 +73,7 @@ describe('clientIp', () => {
   })
 
   it('walks a multi-hop forwarding chain from the nearest proxy', () => {
-    const trusted = parseTrustedProxyCidrs('127.0.0.0/8,10.0.0.0/8')!
+    const trusted = parseTrustedProxyCidrs('127.0.0.0/8, 10.0.0.0/8')!
     const headers = new Headers({
       'x-forwarded-for': '203.0.113.99, 198.51.100.7, 10.0.0.2, 10.0.0.3',
     })
@@ -60,7 +81,7 @@ describe('clientIp', () => {
   })
 
   it('returns the leftmost address when every forwarding hop is trusted', () => {
-    const trusted = parseTrustedProxyCidrs('127.0.0.0/8,10.0.0.0/8')!
+    const trusted = parseTrustedProxyCidrs('127.0.0.0/8, 10.0.0.0/8')!
     const headers = new Headers({ 'x-forwarded-for': '10.0.0.8, 10.0.0.2, 10.0.0.3' })
     expect(clientIp(headers, '127.0.0.1', trusted)).toBe('10.0.0.8')
   })
@@ -69,7 +90,7 @@ describe('clientIp', () => {
     { 'cf-connecting-ip': '', 'x-real-ip': '203.0.113.9' },
     { 'cf-connecting-ip': 'not-an-ip', 'x-forwarded-for': '203.0.113.9' },
     { 'x-real-ip': ' ' },
-    { 'x-forwarded-for': '203.0.113.9,,10.0.0.1' },
+    { 'x-forwarded-for': '203.0.113.9,, 10.0.0.1' },
     { 'x-forwarded-for': '203.0.113.9, nope' },
   ])('fails closed on an empty or malformed trusted header %#', (entries) => {
     expect(clientIp(new Headers(entries), '127.0.0.1')).toBe('127.0.0.1')

@@ -77,6 +77,9 @@ export interface Env {
    *  per UTC day, and login attempts per minute. */
   anonBurstPerMinute: number;
   anonIpDailyImages: number;
+  /** Volume for the same bucket. The image count alone let one address empty
+   * the shared pool, because each upload may be `20 MiB`. */
+  anonIpDailyBytes: number;
   authLoginPerMinute: number;
 
   /** In-site feedback relay ceilings, also in-memory per IP. The relay's mail
@@ -246,6 +249,7 @@ export function parseEnv(input: EnvInput): Env {
 
     anonBurstPerMinute: readInt(ctx, "ANON_BURST_PER_MINUTE", { fallback: 12, min: 0, max: 100_000 }),
     anonIpDailyImages: readInt(ctx, "ANON_IP_DAILY_IMAGES", { fallback: 100, min: 0, max: 1_000_000 }),
+    anonIpDailyBytes: readInt(ctx, "ANON_IP_DAILY_BYTES", { fallback: 256 * MIB, min: 0 }),
     authLoginPerMinute: readInt(ctx, "AUTH_LOGIN_PER_MINUTE", { fallback: 10, min: 0, max: 100_000 }),
 
     feedbackPerMinute: readInt(ctx, "FEEDBACK_PER_MINUTE", { fallback: 3, min: 0, max: 100_000 }),

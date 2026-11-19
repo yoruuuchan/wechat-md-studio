@@ -104,6 +104,7 @@ HTTPS 外链图片而允许向任意外站发起脚本请求。更改 `IMG_BASE_
 | `ANON_TOTAL_BYTES` | `1610612736`（1.5 GiB） | 所有匿名上传合计封顶 |
 | `ANON_BURST_PER_MINUTE` | `12` | 每来源 IP 每分钟上传次数，内存计数 |
 | `ANON_IP_DAILY_IMAGES` | `100` | 每来源 IP 每 UTC 日上传次数，内存计数 |
+| `ANON_IP_DAILY_BYTES` | `268435456`（256 MiB） | 同一桶每 UTC 日的上传体积，内存计数；IPv6 来源按 /64 归并 |
 | `AUTH_LOGIN_PER_MINUTE` | `10` | 每来源 IP 每分钟登录尝试次数，内存计数 |
 | `ANON_GC_DAYS` | `14` | 无云端引用的匿名图回收年龄；`0` 表示无引用即可回收 |
 | `ANON_GC_ENABLED` | `true` | 只有字符串 `false` 关闭回收 |

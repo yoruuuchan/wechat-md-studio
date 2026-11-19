@@ -122,7 +122,7 @@ export const storageRouter = createRouter({
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: burst.message ?? "上传太频繁了" });
         }
 
-        const daily = checkIpDaily(ip);
+        const daily = checkIpDaily(ip, bytes.byteLength);
         if (!daily.ok) {
           denyLog("ip-daily", { ip });
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: daily.message ?? "今日上传额度用完了" });

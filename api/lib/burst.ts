@@ -14,6 +14,8 @@
  * self-hosted deployment nothing.
  */
 import { env } from './env'
+import { ipBucket } from './client-ip'
+import { mb } from './anon-quota'
 
 const WINDOW_MS = 60 * 1000
 /** Past this many tracked IPs, sweep the ones whose window has expired. */
@@ -21,6 +23,7 @@ const SWEEP_AT = 5000
 
 const hits = new Map<string, number[]>()
 const days = new Map<string, { day: string; count: number }>()
+const dailyBytes = new Map<string, { day: string; bytes: number }>()
 const loginHits = new Map<string, number[]>()
 
 export interface BurstVerdict {
@@ -82,15 +85,51 @@ export function allowIpDaily(
   return true
 }
 
+/**
+ * Volume per bucket per UTC day.
+ *
+ * The image count on its own was not a ceiling. Every anonymous upload is
+ * allowed to be `20 MiB`, so `100` of them is two gigabytes against a pool that
+ * holds `1.5` — one address could empty it. Counting bytes instead makes filling
+ * that pool take many source networks rather than one.
+ *
+ * Like its neighbours this is best-effort and in memory: it resets on restart
+ * and is not shared between instances. It is a cost knob, not an accounting
+ * system.
+ */
+export function allowIpDailyBytes(
+  store: Map<string, { day: string; bytes: number }>,
+  key: string,
+  day: string,
+  incomingBytes: number,
+  limit = env.anonIpDailyBytes,
+): boolean {
+  const current = store.get(key)
+  const used = current && current.day === day ? current.bytes : 0
+  if (used + incomingBytes > limit) return false
+  store.set(key, { day, bytes: used + incomingBytes })
+
+  if (store.size > SWEEP_AT) {
+    for (const [k, b] of store) if (b.day !== day) store.delete(k)
+  }
+  return true
+}
+
 export function checkBurst(ip: string): BurstVerdict {
-  if (!allowBurst(hits, ip, Date.now(), env.anonBurstPerMinute)) {
+  if (!allowBurst(hits, ipBucket(ip), Date.now(), env.anonBurstPerMinute)) {
     return { ok: false, message: `上传太频繁了，每分钟最多 ${env.anonBurstPerMinute} 张，稍等一下再试` }
   }
   return { ok: true }
 }
 
-export function checkIpDaily(ip: string): BurstVerdict {
-  if (!allowIpDaily(days, ip, new Date().toISOString().slice(0, 10))) {
+export function checkIpDaily(ip: string, bytes: number): BurstVerdict {
+  const day = new Date().toISOString().slice(0, 10)
+  // Volume first: that is the ceiling a stranger actually reaches, and it must
+  // not be spent incrementally by requests the image count was about to refuse.
+  if (!allowIpDailyBytes(dailyBytes, ipBucket(ip), day, bytes)) {
+    return { ok: false, message: `这个地址今天传的图太大了（每日最多 ${mb(env.anonIpDailyBytes)} MB），明天再来` }
+  }
+  if (!allowIpDaily(days, ipBucket(ip), new Date().toISOString().slice(0, 10))) {
     return { ok: false, message: `这个地址今天传得够多了（每日最多 ${env.anonIpDailyImages} 张），明天再来` }
   }
   return { ok: true }
@@ -103,7 +142,7 @@ export function checkIpDaily(ip: string): BurstVerdict {
  * The owner logging in on a new device stays far below the default.
  */
 export function checkLoginAttempt(ip: string): BurstVerdict {
-  if (!allowBurst(loginHits, ip, Date.now(), env.authLoginPerMinute)) {
+  if (!allowBurst(loginHits, ipBucket(ip), Date.now(), env.authLoginPerMinute)) {
     return { ok: false, message: `尝试太频繁了，每分钟最多 ${env.authLoginPerMinute} 次，等一分钟再来` }
   }
   return { ok: true }

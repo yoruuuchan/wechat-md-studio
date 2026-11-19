@@ -76,6 +76,37 @@ function maskIp(value: bigint, prefix: number, bits: number): bigint {
   return (value >> shift) << shift
 }
 
+/**
+ * One IPv6 client controls a whole /64 — half the address — so an address is
+ * not a unit of budget. Written as arithmetic for the same reason the rest of
+ * this file works in `IPV4_BITS` / `IPV6_BITS` rather than magic numbers.
+ */
+const IPV6_BUCKET_PREFIX = IPV6_BITS / 2
+
+/**
+ * The address a rate limit should count against, which is not always the
+ * address the request came from.
+ *
+ * Counting exact IPv6 addresses hands unlimited attempts to anyone who can bind
+ * a second one: a residential client holds a /64 and rotates through it for
+ * free, resetting every per-IP ceiling on each request. Counting the /64 makes
+ * that rotation useless. IPv4 is returned unchanged — a /32 is a single
+ * address, and carrier-grade NAT is already the widest sharing anyone gets
+ * there.
+ *
+ * This is deliberately separate from `clientIp`: that answers "who sent this"
+ * (for logs and the visitor ledger), this answers "whose budget it spends".
+ */
+export function ipBucket(value: string): string {
+  const ip = canonicalIp(value)
+  if (!ip) return value
+  // IPv4-mapped addresses were already folded to plain IPv4 by canonicalIp, so
+  // a colon here means a real IPv6 address.
+  if (!ip.includes(':')) return ip
+  const network = maskIp(ipv6ToBigInt(ip), IPV6_BUCKET_PREFIX, IPV6_BITS)
+  return `${ipv6FromBigInt(network)}/${IPV6_BUCKET_PREFIX}`
+}
+
 function parseCidr(value: string): ParsedCidr | null {
   const slash = value.indexOf('/')
   if (slash !== value.lastIndexOf('/')) return null

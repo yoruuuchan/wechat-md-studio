@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowBurst, allowIpDaily, checkLoginAttempt } from './burst'
+import { allowBurst, allowIpDaily, allowIpDailyBytes, checkIpDaily, checkLoginAttempt } from './burst'
 import { env } from './env'
 
 const NOW = 1_800_000_000_000
@@ -72,6 +72,47 @@ describe('checkLoginAttempt', () => {
     for (let i = 0; i < env.authLoginPerMinute; i++) checkLoginAttempt(blocked)
     expect(checkLoginAttempt(blocked).ok).toBe(false)
     expect(checkLoginAttempt(`203.0.113.10-${stamp}`).ok).toBe(true)
+  })
+})
+
+describe('allowIpDailyBytes', () => {
+  it('stops the day once the byte ceiling is reached', () => {
+    const store = new Map<string, { day: string; bytes: number }>()
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 600, 1000)).toBe(true)
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 400, 1000)).toBe(true)
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 1, 1000)).toBe(false)
+  })
+
+  it('resets when the UTC day rolls', () => {
+    const store = new Map<string, { day: string; bytes: number }>()
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 1000, 1000)).toBe(true)
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 1, 1000)).toBe(false)
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-20', 1, 1000)).toBe(true)
+  })
+
+  it('counts each bucket separately', () => {
+    const store = new Map<string, { day: string; bytes: number }>()
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 1000, 1000)).toBe(true)
+    expect(allowIpDailyBytes(store, 'ip-a', '2026-11-19', 1, 1000)).toBe(false)
+    expect(allowIpDailyBytes(store, 'ip-b', '2026-11-19', 1000, 1000)).toBe(true)
+  })
+})
+
+describe('checkIpDaily', () => {
+  it('refuses an image bigger than the whole daily volume without charging it', () => {
+    const ip = `198.51.100.${Math.floor(Math.random() *200) +1}-${Date.now()}`
+    const verdict = checkIpDaily(ip, env.anonIpDailyBytes +1)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.message).toContain('太大')
+    // A refusal must not have spent the day: a normal image still fits.
+    expect(checkIpDaily(ip, 1).ok).toBe(true)
+  })
+
+  it('shares one bucket across every address in the same IPv6 /64', () => {
+    const stamp = Date.now()
+    const first = `2001:db8:${stamp %1000}::1`
+    expect(checkIpDaily(first, env.anonIpDailyBytes).ok).toBe(true)
+    expect(checkIpDaily(first.replace('::1', '::2'), 1).ok).toBe(false)
   })
 })
 
