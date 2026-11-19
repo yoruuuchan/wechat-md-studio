@@ -172,7 +172,7 @@ export const zh = {
   'panel.tab.settings': '设置',
   'panel.theme.current': '当前主题',
   'panel.materials.label': '图片清单 · 点击上传直接回填',
-  'panel.materials.notice': '上传的图片公网可读，14 天没被引用会自动回收。',
+  'panel.materials.notice': '上传的图片公网可读，7 天没被引用会自动回收。',
   'panel.materials.guideLink': '使用规范 →',
   'panel.materials.emptyA': '正文中还没有图片。用 ',
   'panel.materials.emptyB': ' 添加占位，或直接把图片拖进编辑器。',
@@ -1051,7 +1051,7 @@ export const zh = {
     '图片存在本站的对象存储里，通过 `https://wechat.yoru-and-akari.dev/api/img/…` **公网可读**——拿到链接的人都能看到，不需要登录，也没有访问密码。',
   'terms.images.b2':
     '本站**不做内容审核**：没有人工审阅，也没有自动扫描。只校验文件头是不是真的图片（jpeg / png / gif / webp），不判断画面上是什么。',
-  'terms.images.b3': '额度是硬顶：每个 IP 每分钟 12 张、每个 UTC 日 100 张 / 256 MB（IPv6 按 /64 计）；全部匿名访客合计 1.5 GiB 封顶；匿名图片 14 天没被任何云端稿件引用就自动回收。',
+  'terms.images.b3': '额度是硬顶：每个 IP 每分钟 12 张、每个 UTC 日 100 张 / 256 MB（IPv6 按 /64 计）；全站每天合计 512 MB 封顶；全部匿名访客合计 1.5 GiB 封顶；匿名图片 7 天没被任何云端稿件引用就自动回收。',
   'terms.images.p2':
     '一句话：**不要上传任何你不愿意公开、或者你不拥有权利的图片。** 需要私密或长期有效的图片，请自己托管，再把地址填进正文——本工具不挑图片来源。',
   'terms.ban.title': '禁止借由本站图床传播的内容',

@@ -174,7 +174,7 @@ export const en: Record<MsgKey, Msg> = {
   'panel.tab.settings': 'Settings',
   'panel.theme.current': 'Current theme',
   'panel.materials.label': 'Image list · upload here to fill the article',
-  'panel.materials.notice': 'Uploaded images are publicly readable and recycled after 14 days without a reference.',
+  'panel.materials.notice': 'Uploaded images are publicly readable and recycled after 7 days without a reference.',
   'panel.materials.guideLink': 'Terms of use →',
   'panel.materials.emptyA': 'No images in this article yet. Add a placeholder with ',
   'panel.materials.emptyB': ', or drop image files straight into the editor.',
@@ -1073,7 +1073,7 @@ export const en: Record<MsgKey, Msg> = {
   'terms.images.b2':
     'The site does **no content review**: no human looks, nothing is scanned. It only checks that the file header is really an image (jpeg / png / gif / webp), never what the picture shows.',
   'terms.images.b3':
-    'Quotas are hard ceilings: 12 images per IP per minute and 100 per UTC day; 1.5 GiB across all anonymous uploads; 256 MB per IP per UTC day (IPv6 counts per /64); and anonymous images are recycled after 14 days without any cloud-article reference.',
+    'Quotas are hard ceilings: 12 images per IP per minute and 100 per UTC day; 1.5 GiB across all anonymous uploads; 256 MB per IP per UTC day (IPv6 counts per /64); 512 MB per day site-wide; and anonymous images are recycled after 7 days without any cloud-article reference.',
   'terms.images.p2':
     'In one sentence: **do not upload anything you would not want public, or that you do not hold the rights to.** For private or long-lived images, host them yourself and put the URL in the article — this tool does not care where an image comes from.',
   'terms.ban.title': 'Content that may not be spread through this image host',

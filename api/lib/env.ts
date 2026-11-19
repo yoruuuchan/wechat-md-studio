@@ -67,6 +67,11 @@ export interface Env {
   anonDailyImages: number;
   anonDailyBytes: number;
   anonTotalBytes: number;
+  /** Everything anonymous uploads may add in one UTC day, across all visitors.
+   * The pool cap alone only said "the bucket is full"; this bounds how fast one
+   * run can get it there. Sustainable daily volume is the pool divided by
+   * ANON_GC_DAYS, so the two move together. */
+  anonDailyTotalBytes: number;
 
   /** Recycling for that pool — see anon-gc.ts for what a sweep deletes.
    *  `ANON_GC_ENABLED=false` stops the sweeps; anything else leaves them on. */
@@ -244,7 +249,8 @@ export function parseEnv(input: EnvInput): Env {
 
     // 0 is a documented setting, not a typo: it means "sweep everything
     // unreferenced right now" (README, 环境变量).
-    anonGcDays: readInt(ctx, "ANON_GC_DAYS", { fallback: 14, min: 0, max: 3650 }),
+    anonGcDays: readInt(ctx, "ANON_GC_DAYS", { fallback: 7, min: 0, max: 3650 }),
+    anonDailyTotalBytes: readInt(ctx, "ANON_DAILY_TOTAL_BYTES", { fallback: 512 * MIB, min: 0 }),
     anonGcEnabled: input.ANON_GC_ENABLED !== "false",
 
     anonBurstPerMinute: readInt(ctx, "ANON_BURST_PER_MINUTE", { fallback: 12, min: 0, max: 100_000 }),

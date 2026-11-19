@@ -4,9 +4,10 @@ import { env } from './env'
  * Budget for uploads that arrive without a login.
  *
  * The image bucket is a shared 10 GB free tier, and an open upload endpoint is
- * the one place where a stranger can spend the owner's money and disk. Two
+ * the one place where a stranger can spend the owner's money and disk. Three
  * ceilings: a rolling 24 h allowance per visitor, and a hard total for every
- * anonymous upload ever kept. The owner's own session is not limited by either.
+ * anonymous upload ever kept, and a daily volume shared by all of them. The
+ * owner's own session is not limited by any of them.
  *
  * This module only decides *whether* a request fits. Reading the usage and then
  * acting on it is not atomic, so the router never calls the check directly:
@@ -36,7 +37,11 @@ export function mb(bytes: number): string {
 }
 
 /** Pure so the ceilings can be tested without a database. */
-export function checkAnonQuota(usage: AnonUsage, incomingBytes: number): AnonQuotaVerdict {
+export function checkAnonQuota(
+  usage: AnonUsage,
+  incomingBytes: number,
+  todayBytes: number,
+): AnonQuotaVerdict {
   if (usage.totalBytes + incomingBytes > env.anonTotalBytes) {
     return {
       ok: false,
@@ -47,6 +52,12 @@ export function checkAnonQuota(usage: AnonUsage, incomingBytes: number): AnonQuo
     return {
       ok: false,
       message: `24 小时内最多上传 ${env.anonDailyImages} 张图，额度用完了，明天再来`,
+    }
+  }
+  if (todayBytes + incomingBytes > env.anonDailyTotalBytes) {
+    return {
+      ok: false,
+      message: `今天全站匿名上传的额度已经用完（每日 ${mb(env.anonDailyTotalBytes)} MB），明天再来`,
     }
   }
   if (usage.windowBytes + incomingBytes > env.anonDailyBytes) {

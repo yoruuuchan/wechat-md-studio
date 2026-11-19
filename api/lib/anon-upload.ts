@@ -25,6 +25,7 @@
  * the object cannot be stored after its record is gone.
  */
 import { randomUUID } from 'node:crypto'
+import { env } from './env'
 import { getSqlite } from '../queries/connection'
 import { ANON_OWNER_ID, ANON_WINDOW_MS, checkAnonQuota, type AnonUsage } from './anon-quota'
 import { storage, type UploadedFile } from './storage'
@@ -143,6 +144,63 @@ function readUsage(visitor: string, now: number): AnonUsage {
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Start of the UTC day `now` falls in, in epoch ms. */
+function startOfUtcDay(now: number): number {
+  return Math.floor(now / DAY_MS) * DAY_MS
+}
+
+/**
+ * Anonymous bytes that landed since 00:00 UTC: settled rows plus live claims.
+ *
+ * `anon-quota.ts` already answers "is there room in the pool at all". This is
+ * the other question — how much of the pool today is allowed to take — so one
+ * long run cannot empty a bucket meant to last ANON_GC_DAYS. Read inside the
+ * same transaction as the claim, so concurrent uploads see one number.
+ *
+ * Live claims are all counted: a reservation expires after RESERVATION_TTL_MS,
+ * so every `pending` row belongs to today by construction.
+ */
+function readTodayBytes(now: number): number {
+  const settled = getSqlite()
+    .prepare(
+      `SELECT coalesce(sum(size), 0) AS settled FROM files
+       WHERE ownerId = ? AND createdAt >= ?`,
+    )
+    .get(ANON_OWNER_ID, Math.floor(startOfUtcDay(now) / 1000)) as
+    | { settled: number }
+    | undefined
+  const held = getSqlite()
+    .prepare(
+      `SELECT coalesce(sum(bytes), 0) AS held FROM anon_upload_reservations
+       WHERE state = 'pending'`,
+    )
+    .get() as { held: number } | undefined
+  return Number(settled?.settled ?? 0) + Number(held?.held ?? 0)
+}
+
+/** Last UTC day the warning was printed for, so it stays one line a day. */
+let warnedDay: number | null = null
+
+/**
+ * Say out loud when the shared day is starting to be eaten. Without this the
+ * budget can only be guessed at; with it, the logs carry the real number and
+ * the ceiling can be set from evidence.
+ */
+function warnIfDayIsTight(todayBytes: number, budget: number): void {
+  if (budget <= 0) return
+  const ratio = todayBytes / budget
+  if (ratio < 0.6) return
+  const day = Math.floor(Date.now() / DAY_MS)
+  if (warnedDay === day) return
+  warnedDay = day
+  console.warn(
+    `[anon-quota] day=${new Date(day * DAY_MS).toISOString().slice(0, 10)} ` +
+      `used=${todayBytes} budget=${budget} pct=${Math.round(ratio * 100)}`,
+  )
+}
+
 /**
  * Claim budget for one anonymous upload. Returns the token to settle or release.
  *
@@ -159,7 +217,9 @@ export async function reserveAnonUpload(
   const now = Date.now()
   const token = randomUUID()
   return transaction(() => {
-    const verdict = checkAnonQuota(readUsage(visitor, now), bytes)
+    const todayBytes = readTodayBytes(now)
+    warnIfDayIsTight(todayBytes, env.anonDailyTotalBytes)
+    const verdict = checkAnonQuota(readUsage(visitor, now), bytes, todayBytes)
     if (!verdict.ok) return { ok: false, message: verdict.message ?? '上传额度用完了' }
     getSqlite()
       .prepare(

@@ -12,6 +12,7 @@ process.env.IMG_ADMIN_KEY = 'test-admin-key'
 process.env.ANON_DAILY_IMAGES = '2'
 process.env.ANON_DAILY_BYTES = '104857600'
 process.env.ANON_TOTAL_BYTES = '104857600'
+process.env.ANON_DAILY_TOTAL_BYTES = '104857600'
 process.env.ANON_BURST_PER_MINUTE = '1000'
 process.env.ANON_IP_DAILY_IMAGES = '1000'
 
@@ -26,6 +27,7 @@ const { env } = await import('./env')
 const { getSqlite } = await import('../queries/connection')
 
 const DEFAULTS = {
+  anonDailyTotalBytes: 104857600,
   anonDailyImages: 2,
   anonDailyBytes: 104857600,
   anonTotalBytes: 104857600,
@@ -128,7 +130,20 @@ describe('reserving the anonymous budget', () => {
     expect(denied.every((r) => !r.ok && r.message.includes('24 小时'))).toBe(true)
   })
 
-  it('counts the global anonymous byte cap across different visitors', async () => {
+  it('stops the day once the shared daily volume is spent', async () => {
+    setLimits({ anonDailyImages: 100, anonDailyBytes: 10_000, anonTotalBytes: 10_000, anonDailyTotalBytes: 250 })
+    mockWorker()
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, i) => reserveAnonUpload(`visitor-${i}`, 100, `key-${i}`)),
+    )
+
+    expect(results.filter((r) => r.ok)).toHaveLength(2)
+    const denied = results.filter((r) => !r.ok)
+    expect(denied).toHaveLength(6)
+    expect(denied.every((r) => !r.ok && r.message.includes('今天'))).toBe(true)
+  })
+
+ it('counts the global anonymous byte cap across different visitors', async () => {
     setLimits({ anonDailyImages: 100, anonDailyBytes: 10_000, anonTotalBytes: 250 })
     mockWorker()
     const results = await Promise.all(
